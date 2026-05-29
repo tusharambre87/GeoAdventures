@@ -589,6 +589,24 @@ export interface IStorage {
   cleanupOptedOutGuideEmails(): Promise<{ cleaned: number; subscribers: number }>;
 }
 
+/**
+ * Canonical country key for city_stop_pool_cache lookups and saves.
+ *
+ * All variants of a country name are collapsed to a single canonical string so
+ * that pool entries seeded with "USA" are found when a trip passes "United States"
+ * (and vice-versa).
+ *
+ * Canonical choices match what the existing 60 USA pool entries were stored with
+ * ("usa"), so no DB migration is required.
+ */
+function normalizeCountryKey(country: string): string {
+  const lower = country.toLowerCase().trim();
+  if (lower === "united states" || lower === "us" || lower === "united states of america") return "usa";
+  if (lower === "united kingdom" || lower === "great britain") return "uk";
+  if (lower === "united arab emirates") return "uae";
+  return lower;
+}
+
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -5775,19 +5793,23 @@ export class DatabaseStorage implements IStorage {
   // ── City Stop Pool Cache ─────────────────────────────────────────────────────
 
   async getCityStopPool(city: string, country: string): Promise<CityStopPoolCache | undefined> {
-    const normalizedKey = `${city.toLowerCase().trim()}:${country.toLowerCase().trim()}`;
+    const normalizedKey = `${city.toLowerCase().trim()}:${normalizeCountryKey(country)}`;
     const [row] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, normalizedKey)).limit(1);
     return row;
   }
 
   async saveCityStopPool(entry: InsertCityStopPoolCache): Promise<CityStopPoolCache> {
+    // Re-derive the key using the same normalization so save and lookup always agree.
+    const [rawCity, ...rest] = entry.normalizedKey.split(":");
+    const normalizedKey = `${rawCity}:${normalizeCountryKey(rest.join(":"))}`;
+    const normalizedEntry = { ...entry, normalizedKey };
     const [row] = await db
       .insert(cityStopPoolCache)
-      .values(entry)
+      .values(normalizedEntry)
       .onConflictDoNothing()
       .returning();
     if (row) return row;
-    const [existing] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, entry.normalizedKey)).limit(1);
+    const [existing] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, normalizedKey)).limit(1);
     return existing;
   }
 
