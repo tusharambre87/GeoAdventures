@@ -295,14 +295,14 @@ export default function PreviewScreen() {
   return (
     <View style={[s.root, { backgroundColor: "#1A1F2E" }]}>
       {/* ── Hero header ── */}
-      <View style={s.hero}>
+      <View style={[s.hero, { paddingTop: insets.top + 16 }]}>
         {landmarkImg ? (
           <Image source={{ uri: landmarkImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <View style={[StyleSheet.absoluteFill, s.heroPlaceholder]} />
         )}
-        <LinearGradient colors={["rgba(26,31,46,0.1)","rgba(26,31,46,0.96)"]} locations={[0.25,1]} style={StyleSheet.absoluteFill} />
-        <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
+        <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
+        <View style={s.heroContent}>
           <Text style={s.heroTitle}>{tripTitle}</Text>
           {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
           <Text style={s.heroMeta}>
@@ -335,6 +335,8 @@ export default function PreviewScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={[s.stopList, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
       >
         {/* Day section header */}
         <Text style={s.dayHeader}>
@@ -379,9 +381,9 @@ export default function PreviewScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  hero: { height: 260, position: "relative" },
+  hero: { position: "relative", paddingHorizontal: 20, paddingBottom: 20 },
   heroPlaceholder: { backgroundColor: G.deep },
-  heroContent: { position:"absolute", left:0, right:0, bottom:0, paddingHorizontal:20, paddingBottom:20 },
+  heroContent: {},
   heroTitle: { fontFamily:F.bold, fontSize:20, fontWeight:"800", color:"#fff", letterSpacing:-0.4, lineHeight:27, marginBottom:4 },
   heroRoute: { fontFamily:F.semibold, fontSize:14, fontWeight:"600", color:G.orange, marginBottom:3 },
   heroMeta: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.55)" },
