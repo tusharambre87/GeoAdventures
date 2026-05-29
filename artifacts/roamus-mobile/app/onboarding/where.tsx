@@ -329,7 +329,6 @@ export default function WhereScreen() {
   const showOneCityGrid = !isMulti && !showSuggestions;
   const showOneCityCard = !isMulti && sel.length > 0 && !showSuggestions;
   const showMultiCard = isMulti && sel.length >= 1 && !showSuggestions;
-  const CARD_W = 164;
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
@@ -429,36 +428,53 @@ export default function WhereScreen() {
       {/* ── Scrollable body ── */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[s.body, { paddingBottom: 130 }]}
+        contentContainerStyle={
+          showOneCityGrid && !showOneCityCard
+            ? [s.body, { paddingBottom: 110, flexGrow: 1 }]
+            : [s.body, { paddingBottom: 110 }]
+        }
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Popular grid (one-city only, no search active) */}
         {showOneCityGrid && (
-          <>
+          <View style={showOneCityCard ? {} : { flex: 1 }}>
             <Text style={s.gridLabel}>POPULAR WITH FAMILIES</Text>
-            <View style={s.gridRow}>
-              {POPULAR_CITIES.map(c => {
-                const selected = sel.includes(c.name);
-                const img = CITY_IMGS[c.name];
+            {/* Rows of 2 — each row uses flex:1 to fill available height */}
+            <View style={showOneCityCard ? { gap: 10 } : { flex: 1, gap: 10 }}>
+              {[0, 2, 4].map(si => {
+                const row = POPULAR_CITIES.slice(si, si + 2);
+                if (!row.length) return null;
                 return (
-                  <Pressable
-                    key={c.name}
-                    onPress={() => selectCity(c.name)}
-                    style={[s.gridCard, { width: CARD_W }, selected && s.gridCardSelected]}
-                  >
-                    {img ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: G.muted + "44" }]} />}
-                    <View style={s.cardGrad} />
-                    {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
-                    <View style={s.cardLabel}>
-                      <Text style={s.cardName}>{c.name}</Text>
-                      <Text style={s.cardSub}>{c.state ?? c.country}</Text>
-                    </View>
-                  </Pressable>
+                  <View key={si} style={{ flex: 1, flexDirection: "row", gap: 10, minHeight: 110 }}>
+                    {row.map(c => {
+                      const selected = sel.includes(c.name);
+                      const img = CITY_IMGS[c.name];
+                      return (
+                        <Pressable
+                          key={c.name}
+                          onPress={() => selectCity(c.name)}
+                          style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}
+                        >
+                          {img
+                            ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                            : <View style={[StyleSheet.absoluteFill, { backgroundColor: G.muted + "44" }]} />}
+                          <View style={s.cardGrad} />
+                          {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
+                          <View style={s.cardLabel}>
+                            <Text style={s.cardName}>{c.name}</Text>
+                            <Text style={s.cardSub}>{c.state ?? c.country}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                    {/* Fill empty slot if last row has odd city count */}
+                    {row.length === 1 && <View style={{ flex: 1 }} />}
+                  </View>
                 );
               })}
             </View>
-          </>
+          </View>
         )}
 
         {/* Popular label for multi-city (quick add hint) */}
@@ -542,8 +558,7 @@ const s = StyleSheet.create({
   suggestSub: { fontFamily: F.regular, fontSize: 12, color: G.muted, marginTop: 1 },
   body: { paddingHorizontal: 20, paddingTop: 8 },
   gridLabel: { fontFamily: F.bold, fontSize: 11, fontWeight: "700", color: G.muted, letterSpacing: 1, marginBottom: 10 },
-  gridRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 },
-  gridCard: { height: 112, borderRadius: 14, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  gridCard: { borderRadius: 14, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   gridCardSelected: { borderWidth: 3, borderColor: G.orange },
   cardGrad: { position: "absolute", left: 0, right: 0, bottom: 0, height: 60, backgroundColor: "rgba(0,0,0,0.3)" },
   checkBadge: { position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: G.orange, alignItems: "center", justifyContent: "center" },
