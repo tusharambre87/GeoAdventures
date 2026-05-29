@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { F, G } from "@/lib/tokens";
 import { useOnboarding, type PreviewDay } from "@/lib/onboardingContext";
 import { useLandmarkImage } from "@/lib/useLandmarkImage";
+import { useWikiPhoto } from "@/lib/useWikiPhoto";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type DisplayStop = { time: string; name: string; desc: string; tag: string; tagColor: string; img: string };
@@ -149,6 +150,12 @@ function stopImg(type?: string, idx = 0): string {
   if (!k) return fallback;
   const urls = STOP_IMGS[k];
   return urls[idx % urls.length];
+}
+
+// ─── Stop thumbnail: Wikipedia photo by name, type-based fallback ────────────
+function StopThumb({ name, fallback }: { name: string; fallback: string }) {
+  const src = useWikiPhoto(name, fallback);
+  return <Image source={{ uri: src }} style={s.stopImg} contentFit="cover" />;
 }
 
 // ─── Convert API preview days to display format ──────────────────────────────
@@ -313,27 +320,23 @@ export default function PreviewScreen() {
     : `Your ${primaryCity} trip is ready 🎉`;
   const routeStr = isMulti ? data.cities.join(" → ") : "";
 
-  const heroHeight = insets.top + 120;
-
   return (
     <View style={[s.root, { backgroundColor: "#1A1F2E" }]}>
-      {/* ── Hero header — fixed height prevents expo-image from expanding layout ── */}
-      <View style={[s.hero, { height: heroHeight }]}>
-        {landmarkImg ? (
-          <Image source={{ uri: landmarkImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, s.heroPlaceholder]} />
-        )}
-        <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
-        <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
-          <Text style={s.heroTitle}>{tripTitle}</Text>
-          {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
-          <Text style={s.heroMeta}>
-            {allDays.length} day{allDays.length !== 1 ? "s" : ""}
-            {totalStops > 0 ? ` · ${totalStops} stops` : ""}
-            {dateRange ? ` · ${dateRange}` : ""}
-          </Text>
-        </View>
+      {/* Background city photo + gradient — absolute, zero layout impact */}
+      {landmarkImg && (
+        <Image source={{ uri: landmarkImg }} style={[StyleSheet.absoluteFill, { opacity: 0.22 }]} contentFit="cover" />
+      )}
+      <LinearGradient colors={["rgba(26,31,46,0)","#1A1F2E"]} locations={[0, 0.38]} style={StyleSheet.absoluteFill} />
+
+      {/* ── Hero header: text only, no fixed height, no image child ── */}
+      <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
+        <Text style={s.heroTitle}>{tripTitle}</Text>
+        {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
+        <Text style={s.heroMeta}>
+          {allDays.length} day{allDays.length !== 1 ? "s" : ""}
+          {totalStops > 0 ? ` · ${totalStops} stops` : ""}
+          {dateRange ? ` · ${dateRange}` : ""}
+        </Text>
       </View>
 
       {/* ── Day tabs ── */}
@@ -368,7 +371,7 @@ export default function PreviewScreen() {
 
         {curDay?.stops.map((stop, i) => (
           <View key={i} style={s.stopCard}>
-            <Image source={{ uri: stop.img }} style={s.stopImg} contentFit="cover" />
+            <StopThumb name={stop.name} fallback={stop.img} />
             <View style={s.stopBody}>
               <Text style={s.stopTime}>{stop.time}</Text>
               <Text style={s.stopName}>{stop.name}</Text>
@@ -403,10 +406,8 @@ export default function PreviewScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1 },
-  hero: { overflow: "hidden" },
-  heroPlaceholder: { backgroundColor: G.deep },
-  heroContent: { paddingHorizontal: 20 },
+  root: { flex: 1, overflow: "hidden" },
+  heroContent: { paddingHorizontal: 20, paddingBottom: 14 },
   heroTitle: { fontFamily:F.bold, fontSize:20, fontWeight:"800", color:"#fff", letterSpacing:-0.4, lineHeight:27, marginBottom:4 },
   heroRoute: { fontFamily:F.semibold, fontSize:14, fontWeight:"600", color:G.orange, marginBottom:3 },
   heroMeta: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.55)" },

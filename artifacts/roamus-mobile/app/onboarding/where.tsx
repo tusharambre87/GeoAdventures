@@ -10,6 +10,7 @@ import { BackBtn, BigBtn, ProgressDots } from "@/lib/onboardingAtoms";
 import { ALL_CITIES, CITY_IMGS, F, G, POPULAR_CITIES, type CityEntry } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { API_BASE } from "@/lib/authContext";
+import { useWikiPhoto } from "@/lib/useWikiPhoto";
 
 const STOP_TIMES = ["9:30", "11:30", "2:00", "3:30"];
 
@@ -150,12 +151,18 @@ function stopTag(type?: string): string {
   return "⭐ Stop";
 }
 
+// ─── Stop thumbnail: Wikipedia photo first, type-based fallback ─────────────
+function StopImage({ name, type, idx = 0 }: { name: string; type?: string; idx?: number }) {
+  const src = useWikiPhoto(name, stopImg({ type }, idx));
+  return <Image source={{ uri: src }} style={d.stopImg} contentFit="cover" />;
+}
+
 // ─── Stop row in dark card ──────────────────────────────────────────────────
 function StopRow({ spot, time, idx = 0 }: { spot: any; time: string; idx?: number }) {
   return (
     <View style={d.stopRow}>
       <Text style={d.stopTime}>{time}</Text>
-      <Image source={{ uri: stopImg(spot, idx) }} style={d.stopImg} contentFit="cover" />
+      <StopImage name={spot.name} type={spot.type} idx={idx} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={d.stopName} numberOfLines={1}>{spot.name}</Text>
         <Text style={d.stopDesc} numberOfLines={2}>{spot.reason || `Great ${spot.type || "stop"} for families`}</Text>
