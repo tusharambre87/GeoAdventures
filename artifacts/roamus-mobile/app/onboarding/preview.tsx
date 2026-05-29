@@ -296,12 +296,15 @@ export default function PreviewScreen() {
     <View style={[s.root, { backgroundColor: "#1A1F2E" }]}>
       {/* ── Hero header ── */}
       <View style={[s.hero, { paddingTop: insets.top + 16 }]}>
-        {landmarkImg ? (
-          <Image source={{ uri: landmarkImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, s.heroPlaceholder]} />
-        )}
-        <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
+        {/* Background: wrapped in absoluteFill View so expo-image never enters the flex flow */}
+        <View style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}>
+          {landmarkImg ? (
+            <Image source={{ uri: landmarkImg }} style={{ flex: 1 }} contentFit="cover" />
+          ) : (
+            <View style={[{ flex: 1 }, s.heroPlaceholder]} />
+          )}
+          <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
+        </View>
         <View style={s.heroContent}>
           <Text style={s.heroTitle}>{tripTitle}</Text>
           {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
