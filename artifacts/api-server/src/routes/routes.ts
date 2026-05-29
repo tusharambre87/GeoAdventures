@@ -5014,6 +5014,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // All routes under /api/travel/* are feature-flagged
   // ============================================================================
 
+  // Distribute stops across days respecting per-day caps for arrival/departure days.
+  function distributeStopsToDays(
+    stops: GeneratedStop[],
+    tripDays: number,
+    arrivalCap: number,
+    lastDayCap: number,
+    perDay: number,
+  ): GeneratedStop[] {
+    const caps: number[] = [];
+    for (let d = 0; d < tripDays; d++) {
+      if (d === 0) caps.push(arrivalCap);
+      else if (d === tripDays - 1) caps.push(lastDayCap);
+      else caps.push(perDay);
+    }
+    let dayIndex = 0;
+    let countInDay = 0;
+    const result: GeneratedStop[] = [];
+    for (const stop of stops) {
+      while (dayIndex < tripDays - 1 && countInDay >= caps[dayIndex]) {
+        dayIndex++;
+        countInDay = 0;
+      }
+      result.push({ ...stop, dayNumber: dayIndex + 1 });
+      countInDay++;
+    }
+    return result;
+  }
+
   // Background stop generation — called after trip is created and response already sent.
   // All AI calls (OpenAI) happen here so they never block the HTTP response.
   async function generateStopsInBackground(
@@ -5108,14 +5136,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Wait briefly so AdventureBuilder can POST anchors to DB before we generate stops
         await new Promise(r => setTimeout(r, 2500));
 
-        // Compute stop count: always derive from tripDays×pace so the correct number of days shows in the plan
-        // packed=4 (not 6) — 6 stops × 90 min avg + travel pushes the day past 10pm
-        const stopsPerDayByPace = pace === "chill" ? 3 : pace === "packed" ? 4 : 4;
-        const effectiveStopCount = isHomeAdventure ? 5
-          : tripDays ? Math.min(tripDays * stopsPerDayByPace, 40)
-          : (stopCount || stopsPerDayByPace * 3);
+        // ── Fetch trip data + tailoring for stop planning ─────────────────────
         const fullTrip = await storage.getTripById(tripId);
         const tripTailoring = fullTrip?.tailoring as any;
+
+        // ── Stop count — arrival/departure-aware ──────────────────────────────
+        const stopsPerDayByPace = pace === "chill" ? 2 : pace === "packed" ? 4 : 3;
+
+        // Read arrival signals from tailoring JSONB
+        const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
+        const lastDayType = tripTailoring?.lastDay as string | null;
+
+        // Arrival day cap: afternoon arrival = 2 stops, evening = 1, morning = full
+        const arrivalDayCap = arrivalTimeSig === "afternoon" ? 2
+          : arrivalTimeSig === "evening" ? 1
+          : stopsPerDayByPace;
+
+        // Last day cap: travel day = 1 stop max, leaving late = 2, full day = normal
+        const lastDayCap = lastDayType === "travel" ? 1
+          : lastDayType === "late" ? 2
+          : stopsPerDayByPace;
 
         // ── Derive children ages for pool selection ───────────────────────────
         // Read ages directly from travelers JSONB — no DB join needed
@@ -5129,6 +5169,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch { /* non-fatal */ }
         const toddlerNote = childrenAges.some(a => a <= 5) ? " — toddler nap window active" : "";
         console.log(`[Travel] [bg] childrenAges: [${childrenAges.join(", ")}]${toddlerNote}`);
+
+        // Toddler nap: reduce by 1 stop per day if child under 3
+        const hasToddler = childrenAges.some(a => a < 3);
+        const effectivePerDay = hasToddler
+          ? Math.max(1, stopsPerDayByPace - 1)
+          : stopsPerDayByPace;
+
+        // Total: arrival day + middle days + last day (each capped separately)
+        const middleDays = tripDays ? Math.max(0, tripDays - 2) : 0;
+        const effectiveStopCount = isHomeAdventure ? 5
+          : tripDays && tripDays >= 2
+            ? arrivalDayCap + (middleDays * effectivePerDay) + lastDayCap
+            : tripDays
+              ? Math.min(tripDays * effectivePerDay, 40)
+              : (stopCount || effectivePerDay * 3);
 
         // ── Try pool first (zero AI calls for cached cities) ──────────────────
         let usedPool = false;
@@ -5150,8 +5205,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               pace: plannerPace,
             };
             const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
-            for (let i = 0; i < selectedStops.length; i++) {
-              const stop = selectedStops[i];
+            const distributedPoolStops = distributeStopsToDays(
+              selectedStops.slice(0, effectiveStopCount),
+              plannerTripDays,
+              arrivalDayCap,
+              lastDayCap,
+              effectivePerDay,
+            );
+            for (let i = 0; i < distributedPoolStops.length; i++) {
+              const stop = distributedPoolStops[i];
               await storage.createStop({
                 tripId,
                 name: stop.name,
@@ -5246,7 +5308,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tripTailoring || undefined,
             tripAgeGroups.length > 0 ? tripAgeGroups : undefined
           );
-          for (const stop of generatedStops) {
+          const distributedAIStops = distributeStopsToDays(
+            generatedStops.slice(0, effectiveStopCount),
+            tripDays || 1,
+            arrivalDayCap,
+            lastDayCap,
+            effectivePerDay,
+          );
+          for (const stop of distributedAIStops) {
             await storage.createStop({
               tripId,
               name: stop.name,

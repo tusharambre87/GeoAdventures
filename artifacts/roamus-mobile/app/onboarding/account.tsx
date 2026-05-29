@@ -58,6 +58,10 @@ export default function AccountScreen() {
             indoorOutdoor: data.indoorOutdoor ?? "both",
             budgetSensitivity: data.budgetLevel ?? "moderate",
             kidEnergyLevel: data.kidEnergyLevel ?? "mixed",
+            arrivalMethod: data.arrivalMethod ?? null,
+            arrivalTime: data.arrivalTime ?? null,
+            lastDay: data.lastDay ?? "full",
+            cityTransitions: data.cityTransitions ?? {},
           },
         }),
       });
