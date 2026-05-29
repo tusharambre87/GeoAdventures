@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   plannerTripPlans,
   plannerTripPlanStops,
@@ -10,6 +10,7 @@ import {
   plannerParentSupport,
   plannerPlaceReference,
   plannerStopIntelligence,
+  stopLibrary,
   travelTrips,
   travelStops,
   type PlannerTripPlan,
@@ -1991,7 +1992,203 @@ Return a JSON object:
 Generate exactly 10 stops. Make each genuinely useful to real families visiting ${destination}.${GEOQUEST_SAFETY_PROMPT}`;
 }
 
+// ── Pool-building helpers ──────────────────────────────────────────────────
+
+/** Sensible default visit duration by stop type (minutes). */
+function durationByStopType(stopType: string): number {
+  switch (stopType.toLowerCase()) {
+    case "museum": return 120;
+    case "zoo": return 150;
+    case "aquarium": return 120;
+    case "park": case "garden": return 60;
+    case "nature": return 75;
+    case "landmark": return 45;
+    case "adventure": return 90;
+    case "food": case "restaurant": case "cafe": return 60;
+    case "street": return 45;
+    default: return 75;
+  }
+}
+
+/** Indoor/outdoor classification by stop type. */
+function indoorOutdoorByStopType(stopType: string): "indoor" | "outdoor" | "both" {
+  const t = stopType.toLowerCase();
+  if (["museum", "aquarium", "theater", "food", "restaurant", "cafe", "indoor_attraction"].includes(t)) return "indoor";
+  if (["park", "garden", "nature", "beach", "hiking", "outdoor_attraction", "street"].includes(t)) return "outdoor";
+  return "both"; // zoo, landmark, adventure — can be either
+}
+
+/** Family anchor type by stop type. */
+function anchorTypeByStopType(stopType: string): CachedStopCandidate["familyAnchorType"] {
+  const t = stopType.toLowerCase();
+  if (["museum", "zoo", "aquarium", "landmark", "adventure"].includes(t)) return "anchor";
+  if (["park", "garden", "nature"].includes(t)) return "support";
+  if (["food", "restaurant", "cafe"].includes(t)) return "meal";
+  if (["street"].includes(t)) return "filler";
+  return "support";
+}
+
+// ── Primary pool builder — reads from stop_library + planner_stop_intelligence ─
+
+/**
+ * Builds a city stop pool from curated stop_library rows joined with
+ * planner_stop_intelligence scores. Makes zero AI calls.
+ * Falls back to AI generation only when stop_library has no entries for
+ * the requested city/country.
+ */
 export async function generateCityStopPool(
+  city: string,
+  country: string
+): Promise<CachedStopCandidate[]> {
+  const rows = await db
+    .select({
+      name: stopLibrary.name,
+      description: stopLibrary.description,
+      latitude: stopLibrary.latitude,
+      longitude: stopLibrary.longitude,
+      address: stopLibrary.address,
+      stopType: stopLibrary.stopType,
+      enrichment: stopLibrary.enrichment,
+      // Intelligence joined via stop_library_id (column added by migration, absent from Drizzle schema)
+      effortLabel: plannerStopIntelligence.effortLabel,
+      rationaleShort: plannerStopIntelligence.rationaleShort,
+      whyWorthItLabel: plannerStopIntelligence.whyWorthItLabel,
+      morningFitScore: plannerStopIntelligence.morningFitScore,
+      afterLunchFitScore: plannerStopIntelligence.afterLunchFitScore,
+      lateDayFitScore: plannerStopIntelligence.lateDayFitScore,
+      anchorStopFitScore: plannerStopIntelligence.anchorStopFitScore,
+      strollerEaseScore: plannerStopIntelligence.strollerEaseScore,
+      age2to4Fit: plannerStopIntelligence.age2to4Fit,
+      age5to7Fit: plannerStopIntelligence.age5to7Fit,
+      age8to12Fit: plannerStopIntelligence.age8to12Fit,
+      parentEffortScore: plannerStopIntelligence.parentEffortScore,
+    })
+    .from(stopLibrary)
+    .leftJoin(
+      plannerStopIntelligence,
+      sql`planner_stop_intelligence.stop_library_id = ${stopLibrary.id}`,
+    )
+    .where(
+      and(
+        sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${city}))`,
+        sql`LOWER(TRIM(${stopLibrary.country})) = LOWER(TRIM(${country}))`,
+      ),
+    )
+    .orderBy(stopLibrary.name);
+
+  if (rows.length === 0) {
+    console.warn(`[CityPool] No stop_library entries for ${city}, ${country} — falling back to AI`);
+    return generateCityStopPoolFromAI(city, country);
+  }
+
+  // Deduplicate: multiple planner_stop_intelligence rows can share the same stop_library_id,
+  // and stop_library itself may have Unicode apostrophe variants of the same name.
+  // Keep the first hit per normalized name (sort order already puts intelligence-rich rows first).
+  const normalizeKey = (s: string) =>
+    s.toLowerCase().trim()
+      .replace(/[\u2018\u2019\u201a\u201b\u02bc]/g, "'")  // smart/curly single quotes → straight
+      .replace(/[\u201c\u201d\u201e\u201f]/g, '"');        // smart double quotes → straight
+  const seen = new Set<string>();
+  const uniqueRows = rows.filter(row => {
+    const key = normalizeKey(row.name);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  console.log(`[CityPoolSeeder] Building pool for ${city} from stop_library — ${uniqueRows.length} stops`);
+
+  return uniqueRows.map((row): CachedStopCandidate => {
+    const enrichment = row.enrichment as Record<string, string> | null;
+    const stopType = row.stopType ?? "landmark";
+
+    // effortLevel: parse intelligence effortLabel text, fall back to parentEffortScore
+    let effortLevel: "low" | "moderate" | "high" = "moderate";
+    const elText = (row.effortLabel ?? "").toLowerCase();
+    if (elText.includes("easy") || elText.includes("low")) effortLevel = "low";
+    else if (elText.includes("high") || elText.includes("strenuous")) effortLevel = "high";
+    else if (row.parentEffortScore != null) {
+      if (row.parentEffortScore <= 35) effortLevel = "low";
+      else if (row.parentEffortScore >= 70) effortLevel = "high";
+    }
+
+    // sensoryLoad: enrichment field ("medium" → "moderate")
+    let sensoryLoad: "low" | "moderate" | "high" = "moderate";
+    const slText = (enrichment?.sensoryLoad ?? "").toLowerCase();
+    if (slText === "low") sensoryLoad = "low";
+    else if (slText === "high") sensoryLoad = "high";
+
+    // minAge: derive from age-band fit scores (threshold ≥60)
+    let minAge = 0;
+    const a2 = row.age2to4Fit ?? 0;
+    const a5 = row.age5to7Fit ?? 0;
+    const a8 = row.age8to12Fit ?? 0;
+    if (a2 >= 60 || (a2 === 0 && a5 === 0 && a8 === 0)) minAge = 0;
+    else if (a5 >= 60) minAge = 5;
+    else if (a8 >= 60) minAge = 8;
+
+    // strollerFriendly: intelligence score ≥60, or enrichment flag
+    const strollerFriendly =
+      row.strollerEaseScore != null
+        ? row.strollerEaseScore >= 60
+        : enrichment?.strollerAccessibility === "yes";
+
+    const whyNow = row.rationaleShort ?? row.whyWorthItLabel ?? `A great family stop in ${city}`;
+    const indoorOutdoor = indoorOutdoorByStopType(stopType);
+
+    return {
+      name: row.name,
+      description: row.description ?? undefined,
+      latitude: row.latitude ?? undefined,
+      longitude: row.longitude ?? undefined,
+      address: row.address ?? undefined,
+      stopType,
+      type: stopType,
+      durationMinutes: durationByStopType(stopType),
+      effortLevel,
+      indoorOutdoor,
+      sensoryLoad,
+      familyAnchorType: anchorTypeByStopType(stopType),
+      minAge,
+      whyNow,
+      morningFitScore: row.morningFitScore ?? undefined,
+      afterLunchFitScore: row.afterLunchFitScore ?? undefined,
+      lateDayFitScore: row.lateDayFitScore ?? undefined,
+      anchorStopFitScore: row.anchorStopFitScore ?? undefined,
+      parentSupportData: {
+        breakSuggestion: "Find a nearby bench or café for a quick rest.",
+        foodSuggestion: "Check the venue's café or look for options nearby.",
+        keepGoingSuggestion: "Explore any adjacent exhibits or outdoor areas.",
+        moreFunSuggestion: "Ask staff for family activity sheets or guided highlights.",
+        shortenSuggestion: "Pick the one highlight and save the rest for next time.",
+      },
+      placeReferenceData: {
+        directionsNote: row.address ?? `Located in ${city}`,
+        openingHours: "Check website for current hours",
+        priceRange: "$$",
+        bookingRequired: false,
+        sourceConfidence: 90,
+      },
+      placeProfileData: {
+        whyItWorks: whyNow,
+        bathroomNotes: enrichment?.nearestRestroom ?? "Bathrooms available on-site.",
+        foodOptions: "Check venue website for dining options.",
+        parkingNotes: enrichment?.parkingAvailability ?? "Check local parking options.",
+        bestTimeOfDay: enrichment?.bestTimeOfDay ?? "Morning or early afternoon",
+        weatherSensitive: indoorOutdoor === "outdoor",
+        strollerFriendly,
+        nearbyStops: [],
+        practicalTips: enrichment?.typicalWaitTime
+          ? [`Typical wait time: ${enrichment.typicalWaitTime}`]
+          : [],
+      },
+    };
+  });
+}
+
+// ── AI fallback — used only when stop_library has no entries for a city ────
+
+async function generateCityStopPoolFromAI(
   city: string,
   country: string
 ): Promise<CachedStopCandidate[]> {
