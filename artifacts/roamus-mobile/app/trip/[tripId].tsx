@@ -536,10 +536,12 @@ function TripPlanOverview({
   trip,
   groups,
   onSelectDay,
+  isGenerating,
 }: {
   trip: Trip;
   groups: CityGroup[];
   onSelectDay: (dayIndex: number) => void;
+  isGenerating: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const allDays = groups.flatMap(g => g.days);
@@ -595,6 +597,14 @@ function TripPlanOverview({
             <Text style={ov.healthLabel}>READY</Text>
           </View>
         </View>
+
+        {/* Generating banner */}
+        {isGenerating && (
+          <View style={ov.generatingBanner}>
+            <ActivityIndicator size="small" color={G.orange} style={{ marginRight: 8 }} />
+            <Text style={ov.generatingText}>Building your stops…</Text>
+          </View>
+        )}
       </View>
 
       <ScrollView
@@ -682,10 +692,28 @@ export default function TripPlanScreen() {
     queryFn: () => travelAPI.getTrip(tripId!),
     enabled: !!tripId,
     retry: 1,
+    // Poll every 4s while stops haven't arrived yet (async generation on server)
+    refetchInterval: (query) => {
+      const t = query.state.data as Trip | undefined;
+      if (!t) return false;
+      return (t.stops?.length ?? 0) === 0 ? 4000 : false;
+    },
   });
 
-  const stops: TripStop[] = (trip as any)?.stops ?? [];
-  const totalDays = (trip as any)?.tripDays ?? (trip as any)?.trip_days ?? 0;
+  const stops: TripStop[] = trip?.stops ?? [];
+
+  // Compute totalDays from trip dates (most reliable); fall back to plannerTripDays
+  const totalDays = (() => {
+    if (trip?.startDate && trip?.endDate) {
+      return (
+        Math.round(
+          (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000
+        ) + 1
+      );
+    }
+    return (trip as any)?.plannerTripDays ?? 0;
+  })();
+
   const groups = trip ? buildCityGroups(stops, totalDays) : [];
   const allDays = groups.flatMap(g => g.days);
 
@@ -746,6 +774,7 @@ export default function TripPlanScreen() {
       trip={trip}
       groups={groups}
       onSelectDay={setSelectedDay}
+      isGenerating={stops.length === 0}
     />
   );
 }
@@ -777,6 +806,8 @@ const ov = StyleSheet.create({
   healthNumGreen: { color: G.green },
   healthLabel: { fontFamily: F.medium, fontSize: 10, fontWeight: "500", color: G.muted, letterSpacing: 0.8, marginTop: 2 },
   healthDiv: { width: 0.5, height: 32, backgroundColor: "rgba(26,31,46,0.1)" },
+  generatingBanner: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 10, backgroundColor: "rgba(232,105,42,0.08)", borderTopWidth: 0.5, borderTopColor: "rgba(232,105,42,0.2)" },
+  generatingText: { fontFamily: F.medium, fontSize: 13, color: G.orange },
 
   body: { paddingHorizontal: 20, paddingTop: 20 },
   citySection: { marginBottom: 24 },
