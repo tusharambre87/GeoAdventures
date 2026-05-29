@@ -192,15 +192,18 @@ function StopCard({
   dayIndex,
   isLast,
   onReplace,
+  onDetails,
 }: {
   stop: TripStop;
   dayIndex: number;
   isLast: boolean;
   onReplace: (stopId: string) => void;
+  onDetails: (stopId: string) => void;
 }) {
   const heroImg = useStopImage(stop.id);
   const ticket = needsTicket(stop.stopType);
   const tip = (stop.metadata as any)?.tip ?? (stop.metadata as any)?.parentTip ?? null;
+  const travelMins = (stop.metadata as any)?.travelMinutes as number | undefined;
 
   return (
     <View style={sd.row}>
@@ -219,7 +222,8 @@ function StopCard({
         <View style={sd.body}>
           <Text style={sd.name} numberOfLines={2}>{stop.name}</Text>
           <View style={sd.meta}>
-            <Text style={sd.metaText}>~{estimatedMins(stop.stopType)}m</Text>
+            {travelMins ? <Text style={sd.metaText}>🚗 {travelMins} min</Text> : null}
+            <Text style={sd.metaText}>⏱ {estimatedMins(stop.stopType)} min</Text>
             {ticket && <Text style={sd.metaTicket}>🎟 Ticket needed</Text>}
           </View>
           {stop.stopType ? (
@@ -233,14 +237,10 @@ function StopCard({
             <View style={sd.tipRow}>
               <Text style={sd.tip}>💡 {tip}</Text>
             </View>
-          ) : stop.description ? (
-            <View style={sd.tipRow}>
-              <Text style={sd.tip} numberOfLines={2}>{stop.description}</Text>
-            </View>
           ) : null}
         </View>
         <View style={sd.actions}>
-          <Pressable style={sd.action}>
+          <Pressable style={sd.action} onPress={() => onDetails(stop.id)}>
             <Text style={sd.actionText}>Details →</Text>
           </Pressable>
           <View style={sd.actionDivider} />
@@ -400,6 +400,7 @@ function DayDetail({
 }) {
   const insets = useSafeAreaInsets();
   const [replacingStopId, setReplacingStopId] = useState<string | null>(null);
+  const [viewingStopId, setViewingStopId] = useState<string | null>(null);
   const contentStops = day.stops.filter(s => !isMealStop(s.stopType));
   const mealStops = day.stops.filter(s => isMealStop(s.stopType));
   const ticketStops = day.stops.filter(s => needsTicket(s.stopType));
@@ -484,6 +485,7 @@ function DayDetail({
                   dayIndex={day.dayIndex}
                   isLast={isLast}
                   onReplace={setReplacingStopId}
+                  onDetails={setViewingStopId}
                 />
               );
             })}
@@ -526,7 +528,123 @@ function DayDetail({
           </View>
         </View>
       </Modal>
+
+      {/* Stop detail sheet */}
+      <StopDetailSheet
+        stop={day.stops.find(s => s.id === viewingStopId) ?? null}
+        visible={!!viewingStopId}
+        onClose={() => setViewingStopId(null)}
+      />
     </View>
+  );
+}
+
+// ─── StopDetailSheet ─────────────────────────────────────────────────────────
+
+function StopDetailSheet({
+  stop,
+  visible,
+  onClose,
+}: {
+  stop: TripStop | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const heroImg = useStopImage(stop?.id ?? "");
+  if (!stop) return null;
+
+  const storyPack = (stop as any).storyPack as { mainStory?: string } | null | undefined;
+  const rawStory = storyPack?.mainStory ?? null;
+  const mainStory = rawStory ? rawStory.slice(0, 300) : null;
+  const showEllipsis = rawStory && rawStory.length > 300;
+  const whyItWorks = (stop.metadata as any)?.whyItWorks as string | null | undefined;
+  const bathroomNotes = (stop.metadata as any)?.bathroomNotes as string | null | undefined;
+  const missions = stop.stopMissions?.slice(0, 3) ?? [];
+
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={ds.overlay} />
+      </TouchableWithoutFeedback>
+      <View style={[ds.sheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={ds.handle} />
+        <Pressable style={ds.closeBtn} onPress={onClose} hitSlop={8}>
+          <Ionicons name="close" size={16} color={G.muted} />
+        </Pressable>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ds.scrollBody}>
+          {heroImg ? (
+            <Image source={{ uri: heroImg }} style={ds.heroImg} contentFit="cover" />
+          ) : (
+            <View style={ds.heroPlaceholder}>
+              <Ionicons name="image-outline" size={32} color={G.muted} />
+            </View>
+          )}
+
+          <View style={ds.nameBlock}>
+            <Text style={ds.stopName}>{stop.name}</Text>
+            {stop.stopType ? (
+              <Text style={ds.stopType}>{stop.stopType.replace(/_/g, " ")}</Text>
+            ) : null}
+          </View>
+
+          {mainStory ? (
+            <View style={ds.section}>
+              <Text style={ds.sectionLabel}>THE STORY</Text>
+              <Text style={ds.bodyText}>{mainStory}{showEllipsis ? "…" : ""}</Text>
+            </View>
+          ) : null}
+
+          {whyItWorks ? (
+            <View style={ds.section}>
+              <Text style={ds.sectionLabel}>WHY IT WORKS FOR YOUR FAMILY</Text>
+              <Text style={ds.bodyText}>{whyItWorks}</Text>
+            </View>
+          ) : null}
+
+          {bathroomNotes ? (
+            <View style={ds.section}>
+              <Text style={ds.sectionLabel}>PRACTICAL NOTES</Text>
+              <Text style={ds.bodyText}>{bathroomNotes}</Text>
+            </View>
+          ) : null}
+
+          {missions.length > 0 ? (
+            <View style={ds.section}>
+              <Text style={ds.sectionLabel}>KID MISSIONS</Text>
+              {missions.map((m, i) => (
+                <View key={i} style={ds.missionRow}>
+                  <View style={ds.missionBadge}>
+                    <Text style={ds.missionBadgeText}>{i + 1}</Text>
+                  </View>
+                  <View style={ds.missionBody}>
+                    <Text style={ds.missionType}>{m.type.toUpperCase()}</Text>
+                    <Text style={ds.missionQ}>{m.question}</Text>
+                    {m.options && m.options.length > 0 ? (
+                      <View style={ds.optionsList}>
+                        {m.options.map((opt, oi) => (
+                          <Text key={oi} style={ds.optionText}>· {opt}</Text>
+                        ))}
+                      </View>
+                    ) : null}
+                    <Text style={ds.missionXp}>+{m.xpReward} XP</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {!mainStory && !whyItWorks && missions.length === 0 ? (
+            <View style={ds.section}>
+              <Text style={[ds.bodyText, { color: G.muted, fontStyle: "italic" }]}>
+                {stop.description ?? "No additional details available for this stop."}
+              </Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -1018,6 +1136,38 @@ const rs = StyleSheet.create({
     borderRadius: 16, alignItems: "center",
   },
   ctaText: { fontFamily: F.bold, fontSize: 14, fontWeight: "700", color: G.card },
+});
+
+const ds = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
+  sheet: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: G.card,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: "88%",
+    shadowColor: "#000", shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 8,
+  },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(26,31,46,0.15)", alignSelf: "center", marginTop: 10, marginBottom: 4 },
+  closeBtn: { position: "absolute", top: 14, right: 16, width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(26,31,46,0.06)", alignItems: "center", justifyContent: "center" },
+  scrollBody: { paddingBottom: 24 },
+  heroImg: { width: "100%", height: 180, backgroundColor: "rgba(26,31,46,0.06)" },
+  heroPlaceholder: { width: "100%", height: 180, backgroundColor: "rgba(26,31,46,0.06)", alignItems: "center", justifyContent: "center" },
+  nameBlock: { paddingHorizontal: 20, marginTop: 16, marginBottom: 12 },
+  stopName: { fontFamily: F.bold, fontSize: 20, fontWeight: "700", color: G.deep, marginBottom: 2 },
+  stopType: { fontFamily: F.medium, fontSize: 12, color: G.muted, textTransform: "capitalize" },
+  section: { paddingHorizontal: 20, marginBottom: 20 },
+  sectionLabel: { fontFamily: F.bold, fontSize: 10, fontWeight: "700", color: G.orange, letterSpacing: 1, marginBottom: 6 },
+  bodyText: { fontFamily: F.regular, fontSize: 14, color: G.deep, lineHeight: 22 },
+  missionRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  missionBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: G.orange + "18", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 },
+  missionBadgeText: { fontFamily: F.bold, fontSize: 13, fontWeight: "700", color: G.orange },
+  missionBody: { flex: 1 },
+  missionType: { fontFamily: F.bold, fontSize: 10, fontWeight: "700", color: G.muted, letterSpacing: 0.8, marginBottom: 2 },
+  missionQ: { fontFamily: F.medium, fontSize: 13, fontWeight: "500", color: G.deep, lineHeight: 19, marginBottom: 4 },
+  optionsList: { marginBottom: 4 },
+  optionText: { fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 18 },
+  missionXp: { fontFamily: F.semibold, fontSize: 11, fontWeight: "600", color: G.orange },
 });
 
 const root = StyleSheet.create({
