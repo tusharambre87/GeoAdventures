@@ -5127,6 +5127,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .map(t => parseInt(t.age ?? "0", 10))
             .filter(n => n > 0 && n < 18);
         } catch { /* non-fatal */ }
+        const toddlerNote = childrenAges.some(a => a <= 5) ? " — toddler nap window active" : "";
+        console.log(`[Travel] [bg] childrenAges: [${childrenAges.join(", ")}]${toddlerNote}`);
 
         // ── Try pool first (zero AI calls for cached cities) ──────────────────
         let usedPool = false;
