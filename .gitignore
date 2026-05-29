@@ -18,3 +18,4 @@ generated/
 replit.nix
 .cache/
 .config/
+.migration-backup/
