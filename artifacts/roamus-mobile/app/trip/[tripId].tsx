@@ -271,64 +271,77 @@ function MealCard({ stop }: { stop: TripStop }) {
 
 // ─── RouteMapCard ─────────────────────────────────────────────────────────────
 
-function buildOsmUrl(stops: TripStop[]): string | null {
-  const pts = stops
-    .map(s => ({ lat: parseFloat(s.latitude ?? ""), lng: parseFloat(s.longitude ?? "") }))
-    .filter(p => !isNaN(p.lat) && !isNaN(p.lng));
-  if (pts.length === 0) return null;
-  const centerLat = pts.reduce((a, p) => a + p.lat, 0) / pts.length;
-  const centerLng = pts.reduce((a, p) => a + p.lng, 0) / pts.length;
-  const markers = pts.slice(0, 5).map((p, i) => `${p.lat},${p.lng},red-${i + 1}`).join("|");
-  return (
-    `https://staticmap.openstreetmap.de/staticmap.php` +
-    `?center=${centerLat.toFixed(6)},${centerLng.toFixed(6)}` +
-    `&zoom=13&size=600x200&markers=${markers}`
-  );
-}
+function RouteMapCard({ stops, totalTravelMins }: {
+  stops: TripStop[];
+  totalTravelMins: number;
+}) {
+  const geo = stops
+    .filter(s => s.latitude && s.longitude)
+    .map(s => ({
+      lat: parseFloat(s.latitude!),
+      lng: parseFloat(s.longitude!),
+      name: s.name,
+    }));
 
-function RouteMapCard({ stops }: { stops: TripStop[] }) {
-  const content = stops.filter(s => !isMealStop(s.stopType));
-  const totalTravel = Math.max(0, content.length - 1) * 18;
-  const mapUrl = buildOsmUrl(content);
-  const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  if (geo.length === 0) {
+    return (
+      <View style={rm.card}>
+        <View style={rm.empty}>
+          <Ionicons name="map-outline" size={24} color={G.muted} />
+          <Text style={rm.emptyText}>Map loading…</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const lats = geo.map(g => g.lat);
+  const lngs = geo.map(g => g.lng);
+  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+
+  const latSpread = Math.max(...lats) - Math.min(...lats);
+  const lngSpread = Math.max(...lngs) - Math.min(...lngs);
+  const spread = Math.max(latSpread, lngSpread);
+  const zoom = spread < 0.02 ? 15
+    : spread < 0.05 ? 14
+    : spread < 0.1 ? 13
+    : spread < 0.2 ? 12
+    : 11;
+
+  const markers = geo
+    .slice(0, 6)
+    .map((g, i) => `${g.lat.toFixed(4)},${g.lng.toFixed(4)},red-${i + 1}`)
+    .join("|");
+
+  const mapUrl =
+    `https://staticmap.openstreetmap.de/staticmap.php` +
+    `?center=${centerLat.toFixed(4)},${centerLng.toFixed(4)}` +
+    `&zoom=${zoom}&size=600x200&maptype=mapnik` +
+    `&markers=${markers}`;
 
   return (
     <View style={rm.card}>
-      {mapUrl && !imgError ? (
-        <>
-          <Image
-            source={{ uri: mapUrl }}
-            style={rm.mapImage}
-            contentFit="cover"
-            onLoad={() => setImgLoaded(true)}
-            onError={() => setImgError(true)}
-          />
-          {!imgLoaded && (
-            <View style={rm.loadingOverlay}>
-              <ActivityIndicator size="small" color={G.orange} />
-            </View>
-          )}
-        </>
-      ) : (
-        <View style={rm.bg}>
-          {content.slice(0, 5).map((s, i) => (
-            <View
-              key={s.id}
-              style={[rm.pin, { left: 24 + i * 54, top: 30 + (i % 2 === 0 ? 20 : 50) }]}
-            >
-              <View style={rm.pinDot}>
-                <Text style={rm.pinNum}>{i + 1}</Text>
-              </View>
-              {i < content.slice(0, 5).length - 1 && <View style={rm.connector} />}
-            </View>
-          ))}
+      {imgError ? (
+        <View style={rm.empty}>
+          <Ionicons name="map-outline" size={24} color={G.muted} />
+          <Text style={rm.emptyText}>Map unavailable</Text>
         </View>
+      ) : (
+        <Image
+          source={{ uri: mapUrl }}
+          style={rm.mapImg}
+          contentFit="cover"
+          onError={() => setImgError(true)}
+        />
       )}
       <View style={rm.overlay}>
-        <Text style={rm.info}>{content.length} stops · ~{formatDuration(totalTravel)} travel</Text>
-        <Pressable style={rm.btn}>
-          <Text style={rm.btnText}>Open in Maps</Text>
+        <Text style={rm.overlayText}>
+          {geo.length} stop{geo.length !== 1 ? "s" : ""} · ~{totalTravelMins} min travel
+        </Text>
+        <Pressable style={rm.fullMapBtn}>
+          <Text style={rm.fullMapText}>Full map</Text>
         </Pressable>
       </View>
     </View>
@@ -497,7 +510,10 @@ function DayDetail({
 
         {/* Route Map */}
         <Text style={dh.sectionLabel}>ROUTE</Text>
-        <RouteMapCard stops={contentStops} />
+        <RouteMapCard
+          stops={day.stops}
+          totalTravelMins={Math.round(day.stops.length * 18)}
+        />
 
         {/* Stop by Stop */}
         <Text style={dh.sectionLabel}>STOP BY STOP</Text>
@@ -1102,35 +1118,23 @@ const mc = StyleSheet.create({
 
 const rm = StyleSheet.create({
   card: {
-    backgroundColor: "#e8f2e8", borderRadius: 14, borderWidth: 0.5,
-    borderColor: "rgba(26,31,46,0.08)", height: 140, overflow: "hidden", marginBottom: 4,
-    position: "relative",
+    borderRadius: 14, overflow: "hidden", backgroundColor: "#e8f2e8",
+    height: 160, marginBottom: 24, position: "relative",
   },
-  mapImage: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  loadingOverlay: {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: "center", justifyContent: "center", backgroundColor: "#e8f2e8",
-  },
-  bg: { position: "absolute", inset: 0 as any },
-  pin: { position: "absolute", alignItems: "center" },
-  pinDot: {
-    width: 22, height: 22, borderRadius: 11, backgroundColor: G.orange,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: G.orange, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3,
-  },
-  pinNum: { fontFamily: F.bold, fontSize: 11, fontWeight: "700", color: G.card },
-  connector: { height: 2, width: 40, backgroundColor: G.orange, opacity: 0.4, marginTop: 4 },
+  mapImg: { width: "100%", height: "100%" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
+  emptyText: { fontSize: 13, color: G.muted },
   overlay: {
     position: "absolute", bottom: 0, left: 0, right: 0,
-    padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
   },
-  info: { fontFamily: F.medium, fontSize: 12, fontWeight: "500", color: G.card },
-  btn: {
-    backgroundColor: G.card, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 5,
+  overlayText: { fontSize: 12, color: "white", fontWeight: "500" },
+  fullMapBtn: {
+    backgroundColor: "white", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8,
   },
-  btnText: { fontFamily: F.medium, fontSize: 11, fontWeight: "500", color: G.orange },
+  fullMapText: { fontSize: 11, fontWeight: "500", color: G.orange },
 });
 
 const rs = StyleSheet.create({
