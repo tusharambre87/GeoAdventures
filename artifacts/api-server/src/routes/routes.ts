@@ -5118,15 +5118,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const tripTailoring = fullTrip?.tailoring as any;
 
         // ── Derive children ages for pool selection ───────────────────────────
+        // Read ages directly from travelers JSONB — no DB join needed
+        // travelers is stored as [{ name, isParent, age }, ...]
         let childrenAges: number[] = [];
         try {
-          const tripTravelers = (fullTrip?.travelers ?? []) as Array<{ explorerId?: string }>;
-          const travelerIds = tripTravelers.map(t => t.explorerId).filter(Boolean) as string[];
-          if (travelerIds.length > 0) {
-            const explorerRows = await db.select({ age: players.age }).from(players)
-              .where(drizzleSql`${players.id} = ANY(${travelerIds})`);
-            childrenAges = explorerRows.map(r => parseInt(r.age ?? "0", 10)).filter(n => n > 0);
-          }
+          childrenAges = ((fullTrip?.travelers ?? []) as any[])
+            .filter(t => !t.isParent && t.age)
+            .map(t => parseInt(t.age ?? "0", 10))
+            .filter(n => n > 0 && n < 18);
         } catch { /* non-fatal */ }
 
         // ── Try pool first (zero AI calls for cached cities) ──────────────────

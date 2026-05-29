@@ -51,7 +51,14 @@ export default function AccountScreen() {
           pace: PACE_MAP[data.pace ?? ""] ?? "balanced",
           adventureContext: "travel",
           autoGenerateStops: true,
-          tailoring: { transport: data.transport, stroller: data.stroller, interests: data.interests },
+          tailoring: {
+            transport: data.transport,
+            stroller: data.stroller,
+            interests: data.interests,
+            indoorOutdoor: data.indoorOutdoor ?? "both",
+            budgetSensitivity: data.budgetLevel ?? "moderate",
+            kidEnergyLevel: data.kidEnergyLevel ?? "mixed",
+          },
         }),
       });
       if (res.ok) {

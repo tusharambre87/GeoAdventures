@@ -36,6 +36,9 @@ export type OnboardingData = {
   transport: string | null;
   stroller: boolean | null;
   interests: string[];
+  indoorOutdoor: string | null;
+  budgetLevel: string | null;
+  kidEnergyLevel: string | null;
   createdTripId: string | null;
   /** AI-generated trip preview; set by Building screen before account creation */
   generatedTrip: { days: PreviewDay[] } | null;
@@ -61,6 +64,9 @@ const DEFAULT: OnboardingData = {
   transport: null,
   stroller: null,
   interests: [],
+  indoorOutdoor: null,
+  budgetLevel: null,
+  kidEnergyLevel: null,
   createdTripId: null,
   generatedTrip: null,
   onboardingInProgress: false,
