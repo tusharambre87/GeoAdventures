@@ -33,11 +33,33 @@ async function apiFetch<T = unknown>(
   return res.json() as Promise<T>;
 }
 
+export type StopMission = {
+  type: "knowledge" | "observation" | "photo";
+  question: string;
+  options?: string[];
+  correctOption?: number;
+  xpReward: number;
+  completed: boolean;
+  skipped: boolean;
+  attempts: number;
+};
+
 export type TripStop = {
   id: string;
   name: string;
   city?: string;
   visited?: boolean;
+  isVisited?: boolean;
+  stopType?: string | null;
+  dayIndex?: number | null;
+  displayOrder?: number | null;
+  cityGroup?: string | null;
+  description?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  stopMissions?: StopMission[] | null;
+  metadata?: Record<string, unknown> | null;
+  address?: string | null;
 };
 
 export type Trip = {
@@ -52,6 +74,9 @@ export type Trip = {
   totalStops: number;
   visitedStops: number;
   stops: TripStop[];
+  travelers?: Array<{ name: string; avatarKey?: string }> | null;
+  tripDays?: number | null;
+  cityDates?: Record<string, { start: string; end: string }> | null;
 };
 
 export type TripsResponse = {
@@ -63,6 +88,14 @@ export type TripsResponse = {
   };
 };
 
+export type ReplacementSuggestion = {
+  id: string;
+  name: string;
+  stopType?: string;
+  description?: string;
+  imageUrl?: string;
+};
+
 export const travelAPI = {
   getTrips: () => apiFetch<TripsResponse>("/api/travel/trips"),
   getTrip: (tripId: string) => apiFetch<Trip>(`/api/travel/trips/${tripId}`),
@@ -71,4 +104,15 @@ export const travelAPI = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  getStops: (tripId: string) =>
+    apiFetch<{ stops: TripStop[] }>(`/api/travel/trips/${tripId}/stops`),
+  replaceStop: (stopId: string, data: Partial<TripStop>) =>
+    apiFetch<TripStop>(`/api/travel/stops/${stopId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  getReplacementSuggestions: (tripId: string, stopId: string, day: number) =>
+    apiFetch<{ suggestions: ReplacementSuggestion[] }>(
+      `/api/travel/trips/${tripId}/replacement-suggestions?stopId=${stopId}&day=${day}`
+    ),
 };
