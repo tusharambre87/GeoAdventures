@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "-zcWQfHLVsfGL7oWNX3aN"
+uri = "file://artifacts/roamus-mobile/assets/images/icon.png"
+type = "image"
+title = "roamus app icon"

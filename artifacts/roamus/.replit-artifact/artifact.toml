@@ -1,0 +1,43 @@
+kind = "web"
+previewPath = "/"
+title = "RoamUs"
+version = "1.0.0"
+id = "artifacts/roamus"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22353
+
+[services.development]
+run = "pnpm --filter @workspace/roamus run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/roamus", "run", "build" ]
+publicDir = "artifacts/roamus/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/privacy"
+to = "/privacy.html"
+
+[[services.production.rewrites]]
+from = "/terms"
+to = "/terms.html"
+
+[[services.production.rewrites]]
+from = "/refunds"
+to = "/refunds.html"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22353"
+BASE_PATH = "/"

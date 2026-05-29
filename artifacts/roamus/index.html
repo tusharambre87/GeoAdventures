@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="description" content="RoamUs — The app that runs your family trip, not just plans it. Offline-ready, kids engaged, memories captured."/>
+<meta property="og:title" content="RoamUs — Every trip becomes a story"/>
+<meta property="og:description" content="Not a trip planner. A trip companion. RoamUs keeps your family present while it handles the rest."/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="RoamUs"/>
+<meta property="og:image" content="/og-social-share.png"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="RoamUs — Every trip becomes a story"/>
+<meta name="twitter:description" content="Not a trip planner. A trip companion. RoamUs keeps your family present while it handles the rest."/>
+<meta name="twitter:image" content="/og-social-share.png"/>
+<title>RoamUs — Every trip becomes a story</title>
+<link rel="icon" type="image/png" href="/favicon.png"/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="apple-touch-icon" href="/favicon.png"/>
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#E8692A"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --orange:#E8692A;--orange-lt:#FDF0E9;--orange-dk:#C4561E;
+  --cream:#F5F2EE;--deep:#1A1F2E;--muted:#8A8FA8;
+  --sage:#7A9E8E;--sage-lt:#EEF5F2;
+  --border:rgba(26,31,46,0.10);
+}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:var(--deep);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;padding-top:calc(14px + env(safe-area-inset-top));background:rgba(245,242,238,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:var(--orange);text-decoration:none;-webkit-tap-highlight-color:transparent}
+.nav-links{display:flex;align-items:center;gap:24px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--muted);text-decoration:none;padding:8px 0;-webkit-tap-highlight-color:transparent}
+.btn-nav{background:var(--orange);color:white!important;padding:10px 20px;border-radius:100px;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .2s;cursor:pointer;border:none}
+.btn-nav:hover,.btn-nav:active{background:var(--orange-dk)!important}
+
+/* HERO */
+.hero{min-height:100svh;display:flex;align-items:center;padding:100px 24px 72px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;z-index:0;background:radial-gradient(ellipse 60% 50% at 70% 50%,rgba(232,105,42,.08) 0%,transparent 70%),radial-gradient(ellipse 40% 60% at 20% 80%,rgba(122,158,142,.10) 0%,transparent 60%)}
+.hero-inner{position:relative;z-index:1;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;width:100%}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--orange-lt);color:var(--orange);font-size:12px;font-weight:600;letter-spacing:.08em;padding:6px 14px;border-radius:100px;margin-bottom:24px}
+.badge-dot{width:6px;height:6px;background:var(--orange);border-radius:50%;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+h1{font-family:'Fraunces',serif;font-size:56px;font-weight:700;line-height:1.06;letter-spacing:-1.5px;margin-bottom:20px}
+h1 em{font-style:italic;color:var(--orange)}
+.hero-sub{font-size:18px;line-height:1.65;color:var(--muted);margin-bottom:40px;max-width:440px}
+.hero-ctas{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.btn-primary{display:inline-flex;align-items:center;gap:10px;background:var(--deep);color:white;padding:15px 28px;border-radius:100px;font-size:15px;font-weight:600;text-decoration:none;transition:background .2s;-webkit-tap-highlight-color:transparent;min-height:50px;cursor:pointer;border:none}
+.btn-primary:hover,.btn-primary:active{background:var(--orange)}
+.btn-secondary{font-size:15px;font-weight:500;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:15px 0;-webkit-tap-highlight-color:transparent;cursor:pointer;border:none;background:none}
+
+/* FOUNDING FAMILIES proof bar */
+.founding-bar{display:flex;align-items:center;gap:14px;margin-top:28px;padding:14px 18px;background:white;border-radius:14px;border:1px solid var(--border);max-width:420px;flex-wrap:wrap}
+.founding-avatars{display:flex}
+.avatar{width:30px;height:30px;border-radius:50%;border:2px solid white;margin-left:-7px;font-size:14px;display:flex;align-items:center;justify-content:center;background:var(--orange-lt)}
+.avatar:first-child{margin-left:0}
+.founding-text{font-size:13px;color:var(--muted);line-height:1.4;flex:1}
+.founding-text strong{color:var(--deep);font-weight:600;display:block;margin-bottom:2px}
+.founding-badge{background:var(--orange-lt);color:var(--orange);font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;letter-spacing:.06em;white-space:nowrap}
+
+/* PHONE */
+.phone-wrap{position:relative;display:flex;justify-content:center}
+.phone{width:270px;height:580px;background:var(--deep);border-radius:46px;box-shadow:0 40px 80px rgba(26,31,46,.22),0 0 0 1px rgba(255,255,255,.06);overflow:hidden;position:relative;animation:float 5s ease-in-out infinite;flex-shrink:0}
+.phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:100px;height:30px;background:var(--deep);border-radius:0 0 18px 18px;z-index:10}
+.phone-screen{position:absolute;inset:0;background:var(--cream);padding:48px 14px 14px;display:flex;flex-direction:column;gap:9px}
+.phone-brand{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--orange)}
+.phone-greet{font-size:14px;font-weight:600;color:var(--deep)}
+.phone-sub{font-size:10px;color:var(--muted)}
+.phone-card{border-radius:14px;overflow:hidden;height:140px;background:linear-gradient(155deg,#1a3a4a 0%,#2d7a5e 100%);display:flex;flex-direction:column;justify-content:flex-end;padding:12px}
+.card-badge{display:inline-block;background:var(--orange);color:white;font-size:8px;font-weight:700;padding:3px 8px;border-radius:20px;margin-bottom:4px;letter-spacing:.06em}
+.card-title{font-size:13px;font-weight:700;color:white;line-height:1.2}
+.card-meta{font-size:10px;color:rgba(255,255,255,.7);margin-top:2px}
+.phone-stop{background:white;border-radius:11px;padding:9px;display:flex;align-items:center;gap:9px}
+.stop-dot{width:32px;height:32px;border-radius:9px;background:var(--orange-lt);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+.stop-name{font-size:11px;font-weight:600;color:var(--deep)}
+.stop-meta{font-size:9px;color:var(--muted);margin-top:1px}
+.phone-nav{display:flex;justify-content:space-around;align-items:center;background:white;border-radius:22px;padding:9px 6px;margin-top:auto}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px}
+.ni-lbl{font-size:8px;color:var(--muted)}
+.ni-lbl.active{color:var(--orange);font-weight:600}
+.phone-float{position:absolute;right:-36px;top:90px;background:white;border-radius:14px;padding:11px 14px;box-shadow:0 8px 28px rgba(26,31,46,.14);width:142px}
+.phone-float2{position:absolute;left:-46px;bottom:90px;background:white;border-radius:14px;padding:11px 14px;box-shadow:0 8px 28px rgba(26,31,46,.14);width:142px}
+.fl{font-size:9px;color:var(--muted);font-weight:500;margin-bottom:3px}
+.fv{font-size:12px;font-weight:700;color:var(--deep)}
+.fs{font-size:10px;color:var(--sage);margin-top:2px}
+
+/* SECTIONS */
+section{padding:88px 24px}
+.section-inner{max-width:1100px;margin:0 auto}
+.section-label{font-size:12px;font-weight:600;letter-spacing:.15em;color:var(--orange);text-transform:uppercase;margin-bottom:16px}
+h2{font-family:'Fraunces',serif;font-size:44px;font-weight:700;letter-spacing:-1px;line-height:1.1;margin-bottom:20px}
+h2 em{font-style:italic;color:var(--orange)}
+.section-sub{font-size:17px;color:var(--muted);line-height:1.7;max-width:560px;margin-bottom:56px}
+
+/* PROBLEM */
+.problem-sec{background:var(--deep)}
+.problem-sec .section-label{color:var(--sage)}
+.problem-sec h2{color:white}
+.problem-sec .section-sub{color:rgba(255,255,255,.5)}
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;border-radius:20px;overflow:hidden;margin-top:56px}
+.pcell{background:rgba(255,255,255,.04);padding:36px}
+.pcell-icon{font-size:26px;margin-bottom:14px}
+.pcell-title{font-size:17px;font-weight:600;color:white;margin-bottom:10px}
+.pcell-body{font-size:14px;color:rgba(255,255,255,.48);line-height:1.7}
+
+/* LAYERS */
+.layers-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.layer-card{background:white;border-radius:20px;padding:30px;border:1px solid var(--border);transition:transform .2s,box-shadow .2s}
+.layer-card:hover{transform:translateY(-3px);box-shadow:0 20px 60px rgba(26,31,46,.08)}
+.layer-card.dark{background:var(--deep)}
+.layer-num{font-size:11px;font-weight:700;letter-spacing:.15em;color:var(--orange);margin-bottom:18px}
+.layer-icon{font-size:34px;margin-bottom:14px}
+.layer-title{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--deep);margin-bottom:10px}
+.layer-card.dark .layer-title{color:white}
+.layer-body{font-size:14px;color:var(--muted);line-height:1.7}
+.layer-card.dark .layer-body{color:rgba(255,255,255,.5)}
+.layer-tag{display:inline-block;margin-top:18px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:100px}
+.tag-build{background:#EBF4FF;color:#1D6FA4}
+.tag-run{background:rgba(232,105,42,.15);color:var(--orange)}
+.tag-engage{background:#FFF4E0;color:#C47A1B}
+.tag-memory{background:var(--sage-lt);color:#3D7A6A}
+
+/* PRICING */
+.pricing-sec{background:var(--sage-lt)}
+.plans-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.plan{background:white;border-radius:20px;padding:30px;border:1px solid var(--border);position:relative}
+.plan.popular{background:var(--deep)}
+.plan-pop-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--orange);color:white;font-size:11px;font-weight:700;letter-spacing:.08em;padding:5px 16px;border-radius:100px;white-space:nowrap}
+.plan-name{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;letter-spacing:.05em}
+.plan.popular .plan-name{color:rgba(255,255,255,.5)}
+.plan-price{font-family:'Fraunces',serif;font-size:46px;font-weight:700;line-height:1;color:var(--deep);letter-spacing:-2px;margin-bottom:4px}
+.plan.popular .plan-price{color:white}
+.plan-cadence{font-size:13px;color:var(--muted);margin-bottom:26px}
+.plan.popular .plan-cadence{color:rgba(255,255,255,.4)}
+.plan-features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:26px}
+.plan-features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--deep);line-height:1.4}
+.plan.popular .plan-features li{color:rgba(255,255,255,.8)}
+.chk{color:var(--sage);font-weight:700;flex-shrink:0;font-size:15px}
+.plan.popular .chk{color:var(--orange)}
+.btn-plan{display:flex;align-items:center;justify-content:center;width:100%;text-align:center;padding:14px;border-radius:100px;font-size:14px;font-weight:600;text-decoration:none;transition:all .2s;-webkit-tap-highlight-color:transparent;cursor:pointer;min-height:48px;border:none}
+.btn-dark{background:var(--deep);color:white}
+.btn-dark:hover,.btn-dark:active{background:var(--orange)}
+.btn-orange{background:var(--orange);color:white}
+.btn-orange:hover,.btn-orange:active{background:var(--orange-dk)}
+
+/* TESTIMONIALS */
+.testimonials-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.testimonial{background:white;border-radius:20px;padding:26px;border:1px solid var(--border)}
+.stars{color:var(--orange);font-size:14px;margin-bottom:12px;letter-spacing:2px}
+.testimonial-text{font-size:15px;color:var(--deep);line-height:1.65;font-style:italic;margin-bottom:18px}
+.author{display:flex;align-items:center;gap:10px}
+.author-av{width:36px;height:36px;border-radius:50%;background:var(--orange-lt);font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.author-name{font-size:13px;font-weight:600;color:var(--deep)}
+.author-meta{font-size:12px;color:var(--muted)}
+
+/* APP STORE BADGES */
+.cta-sec{background:var(--deep);text-align:center;padding:112px 24px}
+.cta-sec h2{color:white}
+.cta-sec .section-sub{color:rgba(255,255,255,.5);margin:0 auto 44px}
+.store-badges{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+.store-badge{display:inline-flex;align-items:center;gap:10px;background:#000;color:white;padding:10px 20px;border-radius:10px;text-decoration:none;transition:opacity .2s;-webkit-tap-highlight-color:transparent;cursor:pointer;border:1px solid rgba(255,255,255,.15);min-width:160px}
+.store-badge:hover{opacity:.85}
+.store-badge-soon{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+.badge-icon{flex-shrink:0}
+.badge-text{text-align:left}
+.badge-line1{font-size:10px;font-weight:400;opacity:.75;display:block;letter-spacing:.02em}
+.badge-line2{font-size:17px;font-weight:600;display:block;letter-spacing:-.2px;line-height:1.2}
+
+/* FOOTER */
+footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);flex-wrap:wrap;gap:16px}
+.footer-logo{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--orange)}
+.footer-links{display:flex;gap:24px;flex-wrap:wrap}
+.footer-links a{font-size:13px;color:var(--muted);text-decoration:none;padding:4px 0;-webkit-tap-highlight-color:transparent}
+.footer-copy{font-size:13px;color:var(--muted)}
+
+/* WAITLIST MODAL */
+.modal-overlay{position:fixed;inset:0;z-index:999;background:rgba(26,31,46,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .3s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--cream);border-radius:24px;padding:40px;max-width:420px;width:100%;position:relative;transform:translateY(20px) scale(.97);transition:transform .3s;box-shadow:0 40px 80px rgba(0,0,0,.3)}
+.modal-overlay.open .modal{transform:translateY(0) scale(1)}
+.modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;background:rgba(26,31,46,.08);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);-webkit-tap-highlight-color:transparent}
+.modal-close:hover{background:rgba(26,31,46,.14)}
+.modal-icon{font-size:40px;margin-bottom:16px}
+.modal-tag{display:inline-block;background:var(--orange-lt);color:var(--orange);font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;letter-spacing:.08em;margin-bottom:14px}
+.modal h3{font-family:'Fraunces',serif;font-size:28px;font-weight:700;letter-spacing:-.5px;margin-bottom:10px;color:var(--deep);line-height:1.15}
+.modal p{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.modal-form{display:flex;flex-direction:column;gap:12px}
+.modal-input{width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--border);background:white;font-size:15px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--deep);outline:none;transition:border-color .2s;-webkit-appearance:none}
+.modal-input:focus{border-color:var(--orange)}
+.modal-input::placeholder{color:var(--muted)}
+.modal-submit{background:var(--orange);color:white;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:background .2s;-webkit-tap-highlight-color:transparent;min-height:50px}
+.modal-submit:hover,.modal-submit:active{background:var(--orange-dk)}
+.modal-fine{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
+.modal-success{display:none;text-align:center;padding:20px 0}
+.modal-success.show{display:block}
+.modal-form.hide{display:none}
+
+/* ANIMATIONS */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .7s ease both}
+.fu1{animation-delay:.1s}.fu2{animation-delay:.2s}.fu3{animation-delay:.3s}.fu4{animation-delay:.4s}
+@media(prefers-reduced-motion:reduce){.fu,.phone{animation:none}.fu{opacity:1;transform:none}}
+
+/* MOBILE */
+@media(max-width:768px){
+  h1{font-size:38px;letter-spacing:-1px}
+  h2{font-size:32px}
+  .hero{padding:90px 20px 60px}
+  .hero-inner{grid-template-columns:1fr;gap:48px}
+  .phone-wrap{order:-1}
+  .phone-float,.phone-float2{display:none}
+  .phone{width:240px;height:520px}
+  .problem-grid{grid-template-columns:1fr}
+  .layers-grid{grid-template-columns:1fr}
+  .plans-grid{grid-template-columns:1fr;max-width:380px;margin:0 auto}
+  .testimonials-grid{grid-template-columns:1fr}
+  nav{padding:12px 20px}
+  .nav-links a:not(.btn-nav){display:none}
+  section{padding:64px 20px}
+  .cta-sec{padding:80px 20px}
+  .store-badges{flex-direction:column;align-items:center}
+  .store-badge{width:100%;max-width:220px;justify-content:center}
+  footer{justify-content:center;text-align:center}
+  .modal{padding:28px 24px}
+  .modal h3{font-size:24px}
+  .founding-bar{max-width:100%}
+}
+@media(max-width:400px){
+  h1{font-size:32px}
+  h2{font-size:26px}
+  .hero-sub{font-size:16px}
+  .phone{width:210px;height:460px}
+}
+</style>
+</head>
+<body>
+
+<script>
+(function(){
+  var p = window.location.pathname;
+  var legal = ['/privacy','/terms','/refunds'];
+  if(legal.indexOf(p) === -1 && p !== '/' && p !== ''){
+    window.location.replace('/');
+  }
+})();
+</script>
+
+<!-- WAITLIST MODAL -->
+<div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()" aria-label="Close">×</button>
+    <div class="modal-icon">🗺️</div>
+    <div class="modal-tag">FOUNDING FAMILIES — LIMITED SPOTS</div>
+    <h3 id="modal-title">Be first to roam with us.</h3>
+    <p>RoamUs launches soon. Join our founding families list and we'll reach out the moment the app is live — plus early access pricing.</p>
+    <div class="modal-form" id="modal-form">
+      <input class="modal-input" type="text" id="wl-name" placeholder="Your first name" autocomplete="given-name" required/>
+      <input class="modal-input" type="email" id="wl-email" placeholder="Your email address" autocomplete="email" required/>
+      <button class="modal-submit" onclick="submitWaitlist()">Reserve my spot →</button>
+      <p class="modal-fine">No spam. Just a heads-up when we launch. Unsubscribe anytime.</p>
+    </div>
+    <div class="modal-success" id="modal-success">
+      <div style="font-size:48px;margin-bottom:16px">🎉</div>
+      <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--deep);margin-bottom:10px">You're on the list!</div>
+      <p style="font-size:14px;color:var(--muted);line-height:1.6">We'll email you the moment RoamUs launches. Watch for a message from <strong>hello@roamus.app</strong>.</p>
+    </div>
+  </div>
+</div>
+
+<nav>
+  <a class="nav-logo" href="/">RoamUs</a>
+  <div class="nav-links">
+    <a href="#how-it-works">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <button onclick="openModal()" class="btn-nav">Get early access</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-inner">
+    <div>
+      <div class="badge fu"><span class="badge-dot"></span> Launching soon on iPhone</div>
+      <h1 class="fu fu1">Every trip<br/>becomes <em>a story.</em></h1>
+      <p class="hero-sub fu fu2">Not a trip planner. A trip companion. RoamUs keeps your family present while it handles everything else — stops, timing, kids engaged, memories captured.</p>
+      <div class="hero-ctas fu fu3">
+        <button onclick="openModal()" class="btn-primary">📱 Get early access</button>
+        <a href="#how-it-works" class="btn-secondary">See how it works →</a>
+      </div>
+      <div class="founding-bar fu fu4">
+        <div class="founding-avatars">
+          <div class="avatar">👨‍👩‍👧</div><div class="avatar">👨‍👩‍👦</div>
+          <div class="avatar">👩‍👧‍👦</div><div class="avatar">👨‍👧</div>
+        </div>
+        <div class="founding-text">
+          <strong>Founding families waitlist open</strong>
+          Early access · Special launch pricing
+        </div>
+        <div class="founding-badge">LIMITED</div>
+      </div>
+    </div>
+    <div class="phone-wrap fu fu2">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-brand">RoamUs</div>
+          <div class="phone-greet">Good morning, Sarah 👋</div>
+          <div class="phone-sub">12 trips in your journal</div>
+          <div class="phone-card">
+            <div class="card-badge">ACTIVE TRIP</div>
+            <div class="card-title">Chicago Family Weekend</div>
+            <div class="card-meta">Day 1 of 3 · Next: Millennium Park</div>
+          </div>
+          <div class="phone-stop"><div class="stop-dot">🎭</div><div><div class="stop-name">Millennium Park</div><div class="stop-meta">Landmark · 10:00 AM · 60 min</div></div></div>
+          <div class="phone-stop"><div class="stop-dot">🍕</div><div><div class="stop-name">Lou Malnati's Pizzeria</div><div class="stop-meta">Food · 12:30 PM · 45 min</div></div></div>
+          <div class="phone-stop"><div class="stop-dot">🏛️</div><div><div class="stop-name">The Art Institute</div><div class="stop-meta">Museum · 2:00 PM · 90 min</div></div></div>
+          <div class="phone-nav">
+            <div class="ni"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8692A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="ni-lbl active">Trips</span></div>
+            <div class="ni"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="ni-lbl">Today</span></div>
+            <div class="ni"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span class="ni-lbl">At Stop</span></div>
+            <div class="ni"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="ni-lbl">Memories</span></div>
+            <div class="ni"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="ni-lbl">Me</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-float"><div class="fl">Kids engaged</div><div class="fv">3 missions</div><div class="fs">✓ All done today</div></div>
+      <div class="phone-float2"><div class="fl">Trip memory</div><div class="fv">Auto-generated</div><div class="fs">📸 11 photos saved</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem-sec">
+  <div class="section-inner">
+    <div class="section-label">The gap nobody talks about</div>
+    <h2 style="color:white">Plans are easy.<br/><em>Execution</em> is hard.</h2>
+    <p class="section-sub">You did everything right. Google Maps, TripAdvisor, Reddit threads. But on the day — kids complaining, stops running long, parents buried in phones. The plan fell apart.</p>
+    <div class="problem-grid">
+      <div class="pcell"><div class="pcell-icon">🗺️</div><div class="pcell-title">Google Maps knows where to go.</div><div class="pcell-body">It doesn't know you have a 7-year-old who needs a snack break, or that your family is done after stop 3. It gives you directions, not a day.</div></div>
+      <div class="pcell"><div class="pcell-icon">⭐</div><div class="pcell-title">TripAdvisor knows what's popular.</div><div class="pcell-body">It doesn't know what works for families like yours. A 4.8-star restaurant means nothing if no kid there is under 25.</div></div>
+      <div class="pcell"><div class="pcell-icon">📋</div><div class="pcell-title">Trip planners plan beautifully.</div><div class="pcell-body">But a great plan in Notes and a great day on the ground are different things. Nobody hands it to the family and says "run."</div></div>
+      <div class="pcell" style="background:rgba(232,105,42,.1)"><div class="pcell-icon">📱</div><div class="pcell-title" style="color:var(--orange)">RoamUs runs the day.</div><div class="pcell-body" style="color:rgba(255,255,255,.65)">At each stop it knows what's next. It keeps your kids engaged. It captures the moment. You stay present. The app handles the rest.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-inner">
+    <div class="section-label">How it works</div>
+    <h2>Four layers.<br/>One <em>smooth</em> day.</h2>
+    <p class="section-sub">RoamUs covers the entire trip lifecycle — before, during, and after. Each layer builds on the last.</p>
+    <div class="layers-grid">
+      <div class="layer-card"><div class="layer-num">01 — BEFORE YOUR TRIP</div><div class="layer-icon">🗓️</div><div class="layer-title">Build</div><p class="layer-body">Tell RoamUs where you're going, who's coming, and how you like to travel. It generates a smart itinerary — family-tested, not just tourist-popular.</p><span class="layer-tag tag-build">Planning layer</span></div>
+      <div class="layer-card dark"><div class="layer-num">02 — ON THE DAY</div><div class="layer-icon">📍</div><div class="layer-title">Run</div><p class="layer-body">This is the whole product. At each stop, RoamUs shows exactly what to do, how long to stay, what to see first. No decisions. No searching. Just be there.</p><span class="layer-tag tag-run">Core experience</span></div>
+      <div class="layer-card"><div class="layer-num">03 — FOR YOUR KIDS</div><div class="layer-icon">🎯</div><div class="layer-title">Engage</div><p class="layer-body">Every stop has age-appropriate missions — challenges, facts, photo hunts. They're not watching YouTube. They're part of the trip.</p><span class="layer-tag tag-engage">Kids layer</span></div>
+      <div class="layer-card"><div class="layer-num">04 — AFTER YOUR TRIP</div><div class="layer-icon">📖</div><div class="layer-title">Remember</div><p class="layer-body">When the trip ends, RoamUs auto-generates your family's story — photos, moments, kid quotes, map replay. Share it in one tap.</p><span class="layer-tag tag-memory">Memory layer</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section style="background:white">
+  <div class="section-inner">
+    <div class="section-label">Early families</div>
+    <h2>They tried it.<br/>Here's what <em>happened.</em></h2>
+    <p class="section-sub" style="margin-bottom:44px">From our founding families beta.</p>
+    <div class="testimonials-grid">
+      <div class="testimonial"><div class="stars">★★★★★</div><p class="testimonial-text">"First trip to Chicago where my husband wasn't buried in Google Maps the whole time. We actually stood at the Bean and just looked at it. That's never happened before."</p><div class="author"><div class="author-av">👩‍👧‍👦</div><div><div class="author-name">Jennifer M.</div><div class="author-meta">Chicago weekend · 2 kids, ages 5 and 8</div></div></div></div>
+      <div class="testimonial"><div class="stars">★★★★★</div><p class="testimonial-text">"My son completed 9 missions at Yellowstone. He was so focused on spotting the hidden animal near the geyser that he put his iPad down voluntarily. I have witnesses."</p><div class="author"><div class="author-av">👨‍👦</div><div><div class="author-name">Rahul T.</div><div class="author-meta">Yellowstone · son, age 9</div></div></div></div>
+      <div class="testimonial"><div class="stars">★★★★★</div><p class="testimonial-text">"The trip story RoamUs made after our NYC trip made me cry. My daughter's quotes, all our photos, the whole route on a map. It's the thing I'll show her when she's 25."</p><div class="author"><div class="author-av">👩‍👧</div><div><div class="author-name">Priya K.</div><div class="author-meta">New York City · daughter, age 10</div></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing-sec" id="pricing">
+  <div class="section-inner">
+    <div class="section-label">Pricing</div>
+    <h2>Start free.<br/>Pay when it <em>matters.</em></h2>
+    <p class="section-sub">Build your trip for free. Unlock the Run layer — the part that actually makes your day work — when you're ready to go.</p>
+    <div class="plans-grid">
+      <div class="plan">
+        <div class="plan-name">FREE EXPLORER</div>
+        <div class="plan-price">$0</div>
+        <div class="plan-cadence">always free</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span> Build up to 1 trip</li>
+          <li><span class="chk">✓</span> Day 1 preview (5 stops)</li>
+          <li><span class="chk">✓</span> AI trip suggestions</li>
+          <li><span class="chk">✓</span> Basic planning tools</li>
+        </ul>
+        <button onclick="openModal()" class="btn-plan btn-dark">Get started free</button>
+      </div>
+      <div class="plan popular">
+        <div class="plan-pop-badge">MOST POPULAR</div>
+        <div class="plan-name">GEOPASS MONTHLY</div>
+        <div class="plan-price" id="price-geopass">$4.99</div>
+        <div class="plan-cadence" id="cadence-geopass">per month · whole family</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span> Unlimited trips</li>
+          <li><span class="chk">✓</span> Full Run layer at every stop</li>
+          <li><span class="chk">✓</span> All kids missions + games</li>
+          <li><span class="chk">✓</span> Offline access</li>
+          <li><span class="chk">✓</span> Auto trip story + memories</li>
+          <li><span class="chk">✓</span> Push notifications</li>
+        </ul>
+        <button onclick="openModal()" class="btn-plan btn-orange">Join the waitlist</button>
+      </div>
+      <div class="plan">
+        <div class="plan-name">TRIP PACK</div>
+        <div class="plan-price" id="price-trippack">$9.99</div>
+        <div class="plan-cadence">per trip · one-time</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span> One full trip unlock</li>
+          <li><span class="chk">✓</span> Complete Run experience</li>
+          <li><span class="chk">✓</span> Kids missions included</li>
+          <li><span class="chk">✓</span> Trip story auto-generated</li>
+          <li><span class="chk">✓</span> Offline access for the trip</li>
+        </ul>
+        <button onclick="openModal()" class="btn-plan btn-dark">Join the waitlist</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-sec" id="download">
+  <div class="section-inner">
+    <div class="section-label" style="color:var(--sage)">Ready to roam?</div>
+    <h2>Your next trip<br/>deserves to <em>actually work.</em></h2>
+    <p class="section-sub">Join our founding families waitlist. We'll reach out the moment the app goes live — with early access and founding pricing.</p>
+    <div class="store-badges">
+      <button onclick="openModal()" class="store-badge" aria-label="Download on the App Store">
+        <div class="badge-icon">
+          <svg width="28" height="34" viewBox="0 0 28 34" fill="none">
+            <path d="M23.2 17.9c0-3.8 3.1-5.6 3.2-5.7-1.7-2.5-4.4-2.9-5.4-2.9-2.3-.2-4.5 1.3-5.6 1.3-1.2 0-2.9-1.3-4.8-1.3-2.5 0-4.8 1.5-6.1 3.7-2.6 4.5-.7 11.2 1.9 14.8 1.2 1.8 2.7 3.8 4.6 3.7 1.8-.1 2.5-1.2 4.8-1.2 2.2 0 2.9 1.2 4.8 1.1 2-.1 3.2-1.8 4.4-3.6 1.4-2 2-4 2-4.1-.1 0-3.8-1.4-3.8-5.8zM19.5 6.4c1-1.3 1.8-3 1.5-4.8-1.5.1-3.4 1-4.5 2.3-1 1.1-1.8 2.9-1.6 4.6 1.7.1 3.4-1 4.6-2.1z" fill="white"/>
+          </svg>
+        </div>
+        <div class="badge-text">
+          <span class="badge-line1">Download on the</span>
+          <span class="badge-line2">App Store</span>
+        </div>
+      </button>
+      <button onclick="openModal()" class="store-badge store-badge-soon" aria-label="Get it on Google Play - Coming Soon">
+        <div class="badge-icon">
+          <svg width="24" height="27" viewBox="0 0 24 27" fill="none">
+            <path d="M1.2.8C.5 1.5.1 2.6.1 4v19c0 1.4.4 2.5 1.1 3.2l.1.1L12.6 15v-.3L1.3.7z" fill="#4FC3F7"/>
+            <path d="M16.5 19.1l-3.9-3.9v-.3l3.9-3.9.1.1 4.6 2.6c1.3.7 1.3 1.9 0 2.6l-4.7 2.8z" fill="#FFCA28"/>
+            <path d="M16.6 19l-4-4L1.2 26.2c.4.5 1.1.5 2 .1L16.6 19z" fill="#F44336"/>
+            <path d="M16.6 11l-14.4-8c-.9-.5-1.6-.4-2 .1L12.6 15l4-4z" fill="#4CAF50"/>
+          </svg>
+        </div>
+        <div class="badge-text">
+          <span class="badge-line1">Coming soon to</span>
+          <span class="badge-line2">Google Play</span>
+        </div>
+      </button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">RoamUs</div>
+  <div class="footer-links">
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+    <a href="/refunds">Refunds</a>
+    <a href="mailto:hello@roamus.app">Contact</a>
+  </div>
+  <div class="footer-copy">© 2025 RoamUs. All rights reserved.</div>
+</footer>
+
+<script>
+function openModal(){
+  document.getElementById('modal').classList.add('open');
+  document.body.style.overflow='hidden';
+  setTimeout(function(){document.getElementById('wl-name').focus();},300);
+}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.getElementById('modal').addEventListener('click',function(e){
+  if(e.target===this) closeModal();
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape') closeModal();
+});
+function submitWaitlist(){
+  var name=document.getElementById('wl-name').value.trim();
+  var email=document.getElementById('wl-email').value.trim();
+  if(!name){document.getElementById('wl-name').focus();return;}
+  if(!email||!email.includes('@')){document.getElementById('wl-email').focus();return;}
+  fetch('/api/waitlist',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,email:email,source:'landing_page',timestamp:new Date().toISOString()})
+  }).catch(function(){});
+  document.getElementById('modal-form').classList.add('hide');
+  document.getElementById('modal-success').classList.add('show');
+}
+
+// Geo-based pricing — defaults shown immediately, updated async
+(function(){
+  function applyPricing(p){
+    var gp=document.getElementById('price-geopass');
+    var tp=document.getElementById('price-trippack');
+    var cd=document.getElementById('cadence-geopass');
+    if(gp) gp.textContent=p.symbol+p.geopass;
+    if(tp) tp.textContent=p.symbol+p.trippack;
+    if(cd && p.cadence) cd.textContent=p.cadence;
+  }
+  fetch('/api/pricing')
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(p){if(p) applyPricing(p);})
+    .catch(function(){});
+})();
+</script>
+</body>
+</html>

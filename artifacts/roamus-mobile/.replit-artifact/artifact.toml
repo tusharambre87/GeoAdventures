@@ -1,0 +1,26 @@
+kind = "mobile"
+previewPath = "/roamus-mobile/"
+title = "RoamUs"
+version = "1.0.0"
+id = "artifacts/roamus-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+name = "expo"
+paths = [ "/roamus-mobile/" ]
+localPort = 5000
+
+[services.development]
+run = "pnpm --filter @workspace/roamus-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/roamus-mobile", "run", "build" ]
+run = [ "sh", "artifacts/roamus-mobile/start.sh" ]
+
+[services.env]
+PORT = "5000"
+BASE_PATH = "/roamus-mobile/"
