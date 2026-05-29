@@ -271,31 +271,64 @@ function MealCard({ stop }: { stop: TripStop }) {
 
 // ─── RouteMapCard ─────────────────────────────────────────────────────────────
 
+function buildOsmUrl(stops: TripStop[]): string | null {
+  const pts = stops
+    .map(s => ({ lat: parseFloat(s.latitude ?? ""), lng: parseFloat(s.longitude ?? "") }))
+    .filter(p => !isNaN(p.lat) && !isNaN(p.lng));
+  if (pts.length === 0) return null;
+  const centerLat = pts.reduce((a, p) => a + p.lat, 0) / pts.length;
+  const centerLng = pts.reduce((a, p) => a + p.lng, 0) / pts.length;
+  const markers = pts.slice(0, 5).map((p, i) => `${p.lat},${p.lng},red-${i + 1}`).join("|");
+  return (
+    `https://staticmap.openstreetmap.de/staticmap.php` +
+    `?center=${centerLat.toFixed(6)},${centerLng.toFixed(6)}` +
+    `&zoom=13&size=600x200&markers=${markers}`
+  );
+}
+
 function RouteMapCard({ stops }: { stops: TripStop[] }) {
   const content = stops.filter(s => !isMealStop(s.stopType));
   const totalTravel = Math.max(0, content.length - 1) * 18;
+  const mapUrl = buildOsmUrl(content);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <View style={rm.card}>
-      <View style={rm.bg}>
-        {content.slice(0, 5).map((s, i) => (
-          <View
-            key={s.id}
-            style={[rm.pin, { left: 24 + i * 54, top: 30 + (i % 2 === 0 ? 20 : 50) }]}
-          >
-            <View style={rm.pinDot}>
-              <Text style={rm.pinNum}>{i + 1}</Text>
+      {mapUrl && !imgError ? (
+        <>
+          <Image
+            source={{ uri: mapUrl }}
+            style={rm.mapImage}
+            contentFit="cover"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgError(true)}
+          />
+          {!imgLoaded && (
+            <View style={rm.loadingOverlay}>
+              <ActivityIndicator size="small" color={G.orange} />
             </View>
-            {i < content.slice(0, 5).length - 1 && (
-              <View style={rm.connector} />
-            )}
-          </View>
-        ))}
-      </View>
+          )}
+        </>
+      ) : (
+        <View style={rm.bg}>
+          {content.slice(0, 5).map((s, i) => (
+            <View
+              key={s.id}
+              style={[rm.pin, { left: 24 + i * 54, top: 30 + (i % 2 === 0 ? 20 : 50) }]}
+            >
+              <View style={rm.pinDot}>
+                <Text style={rm.pinNum}>{i + 1}</Text>
+              </View>
+              {i < content.slice(0, 5).length - 1 && <View style={rm.connector} />}
+            </View>
+          ))}
+        </View>
+      )}
       <View style={rm.overlay}>
         <Text style={rm.info}>{content.length} stops · ~{formatDuration(totalTravel)} travel</Text>
         <Pressable style={rm.btn}>
-          <Text style={rm.btnText}>Full map</Text>
+          <Text style={rm.btnText}>Open in Maps</Text>
         </Pressable>
       </View>
     </View>
@@ -1072,6 +1105,11 @@ const rm = StyleSheet.create({
     backgroundColor: "#e8f2e8", borderRadius: 14, borderWidth: 0.5,
     borderColor: "rgba(26,31,46,0.08)", height: 140, overflow: "hidden", marginBottom: 4,
     position: "relative",
+  },
+  mapImage: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  loadingOverlay: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: "center", justifyContent: "center", backgroundColor: "#e8f2e8",
   },
   bg: { position: "absolute", inset: 0 as any },
   pin: { position: "absolute", alignItems: "center" },
