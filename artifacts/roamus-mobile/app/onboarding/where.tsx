@@ -134,11 +134,20 @@ function stopImg(spot: { type?: string; emoji?: string }, idx = 0) {
 }
 
 function stopTag(type?: string): string {
-  if (!type) return "Free · All ages";
+  if (!type) return "⭐ All ages";
   const t = type.toLowerCase();
-  if (t.includes("museum") || t.includes("art") || t.includes("science") || t.includes("aquarium") || t.includes("zoo")) return "Ticket · Ages 5+";
-  if (t.includes("food") || t.includes("restaurant") || t.includes("market")) return "Food · All ages";
-  return "Free · All ages";
+  if (t.includes("museum"))               return "🏛️ Museum";
+  if (t.includes("zoo"))                  return "🦁 Animals";
+  if (t.includes("aquarium"))             return "🐟 Aquarium";
+  if (t.includes("science"))              return "🔬 Science";
+  if (t.includes("art") || t.includes("gallery")) return "🎨 Art";
+  if (t.includes("food") || t.includes("restaurant") || t.includes("market")) return "🍕 Food";
+  if (t.includes("park") || t.includes("garden") || t.includes("nature"))     return "🌿 Outdoors";
+  if (t.includes("beach"))                return "🌊 Beach";
+  if (t.includes("landmark") || t.includes("monument")) return "📍 Landmark";
+  if (t.includes("entertainment") || t.includes("playground")) return "🎡 Fun";
+  if (t.includes("viewpoint"))            return "🔭 Views";
+  return "⭐ Stop";
 }
 
 // ─── Stop row in dark card ──────────────────────────────────────────────────

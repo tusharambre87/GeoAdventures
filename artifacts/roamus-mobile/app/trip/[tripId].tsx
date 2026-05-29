@@ -24,6 +24,37 @@ import { API_BASE } from "@/lib/authContext";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// ─── Stop type → Unsplash fallback image ─────────────────────────────────────
+
+const STOP_TYPE_IMGS: Record<string, string> = {
+  museum:        "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&q=80",
+  park:          "https://images.unsplash.com/photo-1585572219585-c6e1e19eec21?w=400&q=80",
+  garden:        "https://images.unsplash.com/photo-1585572219585-c6e1e19eec21?w=400&q=80",
+  nature:        "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80",
+  food:          "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80",
+  restaurant:    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
+  market:        "https://images.unsplash.com/photo-1476224203421-9ac39bcb3df4?w=400&q=80",
+  landmark:      "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=80",
+  monument:      "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=80",
+  zoo:           "https://images.unsplash.com/photo-1503095396549-807759245b35?w=400&q=80",
+  aquarium:      "https://images.unsplash.com/photo-1461696114087-397271a7aedc?w=400&q=80",
+  art:           "https://images.unsplash.com/photo-1531913223931-c43e5f4c6cd0?w=400&q=80",
+  gallery:       "https://images.unsplash.com/photo-1531913223931-c43e5f4c6cd0?w=400&q=80",
+  science:       "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=400&q=80",
+  beach:         "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80",
+  entertainment: "https://images.unsplash.com/photo-1548438294-1ad5d5f4f063?w=400&q=80",
+  playground:    "https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=400&q=80",
+  viewpoint:     "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80",
+};
+const STOP_IMG_FALLBACK = "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=80";
+
+function stopTypeImage(type?: string | null): string {
+  if (!type) return STOP_IMG_FALLBACK;
+  const t = type.toLowerCase();
+  const key = Object.keys(STOP_TYPE_IMGS).find(k => t.includes(k));
+  return key ? STOP_TYPE_IMGS[key] : STOP_IMG_FALLBACK;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CITY_COLORS = ["#3b82f6", "#a855f7", "#14b8a6", "#f43f5e", "#f97316", "#84cc16"];
@@ -213,13 +244,11 @@ function StopCard({
         {!isLast && <View style={sd.line} />}
       </View>
       <View style={sd.card}>
-        {heroImg ? (
-          <Image source={{ uri: heroImg }} style={sd.img} contentFit="cover" />
-        ) : (
-          <View style={[sd.img, sd.imgPlaceholder]}>
-            <Ionicons name="image-outline" size={22} color={G.muted} />
-          </View>
-        )}
+        <Image
+          source={{ uri: heroImg ?? stopTypeImage(stop.stopType) }}
+          style={sd.img}
+          contentFit="cover"
+        />
         <View style={sd.body}>
           <Text style={sd.name} numberOfLines={2}>{stop.name}</Text>
           <View style={sd.meta}>
@@ -659,8 +688,10 @@ function StopDetailSheet({
 
   const storyPack = (stop as any).storyPack as { mainStory?: string } | null | undefined;
   const rawStory = storyPack?.mainStory ?? null;
-  const mainStory = rawStory ? rawStory.slice(0, 300) : null;
-  const showEllipsis = rawStory && rawStory.length > 300;
+  const cleanStory = (text: string) => text.replace(/\[.*?\]/g, '').trim();
+  const cleanedStory = rawStory ? cleanStory(rawStory) : null;
+  const mainStory = cleanedStory ? cleanedStory.slice(0, 300) : null;
+  const showEllipsis = cleanedStory && cleanedStory.length > 300;
   const whyItWorks = (stop.metadata as any)?.whyItWorks as string | null | undefined;
   const bathroomNotes = (stop.metadata as any)?.bathroomNotes as string | null | undefined;
   const missions = stop.stopMissions?.slice(0, 3) ?? [];
@@ -677,13 +708,11 @@ function StopDetailSheet({
         </Pressable>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ds.scrollBody}>
-          {heroImg ? (
-            <Image source={{ uri: heroImg }} style={ds.heroImg} contentFit="cover" />
-          ) : (
-            <View style={ds.heroPlaceholder}>
-              <Ionicons name="image-outline" size={32} color={G.muted} />
-            </View>
-          )}
+          <Image
+            source={{ uri: heroImg ?? stopTypeImage(stop?.stopType) }}
+            style={ds.heroImg}
+            contentFit="cover"
+          />
 
           <View style={ds.nameBlock}>
             <Text style={ds.stopName}>{stop.name}</Text>

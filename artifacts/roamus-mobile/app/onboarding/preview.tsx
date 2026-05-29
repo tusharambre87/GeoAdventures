@@ -313,20 +313,19 @@ export default function PreviewScreen() {
     : `Your ${primaryCity} trip is ready 🎉`;
   const routeStr = isMulti ? data.cities.join(" → ") : "";
 
+  const heroHeight = insets.top + 120;
+
   return (
     <View style={[s.root, { backgroundColor: "#1A1F2E" }]}>
-      {/* ── Hero header ── */}
-      <View style={[s.hero, { paddingTop: insets.top + 16 }]}>
-        {/* Background: wrapped in absoluteFill View so expo-image never enters the flex flow */}
-        <View style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}>
-          {landmarkImg ? (
-            <Image source={{ uri: landmarkImg }} style={{ flex: 1 }} contentFit="cover" />
-          ) : (
-            <View style={[{ flex: 1 }, s.heroPlaceholder]} />
-          )}
-          <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
-        </View>
-        <View style={s.heroContent}>
+      {/* ── Hero header — fixed height prevents expo-image from expanding layout ── */}
+      <View style={[s.hero, { height: heroHeight }]}>
+        {landmarkImg ? (
+          <Image source={{ uri: landmarkImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, s.heroPlaceholder]} />
+        )}
+        <LinearGradient colors={["rgba(26,31,46,0.15)","rgba(26,31,46,0.97)"]} locations={[0,1]} style={StyleSheet.absoluteFill} />
+        <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
           <Text style={s.heroTitle}>{tripTitle}</Text>
           {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
           <Text style={s.heroMeta}>
@@ -405,9 +404,9 @@ export default function PreviewScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  hero: { position: "relative", paddingHorizontal: 20, paddingBottom: 20 },
+  hero: { overflow: "hidden" },
   heroPlaceholder: { backgroundColor: G.deep },
-  heroContent: {},
+  heroContent: { paddingHorizontal: 20 },
   heroTitle: { fontFamily:F.bold, fontSize:20, fontWeight:"800", color:"#fff", letterSpacing:-0.4, lineHeight:27, marginBottom:4 },
   heroRoute: { fontFamily:F.semibold, fontSize:14, fontWeight:"600", color:G.orange, marginBottom:3 },
   heroMeta: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.55)" },
