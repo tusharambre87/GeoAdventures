@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import Svg, { Circle, G as SvgG, Polyline, Text as SvgText } from "react-native-svg";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -271,6 +272,37 @@ function MealCard({ stop }: { stop: TripStop }) {
 
 // ─── RouteMapCard ─────────────────────────────────────────────────────────────
 
+function lon2tile(lon: number, zoom: number) {
+  return Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
+}
+function lat2tile(lat: number, zoom: number) {
+  return Math.floor(
+    (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI)
+    / 2 * Math.pow(2, zoom)
+  );
+}
+function latLngToPixel(
+  lat: number, lng: number,
+  centerLat: number, centerLng: number,
+  zoom: number,
+  cardWidth: number, cardHeight: number
+): { x: number; y: number } {
+  const scale = Math.pow(2, zoom) * 256;
+  const centerX = (centerLng + 180) / 360 * scale;
+  const sinLat = Math.sin(centerLat * Math.PI / 180);
+  const centerY = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale;
+  const sinStopLat = Math.sin(lat * Math.PI / 180);
+  const stopX = (lng + 180) / 360 * scale;
+  const stopY = (0.5 - Math.log((1 + sinStopLat) / (1 - sinStopLat)) / (4 * Math.PI)) * scale;
+  return {
+    x: cardWidth / 2 + (stopX - centerX),
+    y: cardHeight / 2 + (stopY - centerY),
+  };
+}
+
+const CARD_W = 340;
+const CARD_H = 160;
+
 function RouteMapCard({ stops, totalTravelMins }: {
   stops: TripStop[];
   totalTravelMins: number;
@@ -283,14 +315,15 @@ function RouteMapCard({ stops, totalTravelMins }: {
       name: s.name,
     }));
 
-  const [imgError, setImgError] = useState(false);
-
   if (geo.length === 0) {
     return (
       <View style={rm.card}>
         <View style={rm.empty}>
           <Ionicons name="map-outline" size={24} color={G.muted} />
           <Text style={rm.emptyText}>Map loading…</Text>
+        </View>
+        <View style={rm.overlay}>
+          <Text style={rm.overlayText}>{stops.length} stops</Text>
         </View>
       </View>
     );
@@ -301,41 +334,62 @@ function RouteMapCard({ stops, totalTravelMins }: {
   const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
   const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
 
-  const latSpread = Math.max(...lats) - Math.min(...lats);
-  const lngSpread = Math.max(...lngs) - Math.min(...lngs);
-  const spread = Math.max(latSpread, lngSpread);
-  const zoom = spread < 0.02 ? 15
-    : spread < 0.05 ? 14
-    : spread < 0.1 ? 13
-    : spread < 0.2 ? 12
+  const spread = Math.max(
+    Math.max(...lats) - Math.min(...lats),
+    Math.max(...lngs) - Math.min(...lngs)
+  );
+  const zoom = spread < 0.01 ? 15
+    : spread < 0.03 ? 14
+    : spread < 0.08 ? 13
+    : spread < 0.15 ? 12
     : 11;
 
-  const markers = geo
-    .slice(0, 6)
-    .map((g, i) => `${g.lat.toFixed(4)},${g.lng.toFixed(4)},red-${i + 1}`)
-    .join("|");
+  const tileX = lon2tile(centerLng, zoom);
+  const tileY = lat2tile(centerLat, zoom);
+  const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
 
-  const mapUrl =
-    `https://staticmap.openstreetmap.de/staticmap.php` +
-    `?center=${centerLat.toFixed(4)},${centerLng.toFixed(4)}` +
-    `&zoom=${zoom}&size=600x200&maptype=mapnik` +
-    `&markers=${markers}`;
+  const pins = geo.slice(0, 6).map((g, i) => ({
+    ...latLngToPixel(g.lat, g.lng, centerLat, centerLng, zoom, CARD_W, CARD_H),
+    label: String(i + 1),
+    name: g.name,
+  }));
+
+  const polylinePoints = pins.map(p => `${p.x},${p.y}`).join(" ");
 
   return (
-    <View style={rm.card}>
-      {imgError ? (
-        <View style={rm.empty}>
-          <Ionicons name="map-outline" size={24} color={G.muted} />
-          <Text style={rm.emptyText}>Map unavailable</Text>
-        </View>
-      ) : (
-        <Image
-          source={{ uri: mapUrl }}
-          style={rm.mapImg}
-          contentFit="cover"
-          onError={() => setImgError(true)}
-        />
-      )}
+    <View style={[rm.card, { width: CARD_W, height: CARD_H }]}>
+      <Image
+        source={{ uri: tileUrl }}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+      />
+      <Svg width={CARD_W} height={CARD_H} style={StyleSheet.absoluteFillObject}>
+        {pins.length > 1 && (
+          <Polyline
+            points={polylinePoints}
+            stroke="#f97316"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        )}
+        {pins.map((pin, i) => (
+          <SvgG key={i}>
+            <Circle cx={pin.x} cy={pin.y} r={11} fill="#f97316" />
+            <SvgText
+              x={pin.x}
+              y={pin.y + 4}
+              textAnchor="middle"
+              fill="white"
+              fontSize={10}
+              fontWeight="bold"
+            >
+              {pin.label}
+            </SvgText>
+          </SvgG>
+        ))}
+      </Svg>
       <View style={rm.overlay}>
         <Text style={rm.overlayText}>
           {geo.length} stop{geo.length !== 1 ? "s" : ""} · ~{totalTravelMins} min travel
