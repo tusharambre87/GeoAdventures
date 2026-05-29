@@ -205,31 +205,52 @@ function buildAllDays(
   }
   while (dayCities.length < totalDays) dayCities.push(cities[0] ?? "Your City");
 
-  // apiDays contain stops for the PRIMARY city only — never recycle them into
-  // days that belong to a different city (fixes NY days showing Chicago stops)
+  // Collect unique stops from the primary-city API data (no cycling/repeating)
   const primaryBase = apiDays.length > 0 ? apiDays : FALLBACK_DAYS;
   const primaryCity = cities[0] ?? "Your City";
 
-  let primaryIdx = 0;
-  let otherIdx   = 0;
+  const seenPrimary = new Set<string>();
+  const primaryPool: DisplayStop[] = [];
+  for (const day of primaryBase) {
+    for (const stop of day.stops) {
+      if (!seenPrimary.has(stop.name)) {
+        seenPrimary.add(stop.name);
+        primaryPool.push({ ...stop });
+      }
+    }
+  }
+
+  // Fallback pool for non-primary cities (generic stops, no NY stops on Chicago days)
+  const seenFallback = new Set<string>();
+  const fallbackPool: DisplayStop[] = [];
+  for (const day of FALLBACK_DAYS) {
+    for (const stop of day.stops) {
+      if (!seenFallback.has(stop.name)) {
+        seenFallback.add(stop.name);
+        fallbackPool.push({ ...stop });
+      }
+    }
+  }
+
+  const STOPS_PER_DAY = 3;
+  let primaryCursor = 0;
+  let fallbackCursor = 0;
   const result: DisplayDay[] = [];
 
   for (let i = 0; i < totalDays; i++) {
     const city      = dayCities[i] ?? primaryCity;
     const isPrimary = cities.length === 1 || city === primaryCity;
 
-    let src: DisplayDay;
+    let dayStops: DisplayStop[];
     if (isPrimary) {
-      src = primaryBase[primaryIdx % primaryBase.length];
-      primaryIdx++;
+      dayStops = primaryPool.slice(primaryCursor, primaryCursor + STOPS_PER_DAY);
+      primaryCursor += STOPS_PER_DAY;
     } else {
-      // Use generic FALLBACK_DAYS for non-primary cities so we never
-      // display e.g. "Chicago Children's Museum" on a New York day
-      src = FALLBACK_DAYS[otherIdx % FALLBACK_DAYS.length];
-      otherIdx++;
+      dayStops = fallbackPool.slice(fallbackCursor, fallbackCursor + STOPS_PER_DAY);
+      fallbackCursor += STOPS_PER_DAY;
     }
 
-    result.push({ label: `Day ${i + 1}`, city, stops: src.stops.map(st => ({ ...st })) });
+    result.push({ label: `Day ${i + 1}`, city, stops: dayStops });
   }
   return result;
 }
