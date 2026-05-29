@@ -5,7 +5,8 @@ import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary } from "@workspace/db";
-import { computeStopQualityScore } from "../stopQualityScoring";
+import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
+import { selectStopsFromPool, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification } from "../email";
@@ -5106,43 +5107,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Wait briefly so AdventureBuilder can POST anchors to DB before we generate stops
         await new Promise(r => setTimeout(r, 2500));
 
-        try {
-          const openai = getOpenAI();
-          const geoResponse = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: "You are a geography expert. Return ONLY a JSON object with 'lat' and 'lon' for the given city/destination." },
-              { role: "user", content: `Find coordinates for: ${cityName}` },
-            ],
-            response_format: { type: "json_object" },
-          });
-          const coords = JSON.parse(geoResponse.choices[0].message.content || "{}");
-          if (coords.lat && coords.lon) {
-            await storage.updateTrip(tripId, { latitude: String(coords.lat), longitude: String(coords.lon) });
-          }
-        } catch (e) {
-          console.error("[bg] Error fetching trip coordinates:", e);
-        }
-
-        // Fetch any pre-booked anchors the user added so AI can plan around them
-        let tripAnchorsForGeneration: { name: string; day: number; time: string | null; durationMinutes: number | null; anchorType: string; flexibility: string }[] = [];
-        try {
-          const existingAnchors = await storage.getAnchorsByTripId(tripId);
-          tripAnchorsForGeneration = existingAnchors.map(a => ({
-            name: a.name,
-            day: a.day,
-            time: a.time || null,
-            durationMinutes: a.durationMinutes || null,
-            anchorType: a.anchorType,
-            flexibility: a.flexibility || "hard",
-          }));
-          if (tripAnchorsForGeneration.length > 0) {
-            console.log(`📌 [bg] Found ${tripAnchorsForGeneration.length} anchors to plan around for trip ${tripId}`);
-          }
-        } catch (e) {
-          console.error("[bg] Error fetching anchors:", e);
-        }
-
         // Compute stop count: always derive from tripDays×pace so the correct number of days shows in the plan
         // packed=4 (not 6) — 6 stops × 90 min avg + travel pushes the day past 10pm
         const stopsPerDayByPace = pace === "chill" ? 3 : pace === "packed" ? 4 : 4;
@@ -5152,104 +5116,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fullTrip = await storage.getTripById(tripId);
         const tripTailoring = fullTrip?.tailoring as any;
 
-        // ── Derive explorer age groups for signal-aware generation ────────────
-        let tripAgeGroups: string[] = [];
+        // ── Derive children ages for pool selection ───────────────────────────
+        let childrenAges: number[] = [];
         try {
           const tripTravelers = (fullTrip?.travelers ?? []) as Array<{ explorerId?: string }>;
           const travelerIds = tripTravelers.map(t => t.explorerId).filter(Boolean) as string[];
           if (travelerIds.length > 0) {
             const explorerRows = await db.select({ age: players.age }).from(players)
-              .where(sql`${players.id} = ANY(${travelerIds})`);
-            const ageSet = new Set<string>();
-            for (const row of explorerRows) {
-              const n = parseInt(row.age ?? "0", 10);
-              if (n > 0) ageSet.add(ageToGroup(n));
-            }
-            tripAgeGroups = Array.from(ageSet);
+              .where(drizzleSql`${players.id} = ANY(${travelerIds})`);
+            childrenAges = explorerRows.map(r => parseInt(r.age ?? "0", 10)).filter(n => n > 0);
           }
         } catch { /* non-fatal */ }
 
-        const generatedStops = await generateCityStops(
-          cityName, state || null, country, effectiveStopCount,
-          adventureStyle || 'family_explorer',
-          mealPreferences || undefined,
-          tripAnchorsForGeneration,
-          tripDays || undefined,
-          tripTailoring || undefined,
-          tripAgeGroups.length > 0 ? tripAgeGroups : undefined
-        );
-        for (const stop of generatedStops) {
-          await storage.createStop({
-            tripId,
-            name: stop.name,
-            stopType: stop.stopType || 'landmark',
-            displayOrder: stop.displayOrder,
-            address: stop.address || null,
-            description: stop.description || null,
-            latitude: stop.latitude || null,
-            longitude: stop.longitude || null,
-            missionType: stop.missionType || null,
-            missionQuestion: stop.missionQuestion || null,
-            missionHint: stop.missionHint || null,
-            missionAnswer: stop.missionAnswer || null,
-            missionDifficulty: stop.missionDifficulty || 'normal',
-            missionKeepsakeReward: stop.missionKeepsakeReward || false,
-            stopMissions: stop.stopMissions
-              ? stop.stopMissions.map(m => ({ ...m, xpReward: m.type === 'photo' ? 10 : 5, completed: false, skipped: false, attempts: 0 }))
-              : null,
-            cityGroup: cityName,
-            metadata: (stop.durationMinutes || stop.sessionFit || stop.durationClass || stop.anchorScore || stop.dropPriority)
-              ? {
-                  durationMinutes: stop.durationMinutes ?? null,
-                  sessionFit: stop.sessionFit ?? null,
-                  durationClass: stop.durationClass ?? null,
-                  anchorScore: stop.anchorScore ?? null,
-                  dropPriority: stop.dropPriority ?? null,
-                }
-              : null,
-          });
-        }
-        const missionCount = generatedStops.filter(s => s.missionType).length;
-        if (missionCount > 0) {
-          await storage.updateTrip(tripId, { totalMissions: missionCount, missionsCompleted: 0, missionXpTotal: 0 });
-        }
-        console.log(`✅ [Travel] [bg] Created ${generatedStops.length} AI stops (${missionCount} missions)`);
-
-        // ── Fire-and-forget: seed AI cold-start signals for new stops ─────────
-        generateAIColdStartSignals(
-          cityName, country,
-          generatedStops.map(s => ({ name: s.name, stopType: s.stopType, latitude: s.latitude, longitude: s.longitude }))
-        ).catch(e => console.error("[FamilySignals] Cold-start seed failed:", e));
-
-        (async () => {
-          try {
-            const existingArtifacts = await storage.getAllArtifacts();
-            const coveredStops = new Set(existingArtifacts.map(a => a.stopName));
-            const uncoveredStops = generatedStops.filter(s => !coveredStops.has(s.name));
-            if (uncoveredStops.length > 0) {
-              const cityNameForKeepsakes = city || destination;
-              const generated = await generateArtifactsForStops(
-                uncoveredStops.map(s => ({ name: s.name, stopType: s.stopType })),
-                cityNameForKeepsakes
-              );
-              for (const artifact of generated) {
-                await storage.createArtifact({
-                  stopName: artifact.stopName,
-                  name: artifact.name,
-                  description: artifact.description,
-                  imageEmoji: artifact.imageEmoji,
-                  rarity: artifact.rarity,
-                  unlockType: artifact.unlockType,
-                  unlockConfig: artifact.unlockConfig || null,
-                  displayOrder: artifact.displayOrder,
-                });
-              }
-              console.log(`🏆 [Travel] [bg] Generated ${generated.length} keepsakes for ${cityNameForKeepsakes}`);
+        // ── Try pool first (zero AI calls for cached cities) ──────────────────
+        let usedPool = false;
+        try {
+          const cachedPool = await storage.getCityStopPool(cityName, country);
+          if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
+            console.log(`🎯 [Travel] [bg] Pool hit for ${cityName}`);
+            const firstWithCoords = (cachedPool.stopPool as any[]).find(s => s.latitude && s.longitude);
+            if (firstWithCoords) {
+              await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
-          } catch (artifactError) {
-            console.error("[bg] Error generating keepsakes:", artifactError);
+            const plannerPace: "relaxed" | "moderate" | "busy" =
+              pace === "chill" ? "relaxed" : pace === "packed" ? "busy" : "moderate";
+            const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (stopsPerDayByPace || 3));
+            const plannerInput: PlannerInput = {
+              destination: cityName,
+              tripDays: plannerTripDays,
+              childrenAges,
+              pace: plannerPace,
+            };
+            const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
+            for (let i = 0; i < selectedStops.length; i++) {
+              const stop = selectedStops[i];
+              await storage.createStop({
+                tripId,
+                name: stop.name,
+                stopType: stop.type || 'landmark',
+                displayOrder: stop.displayOrder ?? i,
+                address: stop.address || null,
+                description: null,
+                latitude: stop.latitude || null,
+                longitude: stop.longitude || null,
+                missionType: null,
+                missionQuestion: null,
+                missionHint: null,
+                missionAnswer: null,
+                missionDifficulty: 'normal',
+                missionKeepsakeReward: false,
+                stopMissions: null,
+                cityGroup: cityName,
+                metadata: stop.durationMinutes
+                  ? { durationMinutes: stop.durationMinutes, sessionFit: null, durationClass: null, anchorScore: null, dropPriority: null }
+                  : null,
+              });
+            }
+            console.log(`✅ [Travel] [bg] Pool-served ${selectedStops.length} stops for ${cityName} (0 AI calls)`);
+            usedPool = true;
           }
-        })();
+        } catch (poolErr) {
+          console.error(`[Travel] [bg] Pool selection failed, falling back to AI:`, poolErr);
+        }
+
+        if (!usedPool) {
+          try {
+            const openai = getOpenAI();
+            const geoResponse = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [
+                { role: "system", content: "You are a geography expert. Return ONLY a JSON object with 'lat' and 'lon' for the given city/destination." },
+                { role: "user", content: `Find coordinates for: ${cityName}` },
+              ],
+              response_format: { type: "json_object" },
+            });
+            const coords = JSON.parse(geoResponse.choices[0].message.content || "{}");
+            if (coords.lat && coords.lon) {
+              await storage.updateTrip(tripId, { latitude: String(coords.lat), longitude: String(coords.lon) });
+            }
+          } catch (e) {
+            console.error("[bg] Error fetching trip coordinates:", e);
+          }
+
+          // Fetch any pre-booked anchors the user added so AI can plan around them
+          let tripAnchorsForGeneration: { name: string; day: number; time: string | null; durationMinutes: number | null; anchorType: string; flexibility: string }[] = [];
+          try {
+            const existingAnchors = await storage.getAnchorsByTripId(tripId);
+            tripAnchorsForGeneration = existingAnchors.map(a => ({
+              name: a.name,
+              day: a.day,
+              time: a.time || null,
+              durationMinutes: a.durationMinutes || null,
+              anchorType: a.anchorType,
+              flexibility: a.flexibility || "hard",
+            }));
+            if (tripAnchorsForGeneration.length > 0) {
+              console.log(`📌 [bg] Found ${tripAnchorsForGeneration.length} anchors to plan around for trip ${tripId}`);
+            }
+          } catch (e) {
+            console.error("[bg] Error fetching anchors:", e);
+          }
+
+          // ── Derive explorer age groups for signal-aware generation ────────────
+          let tripAgeGroups: string[] = [];
+          try {
+            const tripTravelers = (fullTrip?.travelers ?? []) as Array<{ explorerId?: string }>;
+            const travelerIds = tripTravelers.map(t => t.explorerId).filter(Boolean) as string[];
+            if (travelerIds.length > 0) {
+              const explorerRows = await db.select({ age: players.age }).from(players)
+                .where(drizzleSql`${players.id} = ANY(${travelerIds})`);
+              const ageSet = new Set<string>();
+              for (const row of explorerRows) {
+                const n = parseInt(row.age ?? "0", 10);
+                if (n > 0) ageSet.add(ageToGroup(n));
+              }
+              tripAgeGroups = Array.from(ageSet);
+            }
+          } catch { /* non-fatal */ }
+
+          const generatedStops = await generateCityStops(
+            cityName, state || null, country, effectiveStopCount,
+            adventureStyle || 'family_explorer',
+            mealPreferences || undefined,
+            tripAnchorsForGeneration,
+            tripDays || undefined,
+            tripTailoring || undefined,
+            tripAgeGroups.length > 0 ? tripAgeGroups : undefined
+          );
+          for (const stop of generatedStops) {
+            await storage.createStop({
+              tripId,
+              name: stop.name,
+              stopType: stop.stopType || 'landmark',
+              displayOrder: stop.displayOrder,
+              address: stop.address || null,
+              description: stop.description || null,
+              latitude: stop.latitude || null,
+              longitude: stop.longitude || null,
+              missionType: stop.missionType || null,
+              missionQuestion: stop.missionQuestion || null,
+              missionHint: stop.missionHint || null,
+              missionAnswer: stop.missionAnswer || null,
+              missionDifficulty: stop.missionDifficulty || 'normal',
+              missionKeepsakeReward: stop.missionKeepsakeReward || false,
+              stopMissions: stop.stopMissions
+                ? stop.stopMissions.map(m => ({ ...m, xpReward: m.type === 'photo' ? 10 : 5, completed: false, skipped: false, attempts: 0 }))
+                : null,
+              cityGroup: cityName,
+              metadata: (stop.durationMinutes || stop.sessionFit || stop.durationClass || stop.anchorScore || stop.dropPriority)
+                ? {
+                    durationMinutes: stop.durationMinutes ?? null,
+                    sessionFit: stop.sessionFit ?? null,
+                    durationClass: stop.durationClass ?? null,
+                    anchorScore: stop.anchorScore ?? null,
+                    dropPriority: stop.dropPriority ?? null,
+                  }
+                : null,
+            });
+          }
+          const missionCount = generatedStops.filter(s => s.missionType).length;
+          if (missionCount > 0) {
+            await storage.updateTrip(tripId, { totalMissions: missionCount, missionsCompleted: 0, missionXpTotal: 0 });
+          }
+          console.log(`🤖 [Travel] [bg] AI-generated ${generatedStops.length} stops`);
+          console.log(`✅ [Travel] [bg] Created ${generatedStops.length} AI stops (${missionCount} missions)`);
+
+          // ── Fire-and-forget: seed AI cold-start signals for new stops ─────────
+          generateAIColdStartSignals(
+            cityName, country,
+            generatedStops.map(s => ({ name: s.name, stopType: s.stopType, latitude: s.latitude, longitude: s.longitude }))
+          ).catch(e => console.error("[FamilySignals] Cold-start seed failed:", e));
+
+          (async () => {
+            try {
+              const existingArtifacts = await storage.getAllArtifacts();
+              const coveredStops = new Set(existingArtifacts.map(a => a.stopName));
+              const uncoveredStops = generatedStops.filter(s => !coveredStops.has(s.name));
+              if (uncoveredStops.length > 0) {
+                const cityNameForKeepsakes = city || destination;
+                const generated = await generateArtifactsForStops(
+                  uncoveredStops.map(s => ({ name: s.name, stopType: s.stopType })),
+                  cityNameForKeepsakes
+                );
+                for (const artifact of generated) {
+                  await storage.createArtifact({
+                    stopName: artifact.stopName,
+                    name: artifact.name,
+                    description: artifact.description,
+                    imageEmoji: artifact.imageEmoji,
+                    rarity: artifact.rarity,
+                    unlockType: artifact.unlockType,
+                    unlockConfig: artifact.unlockConfig || null,
+                    displayOrder: artifact.displayOrder,
+                  });
+                }
+                console.log(`🏆 [Travel] [bg] Generated ${generated.length} keepsakes for ${cityNameForKeepsakes}`);
+              }
+            } catch (artifactError) {
+              console.error("[bg] Error generating keepsakes:", artifactError);
+            }
+          })();
+        }
       }
     } catch (err) {
       console.error(`❌ [Travel] [bg] Stop generation failed for tripId=${tripId}:`, err);
