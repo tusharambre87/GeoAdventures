@@ -10,7 +10,6 @@ import {
   Alert,
   Animated,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,7 +17,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
   type ViewStyle,
   type TextStyle,
@@ -2111,42 +2109,55 @@ function CompareDaysSheet({
   );
 }
 
-// ─── Sheet wrapper (animated bottom sheet) ────────────────────────────────────
+// ─── Sheet wrapper (absolute-positioned overlay — no Modal) ───────────────────
+// React Native's <Modal> is unreliable inside expo-router's Stack on iOS/Expo Go.
+// This renders as a sibling View with StyleSheet.absoluteFill instead.
 
 function SheetModal({
   visible,
   onClose,
   children,
-  maxHeight = '91%',
 }: {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  maxHeight?: `${number}%` | number;
 }) {
-  // Return null when not visible — on React Native Web, <Modal visible={false}>
-  // still mounts a full-screen portal that intercepts all pointer events.
-  // Five stacked invisible overlays = every button on the screen is dead.
+  const translateY = useRef(new Animated.Value(800)).current;
+
+  useEffect(() => {
+    Animated.spring(translateY, {
+      toValue: visible ? 0 : 800,
+      useNativeDriver: true,
+      damping: 28,
+      stiffness: 300,
+    }).start();
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
-    <Modal
-      transparent
-      visible
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={sh.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={[sh.sheet, { maxHeight }]}>
-              {children}
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Pressable
+        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,30,0.48)' }]}
+        onPress={onClose}
+      />
+      <Animated.View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxHeight: '91%',
+          backgroundColor: C.card,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          overflow: 'hidden',
+          transform: [{ translateY }],
+        }}
+      >
+        {children}
+      </Animated.View>
+    </View>
   );
 }
 
