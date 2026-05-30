@@ -11,3 +11,9 @@ id = "46i2sXu8azDNeineplpXk"
 uri = "file://roamus-source.zip"
 type = "unspecified"
 title = "RoamUs Source Code"
+
+[[outputs]]
+id = "qZMaOBXQ7TwtxFl1onNSv"
+uri = "file://roamus-ts-source.zip"
+type = "unspecified"
+title = "RoamUs TypeScript Source Files"
