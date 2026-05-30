@@ -449,28 +449,97 @@ function IconStar({ size = 14, color = C.green }: { size?: number; color?: strin
   );
 }
 
+function IconDownload({ size = 17, color = C.sage }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="7 10 12 15 17 10" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="15" x2="12" y2="3" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconShare({ size = 17, color = C.orange }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="16 6 12 2 8 6" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="2" x2="12" y2="15" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconBars({ size = 17, color = C.green }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="3" width="4" height="18" rx="1" fill={color} opacity={0.55} />
+      <Rect x="10" y="7" width="4" height="14" rx="1" fill={color} opacity={0.75} />
+      <Rect x="17" y="11" width="4" height="10" rx="1" fill={color} />
+    </Svg>
+  );
+}
+
+function IconEdit({ size = 17, color = C.orange }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconGear({ size = 17, color = C.muted }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth={1.8} />
+      <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconCopy({ size = 17, color = C.muted }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="9" y="9" width="13" height="13" rx="2" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // ─── Grip bar ─────────────────────────────────────────────────────────────────
 
 function Grip() {
   return <View style={sh.grip} />;
 }
 
-// ─── useStopHeroImage ─────────────────────────────────────────────────────────
+// ─── useStopHeroImage (module-level cache so each stop fetches once) ──────────
+
+const _heroImageCache = new Map<string, string>();
 
 function useStopHeroImage(stopId: string | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(() =>
+    stopId ? (_heroImageCache.get(stopId) ?? null) : null
+  );
   useEffect(() => {
     if (!stopId) return;
+    const id = stopId;
+    if (_heroImageCache.has(id)) {
+      setUrl(_heroImageCache.get(id)!);
+      return;
+    }
     let cancelled = false;
     async function load() {
       try {
         const token = await AsyncStorage.getItem('auth_token');
-        const res = await fetch(`${API_BASE}/api/travel/stops/${stopId}/hero-image`, {
+        const res = await fetch(`${API_BASE}/api/travel/stops/${id}/hero-image`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok && !cancelled) {
           const data = await res.json();
-          if (data.url) setUrl(data.url);
+          if (data.url) {
+            _heroImageCache.set(id, data.url);
+            setUrl(data.url);
+          }
         }
       } catch { /* silent — color bg stays */ }
     }
@@ -515,7 +584,8 @@ function StopCard({
   tripId,
   onDetails,
   onReplace,
-  onRemoveOptimistic,
+  onDelete,
+  onMoveStop,
 }: {
   stop: Stop;
   isEditable: boolean;
@@ -523,21 +593,31 @@ function StopCard({
   tripId: string;
   onDetails: (s: Stop) => void;
   onReplace: (s: Stop) => void;
-  onRemoveOptimistic: (stopId: string) => void;
+  onDelete: (stopId: string) => Promise<void>;
+  onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
   const heroImg  = useStopHeroImage(stop.id);
   const heroBg   = stopHeroBg(stop.stopType);
   const ticket   = needsTicket(stop);
   const duration = getStopDuration(stop);
+  const [reorderActive, setReorderActive] = useState(false);
+  const reorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function activateReorder() {
+    if (!isEditable) return;
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setReorderActive(true);
+    if (reorderTimerRef.current) clearTimeout(reorderTimerRef.current);
+    reorderTimerRef.current = setTimeout(() => setReorderActive(false), 3000);
+  }
+
+  useEffect(() => () => { if (reorderTimerRef.current) clearTimeout(reorderTimerRef.current); }, []);
 
   function handleRemove() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     swipeRef.current?.close();
-    onRemoveOptimistic(stop.id);
-    apiFetch(`/api/travel/stops/${stop.id}`, { method: 'DELETE' }).catch(() => {
-      showToast("Couldn't remove stop — please try again");
-    });
+    onDelete(stop.id);
   }
 
   function renderRightActions() {
@@ -575,11 +655,30 @@ function StopCard({
         />
         <Text style={sc.heroName} numberOfLines={2}>{stop.name}</Text>
         {isEditable && (
-          <View style={sc.dragHandle}>
-            <View style={sc.dragLine} />
-            <View style={sc.dragLine} />
-            <View style={sc.dragLine} />
-          </View>
+          reorderActive ? (
+            <View style={sc.reorderBtns}>
+              <Pressable
+                style={sc.reorderBtn}
+                onPress={() => { onMoveStop(stop.id, 'up'); setReorderActive(false); }}
+                hitSlop={6}
+              >
+                <Text style={sc.reorderArrow}>▲</Text>
+              </Pressable>
+              <Pressable
+                style={sc.reorderBtn}
+                onPress={() => { onMoveStop(stop.id, 'down'); setReorderActive(false); }}
+                hitSlop={6}
+              >
+                <Text style={sc.reorderArrow}>▼</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={sc.dragHandle} onLongPress={activateReorder} delayLongPress={350}>
+              <View style={sc.dragLine} />
+              <View style={sc.dragLine} />
+              <View style={sc.dragLine} />
+            </Pressable>
+          )
         )}
       </View>
 
@@ -938,7 +1037,8 @@ function DayDetail({
   onReplaceStop,
   onRunDay,
   onOpenOptions,
-  onRemoveOptimistic,
+  onDelete,
+  onMoveStop,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -954,7 +1054,8 @@ function DayDetail({
   onReplaceStop: (s: Stop) => void;
   onRunDay: () => void;
   onOpenOptions: () => void;
-  onRemoveOptimistic: (stopId: string) => void;
+  onDelete: (stopId: string) => Promise<void>;
+  onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
@@ -1077,7 +1178,8 @@ function DayDetail({
             tripId={tripId}
             onDetails={onStopDetails}
             onReplace={onReplaceStop}
-            onRemoveOptimistic={onRemoveOptimistic}
+            onDelete={onDelete}
+            onMoveStop={onMoveStop}
           />
         ))}
 
@@ -1124,7 +1226,7 @@ function StopDetailSheet({
   tripCity,
   onClose,
   onReplace,
-  onRemoveOptimistic,
+  onDelete,
   onOpenRunDay,
 }: {
   stop: Stop | null;
@@ -1132,7 +1234,7 @@ function StopDetailSheet({
   tripCity?: string | null;
   onClose: () => void;
   onReplace: (s: Stop) => void;
-  onRemoveOptimistic: (id: string) => void;
+  onDelete: (id: string) => Promise<void>;
   onOpenRunDay: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1267,10 +1369,7 @@ function StopDetailSheet({
                 </Pressable>
                 <Pressable style={sds.qaBtn} onPress={() => {
                   onClose();
-                  onRemoveOptimistic(stop.id);
-                  apiFetch(`/api/travel/stops/${stop.id}`, { method: 'DELETE' }).catch(() => {
-                    showToast("Couldn't remove stop");
-                  });
+                  onDelete(stop.id);
                 }}>
                   <Text style={sds.qaBtnText}>Skip this stop</Text>
                 </Pressable>
@@ -1444,9 +1543,22 @@ function ReplaceSheet({
     .slice(0, 5);
 
   async function useAlt(alt: typeof alts[0]) {
+    if (!stop) return;
+    const replacedStop = stop;
     try {
-      await apiFetch(`/api/travel/stops/${stop!.id}`, { method: 'DELETE' });
-      showToast('Stop replaced!');
+      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: alt.name,
+          stopType: alt.stopType ?? 'landmark',
+          durationMinutes: alt.durationMinutes ?? 60,
+          dayIndex: replacedStop.dayIndex ?? 0,
+          displayOrder: replacedStop.displayOrder ?? 0,
+          cityGroup: replacedStop.cityGroup ?? null,
+        }),
+      });
+      await apiFetch(`/api/travel/stops/${replacedStop.id}`, { method: 'DELETE' });
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
       onReplaceConfirm();
     } catch {
@@ -1495,10 +1607,31 @@ function ReplaceSheet({
           <>
             <Text style={rep.secLabel}>FROM OTHER DAYS</Text>
             {otherDayStops.map(s => (
-              <Pressable key={s.id} style={rep.otherDayRow} onPress={() => showToast('Move to this day — coming soon')}>
-                <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]}>
-                  <Text style={{ fontSize: 18 }}>{stopTypeEmoji(s.stopType)}</Text>
-                </View>
+              <Pressable
+                key={s.id}
+                style={rep.otherDayRow}
+                onPress={async () => {
+                  try {
+                    const targetDayIndex = selectedDay - 1;
+                    const targetDayStops = allStops
+                      .filter(x => x.dayIndex === targetDayIndex && !isMealStop(x.stopType))
+                      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+                    const newDisplayOrder = targetDayStops.length;
+                    await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({
+                        stopOrders: [{ stopId: s.id, displayOrder: newDisplayOrder, dayIndex: targetDayIndex }],
+                      }),
+                    });
+                    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                    onReplaceConfirm();
+                  } catch {
+                    showToast("Couldn't move stop — try again");
+                  }
+                }}
+              >
+                <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={rep.otherDayName}>{s.name}</Text>
                   <Text style={rep.otherDayMeta}>Day {(s.dayIndex ?? 0) + 1} · {getStopDuration(s)} min</Text>
@@ -1805,31 +1938,29 @@ function TripOptionsSheet({
     );
   }
 
-  const sections: Array<{
-    label: string;
-    items: Array<{ ico: string; bg: string; name: string; sub: string; onPress: () => void }>;
-  }> = [
+  type OptionItem = { icon: React.ReactNode; bg: string; name: string; sub: string; onPress: () => void };
+  const sections: Array<{ label: string; items: OptionItem[] }> = [
     {
       label: 'TRIP TOOLS',
       items: [
-        { ico: '📥', bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: () => showToast('Coming soon') },
-        { ico: '🔗', bg: '#FDF0E9', name: 'Share with family', sub: 'Send the itinerary to your travel partners', onPress: () => Share.share({ message: `Check out our trip plan: ${trip.name}` }) },
-        { ico: '🎒', bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => showToast('Coming soon') },
-        { ico: '📊', bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
+        { icon: <IconDownload />, bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: () => showToast('Coming soon') },
+        { icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family', sub: 'Send the itinerary to your travel partners', onPress: () => Share.share({ message: `Check out our trip plan: ${trip.name}` }) },
+        { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => showToast('Coming soon') },
+        { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
       ],
     },
     {
       label: 'PLAN SETTINGS',
       items: [
-        { ico: '✏️', bg: '#FDF0E9', name: 'Rename trip', sub: 'Change the name shown at the top', onPress: renameTrip },
-        { ico: '⚙️', bg: C.bg, name: 'Edit trip preferences', sub: 'Adjust pace, interests & auto-optimize', onPress: () => showToast('Coming soon') },
-        { ico: '🔄', bg: '#EEF5F2', name: 'Reset today', sub: "Un-skip all stops for today", onPress: () => showToast('Coming soon') },
+        { icon: <IconEdit />, bg: '#FDF0E9', name: 'Rename trip', sub: 'Change the name shown at the top', onPress: renameTrip },
+        { icon: <IconGear />, bg: C.bg, name: 'Edit trip preferences', sub: 'Adjust pace, interests & auto-optimize', onPress: () => showToast('Coming soon') },
+        { icon: <IconRefresh />, bg: '#EEF5F2', name: 'Reset today', sub: 'Un-skip all stops for today', onPress: () => showToast('Coming soon') },
       ],
     },
     {
       label: 'UTILITIES',
       items: [
-        { ico: '📋', bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => showToast('Coming soon') },
+        { icon: <IconCopy />, bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => showToast('Coming soon') },
       ],
     },
   ];
@@ -1853,7 +1984,7 @@ function TripOptionsSheet({
             {sec.items.map(item => (
               <Pressable key={item.name} style={opts.item} onPress={item.onPress}>
                 <View style={[opts.ico, { backgroundColor: item.bg }]}>
-                  <Text style={{ fontSize: 18 }}>{item.ico}</Text>
+                  {item.icon}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={opts.itemName}>{item.name}</Text>
@@ -2106,8 +2237,44 @@ export default function TripPlanScreen() {
     setActiveScreen('detail');
   }
 
-  function removeStopOptimistic(stopId: string) {
+  async function deleteStop(stopId: string) {
+    const snapshot = [...localStops];
     setLocalStops(prev => prev.filter(s => s.id !== stopId));
+    try {
+      await apiFetch(`/api/travel/stops/${stopId}`, { method: 'DELETE' });
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch {
+      setLocalStops(snapshot);
+      showToast("Couldn't remove stop — restored");
+    }
+  }
+
+  function moveStop(stopId: string, dir: 'up' | 'down') {
+    setLocalStops(prev => {
+      const stop = prev.find(s => s.id === stopId);
+      if (!stop) return prev;
+      const dayStops = prev
+        .filter(s => s.dayIndex === stop.dayIndex)
+        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      const idx = dayStops.findIndex(s => s.id === stopId);
+      const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= dayStops.length) return prev;
+      const swapStop = dayStops[swapIdx];
+      const newOrder = prev.map(s => {
+        if (s.id === stopId) return { ...s, displayOrder: swapStop.displayOrder ?? swapIdx };
+        if (s.id === swapStop.id) return { ...s, displayOrder: stop.displayOrder ?? idx };
+        return s;
+      });
+      const stopOrders = newOrder
+        .filter(s => s.dayIndex === stop.dayIndex)
+        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+        .map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex }));
+      apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stopOrders }),
+      }).catch(() => showToast("Couldn't reorder stops"));
+      return newOrder;
+    });
   }
 
   function openStopDetails(stop: Stop) {
@@ -2133,9 +2300,11 @@ export default function TripPlanScreen() {
   // ── Loading / error ──
   if (isLoading) {
     return (
-      <View style={root.center}>
-        <ActivityIndicator size="large" color={C.orange} />
-        <Text style={root.loadingText}>Loading your trip…</Text>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <View style={{ height: 56, backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.border }} />
+        {[140, 108, 108, 108].map((h, i) => (
+          <View key={i} style={{ marginHorizontal: 16, marginTop: i === 0 ? 20 : 10, borderRadius: 16, height: h, backgroundColor: C.border, opacity: 0.55 }} />
+        ))}
       </View>
     );
   }
@@ -2184,7 +2353,8 @@ export default function TripPlanScreen() {
           onReplaceStop={openReplaceSheet}
           onRunDay={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
-          onRemoveOptimistic={removeStopOptimistic}
+          onDelete={deleteStop}
+          onMoveStop={moveStop}
         />
       )}
 
@@ -2196,7 +2366,7 @@ export default function TripPlanScreen() {
           tripCity={trip.city ?? trip.destination}
           onClose={closeSheet}
           onReplace={(s) => { closeSheet(); openReplaceSheet(s); }}
-          onRemoveOptimistic={removeStopOptimistic}
+          onDelete={deleteStop}
           onOpenRunDay={() => { closeSheet(); openRunDay('easier'); }}
         />
       </SheetModal>
@@ -2399,6 +2569,9 @@ const sc = StyleSheet.create({
   heroName: { position: 'relative', zIndex: 1, fontFamily: F.bold, fontSize: 13, color: '#fff', padding: 9, paddingRight: 42, paddingLeft: 12, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, letterSpacing: -0.01, lineHeight: 17 },
   dragHandle: { position: 'absolute', right: 11, bottom: 9, zIndex: 2, width: 27, height: 27, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', gap: 3 },
   dragLine: { width: 13, height: 1.5, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 1 },
+  reorderBtns: { position: 'absolute', right: 9, bottom: 7, zIndex: 2, flexDirection: 'row', gap: 4 },
+  reorderBtn: { width: 27, height: 27, borderRadius: 8, backgroundColor: 'rgba(26,31,46,0.75)', alignItems: 'center', justifyContent: 'center' },
+  reorderArrow: { fontSize: 13, color: '#fff', lineHeight: 17 },
   body: { padding: 9, paddingLeft: 12, paddingRight: 12, paddingBottom: 11 },
   tagsRow: { flexDirection: 'row', gap: 5, flexWrap: 'wrap', marginBottom: 9 },
   tagMuted:   { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border },
