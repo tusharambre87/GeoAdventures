@@ -158,32 +158,24 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
 
 export async function generateStopHeroImage(
   stopName: string,
-  stopType: string,
-  destination: string
+  _stopType: string,
+  _destination: string
 ): Promise<string | undefined> {
   try {
-    const typeHint =
-      stopType === "museum" ? "exterior of the museum building with visitors" :
-      stopType === "park" ? "beautiful outdoor scenery with families enjoying nature" :
-      stopType === "attraction" ? "iconic view of the attraction with tourists" :
-      stopType === "restaurant" || stopType === "food" ? "welcoming exterior with warm lighting" :
-      "daytime exterior view with families";
-
-    const prompt = `A vibrant, photorealistic travel photograph of ${stopName} in ${destination}. ${typeHint}. Bright daylight, wide shot, no text overlays, high quality travel photography.`;
-
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-    });
-
-    return response.data?.[0]?.url || undefined;
+    // Use Wikipedia thumbnail — free, fast, returns real photos of the actual place
+    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(stopName)}&prop=pageimages&format=json&pithumbsize=800&redirects=1`;
+    const res = await fetch(url, { headers: { "User-Agent": "RoamUs/1.0 (family travel app)" } });
+    if (res.ok) {
+      const data = await res.json() as any;
+      const pages = data?.query?.pages ?? {};
+      const page = Object.values(pages)[0] as any;
+      const thumb = page?.thumbnail?.source as string | undefined;
+      if (thumb) return thumb;
+    }
   } catch (err) {
-    console.error("Hero image generation failed:", err);
-    return undefined;
+    console.error("Stop hero image (Wikipedia) failed:", err);
   }
+  return undefined;
 }
 
 function getFallbackData(stopName: string, stopType: string, destination: string): ExploreData {

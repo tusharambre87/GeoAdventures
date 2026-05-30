@@ -697,12 +697,17 @@ function StopDetailSheet({
   const heroImg = useStopImage(stop?.id ?? "");
   if (!stop) return null;
 
-  const storyPack = (stop as any).storyPack as { mainStory?: string } | null | undefined;
+  const storyPack = (stop as any).storyPack as { mainStory?: string; quickHits?: string[] } | null | undefined;
   const rawStory = storyPack?.mainStory ?? null;
-  const cleanStory = (text: string) => text.replace(/\[.*?\]/g, '').trim();
+  const quickHits: string[] = (storyPack as any)?.quickHits ?? [];
+  const cleanStory = (text: string) =>
+    text
+      .replace(/\[.*?\]/g, '')                              // strip TTS tags
+      .replace(/^Hey explorers![\s\S]*?worth seeing[.…]*\s*/i, '') // strip generic intro
+      .trim();
   const cleanedStory = rawStory ? cleanStory(rawStory) : null;
-  const mainStory = cleanedStory ? cleanedStory.slice(0, 300) : null;
-  const showEllipsis = cleanedStory && cleanedStory.length > 300;
+  const mainStory = cleanedStory ? cleanedStory.slice(0, 500) : null;
+  const showEllipsis = cleanedStory && cleanedStory.length > 500;
   const whyItWorks = (stop.metadata as any)?.whyItWorks as string | null | undefined;
   const bathroomNotes = (stop.metadata as any)?.bathroomNotes as string | null | undefined;
   const missions = stop.stopMissions?.slice(0, 3) ?? [];
@@ -736,6 +741,15 @@ function StopDetailSheet({
             <View style={ds.section}>
               <Text style={ds.sectionLabel}>THE STORY</Text>
               <Text style={ds.bodyText}>{mainStory}{showEllipsis ? "…" : ""}</Text>
+            </View>
+          ) : null}
+
+          {quickHits.length > 0 ? (
+            <View style={ds.section}>
+              <Text style={ds.sectionLabel}>DID YOU KNOW?</Text>
+              {quickHits.slice(0, 4).map((hit, i) => (
+                <Text key={i} style={ds.quickHit}>• {hit}</Text>
+              ))}
             </View>
           ) : null}
 
@@ -1295,6 +1309,7 @@ const ds = StyleSheet.create({
   section: { paddingHorizontal: 20, marginBottom: 20 },
   sectionLabel: { fontFamily: F.bold, fontSize: 10, fontWeight: "700", color: G.orange, letterSpacing: 1, marginBottom: 6 },
   bodyText: { fontFamily: F.regular, fontSize: 14, color: G.deep, lineHeight: 22 },
+  quickHit: { fontFamily: F.regular, fontSize: 13, color: G.deep, lineHeight: 20, marginBottom: 4 },
   missionRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
   missionBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: G.orange + "18", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 },
   missionBadgeText: { fontFamily: F.bold, fontSize: 13, fontWeight: "700", color: G.orange },

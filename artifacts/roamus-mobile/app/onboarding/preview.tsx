@@ -327,46 +327,46 @@ export default function PreviewScreen() {
       )}
       <LinearGradient colors={["rgba(26,31,46,0)","#1A1F2E"]} locations={[0, 0.38]} style={StyleSheet.absoluteFill} />
 
-      {/* ── Hero header ── */}
-      <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
-        <Text style={s.heroTitle}>{tripTitle}</Text>
-        {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
-        <Text style={s.heroMeta}>
-          {allDays.length} day{allDays.length !== 1 ? "s" : ""}
-          {totalStops > 0 ? ` · ${totalStops} stops` : ""}
-          {dateRange ? ` · ${dateRange}` : ""}
-        </Text>
-        {/* Trip detail badges — fill the visual hero space */}
-        <View style={s.heroBadges}>
-          {data.travelers.length > 0 && (
+      {/* ── Hero + tabs pinned together — flex:0 prevents voids ── */}
+      <View style={s.heroBlock}>
+        <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
+          <Text style={s.heroTitle}>{tripTitle}</Text>
+          {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
+          <Text style={s.heroMeta}>
+            {allDays.length} day{allDays.length !== 1 ? "s" : ""}
+            {totalStops > 0 ? ` · ${totalStops} stops` : ""}
+            {dateRange ? ` · ${dateRange}` : ""}
+          </Text>
+          <View style={s.heroBadges}>
+            {data.travelers.length > 0 && (
+              <View style={s.heroBadge}>
+                <Text style={s.heroBadgeText}>
+                  {data.travelers.length === 1 ? "Solo" : `${data.travelers.length} travelers`}
+                </Text>
+              </View>
+            )}
+            {data.tripStyle ? (
+              <View style={s.heroBadge}>
+                <Text style={s.heroBadgeText}>
+                  {data.tripStyle === "chill" ? "Relaxed pace" :
+                   data.tripStyle === "packed" ? "Action-packed" :
+                   data.tripStyle === "explorer" ? "Explorer mode" : "Family explorer"}
+                </Text>
+              </View>
+            ) : null}
             <View style={s.heroBadge}>
-              <Text style={s.heroBadgeText}>
-                {data.travelers.length === 1 ? "Solo" : `${data.travelers.length} travelers`}
-              </Text>
+              <Text style={s.heroBadgeText}>AI-planned</Text>
             </View>
-          )}
-          {data.tripStyle ? (
-            <View style={s.heroBadge}>
-              <Text style={s.heroBadgeText}>
-                {data.tripStyle === "chill" ? "Relaxed pace" :
-                 data.tripStyle === "packed" ? "Action-packed" :
-                 data.tripStyle === "explorer" ? "Explorer mode" : "Family explorer"}
-              </Text>
-            </View>
-          ) : null}
-          <View style={s.heroBadge}>
-            <Text style={s.heroBadgeText}>AI-planned</Text>
           </View>
         </View>
-      </View>
 
-      {/* ── Day tabs ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={s.tabsScroll}
-        contentContainerStyle={s.tabs}
-      >
+        {/* ── Day tabs ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.tabsScroll}
+          contentContainerStyle={s.tabs}
+        >
         {allDays.map((d, i) => (
           <Pressable key={i} onPress={() => setActiveDay(i)} style={[s.tab, activeDay === i && s.tabActive]}>
             <Text style={[s.tabDay, activeDay === i && s.tabDayActive]}>Day {i + 1}</Text>
@@ -376,6 +376,7 @@ export default function PreviewScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      </View>{/* end heroBlock */}
 
       {/* ── Stops list ── */}
       <ScrollView
@@ -428,6 +429,7 @@ export default function PreviewScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, overflow: "hidden" },
+  heroBlock: { flexShrink: 0 },
   heroContent: { paddingHorizontal: 20, paddingBottom: 18 },
   heroTitle: { fontFamily:F.bold, fontSize:20, fontWeight:"800", color:"#fff", letterSpacing:-0.4, lineHeight:27, marginBottom:4 },
   heroRoute: { fontFamily:F.semibold, fontSize:14, fontWeight:"600", color:G.orange, marginBottom:3 },
