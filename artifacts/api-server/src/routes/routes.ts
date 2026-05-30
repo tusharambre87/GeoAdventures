@@ -5140,8 +5140,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fullTrip = await storage.getTripById(tripId);
         const tripTailoring = fullTrip?.tailoring as any;
 
+        // ── Pace normalization — handles aliases from onboarding + tailoring ──
+        const normalizePace = (raw: string | null | undefined): "chill" | "balanced" | "packed" => {
+          const p = (raw ?? "").toLowerCase().replace(/[^a-z_]/g, '');
+          if (["chill", "relaxed", "easy", "slow", "chillout", "chill_out"].includes(p)) return "chill";
+          if (["packed", "gogetter", "go_getter", "full", "busy", "active", "intense"].includes(p)) return "packed";
+          return "balanced";
+        };
+        // Use top-level pace first, fall back to tailoring.pace
+        const effectivePace = (() => {
+          const fromParam = normalizePace(pace);
+          if (fromParam !== "balanced") return fromParam;
+          return normalizePace(tripTailoring?.pace);
+        })();
+
         // ── Stop count — arrival/departure-aware ──────────────────────────────
-        const stopsPerDayByPace = pace === "chill" ? 2 : pace === "packed" ? 4 : 3;
+        const stopsPerDayByPace = effectivePace === "chill" ? 2 : effectivePace === "packed" ? 4 : 3;
 
         // Read arrival signals from tailoring JSONB
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
@@ -5196,7 +5210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
             const plannerPace: "relaxed" | "moderate" | "busy" =
-              pace === "chill" ? "relaxed" : pace === "packed" ? "busy" : "moderate";
+              effectivePace === "chill" ? "relaxed" : effectivePace === "packed" ? "busy" : "moderate";
             const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (stopsPerDayByPace || 3));
             const plannerInput: PlannerInput = {
               destination: cityName,
