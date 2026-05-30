@@ -1,8 +1,13 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "-zcWQfHLVsfGL7oWNX3aN"
 uri = "file://artifacts/roamus-mobile/assets/images/icon.png"
 type = "image"
 title = "roamus app icon"
+
+[[outputs]]
+id = "46i2sXu8azDNeineplpXk"
+uri = "file://roamus-source.zip"
+type = "unspecified"
+title = "RoamUs Source Code"
