@@ -2105,49 +2105,20 @@ function SheetModal({
   children: React.ReactNode;
   maxHeight?: `${number}%` | number;
 }) {
-  const slideAnim = useRef(new Animated.Value(900)).current;
-  const prevVisible = useRef(false);
-
-  useEffect(() => {
-    if (visible && !prevVisible.current) {
-      // Opening: reset to off-screen then spring in
-      slideAnim.setValue(900);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 12,
-      }).start();
-    } else if (!visible && prevVisible.current) {
-      // Closing: slide out
-      Animated.timing(slideAnim, {
-        toValue: 900,
-        duration: 220,
-        useNativeDriver: true,
-      }).start();
-    }
-    prevVisible.current = visible;
-  }, [visible]);
-
-  // Always render the Modal — let React Native's `visible` prop manage mounting.
-  // This avoids the race condition where our own `rendered` flag delays the mount
-  // past when the spring animation has already started.
   return (
     <Modal
       transparent
       visible={visible}
-      animationType="none"
+      animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={sh.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
-            <Animated.View
-              style={[sh.sheet, { maxHeight, transform: [{ translateY: slideAnim }] }]}
-            >
+            <View style={[sh.sheet, { maxHeight }]}>
               {children}
-            </Animated.View>
+            </View>
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
