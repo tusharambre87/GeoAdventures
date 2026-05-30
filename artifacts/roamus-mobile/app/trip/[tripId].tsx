@@ -1506,10 +1506,11 @@ function ReplaceSheet({
   const queryClient = useQueryClient();
 
   function chipFilter(c: ReplaceChip): string | null {
-    if (c === 'Outdoors')  return 'outdoors';
-    if (c === 'Shorter')   return 'shorter';
-    if (c === 'More fun')  return 'fun';
-    if (c === 'Indoor')    return null;  // API has no indoor filter — omit
+    if (c === 'Best match') return 'best_match';
+    if (c === 'Outdoors')   return 'outdoors';
+    if (c === 'Shorter')    return 'shorter';
+    if (c === 'More fun')   return 'fun';
+    if (c === 'Indoor')     return null;  // API has no indoor filter — omit
     return null;
   }
 
@@ -1524,7 +1525,7 @@ function ReplaceSheet({
           body: JSON.stringify({
             stopName: stop.name,
             stopType: stop.stopType,
-            destination: trip.destination,
+            destination: trip.city ?? trip.destination ?? '',
             chipFilter: chipFilter(chipVal),
             search: searchVal || undefined,
           }),
@@ -1542,7 +1543,7 @@ function ReplaceSheet({
   useEffect(() => {
     if (!stop) return;
     loadAlts(chip, '');
-  }, [stop, chip]);
+  }, [stop?.id, chip]);
 
   function onSearchChange(text: string) {
     setSearch(text);
@@ -1664,7 +1665,7 @@ function ReplaceSheet({
           [0, 1, 2].map(i => <View key={i} style={rep.skeleton} />)
         ) : alts.length === 0 ? (
           <Text style={{ color: C.muted, fontSize: 13, fontFamily: F.regular, marginBottom: 16 }}>
-            Couldn't find alternatives right now — try a different filter
+            No alternatives found
           </Text>
         ) : (
           alts.map((alt, i) => (
