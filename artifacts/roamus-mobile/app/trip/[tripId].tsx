@@ -1554,6 +1554,7 @@ function ReplaceSheet({
 
   const otherDayStops = allStops
     .filter(s => s.id !== stop.id && s.dayIndex !== stop.dayIndex && !isMealStop(s.stopType))
+    .filter(s => search.trim() === '' || s.name.toLowerCase().includes(search.toLowerCase()))
     .slice(0, 5);
 
   async function useAlt(alt: typeof alts[0]) {
