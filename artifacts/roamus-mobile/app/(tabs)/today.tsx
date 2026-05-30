@@ -15,6 +15,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -209,6 +210,20 @@ function formatDayDate(startDate?: string | null, dayIndex?: number): string {
   } catch { return ''; }
 }
 
+/** Safely parse metadata — API may return JSONB as a raw string */
+function parseMetadata(raw: StopMetadata | Record<string, unknown> | null | undefined): StopMetadata {
+  if (!raw) return {};
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) as StopMetadata; } catch { return {}; }
+  }
+  return raw as StopMetadata;
+}
+
+function hasTicketSignal(raw: StopMetadata | Record<string, unknown> | null | undefined): boolean {
+  const m = parseMetadata(raw);
+  return m.ticketSignal === true || (m.ticketSignal as unknown) === 'true';
+}
+
 function openTicketSearch(stopName: string) {
   Linking.openURL(
     'https://www.google.com/search?q=' + encodeURIComponent(stopName + ' tickets')
@@ -359,7 +374,7 @@ export default function TodayScreen() {
 
   const city = trip?.city ?? trip?.destination ?? '';
   const dayLabel = formatDayDate(trip?.startDate, resolvedDayIndex);
-  const ticketStops = dayStops.filter(s => s.metadata?.ticketSignal === true);
+  const ticketStops = dayStops.filter(s => hasTicketSignal(s.metadata));
   const stopTimes = buildStopTimes(dayStops);
 
   // ── Loading ──
@@ -483,13 +498,14 @@ export default function TodayScreen() {
           )}
 
           {dayStops.map((stop, i) => {
+            const meta = parseMetadata(stop.metadata);
             const isRemoved = selectedPace === 'easier' &&
               isFinite(maxDropPriority) &&
-              (stop.metadata?.dropPriority ?? -Infinity) === maxDropPriority;
-            const hasTicket  = stop.metadata?.ticketSignal === true;
+              (meta.dropPriority ?? -Infinity) === maxDropPriority;
+            const hasTicket  = hasTicketSignal(stop.metadata);
             const isFreeStop = !hasTicket &&
               ['park', 'nature', 'landmark'].includes(stop.stopType ?? '');
-            const isAnchor   = (stop.metadata?.anchorScore ?? 0) >= 8;
+            const isAnchor   = (meta.anchorScore ?? 0) >= 8;
 
             return (
               <View
@@ -516,18 +532,19 @@ export default function TodayScreen() {
                       </View>
                     )}
                     {hasTicket && !isRemoved && (
-                      <Pressable
+                      <TouchableOpacity
                         style={pd.tagTicket}
                         onPress={() => openTicketSearch(stop.name)}
                         hitSlop={6}
+                        activeOpacity={0.7}
                       >
                         <Text style={pd.tagTicketText}>🎫 Ticket needed</Text>
-                      </Pressable>
+                      </TouchableOpacity>
                     )}
                     {isFreeStop && !isRemoved && (
-                      <View style={pd.tagFree}>
+                      <TouchableOpacity style={pd.tagFree} activeOpacity={0.8}>
                         <Text style={pd.tagFreeText}>Free entry</Text>
-                      </View>
+                      </TouchableOpacity>
                     )}
                     {isAnchor && !isRemoved && (
                       <View style={pd.tagAnchor}>
