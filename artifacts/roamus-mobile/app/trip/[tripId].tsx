@@ -642,7 +642,6 @@ function StopCard({
       <Pressable
         style={sc.detailsBtn}
         onPress={() => {
-          console.log('[DEBUG] Details button pressed for stop:', stop?.name);
           if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onDetails(stop);
         }}
@@ -2279,10 +2278,8 @@ export default function TripPlanScreen() {
   }
 
   function openStopDetails(stop: Stop) {
-    console.log('[DEBUG] Details tapped, activeSheet before:', activeSheet, 'stop:', stop?.name);
     setSelectedStop(stop);
     setActiveSheet('stopDetail');
-    console.log('[DEBUG] activeSheet after setActiveSheet (state updates are async — next render will reflect change)');
   }
 
   function openReplaceSheet(stop: Stop) {
