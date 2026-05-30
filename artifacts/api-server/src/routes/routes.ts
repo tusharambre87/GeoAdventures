@@ -5208,13 +5208,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .filter((i: string) => i.length > 0),
             };
             const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
-            const distributedPoolStops = distributeStopsToDays(
+            const rawDistributedPoolStops = distributeStopsToDays(
               selectedStops.slice(0, effectiveStopCount),
               plannerTripDays,
               arrivalDayCap,
               lastDayCap,
               effectivePerDay,
             );
+            // Safety-net dedup: catch any near-duplicate names (& vs and, punctuation) that slipped through
+            const normN = (n: string) => n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+            const seenWritten = new Set<string>();
+            const distributedPoolStops = rawDistributedPoolStops.filter(s => {
+              const key = normN(s.name);
+              if (seenWritten.has(key)) { console.log(`[Dedup] Skipping duplicate stop: "${s.name}"`); return false; }
+              seenWritten.add(key);
+              return true;
+            });
             for (let i = 0; i < distributedPoolStops.length; i++) {
               const stop = distributedPoolStops[i];
               await storage.createStop({

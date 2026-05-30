@@ -2449,6 +2449,11 @@ export function selectStopsFromPool(
   let learningHeavyCount = 0;
   const remaining = new Set(candidates);
 
+  // Normalized name dedup — prevents "Foo & Bar" and "Foo and Bar" from both being selected
+  const normStopName = (n: string) =>
+    n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  const usedNormNames = new Set<string>();
+
   // Track zones for the current day window (reset when dayPosition wraps to 0)
   let zonesInCurrentDay = new Set<string>();
   // Track cumulative effective-duration minutes for the current day
@@ -2484,6 +2489,7 @@ export function selectStopsFromPool(
       // Hard constraints: skip entirely
       if (isLearningHeavy && learningHeavyCount >= learningLimit) continue;
       if (typeCount >= 2 && remaining.size > 5) continue;
+      if (usedNormNames.has(normStopName(c.name))) continue;
       // Toddler nap rule: meal stops cannot be the first activity of the day (must come after nap at ~1pm)
       const isMealType = ["restaurant", "meal", "food", "cafe"].includes(c.type ?? "");
       if (napActive && dayPosition === 0 && isMealType) continue;
@@ -2533,6 +2539,7 @@ export function selectStopsFromPool(
     if (!bestCandidate) break;
 
     selected.push(bestCandidate);
+    usedNormNames.add(normStopName(bestCandidate.name));
     remaining.delete(bestCandidate);
     usedTypes.set(bestCandidate.type, (usedTypes.get(bestCandidate.type) || 0) + 1);
     if (["museum", "history", "culture"].includes(bestCandidate.type)) learningHeavyCount++;

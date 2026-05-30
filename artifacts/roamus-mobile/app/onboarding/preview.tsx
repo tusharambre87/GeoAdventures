@@ -152,9 +152,10 @@ function stopImg(type?: string, idx = 0): string {
   return urls[idx % urls.length];
 }
 
-// ─── Stop thumbnail: type-based Unsplash image ───────────────────────────────
-function StopThumb({ fallback }: { name?: string; fallback: string }) {
-  return <Image source={{ uri: fallback }} style={s.stopImg} contentFit="cover" />;
+// ─── Stop thumbnail: Wikipedia photo of actual stop, type-based Unsplash fallback ─
+function StopThumb({ name, fallback }: { name?: string; fallback: string }) {
+  const src = useWikiPhoto(name ?? "", fallback);
+  return <Image source={{ uri: src }} style={s.stopImg} contentFit="cover" />;
 }
 
 // ─── Convert API preview days to display format ──────────────────────────────
