@@ -1718,6 +1718,7 @@ function RunDaySheet({
   onModeChange,
   onClose,
   onStopsUpdated,
+  onNavigateToDay,
   queryClient,
 }: {
   selectedDay: number;
@@ -1727,6 +1728,7 @@ function RunDaySheet({
   onModeChange: (m: RunMode) => void;
   onClose: () => void;
   onStopsUpdated: (stops: Stop[]) => void;
+  onNavigateToDay: (day: number) => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const [applying, setApplying] = useState(false);
@@ -1756,6 +1758,7 @@ function RunDaySheet({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       onClose();
+      onNavigateToDay(selectedDay);
     } catch {
       Alert.alert('Error', "Couldn't update your day — try again");
     } finally {
@@ -2411,6 +2414,7 @@ export default function TripPlanScreen() {
             onModeChange={setRunMode}
             onClose={closeSheet}
             onStopsUpdated={setLocalStops}
+            onNavigateToDay={goToDay}
             queryClient={queryClient}
           />
         </SheetModal>
