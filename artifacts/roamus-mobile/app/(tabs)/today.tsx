@@ -480,6 +480,10 @@ export default function TodayScreen() {
     setSubmittingRating(false);
   }
 
+  function handlePhotoSlot() {
+    Alert.alert('Photos coming soon', 'Photo capture will be available in the next update.');
+  }
+
   // ── Derived ──
   const totalDays = (() => {
     if (!trip) return 1;
@@ -571,7 +575,7 @@ export default function TodayScreen() {
                   key={idx}
                   style={dw.photoSlot}
                   activeOpacity={0.7}
-                  onPress={() => console.log('Photo picker coming soon')}
+                  onPress={handlePhotoSlot}
                 >
                   <Text style={dw.photoPlus}>+</Text>
                 </TouchableOpacity>
@@ -714,7 +718,7 @@ export default function TodayScreen() {
                   key={idx}
                   style={vi.photoSlot}
                   activeOpacity={0.7}
-                  onPress={() => console.log('Photo picker coming soon')}
+                  onPress={handlePhotoSlot}
                 >
                   <Text style={vi.photoPlus}>+</Text>
                 </TouchableOpacity>
@@ -1079,7 +1083,6 @@ export default function TodayScreen() {
             onPress={() => {
               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setTodayState('atstop');
-              router.push({ pathname: '/(tabs)/atstop', params: { stopId: stop.id } });
             }}
           >
             <Text style={er.imHereText}>📍  I'm here — we arrived</Text>
