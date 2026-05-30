@@ -852,7 +852,7 @@ function DayCard({
   return (
     <Pressable
       style={({ pressed }) => [dc.card, status === 'past' && dc.cardPast, { opacity: pressed ? 0.95 : 1 }]}
-      onPress={status === 'past' ? undefined : onPress}
+      onPress={onPress}
     >
       {/* Top row */}
       <View style={dc.topRow}>
@@ -1168,23 +1168,26 @@ function DayDetail({
           <Text style={dd.secLabel}>STOP BY STOP</Text>
         )}
 
-        {/* Stop cards */}
-        {contentStops.map(stop => (
-          <StopCard
-            key={stop.id}
-            stop={stop}
-            isEditable={isEditable}
-            isAnchor={anchor?.id === stop.id}
-            tripId={tripId}
-            onDetails={onStopDetails}
-            onReplace={onReplaceStop}
-            onDelete={onDelete}
-            onMoveStop={onMoveStop}
-          />
+        {/* Stop cards — meal cards splice in after first content stop */}
+        {contentStops.map((stop, i) => (
+          <React.Fragment key={stop.id}>
+            <StopCard
+              stop={stop}
+              isEditable={isEditable}
+              isAnchor={anchor?.id === stop.id}
+              tripId={tripId}
+              onDetails={onStopDetails}
+              onReplace={onReplaceStop}
+              onDelete={onDelete}
+              onMoveStop={onMoveStop}
+            />
+            {i === 0 && mealStops.map(ms => (
+              <MealCard key={ms.id} stop={ms} />
+            ))}
+          </React.Fragment>
         ))}
-
-        {/* Meal cards */}
-        {mealStops.map(stop => (
+        {/* Meal cards for days with no content stops */}
+        {contentStops.length === 0 && mealStops.map(stop => (
           <MealCard key={stop.id} stop={stop} />
         ))}
 
@@ -2250,30 +2253,32 @@ export default function TripPlanScreen() {
   }
 
   function moveStop(stopId: string, dir: 'up' | 'down') {
-    setLocalStops(prev => {
-      const stop = prev.find(s => s.id === stopId);
-      if (!stop) return prev;
-      const dayStops = prev
-        .filter(s => s.dayIndex === stop.dayIndex)
-        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-      const idx = dayStops.findIndex(s => s.id === stopId);
-      const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
-      if (swapIdx < 0 || swapIdx >= dayStops.length) return prev;
-      const swapStop = dayStops[swapIdx];
-      const newOrder = prev.map(s => {
-        if (s.id === stopId) return { ...s, displayOrder: swapStop.displayOrder ?? swapIdx };
-        if (s.id === swapStop.id) return { ...s, displayOrder: stop.displayOrder ?? idx };
-        return s;
-      });
-      const stopOrders = newOrder
-        .filter(s => s.dayIndex === stop.dayIndex)
-        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-        .map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex }));
-      apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stopOrders }),
-      }).catch(() => showToast("Couldn't reorder stops"));
-      return newOrder;
+    const snapshot = [...localStops];
+    const stop = snapshot.find(s => s.id === stopId);
+    if (!stop) return;
+    const dayStops = snapshot
+      .filter(s => s.dayIndex === stop.dayIndex)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const idx = dayStops.findIndex(s => s.id === stopId);
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= dayStops.length) return;
+    const swapStop = dayStops[swapIdx];
+    const newOrder = snapshot.map(s => {
+      if (s.id === stopId) return { ...s, displayOrder: swapStop.displayOrder ?? swapIdx };
+      if (s.id === swapStop.id) return { ...s, displayOrder: stop.displayOrder ?? idx };
+      return s;
+    });
+    setLocalStops(newOrder);
+    const stopOrders = newOrder
+      .filter(s => s.dayIndex === stop.dayIndex)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+      .map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex }));
+    apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+      method: 'PATCH',
+      body: JSON.stringify({ stopOrders }),
+    }).catch(() => {
+      setLocalStops(snapshot);
+      showToast("Couldn't reorder — restored");
     });
   }
 
