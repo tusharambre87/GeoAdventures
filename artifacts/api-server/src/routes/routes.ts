@@ -5532,6 +5532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         viewpoint: "🔭", garden: "🌸", palace: "🏰", temple: "🛕", other: "⭐",
       };
 
+      // Fetch a wide pool so we have type diversity to pick from
       const libRows = await db
         .select({
           name: stopLibrary.name,
@@ -5540,20 +5541,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(stopLibrary)
         .where(ilike(stopLibrary.city, `%${cityLower}%`))
-        .orderBy(drizzleSql`CASE
-          WHEN ${stopLibrary.stopType} ILIKE '%museum%' THEN 0
-          WHEN ${stopLibrary.stopType} ILIKE '%park%' THEN 1
-          WHEN ${stopLibrary.stopType} ILIKE '%aquarium%' THEN 2
-          WHEN ${stopLibrary.stopType} ILIKE '%zoo%' THEN 3
-          WHEN ${stopLibrary.stopType} ILIKE '%landmark%' THEN 4
-          ELSE 5 END`)
-        .limit(8);
+        .orderBy(drizzleSql`RANDOM()`)
+        .limit(40);
 
-      const seen = new Set<string>();
-      const spots = libRows
-        .filter(r => { const k = r.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
-        .slice(0, 4)
-        .map(r => {
+      // Enforce type diversity: max 1 stop per type bucket, up to 3 total
+      const TYPE_ORDER = ["landmark", "park", "zoo", "aquarium", "beach", "nature", "garden", "viewpoint", "museum", "market", "other"];
+      const seenNames = new Set<string>();
+      const seenTypes = new Set<string>();
+      const diverse: typeof libRows = [];
+
+      // One pass sorted by type priority
+      const sorted = [...libRows].sort((a, b) => {
+        const ai = TYPE_ORDER.findIndex(t => (a.stopType ?? "").toLowerCase().includes(t));
+        const bi = TYPE_ORDER.findIndex(t => (b.stopType ?? "").toLowerCase().includes(t));
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+
+      for (const r of sorted) {
+        if (diverse.length >= 3) break;
+        const nameKey = r.name.toLowerCase();
+        if (seenNames.has(nameKey)) continue;
+        const t = (r.stopType ?? "other").toLowerCase();
+        const typeKey = TYPE_ORDER.find(k => t.includes(k)) ?? "other";
+        if (seenTypes.has(typeKey)) continue;
+        seenNames.add(nameKey);
+        seenTypes.add(typeKey);
+        diverse.push(r);
+      }
+
+      // If we didn't hit 3 unique types, fill remainder allowing type repeats
+      for (const r of sorted) {
+        if (diverse.length >= 3) break;
+        const nameKey = r.name.toLowerCase();
+        if (seenNames.has(nameKey)) continue;
+        seenNames.add(nameKey);
+        diverse.push(r);
+      }
+
+      const spots = diverse.map(r => {
           const t = (r.stopType ?? "other").toLowerCase();
           const emojiKey = Object.keys(ANCHOR_EMOJIS).find(k => t.includes(k));
           return {

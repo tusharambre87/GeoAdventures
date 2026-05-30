@@ -175,9 +175,10 @@ function RouteCard({ route, selected, onSelect }: { route: PopularRoute; selecte
   );
 }
 
-// ─── Stop thumbnail: type-based Unsplash image ───────────────────────────────
-function StopImage({ type, idx = 0 }: { name?: string; type?: string; idx?: number }) {
-  return <Image source={{ uri: stopImg({ type }, idx) }} style={d.stopImg} contentFit="cover" />;
+// ─── Stop thumbnail: Wikipedia photo of the actual stop, type-based fallback ─
+function StopImage({ name, type, idx = 0 }: { name?: string; type?: string; idx?: number }) {
+  const src = useWikiPhoto(name ?? "", stopImg({ type }, idx));
+  return <Image source={{ uri: src }} style={d.stopImg} contentFit="cover" />;
 }
 
 // ─── Stop row in dark card ──────────────────────────────────────────────────
