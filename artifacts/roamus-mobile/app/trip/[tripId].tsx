@@ -1287,10 +1287,10 @@ function StopDetailSheet({
     ? enrichment.practicalTips.split('.')[0] + '.'
     : 'Great pick for families of all ages.';
 
-  const parking   = meta?.parkingSignal ?? enrichment?.parkingNotes ?? 'Check nearby';
-  const restrooms = meta?.restroomConfidence ?? enrichment?.bathroomNotes ?? 'Near entrance';
-  const bestTime  = enrichment?.bestTimeOfDay ?? (meta?.sessionFit ?? 'Anytime');
-  const waitTime  = waitTimeForType(stop.stopType);
+  const parking   = enrichment?.parkingNotes ?? '—';
+  const restrooms = meta?.restroomConfidence ?? '—';
+  const bestTime  = enrichment?.bestTimeOfDay ?? '—';
+  const waitTime  = waitTimeForType(stop.stopType) ?? '—';
   const address   = stop.address;
   const foodNearby = meta?.foodNearby ?? [];
 
