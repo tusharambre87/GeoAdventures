@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authContext";
 import { travelAPI, type Trip } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
+import { useOnboarding } from "@/lib/onboardingContext";
 
 function greeting() {
   const h = new Date().getHours();
@@ -113,6 +114,12 @@ function TripCard({ trip }: { trip: Trip }) {
 export default function TripsScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { reset: resetOnboarding } = useOnboarding();
+
+  function startNewTrip() {
+    resetOnboarding();
+    router.push("/onboarding/where" as any);
+  }
 
   async function handleLogout() {
     await logout();
@@ -224,7 +231,7 @@ export default function TripsScreen() {
             <Text style={s.emptyDesc}>Plan your family adventure and unlock quests, stories, and memories along the way.</Text>
             <Pressable
               style={({ pressed }) => [s.planBtn, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={() => router.push("/onboarding/splash" as any)}
+              onPress={startNewTrip}
             >
               <Ionicons name="add-circle-outline" size={18} color="#fff" />
               <Text style={s.planBtnText}>Plan a Trip</Text>
@@ -236,7 +243,7 @@ export default function TripsScreen() {
       {/* Floating + button */}
       <Pressable
         style={[s.fab, { bottom: insets.bottom + 90 }]}
-        onPress={() => router.push("/onboarding/splash" as any)}
+        onPress={startNewTrip}
       >
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
