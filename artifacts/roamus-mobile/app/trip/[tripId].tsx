@@ -2361,64 +2361,74 @@ export default function TripPlanScreen() {
         />
       )}
 
-      {/* ── Sheets ── */}
-      <SheetModal visible={activeSheet === 'stopDetail'} onClose={closeSheet}>
-        <StopDetailSheet
-          stop={selectedStop}
-          isEditable={isSelectedDayEditable}
-          tripCity={trip.city ?? trip.destination}
-          onClose={closeSheet}
-          onReplace={(s) => { closeSheet(); openReplaceSheet(s); }}
-          onDelete={deleteStop}
-          onOpenRunDay={() => { closeSheet(); openRunDay('easier'); }}
-        />
-      </SheetModal>
+      {/* ── Sheets — only ONE ever in the tree at a time ── */}
+      {activeSheet === 'stopDetail' && (
+        <SheetModal visible onClose={closeSheet}>
+          <StopDetailSheet
+            stop={selectedStop}
+            isEditable={isSelectedDayEditable}
+            tripCity={trip.city ?? trip.destination}
+            onClose={closeSheet}
+            onReplace={(s) => { closeSheet(); openReplaceSheet(s); }}
+            onDelete={deleteStop}
+            onOpenRunDay={() => { closeSheet(); openRunDay('easier'); }}
+          />
+        </SheetModal>
+      )}
 
-      <SheetModal visible={activeSheet === 'replace'} onClose={closeSheet}>
-        <ReplaceSheet
-          stop={selectedStop}
-          trip={trip}
-          allStops={localStops}
-          selectedDay={selectedDay}
-          tripId={tripId ?? ''}
-          onClose={closeSheet}
-          onReplaceConfirm={() => { closeSheet(); queryClient.invalidateQueries({ queryKey: ['trip', tripId] }); }}
-        />
-      </SheetModal>
+      {activeSheet === 'replace' && (
+        <SheetModal visible onClose={closeSheet}>
+          <ReplaceSheet
+            stop={selectedStop}
+            trip={trip}
+            allStops={localStops}
+            selectedDay={selectedDay}
+            tripId={tripId ?? ''}
+            onClose={closeSheet}
+            onReplaceConfirm={() => { closeSheet(); queryClient.invalidateQueries({ queryKey: ['trip', tripId] }); }}
+          />
+        </SheetModal>
+      )}
 
-      <SheetModal visible={activeSheet === 'runDay'} onClose={closeSheet}>
-        <RunDaySheet
-          selectedDay={selectedDay}
-          dayStops={dayStopsForSheet}
-          tripId={tripId ?? ''}
-          runMode={runMode}
-          onModeChange={setRunMode}
-          onClose={closeSheet}
-          queryClient={queryClient}
-        />
-      </SheetModal>
+      {activeSheet === 'runDay' && (
+        <SheetModal visible onClose={closeSheet}>
+          <RunDaySheet
+            selectedDay={selectedDay}
+            dayStops={dayStopsForSheet}
+            tripId={tripId ?? ''}
+            runMode={runMode}
+            onModeChange={setRunMode}
+            onClose={closeSheet}
+            queryClient={queryClient}
+          />
+        </SheetModal>
+      )}
 
-      <SheetModal visible={activeSheet === 'options'} onClose={closeSheet}>
-        <TripOptionsSheet
-          trip={trip}
-          tripId={tripId ?? ''}
-          onClose={closeSheet}
-          onCompare={() => setActiveSheet('compare')}
-          queryClient={queryClient}
-        />
-      </SheetModal>
+      {activeSheet === 'options' && (
+        <SheetModal visible onClose={closeSheet}>
+          <TripOptionsSheet
+            trip={trip}
+            tripId={tripId ?? ''}
+            onClose={closeSheet}
+            onCompare={() => setActiveSheet('compare')}
+            queryClient={queryClient}
+          />
+        </SheetModal>
+      )}
 
-      <SheetModal visible={activeSheet === 'compare'} onClose={closeSheet}>
-        <CompareDaysSheet
-          trip={trip}
-          stops={localStops}
-          totalDays={totalDays}
-          getDayStatus={getDayStatus}
-          getStopsForDay={getStopsForDay}
-          onClose={closeSheet}
-          onSelectDay={(d) => { closeSheet(); goToDay(d); }}
-        />
-      </SheetModal>
+      {activeSheet === 'compare' && (
+        <SheetModal visible onClose={closeSheet}>
+          <CompareDaysSheet
+            trip={trip}
+            stops={localStops}
+            totalDays={totalDays}
+            getDayStatus={getDayStatus}
+            getStopsForDay={getStopsForDay}
+            onClose={closeSheet}
+            onSelectDay={(d) => { closeSheet(); goToDay(d); }}
+          />
+        </SheetModal>
+      )}
     </View>
   );
 }
