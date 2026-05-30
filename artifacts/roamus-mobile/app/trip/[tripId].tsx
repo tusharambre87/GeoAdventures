@@ -709,6 +709,7 @@ function StopCard({
           <GHTouchable
             style={sc.detailsBtn}
             onPress={() => {
+              Alert.alert('DETAILS', `Details fired for: ${stop?.name}`);
               console.log('[DEBUG] Details button pressed for stop:', stop?.name);
               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onDetails(stop);
@@ -1082,11 +1083,14 @@ function DayDetail({
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View
+      style={{ flex: 1, backgroundColor: C.bg }}
+      onTouchStart={() => console.log('[DEBUG] DayDetail root received a touch')}
+    >
       {/* Header */}
       <View style={[dd.header, { paddingTop: insets.top + 6 }]}>
         <View style={dd.headerTop}>
-          <Pressable style={dd.iconBtn} onPress={onBack} hitSlop={8}>
+          <Pressable style={dd.iconBtn} onPress={() => { Alert.alert('BACK', 'Back button fired'); onBack(); }} hitSlop={8}>
             <IconChevronLeft />
           </Pressable>
           <View style={dd.titleWrap}>
