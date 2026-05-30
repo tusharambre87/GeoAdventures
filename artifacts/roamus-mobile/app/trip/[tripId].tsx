@@ -1341,11 +1341,13 @@ function StopDetailSheet({
         </View>
 
         <View style={sds.bodyPad}>
-          {/* WhyCard */}
-          <View style={sds.whyCard}>
-            <Text style={sds.whyLabel}>WHY THIS STOP WORKS</Text>
-            <Text style={sds.whyText}>{whyText}</Text>
-          </View>
+          {/* WhyCard — only shown when real enrichment text exists */}
+          {enrichment?.whyNow ? (
+            <View style={sds.whyCard}>
+              <Text style={sds.whyLabel}>WHY THIS STOP WORKS</Text>
+              <Text style={sds.whyText}>{enrichment.whyNow}</Text>
+            </View>
+          ) : null}
 
           {/* TimingCard */}
           <View style={sds.timCard}>
