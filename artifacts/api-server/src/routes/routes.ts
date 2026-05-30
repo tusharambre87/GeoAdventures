@@ -5229,6 +5229,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lastDayCap,
               effectivePerDay,
             );
+            // Free-admission override: certain well-known museums/attractions are always free
+            const FREE_ADMISSION_PATTERNS = [
+              'minneapolis institute of art',
+              'walker art center',
+              'smithsonian',
+              'national gallery',
+              'national museum of natural history',
+              'national air and space',
+              'national portrait gallery',
+              'national museum of american history',
+            ];
+            const isFreeAdmission = (stopName: string): boolean => {
+              const n = stopName.toLowerCase();
+              return FREE_ADMISSION_PATTERNS.some(p => n.includes(p));
+            };
+
             // Safety-net dedup: identical normalization to plannerService normStopName
             const normN = (n: string): string =>
               n.toLowerCase()
@@ -5270,9 +5286,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 missionKeepsakeReward: false,
                 stopMissions: null,
                 cityGroup: cityName,
-                metadata: stop.durationMinutes
-                  ? { durationMinutes: stop.durationMinutes, sessionFit: null, durationClass: null, anchorScore: null, dropPriority: null }
-                  : null,
+                metadata: {
+                  durationMinutes: stop.durationMinutes || null,
+                  sessionFit: null,
+                  durationClass: null,
+                  anchorScore: null,
+                  dropPriority: null,
+                  ticketSignal: isFreeAdmission(stop.name) ? false : null,
+                },
               });
             }
 

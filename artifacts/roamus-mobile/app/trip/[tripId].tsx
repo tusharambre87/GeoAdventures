@@ -177,6 +177,7 @@ function isMealStop(stopType?: string | null): boolean {
 
 function needsTicket(stop: Stop): boolean {
   if (stop.metadata?.ticketSignal === true) return true;
+  if (stop.metadata?.ticketSignal === false) return false;
   if (!stop.stopType) return false;
   const t = stop.stopType.toLowerCase();
   return Array.from(TICKET_TYPES).some(k => t.includes(k));
@@ -708,6 +709,7 @@ function StopCard({
           <Pressable
             style={sc.detailsBtn}
             onPress={() => {
+              console.log('[DEBUG] Details button pressed for stop:', stop?.name);
               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onDetails(stop);
             }}
@@ -1151,8 +1153,8 @@ function DayDetail({
           </View>
         )}
 
-        {/* Before You Go — editable days only */}
-        {isEditable && (tickets > 0 || noLunch) && (
+        {/* Before You Go — editable days with stops only */}
+        {isEditable && dayStops.length > 0 && (tickets > 0 || noLunch) && (
           <View style={dd.bfg}>
             <View style={dd.bfgHeader}>
               <IconInfo size={14} />
@@ -1175,10 +1177,6 @@ function DayDetail({
           </View>
         )}
 
-        {/* Section label */}
-        {dayStops.length > 0 && (
-          <Text style={dd.secLabel}>STOP BY STOP</Text>
-        )}
 
         {/* Stop cards — meal cards splice in after first content stop */}
         {contentStops.map((stop, i) => (
@@ -1219,8 +1217,8 @@ function DayDetail({
         )}
       </ScrollView>
 
-      {/* Footer — editable days only */}
-      {isEditable && (
+      {/* Footer — editable days with stops only */}
+      {isEditable && dayStops.length > 0 && (
         <View style={[dd.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable style={dd.runBtn} onPress={onRunDay}>
             <IconPlay />
@@ -2272,8 +2270,10 @@ export default function TripPlanScreen() {
   }
 
   function openStopDetails(stop: Stop) {
+    console.log('[DEBUG] Details tapped, activeSheet before:', activeSheet, 'stop:', stop?.name);
     setSelectedStop(stop);
     setActiveSheet('stopDetail');
+    console.log('[DEBUG] activeSheet after setActiveSheet (state updates are async — next render will reflect change)');
   }
 
   function openReplaceSheet(stop: Stop) {
@@ -2617,7 +2617,7 @@ const dd = StyleSheet.create({
   tabOn:       { backgroundColor: C.deep, borderColor: C.deep },
   tabTodayOn:  { backgroundColor: C.orange, borderColor: C.orange },
   tabTodayOff: { borderColor: C.orange },
-  tabPast:     { borderColor: 'rgba(138,143,168,0.2)' },
+  tabPast:     { borderColor: C.border, backgroundColor: 'transparent' },
   tabText:       { fontFamily: F.bold, fontSize: 11, color: C.muted },
   tabTextOn:     { color: '#fff' },
   tabTextTodayOn:  { color: '#fff' },

@@ -156,11 +156,23 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
   };
 }
 
+const WIKI_SKIP_STOPS = [
+  'minneapolis institute of art',
+  "children's theatre company",
+  'stone arch bridge',
+  'como park zoo',
+];
+
 export async function generateStopHeroImage(
   stopName: string,
   _stopType: string,
   _destination: string
 ): Promise<string | undefined> {
+  const stopNameNorm = stopName.toLowerCase();
+  if (WIKI_SKIP_STOPS.some(s => stopNameNorm.includes(s))) {
+    return undefined;
+  }
+
   try {
     // Use Wikipedia thumbnail — free, fast, returns real photos of the actual place
     const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(stopName)}&prop=pageimages&format=json&pithumbsize=800&redirects=1`;
