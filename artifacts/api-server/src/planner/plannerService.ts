@@ -2278,6 +2278,16 @@ function candidateToGeneratedStop(
  * indoor/outdoor preference, kid energy level, trip style, interest alignment,
  * cognitive balance rules, and meal integration.
  */
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function selectStopsFromPool(
   pool: CachedStopCandidate[],
   input: PlannerInput,
@@ -2469,6 +2479,10 @@ export function selectStopsFromPool(
   let zonesInCurrentDay = new Set<string>();
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
+  // Track cumulative travel distance and last-stop coordinates for geographic scoring
+  let dailyTravelKm = 0;
+  let lastLat: number | null = null;
+  let lastLon: number | null = null;
 
   while (selected.length < totalStopsNeeded && remaining.size > 0) {
     const dayPosition = selected.length % effectiveStopsPerDay;
@@ -2482,6 +2496,9 @@ export function selectStopsFromPool(
     if (dayPosition === 0) {
       zonesInCurrentDay = new Set<string>();
       dailyDurationMins = 0;
+      dailyTravelKm = 0;
+      lastLat = null;
+      lastLon = null;
     }
 
     const learningLimit = Math.min(
@@ -2541,6 +2558,24 @@ export function selectStopsFromPool(
         }
       }
 
+      // Geographic scoring — applied when we have coordinates for both last stop and candidate
+      if (lastLat !== null && lastLon !== null) {
+        const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+        const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+        if (cLat && cLon) {
+          const distKm = haversineKm(lastLat, lastLon, cLat, cLon);
+          // Heavy penalty for stops > 25 km from last stop (suburb jumps)
+          if (distKm > 25) adjustedScore -= 15;
+          // Moderate penalty for 10–25 km
+          else if (distKm > 10) adjustedScore -= 5;
+          // Bonus for stops within 5 km (walkable / same neighbourhood)
+          else if (distKm < 5) adjustedScore += 6;
+
+          // Daily travel budget: penalise stops that push cumulative km > 30 km/day
+          if (dailyTravelKm + distKm > 30) adjustedScore -= 10;
+        }
+      }
+
       if (adjustedScore > bestAdjustedScore) {
         bestAdjustedScore = adjustedScore;
         bestCandidate = c;
@@ -2552,6 +2587,16 @@ export function selectStopsFromPool(
     selected.push(bestCandidate);
     usedNormNames.add(normStopName(bestCandidate.name));
     remaining.delete(bestCandidate);
+
+    // Update geographic trackers
+    const selLat = bestCandidate.latitude ? parseFloat(String(bestCandidate.latitude)) : null;
+    const selLon = bestCandidate.longitude ? parseFloat(String(bestCandidate.longitude)) : null;
+    if (lastLat !== null && lastLon !== null && selLat && selLon) {
+      dailyTravelKm += haversineKm(lastLat, lastLon, selLat, selLon);
+    }
+    lastLat = selLat;
+    lastLon = selLon;
+
     usedTypes.set(bestCandidate.type, (usedTypes.get(bestCandidate.type) || 0) + 1);
     if (["museum", "history", "culture"].includes(bestCandidate.type)) learningHeavyCount++;
     if (bestCandidate.neighborhoodZone) {
