@@ -5203,6 +5203,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               tripDays: plannerTripDays,
               childrenAges,
               pace: plannerPace,
+              interests: (tripTailoring?.interests ?? [])
+                .map((i: string) => i.replace(/\s*[^\w\s].*$/, '').trim().toLowerCase())
+                .filter((i: string) => i.length > 0),
             };
             const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             const distributedPoolStops = distributeStopsToDays(
