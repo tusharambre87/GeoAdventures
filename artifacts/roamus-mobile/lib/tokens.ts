@@ -109,6 +109,8 @@ export const ALL_CITIES: CityEntry[] = [
   { name: 'Dublin', country: 'Ireland' },
   { name: 'Edinburgh', country: 'UK' },
   { name: 'Lisbon', country: 'Portugal' },
+  { name: 'Porto', country: 'Portugal' },
+  { name: 'Madrid', country: 'Spain' },
   { name: 'Prague', country: 'Czech Republic' },
   { name: 'Vienna', country: 'Austria' },
   { name: 'Tokyo', country: 'Japan' },
@@ -135,7 +137,10 @@ export const CITY_IMGS: Record<string, string> = {
   'San Francisco': 'https://images.unsplash.com/photo-1449034446853-66c86144b0ad?w=400&q=80',
   'Los Angeles': 'https://images.unsplash.com/photo-1534190760961-74e8c1c5c3da?w=400&q=80',
   'Washington DC': 'https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=400&q=80',
-  Boston: 'https://images.unsplash.com/photo-1501979376754-f3e48ddb95e8?w=400&q=80',
+  Boston: 'https://images.unsplash.com/photo-1508941958022-cdbbf7c16fb3?w=400&q=80',
+  'Saint Louis': 'https://images.unsplash.com/photo-1588731247530-d6e6a049f4ac?w=400&q=80',
+  Porto: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=400&q=80',
+  Madrid: 'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400&q=80',
   Miami: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80',
   Orlando: 'https://images.unsplash.com/photo-1580835239846-5e3c8a83e0a7?w=400&q=80',
   Nashville: 'https://images.unsplash.com/photo-1611416518757-e98aacede46e?w=400&q=80',
@@ -152,6 +157,35 @@ export const CITY_IMGS: Record<string, string> = {
   Honolulu: 'https://images.unsplash.com/photo-1542259009477-d625272157b7?w=400&q=80',
   Kyoto: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&q=80',
 };
+
+export type PopularRoute = { cities: CityEntry[]; label: string };
+
+export const POPULAR_ROUTES: PopularRoute[] = [
+  {
+    cities: [{ name: 'Chicago', country: 'USA', state: 'Illinois' }, { name: 'Saint Louis', country: 'USA', state: 'Missouri' }],
+    label: 'Midwest Road Trip',
+  },
+  {
+    cities: [{ name: 'New York', country: 'USA', state: 'New York' }, { name: 'Washington DC', country: 'USA', state: 'DC' }],
+    label: 'East Coast Classics',
+  },
+  {
+    cities: [{ name: 'San Antonio', country: 'USA', state: 'Texas' }, { name: 'Austin', country: 'USA', state: 'Texas' }],
+    label: 'Texas Twin Cities',
+  },
+  {
+    cities: [{ name: 'London', country: 'UK' }, { name: 'Paris', country: 'France' }],
+    label: 'European Capitals',
+  },
+  {
+    cities: [{ name: 'Lisbon', country: 'Portugal' }, { name: 'Porto', country: 'Portugal' }],
+    label: 'Portugal Road Trip',
+  },
+  {
+    cities: [{ name: 'Barcelona', country: 'Spain' }, { name: 'Madrid', country: 'Spain' }],
+    label: 'Spanish Highlights',
+  },
+];
 
 export const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
   'Chicago': { lat: 41.85, lon: -87.65 },

@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { API_BASE } from "@/lib/authContext";
@@ -30,23 +30,21 @@ export default function BuildingScreen() {
 
   const [animDone, setAnimDone] = useState(false);
   const [apiDone, setApiDone] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
   const navigated = useRef(false);
 
   const city = data.cities[0] ?? "Chicago";
   const country = CITY_COUNTRY[city] ?? "USA";
 
-  // Navigate only when animation AND api BOTH complete successfully
+  // Navigate when animation AND api BOTH complete
   useEffect(() => {
-    if (animDone && apiDone && !apiError && !navigated.current) {
+    if (animDone && apiDone && !navigated.current) {
       navigated.current = true;
       router.replace("/onboarding/preview");
     }
-  }, [animDone, apiDone, apiError]);
+  }, [animDone, apiDone]);
 
   async function callPreviewApi() {
     setApiDone(false);
-    setApiError(null);
     navigated.current = false;
     try {
       const adventureStyle = STYLE_MAP[data.tripStyle ?? ""] ?? "family_explorer";
@@ -79,9 +77,8 @@ export default function BuildingScreen() {
         set({ generatedTrip: { days: body.days } });
       }
       setApiDone(true);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      setApiError(msg);
+    } catch (_err) {
+      // API preview failed — still navigate; preview screen has simulated fallback
       setApiDone(true);
     }
   }
@@ -144,31 +141,16 @@ export default function BuildingScreen() {
 
         <View style={s.center}>
           <Text style={s.heading}>
-            {apiError
-              ? "Something went wrong"
-              : stillWaiting
-              ? "Almost ready…"
-              : `Building your\n${city} adventure`}
+            {stillWaiting ? "Almost ready…" : `Building your\n${city} adventure`}
           </Text>
 
-          {!apiError && (
-            <View style={s.track}>
-              <Animated.View style={[s.fill, { width: progressWidth }]} />
-            </View>
-          )}
+          <View style={s.track}>
+            <Animated.View style={[s.fill, { width: progressWidth }]} />
+          </View>
 
-          {apiError ? (
-            <Pressable
-              style={({ pressed }) => [s.retryBtn, { opacity: pressed ? 0.8 : 1 }]}
-              onPress={callPreviewApi}
-            >
-              <Text style={s.retryText}>Try again →</Text>
-            </Pressable>
-          ) : (
-            <Animated.Text style={[s.message, { opacity: stillWaiting ? 1 : msgOpacity }]}>
-              {stillWaiting ? "Finalising your itinerary…" : MESSAGES[msgIdx]}
-            </Animated.Text>
-          )}
+          <Animated.Text style={[s.message, { opacity: stillWaiting ? 1 : msgOpacity }]}>
+            {stillWaiting ? "Finalising your itinerary…" : MESSAGES[msgIdx]}
+          </Animated.Text>
         </View>
 
         <Text style={s.footer}>

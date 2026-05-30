@@ -7,7 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackBtn, BigBtn, ProgressDots } from "@/lib/onboardingAtoms";
-import { ALL_CITIES, CITY_IMGS, F, G, POPULAR_CITIES, type CityEntry } from "@/lib/tokens";
+import { ALL_CITIES, CITY_IMGS, F, G, POPULAR_CITIES, POPULAR_ROUTES, type CityEntry, type PopularRoute } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { API_BASE } from "@/lib/authContext";
 import { useWikiPhoto } from "@/lib/useWikiPhoto";
@@ -151,10 +151,33 @@ function stopTag(type?: string): string {
   return "⭐ Stop";
 }
 
-// ─── Stop thumbnail: Wikipedia photo first, type-based fallback ─────────────
-function StopImage({ name, type, idx = 0 }: { name: string; type?: string; idx?: number }) {
-  const src = useWikiPhoto(name, stopImg({ type }, idx));
-  return <Image source={{ uri: src }} style={d.stopImg} contentFit="cover" />;
+// ─── City grid card image: Wikipedia photo, Unsplash fallback ────────────────
+function CityCardImage({ name }: { name: string }) {
+  const src = useWikiPhoto(name, CITY_IMGS[name] ?? "");
+  return <Image source={{ uri: src }} style={StyleSheet.absoluteFill} contentFit="cover" />;
+}
+
+// ─── Popular multi-city route card ───────────────────────────────────────────
+function RouteCard({ route, selected, onSelect }: { route: PopularRoute; selected: boolean; onSelect: () => void }) {
+  const heroCity = route.cities[0].name;
+  const src = useWikiPhoto(heroCity, CITY_IMGS[heroCity] ?? "");
+  const names = route.cities.map(c => c.name).join(" + ");
+  return (
+    <Pressable onPress={onSelect} style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}>
+      <Image source={{ uri: src }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      <View style={s.cardGrad} />
+      {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
+      <View style={s.cardLabel}>
+        <Text style={s.cardName} numberOfLines={2}>{names}</Text>
+        <Text style={s.cardSub}>{route.label}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Stop thumbnail: type-based Unsplash image ───────────────────────────────
+function StopImage({ type, idx = 0 }: { name?: string; type?: string; idx?: number }) {
+  return <Image source={{ uri: stopImg({ type }, idx) }} style={d.stopImg} contentFit="cover" />;
 }
 
 // ─── Stop row in dark card ──────────────────────────────────────────────────
@@ -456,16 +479,13 @@ export default function WhereScreen() {
                   <View key={si} style={{ flex: 1, flexDirection: "row", gap: 10, minHeight: 110 }}>
                     {row.map(c => {
                       const selected = sel.includes(c.name);
-                      const img = CITY_IMGS[c.name];
                       return (
                         <Pressable
                           key={c.name}
                           onPress={() => selectCity(c.name)}
                           style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}
                         >
-                          {img
-                            ? <Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                            : <View style={[StyleSheet.absoluteFill, { backgroundColor: G.muted + "44" }]} />}
+                          <CityCardImage name={c.name} />
                           <View style={s.cardGrad} />
                           {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
                           <View style={s.cardLabel}>
@@ -484,9 +504,44 @@ export default function WhereScreen() {
           </View>
         )}
 
-        {/* Popular label for multi-city (quick add hint) */}
-        {isMulti && !showSuggestions && (
-          <Text style={s.gridLabel}>POPULAR WITH FAMILIES</Text>
+        {/* Multi-city: popular route pairs grid */}
+        {isMulti && !showSuggestions && !showMultiCard && (
+          <View>
+            <Text style={s.gridLabel}>POPULAR WITH FAMILIES</Text>
+            <View style={{ gap: 10 }}>
+              {[0, 2, 4].map(si => {
+                const row = POPULAR_ROUTES.slice(si, si + 2);
+                if (!row.length) return null;
+                return (
+                  <View key={si} style={{ flexDirection: "row", gap: 10, minHeight: 110 }}>
+                    {row.map(route => {
+                      const routeKey = route.cities.map(c => c.name).join("+");
+                      const allSelected = route.cities.every(c => sel.includes(c.name));
+                      return (
+                        <RouteCard
+                          key={routeKey}
+                          route={route}
+                          selected={allSelected}
+                          onSelect={() => {
+                            const toAddNames = route.cities
+                              .map(c => c.name)
+                              .filter(n => !sel.includes(n));
+                            if (toAddNames.length > 0) {
+                              const next = [...sel, ...toAddNames].slice(0, 3);
+                              toAddNames.forEach(n => fetchPreview(n));
+                              setSel(next);
+                            }
+                            setQuery("");
+                          }}
+                        />
+                      );
+                    })}
+                    {row.length === 1 && <View style={{ flex: 1 }} />}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         )}
 
         {/* One-city: dark top stops card */}
