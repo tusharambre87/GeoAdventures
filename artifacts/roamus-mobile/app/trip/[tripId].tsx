@@ -69,8 +69,8 @@ function stopTypeImage(type?: string | null): string {
 
 const CITY_COLORS = ["#3b82f6", "#a855f7", "#14b8a6", "#f43f5e", "#f97316", "#84cc16"];
 
-// Only flag types that are almost universally paid — "museum" removed (many are free)
-const TICKET_TYPES = ["zoo", "aquarium", "palace", "castle", "theater", "theatre", "observatory"];
+// Types that almost always require tickets — museum re-included; ideally gate per-stop on enrichment.bookingRequired
+const TICKET_TYPES = ["museum", "zoo", "aquarium", "palace", "castle", "theater", "theatre", "observatory"];
 const MEAL_TYPES = ["restaurant", "food", "cafe", "diner", "eatery"];
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
