@@ -1500,7 +1500,7 @@ function ReplaceSheet({
   const [chip, setChip]       = useState<ReplaceChip>('Best match');
   const [search, setSearch]   = useState('');
   const [loading, setLoading] = useState(false);
-  const [alts, setAlts]       = useState<Array<{ id: string; name: string; stopType?: string; description?: string; durationMinutes?: number }>>([]);
+  const [alts, setAlts]       = useState<Array<{ id: string; name: string; stopType?: string; description?: string; duration?: string; durationMinutes?: number }>>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const queryClient = useQueryClient();
@@ -1509,7 +1509,7 @@ function ReplaceSheet({
     if (c === 'Outdoors')  return 'outdoors';
     if (c === 'Shorter')   return 'shorter';
     if (c === 'More fun')  return 'fun';
-    if (c === 'Indoor')    return 'free';
+    if (c === 'Indoor')    return null;  // API has no indoor filter — omit
     return null;
   }
 
@@ -1675,9 +1675,9 @@ function ReplaceSheet({
                     <Text style={rep.altTagText}>{alt.stopType.replace(/_/g, ' ')}</Text>
                   </View>
                 )}
-                {alt.durationMinutes && (
+                {(alt.duration || alt.durationMinutes) && (
                   <View style={rep.altTagN}>
-                    <Text style={rep.altTagNText}>{alt.durationMinutes} min</Text>
+                    <Text style={rep.altTagNText}>{alt.duration ?? `${alt.durationMinutes} min`}</Text>
                   </View>
                 )}
               </View>
@@ -1717,6 +1717,7 @@ function RunDaySheet({
   runMode,
   onModeChange,
   onClose,
+  onStopsUpdated,
   queryClient,
 }: {
   selectedDay: number;
@@ -1725,6 +1726,7 @@ function RunDaySheet({
   runMode: RunMode;
   onModeChange: (m: RunMode) => void;
   onClose: () => void;
+  onStopsUpdated: (stops: Stop[]) => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const [applying, setApplying] = useState(false);
@@ -1743,18 +1745,19 @@ function RunDaySheet({
   async function applyEasier() {
     setApplying(true);
     try {
-      await apiFetch(`/api/travel/trips/${tripId}/apply-preferences`, {
-        method: 'POST',
-        body: JSON.stringify({ pace: 'relaxed' }),
-      });
-      await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      const data = await apiFetch<{ applied?: string[]; stops?: Stop[] }>(
+        `/api/travel/trips/${tripId}/apply-preferences`,
+        { method: 'POST', body: JSON.stringify({ pace: 'relaxed' }) },
+      );
+      if (Array.isArray(data.stops)) {
+        onStopsUpdated(data.stops);
+      }
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       onClose();
-      router.replace('/(tabs)/today' as any);
     } catch {
-      showToast("Couldn't update — try again");
+      Alert.alert('Error', "Couldn't update your day — try again");
     } finally {
       setApplying(false);
     }
@@ -2407,6 +2410,7 @@ export default function TripPlanScreen() {
             runMode={runMode}
             onModeChange={setRunMode}
             onClose={closeSheet}
+            onStopsUpdated={setLocalStops}
             queryClient={queryClient}
           />
         </SheetModal>
