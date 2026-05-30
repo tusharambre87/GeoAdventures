@@ -983,20 +983,26 @@ function TripOverview({
         contentContainerStyle={[ov.body, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        {Array.from({ length: totalDays }, (_, i) => i + 1).map(dayNum => {
-          const dayStops = getStopsForDay(dayNum);
-          const status   = getDayStatus(dayNum);
-          return (
-            <DayCard
-              key={dayNum}
-              dayNum={dayNum}
-              dayStops={dayStops}
-              startDate={trip.startDate}
-              status={status}
-              onPress={() => onSelectDay(dayNum)}
-            />
-          );
-        })}
+        {Array.from({ length: totalDays }, (_, i) => i + 1)
+          .filter(dayNum => {
+            const status = getDayStatus(dayNum);
+            if (status === 'past' || status === 'today') return true;
+            return getStopsForDay(dayNum).length > 0;
+          })
+          .map(dayNum => {
+            const dayStops = getStopsForDay(dayNum);
+            const status   = getDayStatus(dayNum);
+            return (
+              <DayCard
+                key={dayNum}
+                dayNum={dayNum}
+                dayStops={dayStops}
+                startDate={trip.startDate}
+                status={status}
+                onPress={() => onSelectDay(dayNum)}
+              />
+            );
+          })}
 
         {totalDays === 0 && (
           <View style={ov.emptyWrap}>
@@ -1094,7 +1100,13 @@ function DayDetail({
 
         {/* Day tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={dd.tabsRow}>
-          {Array.from({ length: totalDays }, (_, i) => i + 1).map(d => {
+          {Array.from({ length: totalDays }, (_, i) => i + 1)
+            .filter(d => {
+              const s = getDayStatus(d);
+              if (s === 'past' || s === 'today') return true;
+              return getStopsForDay(d).length > 0;
+            })
+            .map(d => {
             const s    = getDayStatus(d);
             const isOn = d === selectedDay;
             const isPast = s === 'past';
@@ -2058,7 +2070,13 @@ function CompareDaysSheet({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={cds.body}>
-        {Array.from({ length: totalDays }, (_, i) => i + 1).map(dayNum => {
+        {Array.from({ length: totalDays }, (_, i) => i + 1)
+          .filter(dayNum => {
+            const st = getDayStatus(dayNum);
+            if (st === 'past' || st === 'today') return true;
+            return getStopsForDay(dayNum).length > 0;
+          })
+          .map(dayNum => {
           const ds       = getStopsForDay(dayNum);
           const st       = getDayStatus(dayNum);
           const theme    = dayTheme(ds);
