@@ -636,6 +636,30 @@ function StopCard({
     );
   }
 
+  // actionRow lives OUTSIDE Swipeable so the PanGestureHandler never blocks its taps
+  const actionRow = (
+    <View style={sc.actionRow}>
+      <Pressable
+        style={sc.detailsBtn}
+        onPress={() => {
+          console.log('[DEBUG] Details button pressed for stop:', stop?.name);
+          if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onDetails(stop);
+        }}
+      >
+        <Text style={sc.detailsBtnText}>Details →</Text>
+      </Pressable>
+      {isEditable ? (
+        <View style={sc.swipeHint}>
+          <Text style={sc.swipeHintText}>swipe </Text>
+          <IconChevronRight size={11} />
+        </View>
+      ) : (
+        <Text style={sc.viewOnlyText}>View only</Text>
+      )}
+    </View>
+  );
+
   const card = (
     <View style={sc.card}>
       {/* Hero */}
@@ -683,7 +707,7 @@ function StopCard({
         )}
       </View>
 
-      {/* Body */}
+      {/* Body — tags only; actionRow is rendered outside Swipeable */}
       <View style={sc.body}>
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
@@ -704,33 +728,12 @@ function StopCard({
             </View>
           )}
         </View>
-
-        <View style={sc.actionRow}>
-          <GHTouchable
-            style={sc.detailsBtn}
-            onPress={() => {
-              console.log('[DEBUG] Details button pressed for stop:', stop?.name);
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onDetails(stop);
-            }}
-          >
-            <Text style={sc.detailsBtnText}>Details →</Text>
-          </GHTouchable>
-          {isEditable ? (
-            <View style={sc.swipeHint}>
-              <Text style={sc.swipeHintText}>swipe </Text>
-              <IconChevronRight size={11} />
-            </View>
-          ) : (
-            <Text style={sc.viewOnlyText}>View only</Text>
-          )}
-        </View>
       </View>
     </View>
   );
 
   if (!isEditable) {
-    return <View style={sc.wrap}>{card}</View>;
+    return <View style={sc.wrap}>{card}{actionRow}</View>;
   }
 
   return (
@@ -748,6 +751,7 @@ function StopCard({
       >
         {card}
       </Swipeable>
+      {actionRow}
     </View>
   );
 }
@@ -2572,8 +2576,8 @@ const sb = StyleSheet.create({
 });
 
 const sc = StyleSheet.create({
-  wrap: { marginBottom: 10, borderRadius: 16, overflow: 'hidden' },
-  card: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, shadowColor: C.deep, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 1 },
+  wrap: { marginBottom: 10, borderRadius: 16, overflow: 'hidden', backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  card: { borderRadius: 16 },
   hero: { height: 108, justifyContent: 'flex-end', position: 'relative' },
   heroName: { position: 'relative', zIndex: 1, fontFamily: F.bold, fontSize: 13, color: '#fff', padding: 9, paddingRight: 42, paddingLeft: 12, textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, letterSpacing: -0.01, lineHeight: 17 },
   dragHandle: { position: 'absolute', right: 11, bottom: 9, zIndex: 2, width: 27, height: 27, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', gap: 3 },
@@ -2591,7 +2595,7 @@ const sc = StyleSheet.create({
   tagFreeText:{ fontFamily: F.bold, fontSize: 10, color: '#1A6B3A' },
   tagAnchor:  { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: '#F0EBFF', borderWidth: 1, borderColor: '#D8CFEF' },
   tagAnchorText: { fontFamily: F.bold, fontSize: 10, color: '#5B3FA8' },
-  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9, paddingHorizontal: 12, paddingBottom: 11 },
   detailsBtn: { backgroundColor: C.deep, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 8 },
   detailsBtnText: { fontFamily: F.bold, fontSize: 12, color: '#fff' },
   swipeHint: { flexDirection: 'row', alignItems: 'center' },
