@@ -2453,12 +2453,16 @@ export function selectStopsFromPool(
   const normStopName = (n: string): string =>
     n.toLowerCase()
       .replace(/^the\s+/, '')
+      .replace(/\bof\s+arts?\b/g, 'of art')
       .replace(/\s+regional\s+/g, ' ')
       .replace(/\s+state\s+park\b/g, '')
+      .replace(/\s+national\s+park\b/g, '')
+      .replace(/\s+county\s+park\b/g, '')
       .replace(/&/g, 'and')
       .replace(/[^a-z0-9 ]/g, '')
       .replace(/\s+/g, ' ')
-      .trim();
+      .trim()
+      .split(' ').slice(0, 5).join(' ');
   const usedNormNames = new Set<string>();
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)
