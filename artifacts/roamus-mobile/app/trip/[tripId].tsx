@@ -1138,6 +1138,9 @@ function StopDetailSheet({
   const [expanded, setExpanded] = useState(false);
   const rotAnim = useRef(new Animated.Value(0)).current;
 
+  // ⚠️ Hook must be above early return — rules of hooks
+  const heroImg = useStopHeroImage(stop?.id ?? null);
+
   useEffect(() => {
     Animated.timing(rotAnim, {
       toValue: expanded ? 1 : 0,
@@ -1148,8 +1151,7 @@ function StopDetailSheet({
 
   if (!stop) return null;
 
-  const heroBg  = stopHeroBg(stop.stopType);
-  const heroImg = useStopHeroImage(stop.id);
+  const heroBg = stopHeroBg(stop.stopType);
   const enrichment = stop.enrichment;
   const meta = stop.metadata;
   const duration = getStopDuration(stop);
@@ -1970,30 +1972,40 @@ function SheetModal({
   maxHeight?: `${number}%` | number;
 }) {
   const slideAnim = useRef(new Animated.Value(900)).current;
-  const [rendered, setRendered] = useState(false);
+  const prevVisible = useRef(false);
 
   useEffect(() => {
-    if (visible) {
-      setRendered(true);
+    if (visible && !prevVisible.current) {
+      // Opening: reset to off-screen then spring in
+      slideAnim.setValue(900);
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
         tension: 65,
         friction: 12,
       }).start();
-    } else {
+    } else if (!visible && prevVisible.current) {
+      // Closing: slide out
       Animated.timing(slideAnim, {
         toValue: 900,
-        duration: 240,
+        duration: 220,
         useNativeDriver: true,
-      }).start(() => setRendered(false));
+      }).start();
     }
+    prevVisible.current = visible;
   }, [visible]);
 
-  if (!rendered) return null;
-
+  // Always render the Modal — let React Native's `visible` prop manage mounting.
+  // This avoids the race condition where our own `rendered` flag delays the mount
+  // past when the spring animation has already started.
   return (
-    <Modal transparent visible={rendered} animationType="none" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={sh.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
