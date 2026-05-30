@@ -1553,7 +1553,7 @@ function ReplaceSheet({
   if (!stop) return null;
 
   const otherDayStops = allStops
-    .filter(s => s.dayIndex !== selectedDay - 1 && !isMealStop(s.stopType))
+    .filter(s => s.id !== stop.id && s.dayIndex !== stop.dayIndex && !isMealStop(s.stopType))
     .slice(0, 5);
 
   async function useAlt(alt: typeof alts[0]) {
