@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 
 import { travelAPI, type Trip, type TripStop } from "@/lib/apiClient";
@@ -674,8 +674,7 @@ function DayDetail({
 
       {/* Stop detail sheet */}
       <StopDetailSheet
-        stop={day.stops.find(s => s.id === viewingStopId) ?? null}
-        visible={!!viewingStopId}
+        stopId={viewingStopId}
         onClose={() => setViewingStopId(null)}
       />
     </View>
@@ -685,122 +684,170 @@ function DayDetail({
 // ─── StopDetailSheet ─────────────────────────────────────────────────────────
 
 function StopDetailSheet({
-  stop,
-  visible,
+  stopId,
   onClose,
 }: {
-  stop: TripStop | null;
-  visible: boolean;
+  stopId: string | null;
   onClose: () => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const [stop, setStop] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const heroImg = useStopImage(stop?.id ?? "");
-  if (!stop) return null;
 
-  const storyPack = (stop as any).storyPack as { mainStory?: string; quickHits?: string[] } | null | undefined;
-  const rawStory = storyPack?.mainStory ?? null;
-  const quickHits: string[] = (storyPack as any)?.quickHits ?? [];
+  useEffect(() => {
+    if (!stopId) { setStop(null); return; }
+    setLoading(true);
+    AsyncStorage.getItem("auth_token").then(token => {
+      fetch(`${API_BASE}/api/travel/stops/${stopId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+        .then(r => r.json())
+        .then(data => { setStop(data); setLoading(false); })
+        .catch(() => setLoading(false));
+    });
+  }, [stopId]);
+
   const cleanStory = (text: string) =>
     text
-      .replace(/\[.*?\]/g, '')                              // strip TTS tags
-      .replace(/^Hey explorers![\s\S]*?worth seeing[.…]*\s*/i, '') // strip generic intro
+      .replace(/\[.*?\]/g, '')
+      .replace(/^Hey explorers![\s\S]*?worth seeing[.…]*\s*/i, '')
       .trim();
-  const cleanedStory = rawStory ? cleanStory(rawStory) : null;
-  const mainStory = cleanedStory ? cleanedStory.slice(0, 500) : null;
-  const showEllipsis = cleanedStory && cleanedStory.length > 500;
-  const whyItWorks = (stop.metadata as any)?.whyItWorks as string | null | undefined;
-  const bathroomNotes = (stop.metadata as any)?.bathroomNotes as string | null | undefined;
-  const missions = stop.stopMissions?.slice(0, 3) ?? [];
+
+  const storyPack = stop?.storyPack as any;
+  const missions: any[] = stop?.stopMissions ?? [];
+  const enrichment = stop?.enrichment as any;
+  const quickHits: string[] = storyPack?.quickHits ?? [];
+  const rawStory: string | null = storyPack?.mainStory ?? null;
+  const mainStory = rawStory ? cleanStory(rawStory).slice(0, 500) : null;
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={ds.overlay} />
-      </TouchableWithoutFeedback>
-      <View style={[ds.sheet, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={ds.handle} />
-        <Pressable style={ds.closeBtn} onPress={onClose} hitSlop={8}>
-          <Ionicons name="close" size={16} color={G.muted} />
-        </Pressable>
+    <Modal
+      visible={!!stopId}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: G.bg }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ds.scrollBody}>
+          {/* Hero image */}
           <Image
             source={{ uri: heroImg ?? stopTypeImage(stop?.stopType) }}
-            style={ds.heroImg}
+            style={{ width: "100%", height: 220 }}
             contentFit="cover"
           />
 
-          <View style={ds.nameBlock}>
-            <Text style={ds.stopName}>{stop.name}</Text>
-            {stop.stopType ? (
-              <Text style={ds.stopType}>{stop.stopType.replace(/_/g, " ")}</Text>
-            ) : null}
-          </View>
+          <View style={{ padding: 20 }}>
 
-          {mainStory ? (
-            <View style={ds.section}>
-              <Text style={ds.sectionLabel}>THE STORY</Text>
-              <Text style={ds.bodyText}>{mainStory}{showEllipsis ? "…" : ""}</Text>
-            </View>
-          ) : null}
+            {/* Close button */}
+            <Pressable
+              onPress={onClose}
+              style={{ position: "absolute", top: 12, right: 20, zIndex: 10 }}
+              hitSlop={8}
+            >
+              <Ionicons name="close-circle" size={28} color={G.muted} />
+            </Pressable>
 
-          {quickHits.length > 0 ? (
-            <View style={ds.section}>
-              <Text style={ds.sectionLabel}>DID YOU KNOW?</Text>
-              {quickHits.slice(0, 4).map((hit, i) => (
-                <Text key={i} style={ds.quickHit}>• {hit}</Text>
-              ))}
-            </View>
-          ) : null}
+            {loading && (
+              <ActivityIndicator color={G.orange} style={{ marginVertical: 40 }} />
+            )}
 
-          {whyItWorks ? (
-            <View style={ds.section}>
-              <Text style={ds.sectionLabel}>WHY IT WORKS FOR YOUR FAMILY</Text>
-              <Text style={ds.bodyText}>{whyItWorks}</Text>
-            </View>
-          ) : null}
+            {!loading && stop && (
+              <>
+                {/* Name + type */}
+                <Text style={{ fontFamily: F.bold, fontSize: 22, fontWeight: "700", color: G.deep, marginBottom: 4, marginTop: 4, paddingRight: 36 }}>
+                  {stop.name}
+                </Text>
+                <Text style={{ fontFamily: F.medium, fontSize: 13, color: G.muted, marginBottom: 20, textTransform: "capitalize" }}>
+                  {stop.stopType?.replace(/_/g, " ")}
+                </Text>
 
-          {bathroomNotes ? (
-            <View style={ds.section}>
-              <Text style={ds.sectionLabel}>PRACTICAL NOTES</Text>
-              <Text style={ds.bodyText}>{bathroomNotes}</Text>
-            </View>
-          ) : null}
-
-          {missions.length > 0 ? (
-            <View style={ds.section}>
-              <Text style={ds.sectionLabel}>KID MISSIONS</Text>
-              {missions.map((m, i) => (
-                <View key={i} style={ds.missionRow}>
-                  <View style={ds.missionBadge}>
-                    <Text style={ds.missionBadgeText}>{i + 1}</Text>
+                {/* Story */}
+                {mainStory ? (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={ds.sectionLabel}>THE STORY</Text>
+                    <Text style={ds.bodyText}>{mainStory}</Text>
                   </View>
-                  <View style={ds.missionBody}>
-                    <Text style={ds.missionType}>{m.type.toUpperCase()}</Text>
-                    <Text style={ds.missionQ}>{m.question}</Text>
-                    {m.options && m.options.length > 0 ? (
-                      <View style={ds.optionsList}>
-                        {m.options.map((opt, oi) => (
-                          <Text key={oi} style={ds.optionText}>· {opt}</Text>
-                        ))}
+                ) : null}
+
+                {/* Did you know */}
+                {quickHits.length > 0 ? (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={ds.sectionLabel}>DID YOU KNOW?</Text>
+                    {quickHits.slice(0, 4).map((hit: string, i: number) => (
+                      <Text key={i} style={ds.quickHit}>• {hit}</Text>
+                    ))}
+                  </View>
+                ) : null}
+
+                {/* Kid missions */}
+                {missions.length > 0 ? (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={ds.sectionLabel}>KID MISSIONS</Text>
+                    {missions.slice(0, 3).map((m: any, i: number) => (
+                      <View key={i} style={{
+                        backgroundColor: "#f9f8f6", borderRadius: 12,
+                        padding: 14, marginBottom: 10,
+                        borderWidth: 0.5, borderColor: "rgba(0,0,0,0.08)",
+                      }}>
+                        <Text style={{ fontFamily: F.bold, fontSize: 11, color: G.orange, fontWeight: "700", marginBottom: 4, textTransform: "uppercase" }}>
+                          {m.type === "photo" ? "📸 Photo challenge" : m.type === "observation" ? "👀 Look for this" : "🧠 Did you know?"}
+                        </Text>
+                        <Text style={{ fontFamily: F.regular, fontSize: 14, color: G.deep, lineHeight: 20 }}>
+                          {m.question}
+                        </Text>
+                        {m.options && m.options.length > 0 ? (
+                          <View style={{ marginTop: 8 }}>
+                            {m.options.map((opt: string, oi: number) => (
+                              <Text key={oi} style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 2 }}>· {opt}</Text>
+                            ))}
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
-                    <Text style={ds.missionXp}>+{m.xpReward} XP</Text>
+                    ))}
                   </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
+                ) : null}
 
-          {!mainStory && !whyItWorks && missions.length === 0 ? (
-            <View style={ds.section}>
-              <Text style={[ds.bodyText, { color: G.muted, fontStyle: "italic" }]}>
-                {stop.description ?? "No additional details available for this stop."}
-              </Text>
-            </View>
-          ) : null}
+                {/* Good to know (enrichment) */}
+                {enrichment && (enrichment.nearestRestroomLocation || enrichment.parkingAvailability || enrichment.bestTimeOfDay || enrichment.typicalWaitTime) ? (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={ds.sectionLabel}>GOOD TO KNOW</Text>
+                    {enrichment.nearestRestroomLocation ? (
+                      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 6 }}>🚻 {enrichment.nearestRestroomLocation}</Text>
+                    ) : null}
+                    {enrichment.parkingAvailability ? (
+                      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 6 }}>🅿️ {enrichment.parkingAvailability}</Text>
+                    ) : null}
+                    {enrichment.bestTimeOfDay ? (
+                      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 6 }}>⏰ Best time: {enrichment.bestTimeOfDay}</Text>
+                    ) : null}
+                    {enrichment.typicalWaitTime ? (
+                      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 6 }}>⌛ Wait time: {enrichment.typicalWaitTime}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Fallback */}
+                {!mainStory && missions.length === 0 ? (
+                  <Text style={[ds.bodyText, { color: G.muted, fontStyle: "italic" }]}>
+                    {stop.description ?? "No additional details available for this stop."}
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
         </ScrollView>
-      </View>
+
+        {/* Done button */}
+        <View style={{ padding: 20, paddingBottom: 8 }}>
+          <Pressable
+            style={{ backgroundColor: G.orange, borderRadius: 20, padding: 16, alignItems: "center" }}
+            onPress={onClose}
+          >
+            <Text style={{ fontFamily: F.bold, color: "#fff", fontWeight: "700", fontSize: 15 }}>Done</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }

@@ -2449,9 +2449,16 @@ export function selectStopsFromPool(
   let learningHeavyCount = 0;
   const remaining = new Set(candidates);
 
-  // Normalized name dedup — prevents "Foo & Bar" and "Foo and Bar" from both being selected
-  const normStopName = (n: string) =>
-    n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+  // Normalized name dedup — catches &/and, "The X"/"X", "Regional Park", punctuation variants
+  const normStopName = (n: string): string =>
+    n.toLowerCase()
+      .replace(/^the\s+/, '')
+      .replace(/\s+regional\s+/g, ' ')
+      .replace(/\s+state\s+park\b/g, '')
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9 ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   const usedNormNames = new Set<string>();
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)

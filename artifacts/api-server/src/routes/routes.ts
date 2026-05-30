@@ -5215,8 +5215,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lastDayCap,
               effectivePerDay,
             );
-            // Safety-net dedup: catch any near-duplicate names (& vs and, punctuation) that slipped through
-            const normN = (n: string) => n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+            // Safety-net dedup: identical normalization to plannerService normStopName
+            const normN = (n: string): string =>
+              n.toLowerCase()
+                .replace(/^the\s+/, '')
+                .replace(/\s+regional\s+/g, ' ')
+                .replace(/\s+state\s+park\b/g, '')
+                .replace(/&/g, 'and')
+                .replace(/[^a-z0-9 ]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
             const seenWritten = new Set<string>();
             const distributedPoolStops = rawDistributedPoolStops.filter(s => {
               const key = normN(s.name);
@@ -7664,6 +7672,37 @@ Return ONLY valid JSON in this exact format:
     }
   });
   
+  // GET a single stop — enriched with stop_library data (storyPack, enrichment, stopMissions)
+  app.get('/api/travel/stops/:stopId', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { stopId } = req.params;
+      const stop = await storage.getStopById(stopId);
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+
+      let enriched: any = { ...stop, storyPack: null, audioUrl: null, keepsake: null, enrichment: null };
+      try {
+        if (stop.name && stop.cityGroup) {
+          const libRows = await storage.getStopLibraryByNames([{ city: stop.cityGroup, name: stop.name }]);
+          const lib = libRows[0] ?? null;
+          enriched = {
+            ...stop,
+            storyPack: lib?.storyPack ?? null,
+            audioUrl: lib?.audioUrl ?? null,
+            keepsake: lib?.keepsake ?? null,
+            enrichment: lib?.enrichment ?? null,
+          };
+        }
+      } catch (enrichErr) {
+        req.log?.warn({ err: enrichErr }, '[Stop] stop_library enrichment join failed');
+      }
+
+      res.json(enriched);
+    } catch (error: any) {
+      req.log?.error({ err: error }, '[Stop] Error fetching stop');
+      res.status(500).json({ message: 'Failed to fetch stop' });
+    }
+  });
+
   // Update a stop
   app.patch('/api/travel/stops/:stopId', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
