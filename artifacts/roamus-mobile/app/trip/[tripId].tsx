@@ -43,10 +43,20 @@ const STOP_TYPE_IMGS: Record<string, string> = {
   science:       "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=400&q=80",
   beach:         "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80",
   entertainment: "https://images.unsplash.com/photo-1548438294-1ad5d5f4f063?w=400&q=80",
+  adventure:     "https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&q=80",
+  culture:       "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=400&q=80",
+  theater:       "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=400&q=80",
+  theatre:       "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=400&q=80",
+  shopping:      "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400&q=80",
+  historic:      "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&q=80",
+  palace:        "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80",
+  castle:        "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80",
+  temple:        "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=400&q=80",
   playground:    "https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=400&q=80",
   viewpoint:     "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80",
 };
-const STOP_IMG_FALLBACK = "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=80";
+// Generic city/activity fallback — NOT a mountain lake
+const STOP_IMG_FALLBACK = "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&q=80";
 
 function stopTypeImage(type?: string | null): string {
   if (!type) return STOP_IMG_FALLBACK;
@@ -59,7 +69,8 @@ function stopTypeImage(type?: string | null): string {
 
 const CITY_COLORS = ["#3b82f6", "#a855f7", "#14b8a6", "#f43f5e", "#f97316", "#84cc16"];
 
-const TICKET_TYPES = ["museum", "zoo", "aquarium", "palace", "castle", "temple", "theater", "theatre", "observatory"];
+// Only flag types that are almost universally paid — "museum" removed (many are free)
+const TICKET_TYPES = ["zoo", "aquarium", "palace", "castle", "theater", "theatre", "observatory"];
 const MEAL_TYPES = ["restaurant", "food", "cafe", "diner", "eatery"];
 
 // ─── Helper functions ─────────────────────────────────────────────────────────

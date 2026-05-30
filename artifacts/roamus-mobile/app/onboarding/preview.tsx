@@ -327,7 +327,7 @@ export default function PreviewScreen() {
       )}
       <LinearGradient colors={["rgba(26,31,46,0)","#1A1F2E"]} locations={[0, 0.38]} style={StyleSheet.absoluteFill} />
 
-      {/* ── Hero header: text only, no fixed height, no image child ── */}
+      {/* ── Hero header ── */}
       <View style={[s.heroContent, { paddingTop: insets.top + 16 }]}>
         <Text style={s.heroTitle}>{tripTitle}</Text>
         {routeStr ? <Text style={s.heroRoute}>{routeStr}</Text> : null}
@@ -336,6 +336,28 @@ export default function PreviewScreen() {
           {totalStops > 0 ? ` · ${totalStops} stops` : ""}
           {dateRange ? ` · ${dateRange}` : ""}
         </Text>
+        {/* Trip detail badges — fill the visual hero space */}
+        <View style={s.heroBadges}>
+          {data.travelers.length > 0 && (
+            <View style={s.heroBadge}>
+              <Text style={s.heroBadgeText}>
+                {data.travelers.length === 1 ? "Solo" : `${data.travelers.length} travelers`}
+              </Text>
+            </View>
+          )}
+          {data.tripStyle ? (
+            <View style={s.heroBadge}>
+              <Text style={s.heroBadgeText}>
+                {data.tripStyle === "chill" ? "Relaxed pace" :
+                 data.tripStyle === "packed" ? "Action-packed" :
+                 data.tripStyle === "explorer" ? "Explorer mode" : "Family explorer"}
+              </Text>
+            </View>
+          ) : null}
+          <View style={s.heroBadge}>
+            <Text style={s.heroBadgeText}>AI-planned</Text>
+          </View>
+        </View>
       </View>
 
       {/* ── Day tabs ── */}
@@ -406,10 +428,13 @@ export default function PreviewScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, overflow: "hidden" },
-  heroContent: { paddingHorizontal: 20, paddingBottom: 14 },
+  heroContent: { paddingHorizontal: 20, paddingBottom: 18 },
   heroTitle: { fontFamily:F.bold, fontSize:20, fontWeight:"800", color:"#fff", letterSpacing:-0.4, lineHeight:27, marginBottom:4 },
   heroRoute: { fontFamily:F.semibold, fontSize:14, fontWeight:"600", color:G.orange, marginBottom:3 },
-  heroMeta: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.55)" },
+  heroMeta: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.55)", marginBottom:12 },
+  heroBadges: { flexDirection:"row", flexWrap:"wrap", gap:8 },
+  heroBadge: { paddingHorizontal:12, paddingVertical:5, borderRadius:20, backgroundColor:"rgba(255,255,255,0.1)", borderWidth:1, borderColor:"rgba(255,255,255,0.15)" },
+  heroBadgeText: { fontFamily:F.medium, fontSize:12, fontWeight:"500", color:"rgba(255,255,255,0.7)" },
   tabsScroll: { flexShrink:0, height:68 },
   tabs: { paddingHorizontal:20, paddingVertical:10, gap:8, alignItems:"center" },
   tab: { paddingVertical:8, paddingHorizontal:14, borderRadius:20, backgroundColor:"rgba(255,255,255,0.08)", alignItems:"center", minWidth:72 },
