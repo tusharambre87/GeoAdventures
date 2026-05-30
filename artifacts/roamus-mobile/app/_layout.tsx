@@ -39,7 +39,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inOnboarding = segments[0] === "onboarding";
     const inLegacyLogin = segments[0] === "login";
 
-    if (!token && !inOnboarding && !inLegacyLogin) {
+    const inTodayPreview = __DEV__ && segments[1] === 'today';
+    if (!token && !inOnboarding && !inLegacyLogin && !inTodayPreview) {
       // No auth — send to onboarding splash
       router.replace("/onboarding/splash");
     } else if (token && !inOnboarding) {
