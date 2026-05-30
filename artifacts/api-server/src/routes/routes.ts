@@ -5275,6 +5275,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   : null,
               });
             }
+
+            // Resequence display_order to be contiguous 0-based within each day
+            const createdStops = await storage.getStopsByTripId(tripId);
+            const byDay = new Map<number, typeof createdStops>();
+            for (const s of createdStops) {
+              const di = s.dayIndex ?? 0;
+              if (!byDay.has(di)) byDay.set(di, []);
+              byDay.get(di)!.push(s);
+            }
+            for (const [, dayStops] of byDay) {
+              dayStops.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+              for (let i = 0; i < dayStops.length; i++) {
+                if (dayStops[i].displayOrder !== i) {
+                  await storage.updateStop(dayStops[i].id, { displayOrder: i });
+                }
+              }
+            }
+            console.log(`[Travel] [bg] Resequenced display_order for ${createdStops.length} stops`);
+
             console.log(`✅ [Travel] [bg] Pool-served ${selectedStops.length} stops for ${cityName} (0 AI calls)`);
             usedPool = true;
           }
