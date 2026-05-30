@@ -2121,10 +2121,15 @@ function SheetModal({
   children: React.ReactNode;
   maxHeight?: `${number}%` | number;
 }) {
+  // Return null when not visible — on React Native Web, <Modal visible={false}>
+  // still mounts a full-screen portal that intercepts all pointer events.
+  // Five stacked invisible overlays = every button on the screen is dead.
+  if (!visible) return null;
+
   return (
     <Modal
       transparent
-      visible={visible}
+      visible
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
