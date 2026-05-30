@@ -23,7 +23,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -658,27 +658,27 @@ function StopCard({
         {isEditable && (
           reorderActive ? (
             <View style={sc.reorderBtns}>
-              <Pressable
+              <GHTouchable
                 style={sc.reorderBtn}
                 onPress={() => { onMoveStop(stop.id, 'up'); setReorderActive(false); }}
                 hitSlop={6}
               >
                 <Text style={sc.reorderArrow}>▲</Text>
-              </Pressable>
-              <Pressable
+              </GHTouchable>
+              <GHTouchable
                 style={sc.reorderBtn}
                 onPress={() => { onMoveStop(stop.id, 'down'); setReorderActive(false); }}
                 hitSlop={6}
               >
                 <Text style={sc.reorderArrow}>▼</Text>
-              </Pressable>
+              </GHTouchable>
             </View>
           ) : (
-            <Pressable style={sc.dragHandle} onLongPress={activateReorder} delayLongPress={350}>
+            <GHTouchable style={sc.dragHandle} onLongPress={activateReorder} delayLongPress={350}>
               <View style={sc.dragLine} />
               <View style={sc.dragLine} />
               <View style={sc.dragLine} />
-            </Pressable>
+            </GHTouchable>
           )
         )}
       </View>
@@ -706,7 +706,7 @@ function StopCard({
         </View>
 
         <View style={sc.actionRow}>
-          <Pressable
+          <GHTouchable
             style={sc.detailsBtn}
             onPress={() => {
               console.log('[DEBUG] Details button pressed for stop:', stop?.name);
@@ -715,7 +715,7 @@ function StopCard({
             }}
           >
             <Text style={sc.detailsBtnText}>Details →</Text>
-          </Pressable>
+          </GHTouchable>
           {isEditable ? (
             <View style={sc.swipeHint}>
               <Text style={sc.swipeHintText}>swipe </Text>
