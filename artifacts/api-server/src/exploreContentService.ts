@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { GEOQUEST_SAFETY_PROMPT, isProhibitedContent } from "./contentSafety";
 
 const MODEL = "gpt-4o-mini";
 const STORY_MODEL = "gpt-4o";
@@ -68,26 +69,21 @@ export interface ExploreData {
   totalStops?: number;
 }
 
-// Strip emojis and markdown from text before TTS narration
+// Strip emojis and markdown — text must be clean for TTS
 export function stripForTTS(text: string): string {
   return text
-    // Remove emoji (covers all Unicode emoji ranges)
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
     .replace(/[\u{2600}-\u{27BF}]/gu, "")
     .replace(/[\u{FE00}-\u{FEFF}]/gu, "")
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
-    // Remove markdown bold/italic
     .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
-    // Remove markdown headers
     .replace(/^#{1,6}\s+/gm, "")
-    // Remove bullet-point symbols that aren't narrator cues
     .replace(/^[•·▪▸►▶–—]\s*/gm, "")
-    // Collapse multiple blank lines
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-// Estimate read-aloud duration: ~130 words/minute for narrated audio
+// Estimate read-aloud duration at ~130 words/minute
 function estimateDuration(text: string): number {
   const wordCount = text.trim().split(/\s+/).length;
   return Math.round((wordCount / 130) * 60);
@@ -99,7 +95,6 @@ export async function getExploreContent(
   destination: string
 ): Promise<ExploreData> {
   try {
-    // Run practical info and stories generation in parallel
     const [practical, stories] = await Promise.all([
       generatePracticalContent(stopName, stopType, destination),
       generateStories(stopName, stopType, destination),
@@ -188,7 +183,6 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
   if (!content) throw new Error("No content in response");
 
   const data = JSON.parse(content);
-  const googleMapsUrlFinal = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stopName + " " + (destination || ""))}`;
 
   return {
     aboutArea: data.aboutArea || `${stopName} is a wonderful place to explore with your family.`,
@@ -201,75 +195,187 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
     gettingAround: data.gettingAround || undefined,
     tips: Array.isArray(data.tips) ? data.tips.slice(0, 4) : undefined,
     reviews: Array.isArray(data.reviews) ? data.reviews.slice(0, 4) : undefined,
-    googleMapsUrl: googleMapsUrlFinal,
+    googleMapsUrl,
   };
 }
+
+// ─── Two-step story generation — same proven approach as GeoAdventures ────────
 
 async function generateStories(
   stopName: string,
   stopType: string,
   destination: string
 ): Promise<{ main: StoryTrack; quickHits: StoryTrack; history: StoryTrack }> {
-  const completion = await openai.chat.completions.create({
-    model: STORY_MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are writing narrated audio content for kids aged 5 to 14 visiting real places on a family trip.
 
-CRITICAL RULES — THESE ARE NON-NEGOTIABLE:
-- NO emojis anywhere. Zero. The text is read aloud by a TTS voice and emojis break it.
-- NO markdown formatting. No asterisks, no hashes, no bullet symbols.
-- NO lists introduced with dashes or numbers.
-- Plain, natural spoken prose only.
-- Narrator cues in square brackets are allowed and encouraged: [pause], [warm voice], [mysterious tone], [excited voice], [gently].
-- Write as if a brilliant, warm storyteller is speaking directly to a child in the back seat of a car.
-- Every sentence should feel effortless to say aloud.`,
-      },
-      {
-        role: "user",
-        content: `Write three narrated audio tracks for kids about to visit ${stopName} (a ${stopType} in ${destination}).
+  // ── Step 1: Gather real, specific facts about this exact place ──────────────
+  let realFacts: string[] = [];
+  try {
+    const factsCompletion = await openai.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You are a knowledgeable travel researcher and historian. 
+Your job is to recall SPECIFIC, REAL, ACCURATE information about a named place — not generic descriptions.
+Think: founding story, key dates, notable people, what was built first and why, construction challenges, surprising historical events, specific features visitors will see, physical dimensions or records, things that make this place unique in the world.
+Be precise. Be specific. Avoid vague generalities.`,
+        },
+        {
+          role: "user",
+          content: `Give me 8 to 10 real, specific, accurate facts about ${stopName} (a ${stopType} in ${destination}).
 
-TRACK 1 — MAIN STORY (target: 600 to 800 words)
-Build genuine curiosity and anticipation before arrival. Structure it in layers:
-Opening (100 words): paint a vivid sensory picture — what the child will see, smell, hear when they arrive. Make it feel like the beginning of an adventure.
-Middle (350 words): share the most fascinating true facts, legends, and secrets woven naturally into a flowing narrative. Include at least one surprising or counterintuitive detail that most visitors never notice. Speak to both younger and older kids.
-Close (150 words): end with ONE thought-provoking question they can think about while they explore. Leave them wanting to look for something specific when they arrive.
+Include a mix of:
+- Origin story: who decided to create it, when, and why
+- Key people involved in its creation or history
+- Specific historical events that happened here or shaped it
+- Surprising or counterintuitive facts most visitors don't know
+- Physical details visitors will actually see (materials, size, design choices)
+- How it has changed over time
 
-TRACK 2 — QUICK HITS (target: 250 to 350 words)
-Four to five surprising, specific facts about this place. Each fact gets two to four sentences. Write them as spoken paragraphs, not a list. Each should be a genuine "wait, really?" moment. Connect each fact to something the child can actually see or experience at the stop.
-
-TRACK 3 — HISTORY (target: 450 to 600 words)
-The human story behind this place. Focus on real people, their struggles, decisions, and discoveries. At least one story of someone overcoming a problem or having a breakthrough. Make history feel alive and personal, not like a textbook. End with why this history still matters today when they stand there.
-
-Return JSON — every field is required:
+Return JSON:
 {
-  "main": "Full main story text. Plain prose. Narrator cues allowed. No emojis. No markdown.",
-  "quickHits": "Quick hits text as spoken paragraphs. Plain prose. No emojis. No markdown.",
-  "history": "History text as spoken paragraphs. Plain prose. No emojis. No markdown."
+  "facts": [
+    "specific fact 1",
+    "specific fact 2",
+    "..."
+  ]
 }`,
-      },
-    ],
-    max_tokens: 3000,
-    temperature: 0.72,
-    response_format: { type: "json_object" },
-  });
+        },
+      ],
+      max_tokens: 600,
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+    });
 
-  const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error("No stories content");
+    const factsContent = factsCompletion.choices[0]?.message?.content;
+    if (factsContent) {
+      const parsed = JSON.parse(factsContent);
+      realFacts = ((parsed.facts || []) as string[])
+        .filter((f: string) => !isProhibitedContent(f))
+        .slice(0, 10);
+    }
+  } catch (err) {
+    console.error("[generateStories] Step 1 facts gathering failed:", err);
+  }
 
-  const data = JSON.parse(content);
+  const factsContext = realFacts.length > 0
+    ? `\n\nReal, verified facts about ${stopName} — YOU MUST use these as the foundation of your stories:\n${realFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n\nDo NOT write generic content that could apply to any place. Every sentence should be specific to ${stopName}.`
+    : `\nNote: Draw on your knowledge of ${stopName} to write stories that are specific to this place only.`;
 
-  const mainText = stripForTTS(data.main || "");
-  const quickHitsText = stripForTTS(data.quickHits || "");
-  const historyText = stripForTTS(data.history || "");
+  // ── Step 2: Write all three tracks using those facts ──────────────────────
+  try {
+    const completion = await openai.chat.completions.create({
+      model: STORY_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You are a brilliant storyteller creating narrated audio tracks for kids aged 5 to 14 who are about to visit a real place on a family trip.
 
-  return {
-    main: { text: mainText, durationSeconds: estimateDuration(mainText) },
-    quickHits: { text: quickHitsText, durationSeconds: estimateDuration(quickHitsText) },
-    history: { text: historyText, durationSeconds: estimateDuration(historyText) },
-  };
+Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller.
+
+WHAT MAKES GREAT TRAVEL AUDIO FOR KIDS:
+- It is completely specific to THIS place. A listener should immediately know which place is being described.
+- It builds genuine curiosity about real things they will see.
+- It treats the listener as intelligent, whatever their age.
+- It tells human stories — real people, real decisions, real struggles.
+- It has rhythm and pace. Some sentences are short. Some breathe longer.
+- It earns every sentence. Nothing is filler.
+
+NARRATOR CUES — use these throughout for natural TTS pacing:
+[pause] — a beat of silence, used after a striking idea
+[warm voice] — gentle and reassuring opening tone
+[mysterious tone] — drop the energy, get conspiratorial
+[excited voice] — genuine enthusiasm, not forced
+[slowly] — slow down for emphasis
+
+ABSOLUTE RULES — violating these ruins the audio:
+- NO emojis. Not one. They are spoken aloud by the TTS engine and sound absurd.
+- NO markdown. No asterisks, hashes, or bullet symbols of any kind.
+- NO lists introduced with numbers or dashes.
+- NO phrases like "imagine you are" or "close your eyes" — they are overused clichés.
+- NO generic content that could describe ANY place. Every sentence must be specific.
+- Plain, natural spoken prose only.
+
+${GEOQUEST_SAFETY_PROMPT}`,
+        },
+        {
+          role: "user",
+          content: `Write three narrated audio tracks for kids visiting ${stopName} (a ${stopType} in ${destination}).
+${factsContext}
+
+──────────────────────────────────────────────────────
+TRACK 1: MAIN STORY — target 500 to 700 words (about 4 to 5 minutes spoken)
+──────────────────────────────────────────────────────
+This is the primary experience. Write it as one flowing narrative, not chapters.
+
+Opening (about 100 words): Start with something specific and vivid about THIS place — a sensory detail, a striking fact, or a moment in history. Do not open with "Welcome to" or "Today we are visiting". Drop the listener straight into the story.
+
+Middle (about 400 words): Weave the real facts into a narrative that builds. Include at least one moment of genuine surprise — something that makes a child say "wait, really?". Include the human story: who made this, why, what was hard about it. Connect what happened in the past to what the child will see with their own eyes.
+
+Close (about 100 words): End with one specific, compelling question they can think about while exploring. Make it connected to something real they will actually see.
+
+──────────────────────────────────────────────────────
+TRACK 2: QUICK HITS — target 200 to 280 words (about 1.5 to 2 minutes spoken)
+──────────────────────────────────────────────────────
+Five to six surprising facts about ${stopName}, written as spoken paragraphs.
+Each fact gets two to four natural sentences. Write them as flowing speech, NOT as a list.
+Each one should be a genuine "wait, I did not know that" moment.
+Each should connect to something the child can actually see or look for at the stop.
+Transition naturally between facts — use phrases like "And here is something even more surprising..." or "But that is not all...".
+
+──────────────────────────────────────────────────────
+TRACK 3: HISTORY — target 220 to 350 words (about 1.5 to 2.5 minutes spoken)
+──────────────────────────────────────────────────────
+The human story behind ${stopName}. Focus on real people and the decisions they made.
+Include: who had the original idea and why, at least one specific challenge or setback they faced, and one moment where a person's choice changed what this place became.
+Write it as a story, not a summary. Use the facts gathered to make it specific.
+End by connecting that history to the child standing there today — why does it still matter?
+
+──────────────────────────────────────────────────────
+
+Return JSON with exactly these three fields. Every field is a single string of plain prose:
+{
+  "main": "The main story text. Plain prose. Narrator cues allowed. No emojis. No markdown. 500 to 700 words.",
+  "quickHits": "The quick hits text. Spoken paragraphs. No emojis. No markdown. 200 to 280 words.",
+  "history": "The history text. Spoken paragraphs. No emojis. No markdown. 220 to 350 words."
+}`,
+        },
+      ],
+      max_tokens: 4000,
+      temperature: 0.72,
+      response_format: { type: "json_object" },
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("No stories content");
+
+    const data = JSON.parse(content);
+
+    const mainRaw = isProhibitedContent(data.main || "") ? "" : (data.main || "");
+    const quickHitsRaw = isProhibitedContent(data.quickHits || "") ? "" : (data.quickHits || "");
+    const historyRaw = isProhibitedContent(data.history || "") ? "" : (data.history || "");
+
+    if (!mainRaw || !quickHitsRaw || !historyRaw) {
+      throw new Error("Missing story tracks in response");
+    }
+
+    const mainText = stripForTTS(mainRaw);
+    const quickHitsText = stripForTTS(quickHitsRaw);
+    const historyText = stripForTTS(historyRaw);
+
+    return {
+      main: { text: mainText, durationSeconds: estimateDuration(mainText) },
+      quickHits: { text: quickHitsText, durationSeconds: estimateDuration(quickHitsText) },
+      history: { text: historyText, durationSeconds: estimateDuration(historyText) },
+    };
+
+  } catch (error) {
+    console.error("[generateStories] Step 2 generation failed:", error);
+    throw error;
+  }
 }
+
+// ─── Hero image ───────────────────────────────────────────────────────────────
 
 const WIKI_SKIP_STOPS = [
   'minneapolis institute of art',
@@ -304,27 +410,45 @@ export async function generateStopHeroImage(
   return undefined;
 }
 
+// ─── Fallback ─────────────────────────────────────────────────────────────────
+
 function getFallbackData(stopName: string, stopType: string, destination: string): ExploreData {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stopName + " " + (destination || ""))}`;
 
-  const mainText = `[Warm voice] You are about to visit ${stopName}. [pause] Take a breath and look around when you arrive. This is a place that has drawn people from all over the world, and today you get to be one of them. [pause] Every great place has layers to it. There are the things you see right away, and then there are the things that take a little patience to notice. [pause] Your job today is to find something that surprises you. Something that you would not have expected. [pause] What is the one thing you want to discover?`;
+  const mainText = `[Warm voice] There is a reason people travel from all over the world to stand where you are about to stand. [pause] ${stopName} is one of those places that looks one way in photographs and feels completely different in person. The scale of it, the details up close, the sounds and the light — none of that comes through in a picture.
 
-  const quickHitsText = `This place is part of a destination that welcomes millions of visitors every year, yet most of them only scratch the surface of what is really here. [pause] The details that most people rush past are often the most interesting. Take your time. [pause] Ask someone who works here about their favorite thing. Local guides and staff almost always know something remarkable that is not in any guidebook. [pause] Look up, look down, and look behind you. Interesting things are rarely only at eye level.`;
+Before you get there, here is something worth knowing. Places like this one were not built overnight, and they were not built easily. Someone had a vision, fought to make it happen, and convinced others it was worth the effort. That human story is written into every part of the place, even if most visitors never stop to think about it.
 
-  const historyText = `[Warm voice] Places like ${stopName} exist because someone, at some point, decided they were worth creating and preserving. [pause] That decision was not always easy. Building something lasting takes vision, resources, and the willingness to believe that future generations will care. [pause] Think about what this place looked like before it became what it is today. Every structure, every path, every feature was once just an idea in someone's mind. [pause] The people who built it could not have known you would be standing here. But in some way, they built it for you.`;
+As you explore, resist the urge to rush through. The things that most people miss are usually right in front of them — in the materials, the proportions, the small decisions that add up to something remarkable. [pause] Look at how things are put together. Look at what is worn smooth from a century of hands touching it. Look up when everyone else is looking straight ahead.
+
+[Mysterious tone] And if you get the chance, find someone who works there and ask them what their favourite detail is. The people who spend their days in a place like this always know something that is not in any guidebook.
+
+[Warm voice] Here is your question to carry with you: what is the one thing about ${stopName} that you would want to tell someone who had never heard of it?`;
+
+  const quickHitsText = `${stopName} draws visitors from dozens of countries every year, but most of them only see a fraction of what is actually there. The parts that take a little extra attention are often the most interesting.
+
+The materials used to build and maintain a place like this tell their own story. Stone, metal, glass, and wood all age differently, and if you look closely at different surfaces, you can often see exactly where and when different parts were added or repaired.
+
+Sound behaves in surprising ways in large structures. Some areas were designed specifically to carry a voice or music across a wide space. Others create pockets of unexpected quiet. Pay attention to how the acoustic character of the space changes as you move through it.
+
+Every place like this has been photographed millions of times, but photographs almost always miss the sense of scale. Until you are standing next to the real thing, it is nearly impossible to understand how large, or sometimes how small, it actually is.
+
+The people who maintain a place like this work mostly invisibly. The cleaning, the repairs, the climate control, the security — it is a continuous effort that most visitors never think about. What you are seeing today exists because of work that happened last night.`;
+
+  const historyText = `[Warm voice] The story of ${stopName} begins with a decision — someone looked at a piece of land, or a problem that needed solving, and said: this is where it should go, and this is what it should be.
+
+That decision was almost certainly harder to make than it looks in hindsight. Resources had to be gathered. People had to be convinced. Plans that seemed sound on paper ran into realities that nobody had anticipated. There were probably moments when the whole thing might have been abandoned.
+
+The version of ${stopName} that exists today is not the first version that was imagined. It is the version that survived compromise, setback, and the long test of time. Every generation since has had to decide whether to maintain it, restore it, or let it decline. The fact that you are visiting it means enough people kept saying yes.
+
+[Pause] When you stand inside or in front of it, you are standing in a place that outlasted the people who built it, the arguments that surrounded its creation, and several different eras of what people thought was worth caring about. [Warm voice] That is not nothing. That is actually remarkable.`;
 
   return {
     aboutArea: `${stopName} is a popular destination in ${destination || "the area"}. This ${stopType} offers wonderful experiences for the whole family.`,
     googleMapsUrl,
-    nearbyAttractions: [
-      { name: "Local Visitor Center", type: "landmark", distance: "5 min walk" },
-    ],
-    restaurants: [
-      { name: "Family Cafe", cuisine: "American", distance: "5 min walk", priceRange: "$$" },
-    ],
-    kidFriendlyPlaces: [
-      { name: "Local Playground", type: "playground", distance: "10 min walk", description: "Great for kids!", ageRange: "All ages" },
-    ],
+    nearbyAttractions: [{ name: "Local Visitor Center", type: "landmark", distance: "5 min walk" }],
+    restaurants: [{ name: "Family Cafe", cuisine: "American", distance: "5 min walk", priceRange: "$$" }],
+    kidFriendlyPlaces: [{ name: "Local Playground", type: "playground", distance: "10 min walk", description: "Great for kids!", ageRange: "All ages" }],
     gettingAround: "Check local parking availability before you arrive.",
     tips: ["Bring water and snacks for the kids", "Arrive early for the best experience"],
     stories: {
