@@ -141,6 +141,7 @@ export default function GameHub() {
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.dismissAll();
+              setTimeout(() => router.dismiss(), 50);
             }}
           >
             <Text style={s.handBackText}>{"Hand to parent \u2192"}</Text>

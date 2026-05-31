@@ -112,7 +112,9 @@ export default function Celebration() {
           style={({ pressed }) => [s.primaryBtn, pressed && { transform: [{ scale: 0.98 }] }]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // dismissAll pops to kids/index; dismiss() then closes the modal
             router.dismissAll();
+            setTimeout(() => router.dismiss(), 50);
           }}
         >
           <Text style={s.primaryBtnText}>{"👆 Show your parent!"}</Text>

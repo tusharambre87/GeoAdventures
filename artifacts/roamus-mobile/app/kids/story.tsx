@@ -2,7 +2,6 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
-  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -42,14 +41,20 @@ function fmtSec(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+// Parse "m:ss" string → total seconds
+function parseDuration(s: string): number {
+  const [m, sec] = s.split(":").map(Number);
+  return (m || 0) * 60 + (sec || 0);
+}
+
 export default function StoryPlayer() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
   const [storyIdx, setStoryIdx] = useState(kids.currentStoryIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const progress = useRef(new Animated.Value(0)).current;
-  const playAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const story = STORIES[storyIdx];
   const stopName = kids.stopName || "Millennium Park";
@@ -59,6 +64,10 @@ export default function StoryPlayer() {
     kids.exploreContent?.stories?.[storyKey]?.text ?? MOCK_TEXTS[storyKey] ?? "";
   const rawDuration = kids.exploreContent?.stories?.[storyKey]?.durationSeconds;
   const storyDuration = rawDuration ? fmtSec(rawDuration) : story.duration;
+  const totalSec = rawDuration ?? parseDuration(storyDuration);
+  const progressPct = totalSec > 0 ? Math.min((elapsed / totalSec) * 100, 100) : 0;
+  const remaining = Math.max(0, totalSec - elapsed);
+
   const stopLabel =
     kids.exploreContent?.stopIndex && kids.exploreContent?.totalStops
       ? `STOP ${kids.exploreContent.stopIndex} OF ${kids.exploreContent.totalStops}`
@@ -66,35 +75,50 @@ export default function StoryPlayer() {
 
   const nextLabels = ["Quick Hits \u2192", "History \u2192", "Continue \u2192 Wonder Time"];
 
+  function stopTimer() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }
+
   function handlePlay() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isPlaying) {
-      playAnim.current?.stop();
+      stopTimer();
       setIsPlaying(false);
     } else {
       setIsPlaying(true);
-      playAnim.current = Animated.timing(progress, {
-        toValue: 1,
-        duration: 12000,
-        useNativeDriver: false,
-      });
-      playAnim.current.start(({ finished }) => {
-        if (finished) {
-          setIsPlaying(false);
-          kids.markStoryComplete(storyIdx);
-        }
-      });
+      timerRef.current = setInterval(() => {
+        setElapsed(e => {
+          const next = e + 1;
+          if (next >= totalSec) {
+            stopTimer();
+            setIsPlaying(false);
+            kids.markStoryComplete(storyIdx);
+            return totalSec;
+          }
+          return next;
+        });
+      }, 1000);
     }
+  }
+
+  function resetStory() {
+    stopTimer();
+    setElapsed(0);
+    setIsPlaying(false);
   }
 
   function handleBack() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (storyIdx > 0) {
-      setStoryIdx(storyIdx - 1);
-      kids.setCurrentStoryIndex(storyIdx - 1);
-      progress.setValue(0);
-      setIsPlaying(false);
+      resetStory();
+      const prev = storyIdx - 1;
+      setStoryIdx(prev);
+      kids.setCurrentStoryIndex(prev);
     } else {
+      stopTimer();
       router.back();
     }
   }
@@ -102,21 +126,27 @@ export default function StoryPlayer() {
   function handleNext() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     kids.markStoryComplete(storyIdx);
+    resetStory();
     if (storyIdx < 2) {
       const next = storyIdx + 1;
       setStoryIdx(next);
       kids.setCurrentStoryIndex(next);
-      progress.setValue(0);
-      setIsPlaying(false);
     } else {
       router.push("/kids/wonder");
     }
   }
 
-  const progWidth = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0%", "100%"],
-  });
+  // Reset timer when story changes
+  React.useEffect(() => {
+    resetStory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyIdx]);
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => stopTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const doneCount = kids.completedStories.filter(Boolean).length;
 
@@ -154,8 +184,7 @@ export default function StoryPlayer() {
               onPress={() => {
                 setStoryIdx(i);
                 kids.setCurrentStoryIndex(i);
-                progress.setValue(0);
-                setIsPlaying(false);
+                resetStory();
               }}
             >
               <Text style={[s.pillText, i === storyIdx && s.pillTextActive]}>
@@ -179,8 +208,7 @@ export default function StoryPlayer() {
               style={s.skipBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                progress.setValue(0);
-                setIsPlaying(false);
+                resetStory();
               }}
             >
               <Text style={{ color: "#fff", fontSize: 22 }}>{"⏮"}</Text>
@@ -195,21 +223,20 @@ export default function StoryPlayer() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 kids.markStoryComplete(storyIdx);
-                progress.setValue(0);
-                setIsPlaying(false);
+                resetStory();
               }}
             >
               <Text style={{ color: "#fff", fontSize: 22 }}>{"⏭"}</Text>
             </Pressable>
           </View>
-          <Text style={s.status}>{isPlaying ? "Now playing…" : "Tap to listen"}</Text>
-          {/* Progress bar */}
+          <Text style={s.status}>{isPlaying ? "Now playing…" : elapsed > 0 ? "Paused" : "Tap to listen"}</Text>
+          {/* Progress bar — state-based for reliable updates */}
           <View style={s.progTrack}>
-            <Animated.View style={[s.progFill, { width: progWidth }]} />
+            <View style={[s.progFill, { width: `${progressPct}%` }]} />
           </View>
           <View style={s.timeRow}>
-            <Text style={s.timeText}>0:00</Text>
-            <Text style={s.timeText}>{storyDuration} remaining</Text>
+            <Text style={s.timeText}>{fmtSec(elapsed)}</Text>
+            <Text style={s.timeText}>{fmtSec(remaining)} remaining</Text>
           </View>
         </View>
         {/* Voice + transcript row */}
