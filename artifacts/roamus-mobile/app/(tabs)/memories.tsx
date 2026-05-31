@@ -28,12 +28,11 @@ const C = {
 
 const GRAD_PAIRS: [string, string][] = [
   ['#1a3a5f', '#0d1f2d'],
-  ['#1a3a1a', '#0d1f0d'],
+  ['#1a2a1a', '#0d1f0d'],
   ['#3a1a1a', '#2a0d0d'],
   ['#2d1b4e', '#1a1f2e'],
   ['#1a2a3a', '#0d1520'],
 ];
-
 function gradPair(i: number): [string, string] {
   return GRAD_PAIRS[i % GRAD_PAIRS.length];
 }
@@ -60,34 +59,34 @@ function visitedCount(trip: Trip): number {
   return trip.stops?.filter(s => s.isVisited || s.visited).length ?? (trip as any).visitedStops ?? 0;
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+// ─── State A: truly no trips ──────────────────────────────────────────────────
 
-function EmptyState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets> }) {
+function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets> }) {
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: C.bg }]}>
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Memories</Text>
-        <Text style={styles.pageSub}>Your family travel journal</Text>
+    <View style={[s.root, { paddingTop: insets.top, backgroundColor: C.bg }]}>
+      <View style={s.pageHeader}>
+        <Text style={s.pageTitle}>Memories</Text>
+        <Text style={s.pageSub}>Your family travel journal</Text>
       </View>
-      <View style={styles.emptyCenter}>
-        <View style={styles.emptyIcon}>
+      <View style={s.emptyCenter}>
+        <View style={s.emptyIcon}>
           <Text style={{ fontSize: 36 }}>📸</Text>
         </View>
-        <Text style={styles.emptyTitle}>Your stories start here</Text>
-        <Text style={styles.emptySub}>
+        <Text style={s.emptyTitle}>Your stories start here</Text>
+        <Text style={s.emptySub}>
           Every trip you take becomes a permanent chapter — photos, kid quotes, and a shareable story.
         </Text>
-        <Pressable style={styles.orangePill} onPress={() => router.push('/onboarding/splash')}>
-          <Text style={styles.orangePillText}>🗺 Plan your first trip</Text>
+        <Pressable style={s.orangePill} onPress={() => router.push('/onboarding/splash' as any)}>
+          <Text style={s.orangePillText}>🗺 Plan your first trip</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-// ─── Active trip hero card ────────────────────────────────────────────────────
+// ─── Hero card — for the one active/current trip ──────────────────────────────
 
-function ActiveTripCard({ trip }: { trip: Trip }) {
+function HeroCard({ trip, isExplicitlyActive }: { trip: Trip; isExplicitlyActive: boolean }) {
   const { current, total } = getDayOf(trip);
   const visited = visitedCount(trip);
   const total_ = stopCount(trip);
@@ -95,108 +94,113 @@ function ActiveTripCard({ trip }: { trip: Trip }) {
   const heroPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl ?? null;
 
   return (
-    <View style={{ marginHorizontal: 20, marginBottom: 20 }}>
-      <Text style={[styles.sectionLabel, { paddingTop: 0, paddingLeft: 0 }]}>In Progress</Text>
-      <Pressable
-        style={styles.activeCard}
-        onPress={() => router.push(`/memories/${trip.id}` as any)}
-      >
-        {/* Hero photo / gradient */}
-        <View style={styles.activeHero}>
-          {heroPhoto ? (
-            <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          ) : (
-            <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
-          )}
-          <LinearGradient
-            colors={['transparent', 'rgba(26,31,46,0.2)', 'rgba(26,31,46,1)']}
-            locations={[0, 0.4, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          {/* Live pulse */}
-          <View style={styles.livePill}>
-            <View style={styles.greenDot} />
-            <Text style={styles.livePillText}>Day {current} of {total}</Text>
-          </View>
-          {/* Trip name */}
-          <View style={styles.activeHeroName}>
-            <Text style={styles.activeHeroTitle}>{trip.name}</Text>
-          </View>
+    <Pressable
+      style={s.heroCard}
+      onPress={() => router.push(`/memories/${trip.id}` as any)}
+    >
+      {/* Photo / gradient */}
+      <View style={s.heroPhotoArea}>
+        {heroPhoto
+          ? <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
+        }
+        <LinearGradient
+          colors={['transparent', 'rgba(26,31,46,0.2)', 'rgba(26,31,46,1)']}
+          locations={[0, 0.4, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Status pill */}
+        <View style={s.livePill}>
+          {isExplicitlyActive && <View style={s.greenDot} />}
+          <Text style={s.livePillText}>
+            {isExplicitlyActive ? `Day ${current} of ${total}` : 'Upcoming'}
+          </Text>
         </View>
+        <View style={s.heroNameWrap}>
+          <Text style={s.heroName}>{trip.name}</Text>
+        </View>
+      </View>
 
-        {/* Card footer */}
-        <View style={styles.activeFooter}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activeFooterMeta}>
-              {formatDate(trip.startDate)}
-              {total_ > 0 ? `  ·  ${total_} stops` : ''}
-            </Text>
-            <View style={styles.chipRow}>
+      {/* Footer */}
+      <View style={s.heroFooter}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.heroMeta}>
+            {formatDate(trip.startDate)}{total_ > 0 ? `  ·  ${total_} stops` : ''}
+          </Text>
+          {isExplicitlyActive && (
+            <View style={s.chipRow}>
               {visited > 0 && (
-                <View style={styles.chipDone}>
-                  <Text style={styles.chipDoneText}>📍 {visited} stops done</Text>
+                <View style={s.chipDone}>
+                  <Text style={s.chipDoneText}>📍 {visited} stops done</Text>
                 </View>
               )}
               {remaining > 0 && (
-                <View style={styles.chipRemain}>
-                  <Text style={styles.chipRemainText}>{remaining} remaining</Text>
+                <View style={s.chipRemain}>
+                  <Text style={s.chipRemainText}>{remaining} remaining</Text>
                 </View>
               )}
             </View>
-          </View>
-          <Pressable
-            style={styles.addBtn}
-            onPress={() => router.push(`/memories/${trip.id}` as any)}
-          >
-            <Text style={styles.addBtnText}>📷 Add</Text>
-          </Pressable>
+          )}
         </View>
-      </Pressable>
-    </View>
+        <Pressable style={s.addBtn} onPress={() => router.push(`/memories/${trip.id}` as any)}>
+          <Text style={s.addBtnText}>📷 Add</Text>
+        </Pressable>
+      </View>
+    </Pressable>
   );
 }
 
-// ─── Completed trip compact card ──────────────────────────────────────────────
+// ─── Compact trip card ────────────────────────────────────────────────────────
 
-function CompletedCard({ trip, gradIndex }: { trip: Trip; gradIndex: number }) {
+type CompactCardVariant = 'current' | 'completed';
+
+function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: number; variant: CompactCardVariant }) {
   const total_ = stopCount(trip);
-  const hasStory = !!(trip as any).storySaved;
   const thumbPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl ?? null;
+  const hasStory = !!(trip as any).storySaved;
+
+  const dest = variant === 'completed'
+    ? `/memories/${trip.id}/recap`
+    : `/memories/${trip.id}`;
 
   return (
-    <Pressable
-      style={styles.completedCard}
-      onPress={() => router.push(`/memories/${trip.id}/recap` as any)}
-    >
+    <Pressable style={s.compactCard} onPress={() => router.push(dest as any)}>
       {/* Thumbnail */}
-      <View style={styles.completedThumb}>
-        {thumbPhoto ? (
-          <ExpoImage source={{ uri: thumbPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <LinearGradient colors={gradPair(gradIndex)} style={StyleSheet.absoluteFill} />
-        )}
+      <View style={s.compactThumb}>
+        {thumbPhoto
+          ? <ExpoImage source={{ uri: thumbPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <LinearGradient colors={gradPair(gradIndex)} style={StyleSheet.absoluteFill} />
+        }
       </View>
 
       {/* Body */}
-      <View style={styles.completedBody}>
-        <View style={styles.completedRow}>
-          <Text style={styles.completedName} numberOfLines={2}>{trip.name}</Text>
-          <View style={[styles.storyBadge, hasStory ? styles.storyBadgeOn : styles.storyBadgeOff]}>
-            <Text style={[styles.storyBadgeText, hasStory ? styles.storyBadgeTextOn : styles.storyBadgeTextOff]}>
-              {hasStory ? '✨ Story' : 'Generate'}
-            </Text>
-          </View>
+      <View style={s.compactBody}>
+        <View style={s.compactRow}>
+          <Text style={s.compactName} numberOfLines={2}>{trip.name}</Text>
+          {variant === 'completed' ? (
+            <View style={[s.badge, hasStory ? s.badgeStory : s.badgeMuted]}>
+              <Text style={[s.badgeText, hasStory ? s.badgeTextStory : s.badgeTextMuted]}>
+                {hasStory ? '✨ Story' : 'Generate'}
+              </Text>
+            </View>
+          ) : (
+            <View style={[s.badge, s.badgeInProgress]}>
+              <Text style={[s.badgeText, s.badgeTextInProgress]}>In Progress</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.completedMeta}>
+        <Text style={s.compactMeta}>
           {formatDate(trip.startDate)}{total_ > 0 ? `  ·  ${total_} stops` : ''}
         </Text>
-        {hasStory ? (
-          <Text style={styles.completedQuote} numberOfLines={1}>"A trip worth remembering"</Text>
+        {variant === 'completed' ? (
+          hasStory
+            ? <Text style={s.compactQuote} numberOfLines={1}>"A trip worth remembering"</Text>
+            : <Text style={s.compactGenerate}>Tap to generate story</Text>
         ) : (
-          <Text style={styles.completedGenerate}>Tap to generate story</Text>
+          <Text style={s.compactInProgressHint}>Tap to add memories</Text>
         )}
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Text style={s.chevron}>›</Text>
     </Pressable>
   );
 }
@@ -211,18 +215,27 @@ export default function MemoriesScreen() {
   });
 
   const trips = data?.trips ?? [];
+
+  // Mirror trips tab logic exactly
   const activeTrip = trips.find(t => t.status === 'active' || t.status === 'in_progress');
-  const completedTrips = trips.filter(t => t.status === 'completed');
-  const listTrips = activeTrip ? completedTrips : trips.filter(t => t.status !== 'active' && t.status !== 'in_progress');
+  const currentTrips = trips.filter(t => !['completed', 'archived'].includes(t.status));
+  const completedTrips = trips.filter(t => t.status === 'completed' || t.status === 'archived');
+
+  // Hero = the one explicitly active trip, or the first current trip if none
+  const heroTrip = activeTrip ?? (currentTrips.length > 0 ? currentTrips[0] : null);
+  const isExplicitlyActive = !!activeTrip;
+
+  // Other current trips (not the hero, not completed)
+  const otherCurrentTrips = currentTrips.filter(t => t.id !== heroTrip?.id);
 
   if (isLoading) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top, backgroundColor: C.bg }]}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>Memories</Text>
-          <Text style={styles.pageSub}>Your family travel journal</Text>
+      <View style={[s.root, { paddingTop: insets.top, backgroundColor: C.bg }]}>
+        <View style={s.pageHeader}>
+          <Text style={s.pageTitle}>Memories</Text>
+          <Text style={s.pageSub}>Your family travel journal</Text>
         </View>
-        <View style={styles.centered}>
+        <View style={s.centered}>
           <ActivityIndicator color={C.orange} size="large" />
         </View>
       </View>
@@ -230,38 +243,61 @@ export default function MemoriesScreen() {
   }
 
   if (!isLoading && trips.length === 0) {
-    return <EmptyState insets={insets} />;
+    return <NoTripsState insets={insets} />;
   }
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: C.bg }]}
+      style={[s.root, { backgroundColor: C.bg }]}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Memories</Text>
-        <Text style={styles.pageSub}>Your family travel journal</Text>
+      <View style={s.pageHeader}>
+        <Text style={s.pageTitle}>Memories</Text>
+        <Text style={s.pageSub}>Your family travel journal</Text>
       </View>
 
-      {activeTrip && <ActiveTripCard trip={activeTrip} />}
-
-      {listTrips.length > 0 && (
-        <Text style={styles.sectionLabel}>
-          {activeTrip
-            ? `Completed (${completedTrips.length})`
-            : `All Trips (${listTrips.length})`}
-        </Text>
+      {/* ── Hero card (active or first current trip) ── */}
+      {heroTrip && (
+        <View style={{ marginHorizontal: 20, marginBottom: 4 }}>
+          <Text style={[s.sectionLabel, { paddingTop: 0, paddingLeft: 0 }]}>
+            {isExplicitlyActive ? 'In Progress' : 'Current Trip'}
+          </Text>
+          <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} />
+        </View>
       )}
 
-      {listTrips.map((trip, i) => (
-        <CompletedCard key={trip.id} trip={trip} gradIndex={i} />
-      ))}
+      {/* ── Other in-progress / upcoming trips ── */}
+      {otherCurrentTrips.length > 0 && (
+        <>
+          <Text style={s.sectionLabel}>Upcoming ({otherCurrentTrips.length})</Text>
+          {otherCurrentTrips.map((trip, i) => (
+            <CompactCard key={trip.id} trip={trip} gradIndex={i} variant="current" />
+          ))}
+        </>
+      )}
+
+      {/* ── Completed trips ── */}
+      {completedTrips.length > 0 && (
+        <>
+          <Text style={s.sectionLabel}>
+            Completed ({completedTrips.length})
+          </Text>
+          {completedTrips.map((trip, i) => (
+            <CompactCard key={trip.id} trip={trip} gradIndex={i + otherCurrentTrips.length} variant="completed" />
+          ))}
+        </>
+      )}
+
+      {/* ── If only hero, no others ── */}
+      {completedTrips.length === 0 && otherCurrentTrips.length === 0 && heroTrip && (
+        <Text style={s.hintText}>Complete your trip to see it here as a story</Text>
+      )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   root: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pageHeader: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16 },
@@ -272,8 +308,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1, textTransform: 'uppercase',
     paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10,
   },
+  hintText: {
+    fontSize: 13, fontFamily: F.regular, color: C.muted,
+    textAlign: 'center', paddingHorizontal: 40, paddingTop: 16,
+  },
 
-  // Empty
+  // State A — no trips
   emptyCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
   emptyIcon: { width: 80, height: 80, backgroundColor: C.orangeLt, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 22, fontFamily: F.bold, color: C.deep, textAlign: 'center' },
@@ -281,21 +321,21 @@ const styles = StyleSheet.create({
   orangePill: { backgroundColor: C.orange, borderRadius: 40, paddingVertical: 14, paddingHorizontal: 28, marginTop: 8 },
   orangePillText: { fontSize: 15, fontFamily: F.bold, color: '#fff' },
 
-  // Active card
-  activeCard: { backgroundColor: C.deep, borderRadius: 20, overflow: 'hidden' },
-  activeHero: { height: 180, position: 'relative', justifyContent: 'flex-end' },
+  // Hero card
+  heroCard: { backgroundColor: C.deep, borderRadius: 20, overflow: 'hidden' },
+  heroPhotoArea: { height: 180, position: 'relative', justifyContent: 'flex-end' },
   livePill: {
     position: 'absolute', top: 14, left: 14,
     flexDirection: 'row', alignItems: 'center', gap: 7,
     backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 20,
     paddingVertical: 6, paddingHorizontal: 12,
   },
-  greenDot: { width: 8, height: 8, backgroundColor: '#3DAA6E', borderRadius: 4 },
+  greenDot: { width: 8, height: 8, backgroundColor: C.green, borderRadius: 4 },
   livePillText: { fontSize: 12, fontFamily: F.bold, color: '#fff' },
-  activeHeroName: { padding: 14 },
-  activeHeroTitle: { fontSize: 22, fontFamily: F.bold, color: '#fff', lineHeight: 28 },
-  activeFooter: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, flexDirection: 'row', alignItems: 'center' },
-  activeFooterMeta: { fontSize: 13, fontFamily: F.regular, color: 'rgba(255,255,255,0.6)' },
+  heroNameWrap: { padding: 14 },
+  heroName: { fontSize: 22, fontFamily: F.bold, color: '#fff', lineHeight: 28 },
+  heroFooter: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16, flexDirection: 'row', alignItems: 'center' },
+  heroMeta: { fontSize: 13, fontFamily: F.regular, color: 'rgba(255,255,255,0.6)' },
   chipRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
   chipDone: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 10 },
   chipDoneText: { fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.7)' },
@@ -304,24 +344,29 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: C.orange, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16 },
   addBtnText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
 
-  // Completed card
-  completedCard: {
+  // Compact card
+  compactCard: {
     marginHorizontal: 20, marginBottom: 10,
     backgroundColor: C.card, borderRadius: 18, overflow: 'hidden',
     flexDirection: 'row', alignItems: 'center',
   },
-  completedThumb: { width: 90, height: 90, overflow: 'hidden' },
-  completedBody: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  completedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  completedName: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.deep, lineHeight: 20 },
-  storyBadge: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0 },
-  storyBadgeOn: { backgroundColor: C.orangeLt },
-  storyBadgeOff: { backgroundColor: C.bg },
-  storyBadgeText: { fontSize: 10, fontFamily: F.bold },
-  storyBadgeTextOn: { color: C.orange },
-  storyBadgeTextOff: { color: C.muted },
-  completedMeta: { fontSize: 12, fontFamily: F.regular, color: C.muted, marginTop: 4 },
-  completedQuote: { fontSize: 12, fontFamily: F.regular, color: C.muted, fontStyle: 'italic', marginTop: 3 },
-  completedGenerate: { fontSize: 12, fontFamily: F.semibold, color: C.orange, marginTop: 3 },
+  compactThumb: { width: 90, height: 90, overflow: 'hidden' },
+  compactBody: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  compactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  compactName: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.deep, lineHeight: 20 },
+  compactMeta: { fontSize: 12, fontFamily: F.regular, color: C.muted, marginTop: 4 },
+  compactQuote: { fontSize: 12, fontFamily: F.regular, color: C.muted, fontStyle: 'italic', marginTop: 3 },
+  compactGenerate: { fontSize: 12, fontFamily: F.semibold, color: C.orange, marginTop: 3 },
+  compactInProgressHint: { fontSize: 12, fontFamily: F.regular, color: C.muted, marginTop: 3 },
   chevron: { fontSize: 20, color: C.muted, paddingRight: 14 },
+
+  // Badges
+  badge: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8, flexShrink: 0 },
+  badgeText: { fontSize: 10, fontFamily: F.bold },
+  badgeStory: { backgroundColor: C.orangeLt },
+  badgeTextStory: { color: C.orange },
+  badgeMuted: { backgroundColor: C.bg },
+  badgeTextMuted: { color: C.muted },
+  badgeInProgress: { backgroundColor: 'rgba(61,170,110,0.12)', borderWidth: 1, borderColor: 'rgba(61,170,110,0.3)' },
+  badgeTextInProgress: { color: '#3DAA6E' },
 });
