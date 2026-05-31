@@ -15,6 +15,7 @@ import {
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   LayoutAnimation,
   Linking,
   Platform,
@@ -193,6 +194,12 @@ function parseMetadata(raw: Stop['metadata']): StopMetadata {
   if (!raw) return {};
   if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return {}; } }
   return raw as StopMetadata;
+}
+
+function parseEnrichment(raw: Stop['enrichment']): StopEnrichment {
+  if (!raw) return {};
+  if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return {}; } }
+  return raw as StopEnrichment;
 }
 
 function isStopVisited(s: Stop): boolean { return !!(s.isVisited || s.visited); }
@@ -503,7 +510,7 @@ export default function AtStopScreen() {
   // ── Screen C — Stop Detail ────────────────────────────────────────────────
   if (!currentStop) return null;
   const meta        = parseMetadata(currentStop.metadata);
-  const enrichment  = currentStop.enrichment ?? {};
+  const enrichment  = parseEnrichment(currentStop.enrichment);
   const bgColor     = STOP_HERO_BG[currentStop.stopType ?? ''] ?? STOP_HERO_BG.default;
   const emoji       = STOP_HERO_EMOJI[currentStop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
   const hasTicket   = meta.ticketSignal === true;
@@ -517,7 +524,7 @@ export default function AtStopScreen() {
 
   return (
     <View style={sc.screen}>
-      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 200 }}
+      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -525,10 +532,7 @@ export default function AtStopScreen() {
           {heroImageUrl ? (
             <Image source={{ uri: heroImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor,
-              alignItems: 'center', justifyContent: 'center' }]}>
-              <Text style={{ fontSize: 80 }}>{emoji}</Text>
-            </View>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />
           )}
           <LinearGradient
             colors={['transparent', 'rgba(26,31,46,0.08)', 'rgba(26,31,46,0.75)']}
@@ -556,7 +560,7 @@ export default function AtStopScreen() {
 
           {/* Stop info at hero bottom */}
           <View style={dt.heroBottom}>
-            <Text style={dt.heroType}>{stopTypeLabel} · Stop {stopOrderNum} of {totalStops}</Text>
+            <Text style={dt.heroType}>{stopTypeLabel} · Stop {(currentStop.displayOrder ?? stopIdx) + 1} of {totalStops}</Text>
             <Text style={dt.heroName} numberOfLines={2}>{currentStop.name}</Text>
             <Text style={dt.heroSub}>{duration} min · Open now</Text>
           </View>
@@ -670,25 +674,18 @@ export default function AtStopScreen() {
           {exploreOpen && (
             <View style={dt.exploreBody}>
 
-              {/* What you'll experience */}
+              {/* Best way to do this stop — practicalTips as orange bullet list */}
               {!!enrichment.practicalTips && (
                 <>
-                  <Text style={dt.exploreSubLabel}>What you’ll experience</Text>
-                  <Text style={dt.exploreBodyText}>{enrichment.practicalTips}</Text>
-                </>
-              )}
-
-              {/* Best way to do this stop — orange bullet list */}
-              {[enrichment.whyNow, enrichment.bestTimeOfDay, enrichment.parkingNotes]
-                .filter(Boolean).length > 0 && (
-                <>
                   <Text style={dt.exploreSubLabel}>Best way to do this stop</Text>
-                  {[enrichment.whyNow, enrichment.bestTimeOfDay, enrichment.parkingNotes]
-                    .filter((t): t is string => !!t)
+                  {enrichment.practicalTips
+                    .split(/\.\s+/)
+                    .map(s => s.replace(/\.$/, '').trim())
+                    .filter(s => s.length > 8)
                     .map((tip, i) => (
                       <View key={i} style={dt.bulletRow}>
                         <View style={dt.bulletDot} />
-                        <Text style={dt.bulletText}>{tip}</Text>
+                        <Text style={dt.bulletText}>{tip}.</Text>
                       </View>
                     ))}
                 </>
@@ -728,57 +725,57 @@ export default function AtStopScreen() {
           )}
         </View>
 
+        {/* ── CTA buttons (scroll with content) ───────────────────────────── */}
+        <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
+          {/* 1. Primary — Capture a moment */}
+          <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+            onPress={() => {
+              Alert.alert('Add a photo', 'Choose a source', [
+                {
+                  text: '📷  Camera',
+                  onPress: async () => {
+                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                    if (status !== 'granted') {
+                      Alert.alert('Permission needed', 'Allow camera access in Settings to take photos.');
+                      return;
+                    }
+                    await ImagePicker.launchCameraAsync({ mediaTypes: ['images'],
+                      allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                  },
+                },
+                {
+                  text: '🖼  Photo Library',
+                  onPress: async () => {
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status !== 'granted') {
+                      Alert.alert('Permission needed', 'Allow photo library access in Settings.');
+                      return;
+                    }
+                    await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'],
+                      allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                  },
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}>
+            <Text style={dt.ctaPrimaryText}>📸 Capture a moment</Text>
+          </TouchableOpacity>
+
+          {/* 2. Secondary — Let kids explore */}
+          <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
+            onPress={() => router.push({ pathname: '/(tabs)/atstop',
+              params: { mode: 'kids', stopId: currentStop.id } })}>
+            <Text style={dt.ctaSecondaryText}>🧭 Let kids explore</Text>
+          </TouchableOpacity>
+
+          {/* 3. Tertiary — Mark stop complete */}
+          <TouchableOpacity style={dt.ctaTertiary} activeOpacity={0.88}
+            onPress={() => openSheet('feedback')}>
+            <Text style={dt.ctaTertiaryText}>✓ Mark stop complete</Text>
+          </TouchableOpacity>
+        </View>
+
       </ScrollView>
-
-      {/* ── Fixed CTA bar ────────────────────────────────────────────────── */}
-      <View style={[dt.ctaBar, { paddingBottom: insets.bottom + 8 }]}>
-        {/* 1. Primary — Capture a moment */}
-        <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-          onPress={() => {
-            Alert.alert('Add a photo', 'Choose a source', [
-              {
-                text: '📷  Camera',
-                onPress: async () => {
-                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                  if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Allow camera access in Settings to take photos.');
-                    return;
-                  }
-                  await ImagePicker.launchCameraAsync({ mediaTypes: ['images'],
-                    allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                },
-              },
-              {
-                text: '🖼  Photo Library',
-                onPress: async () => {
-                  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                  if (status !== 'granted') {
-                    Alert.alert('Permission needed', 'Allow photo library access in Settings.');
-                    return;
-                  }
-                  await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'],
-                    allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                },
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]);
-          }}>
-          <Text style={dt.ctaPrimaryText}>📸 Capture a moment</Text>
-        </TouchableOpacity>
-
-        {/* 2. Secondary — Let kids explore */}
-        <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
-          onPress={() => router.push({ pathname: '/(tabs)/atstop',
-            params: { mode: 'kids', stopId: currentStop.id } })}>
-          <Text style={dt.ctaSecondaryText}>🧭 Let kids explore</Text>
-        </TouchableOpacity>
-
-        {/* 3. Tertiary — Mark stop complete */}
-        <TouchableOpacity style={dt.ctaTertiary} activeOpacity={0.88}
-          onPress={() => openSheet('feedback')}>
-          <Text style={dt.ctaTertiaryText}>✓ Mark stop complete</Text>
-        </TouchableOpacity>
-      </View>
 
       {/* ── SHEET: Change Stop ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'change'} onClose={() => setActiveSheet('none')}>
@@ -862,42 +859,46 @@ export default function AtStopScreen() {
       <SheetModal visible={activeSheet === 'feedback'} onClose={() => setActiveSheet('none')}>
         <Text style={sh.title}>How was it?</Text>
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
-        <View style={sh.emojiRow}>
-          {([
-            { emoji: '😐', label: 'Okay',    val: 'okay'    as FeedbackRating },
-            { emoji: '😊', label: 'Good',    val: 'good'    as FeedbackRating },
-            { emoji: '🤩', label: 'Amazing', val: 'amazing' as FeedbackRating },
-          ] as const).map(opt => (
-            <TouchableOpacity key={opt.val}
-              style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
-              activeOpacity={0.8}
-              onPress={() => setFeedbackRating(opt.val)}>
-              <Text style={sh.emojiOptIcon}>{opt.emoji}</Text>
-              <Text style={sh.emojiOptLabel}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TextInput
-          style={[sh.feedbackInput, feedbackInputFocused && { borderColor: C.orange }]}
-          placeholder="Anything to add? (optional)"
-          placeholderTextColor={C.muted}
-          multiline
-          numberOfLines={2}
-          value={feedbackText}
-          onChangeText={setFeedbackText}
-          onFocus={() => setFeedbackInputFocused(true)}
-          onBlur={() => setFeedbackInputFocused(false)}
-        />
-        <TouchableOpacity style={sh.feedbackSubmit} activeOpacity={0.88}
-          onPress={() => handleMarkComplete(false)}
-          disabled={submittingFeedback}>
-          {submittingFeedback
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={sh.feedbackSubmitText}>✓ Done — mark complete</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={sh.skipBtn} onPress={() => handleMarkComplete(true)}>
-          <Text style={sh.skipText}>Skip feedback</Text>
-        </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={20}>
+          <View style={sh.emojiRow}>
+            {([
+              { emoji: '😐', label: 'Okay',    val: 'okay'    as FeedbackRating },
+              { emoji: '😊', label: 'Good',    val: 'good'    as FeedbackRating },
+              { emoji: '🤩', label: 'Amazing', val: 'amazing' as FeedbackRating },
+            ] as const).map(opt => (
+              <TouchableOpacity key={opt.val}
+                style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
+                activeOpacity={0.8}
+                onPress={() => setFeedbackRating(opt.val)}>
+                <Text style={sh.emojiOptIcon}>{opt.emoji}</Text>
+                <Text style={sh.emojiOptLabel}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            style={[sh.feedbackInput, feedbackInputFocused && { borderColor: C.orange }]}
+            placeholder="Anything to add? (optional)"
+            placeholderTextColor={C.muted}
+            multiline
+            numberOfLines={2}
+            value={feedbackText}
+            onChangeText={setFeedbackText}
+            onFocus={() => setFeedbackInputFocused(true)}
+            onBlur={() => setFeedbackInputFocused(false)}
+          />
+          <TouchableOpacity style={sh.feedbackSubmit} activeOpacity={0.88}
+            onPress={() => handleMarkComplete(false)}
+            disabled={submittingFeedback}>
+            {submittingFeedback
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={sh.feedbackSubmitText}>✓ Done — mark complete</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={sh.skipBtn} onPress={() => handleMarkComplete(true)}>
+            <Text style={sh.skipText}>Skip feedback</Text>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </SheetModal>
 
       {/* ── SHEET: Rescue ────────────────────────────────────────────────── */}
@@ -1121,8 +1122,7 @@ const dt = StyleSheet.create({
   bulletDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.orange, marginTop: 6, flexShrink: 0 },
   bulletText: { fontFamily: F.regular, fontSize: 13, color: C.deep, lineHeight: 21, flex: 1 },
   // CTAs
-  ctaBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(245,242,238,0.97)',
-    borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 20, paddingTop: 12, gap: 8 },
+  ctaGroup: { marginHorizontal: 20, marginTop: 20, gap: 8 },
   ctaPrimary: { backgroundColor: C.orange, borderRadius: 16, paddingVertical: 18,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: C.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
