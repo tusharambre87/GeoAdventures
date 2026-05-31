@@ -64,6 +64,10 @@ function RootLayoutNav() {
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="kids"
+        options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }

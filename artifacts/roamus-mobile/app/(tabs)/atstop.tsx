@@ -835,8 +835,8 @@ export default function AtStopScreen() {
 
           {/* 2. Secondary — Let kids explore */}
           <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
-            onPress={() => router.push({ pathname: '/(tabs)/atstop',
-              params: { mode: 'kids', stopId: currentStop.id } })}>
+            onPress={() => router.push({ pathname: '/kids' as never,
+              params: { stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name), tripId: trip?.id ?? '' } })}>
             <Text style={dt.ctaSecondaryText}>🧭 Let kids explore</Text>
           </TouchableOpacity>
 

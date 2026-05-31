@@ -994,7 +994,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={as.kidsBtn}
             activeOpacity={0.85}
-            onPress={() => router.push({ pathname: '/(tabs)/atstop', params: { mode: 'kids', stopId: stop.id } })}
+            onPress={() => router.push({ pathname: '/kids' as never, params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' } })}
           >
             <Text style={as.kidsBtnText}>🧭  Let kids explore</Text>
           </TouchableOpacity>
@@ -1108,8 +1108,8 @@ export default function TodayScreen() {
             style={er.kidsStrip}
             activeOpacity={0.85}
             onPress={() => router.push({
-              pathname: '/(tabs)/atstop',
-              params: { mode: 'kids', stopId: stop.id },
+              pathname: '/kids' as never,
+              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' },
             })}
           >
             <View style={er.kidsIcon}>

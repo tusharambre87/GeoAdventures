@@ -96,6 +96,48 @@ export type ReplacementSuggestion = {
   imageUrl?: string;
 };
 
+export interface ExploreContent {
+  stopId: string;
+  stopName: string;
+  stories: {
+    main: { text: string; durationSeconds: number };
+    quickHits: { text: string; durationSeconds: number };
+    history: { text: string; durationSeconds: number };
+  };
+  wonderPrompt: string;
+  wonderTopics: string[];
+  missions: [
+    { type: "quiz"; question: string; options: string[]; correctIndex: number; xp: number },
+    { type: "observation"; instruction: string; xp: number },
+    { type: "photo"; instruction: string; xp: number },
+  ];
+}
+
+export const kidsAPI = {
+  getExplore: (stopId: string) =>
+    apiFetch<ExploreContent>(`/api/travel/stops/${stopId}/explore`),
+  postWonderResponse: (
+    stopId: string,
+    data: { explorerId: string; topic: string; observation: string }
+  ) =>
+    apiFetch(`/api/travel/stops/${stopId}/wonder-response`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  completeMission: (
+    stopId: string,
+    data: { explorerId: string; missionId: string; answer: string }
+  ) =>
+    apiFetch(`/api/travel/stops/${stopId}/complete-mission`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  getProgress: (tripId: string, explorerId: string) =>
+    apiFetch<{ xp: number; level: number }>(
+      `/api/travel/trips/${tripId}/progress/${explorerId}`
+    ),
+};
+
 export const travelAPI = {
   getTrips: () => apiFetch<TripsResponse>("/api/travel/trips"),
   getTrip: (tripId: string) => apiFetch<Trip>(`/api/travel/trips/${tripId}`),
