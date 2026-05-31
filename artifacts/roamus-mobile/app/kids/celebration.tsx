@@ -112,7 +112,7 @@ export default function Celebration() {
           style={({ pressed }) => [s.primaryBtn, pressed && { transform: [{ scale: 0.98 }] }]}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.dismiss();
+            router.navigate("/(tabs)/today" as never);
           }}
         >
           <Text style={s.primaryBtnText}>{"👆 Show your parent!"}</Text>

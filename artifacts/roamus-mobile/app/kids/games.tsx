@@ -126,6 +126,15 @@ export default function GameHub() {
           >
             <Text style={s.backLinkText}>{"\u2190 Back"}</Text>
           </Pressable>
+          <Pressable
+            style={s.handBackLink}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.navigate("/(tabs)/today" as never);
+            }}
+          >
+            <Text style={s.handBackText}>{"Hand to parent \u2192"}</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
