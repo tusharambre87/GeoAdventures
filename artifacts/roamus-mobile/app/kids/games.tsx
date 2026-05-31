@@ -31,14 +31,16 @@ const GRID_GAMES = [
     tag: "TEAM",
     tagBg: "#DCFCE7",
     tagColor: "#16A34A",
+    type: "scavenger",
   },
   {
     icon: "🌍",
     name: "GeoGuess",
-    desc: "Guess cities from clues",
+    desc: "This or that at your stop",
     tag: "SOLO",
     tagBg: "#EFF6FF",
     tagColor: "#2563EB",
+    type: "geoguess",
   },
   {
     icon: "👁",
@@ -47,6 +49,7 @@ const GRID_GAMES = [
     tag: "FAMILY",
     tagBg: "#FDF0E9",
     tagColor: "#E8692A",
+    type: "geospy",
   },
   {
     icon: "🗺️",
@@ -55,6 +58,7 @@ const GRID_GAMES = [
     tag: "TRIVIA",
     tagBg: "#F5F3FF",
     tagColor: "#7C3AED",
+    type: "guess-place",
   },
 ];
 
@@ -79,7 +83,10 @@ export default function GameHub() {
           {/* ── Hero game ── */}
           <Pressable
             style={({ pressed }) => [s.heroCard, pressed && { transform: [{ scale: 0.98 }] }]}
-            onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/kids/game-play?type=think-fast" as never);
+            }}
           >
             <LinearGradient
               colors={["#1A2F4A", "#0D1829"]}
@@ -102,7 +109,10 @@ export default function GameHub() {
               <Pressable
                 key={game.name}
                 style={({ pressed }) => [s.gridCard, pressed && { backgroundColor: K.bg }]}
-                onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/kids/game-play?type=${game.type}` as never);
+                }}
               >
                 <Text style={s.gridIcon}>{game.icon}</Text>
                 <Text style={s.gridName}>{game.name}</Text>

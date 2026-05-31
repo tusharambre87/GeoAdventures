@@ -113,9 +113,34 @@ export interface ExploreContent {
   ];
 }
 
+export type GuessRound = {
+  question: string;
+  options: { emoji: string; label: string }[];
+};
+export type ThisOrThatRound = {
+  question: string;
+  optionA: { emoji: string; label: string };
+  optionB: { emoji: string; label: string };
+  funFact: string;
+};
+export type SpotItRound = { prompt: string };
+export type BuildItRound = {
+  prompt: string;
+  options: { emoji: string; label: string }[];
+};
+export type GameContentRounds = {
+  guess: GuessRound[];
+  thisorthat: ThisOrThatRound[];
+  spotit: SpotItRound[];
+  buildit: BuildItRound[];
+  connectionFact?: string;
+};
+
 export const kidsAPI = {
   getExplore: (stopId: string) =>
     apiFetch<ExploreContent>(`/api/travel/stops/${stopId}/explore`),
+  getGames: (stopId: string) =>
+    apiFetch<GameContentRounds>(`/api/travel/stops/${stopId}/games`),
   postWonderResponse: (
     stopId: string,
     data: { explorerId: string; topic: string; observation: string }
