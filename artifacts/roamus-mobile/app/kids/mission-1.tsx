@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -70,6 +71,14 @@ export default function Mission1() {
       duration: 300,
       useNativeDriver: true,
     }).start();
+
+    if (kids.stopId) {
+      kidsAPI.completeMission(kids.stopId, {
+        explorerId: "default",
+        missionId: "quiz",
+        answer: quiz.options[idx] ?? String(idx),
+      }).catch(() => {});
+    }
 
     const isCorrect = idx === quiz.correctIndex;
     const delay = isCorrect ? 700 : 1300;

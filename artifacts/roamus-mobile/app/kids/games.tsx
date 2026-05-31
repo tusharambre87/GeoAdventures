@@ -116,7 +116,7 @@ export default function GameHub() {
             ))}
           </View>
 
-          {/* ── Back link ── */}
+          {/* ── Back + Hand back ── */}
           <Pressable
             style={s.backLink}
             onPress={() => {
@@ -125,6 +125,15 @@ export default function GameHub() {
             }}
           >
             <Text style={s.backLinkText}>{"\u2190 Back"}</Text>
+          </Pressable>
+          <Pressable
+            style={s.handBackLink}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.dismiss();
+            }}
+          >
+            <Text style={s.handBackText}>{"\u2190 Hand back to parent"}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -244,11 +253,20 @@ const s = StyleSheet.create({
   },
   backLink: {
     alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
   backLinkText: {
     fontFamily: F.semibold,
     fontSize: 14,
+    color: K.muted,
+  },
+  handBackLink: {
+    alignItems: "center",
+    paddingBottom: 20,
+  },
+  handBackText: {
+    fontFamily: F.semibold,
+    fontSize: 13,
     color: K.muted,
   },
 });

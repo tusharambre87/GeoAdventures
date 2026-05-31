@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -143,6 +144,13 @@ export default function Mission3() {
             style={({ pressed }) => [s.nextBtn, pressed && { opacity: 0.88 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              if (kids.stopId) {
+                kidsAPI.completeMission(kids.stopId, {
+                  explorerId: "default",
+                  missionId: "photo",
+                  answer: photoUri ?? "skipped",
+                }).catch(() => {});
+              }
               router.push("/kids/celebration");
             }}
           >

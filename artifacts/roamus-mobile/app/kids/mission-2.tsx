@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -46,7 +47,16 @@ export default function Mission2() {
   async function handleSubmit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500));
+    try {
+      if (kids.stopId) {
+        await kidsAPI.completeMission(kids.stopId, {
+          explorerId: "default",
+          missionId: "observation",
+          answer: obs || "—",
+        });
+      }
+    } catch {
+    }
     setSubmitting(false);
     router.push("/kids/mission-3");
   }

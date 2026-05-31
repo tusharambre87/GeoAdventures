@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -56,7 +57,16 @@ export default function WonderTime() {
     kids.setWonderObservation(text);
     kids.setSelectedTopics(selected);
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 600));
+    try {
+      if (kids.stopId) {
+        await kidsAPI.postWonderResponse(kids.stopId, {
+          explorerId: "default",
+          topic: selected.join(", ") || "general",
+          observation: text || "—",
+        });
+      }
+    } catch {
+    }
     setSubmitting(false);
     router.push("/kids/mission-1");
   }

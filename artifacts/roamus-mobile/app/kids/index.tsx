@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -56,7 +57,36 @@ export default function ExplorerHome() {
     }
   }, [params.stopId]);
 
-  const stopName = kids.stopName || (params.stopName ? decodeURIComponent(params.stopName) : "Millennium Park");
+  const stopId = kids.stopId || params.stopId || "";
+  const tripId = kids.tripId || params.tripId || "";
+
+  useEffect(() => {
+    if (!stopId) return;
+    kids.setLoadingExplore(true);
+    kids.setExploreError(false);
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 3000)
+    );
+
+    Promise.race([kidsAPI.getExplore(stopId), timeout])
+      .then((content) => {
+        kids.setExploreContent(content);
+        kids.setLoadingExplore(false);
+      })
+      .catch((err: Error & { status?: number }) => {
+        kids.setLoadingExplore(false);
+        kids.setExploreError(true);
+      });
+
+    if (tripId) {
+      kidsAPI.getProgress(tripId, "default")
+        .then((prog) => kids.setXpToday(prog.xp))
+        .catch(() => {});
+    }
+  }, [stopId]);
+
+  const stopName = kids.stopName || (params.stopName ? decodeURIComponent(params.stopName) : "Explorer");
   const kidName = kids.kidName || "Explorer";
   const xpToday = kids.xpToday;
 
@@ -91,6 +121,12 @@ export default function ExplorerHome() {
               <ShimmerRow />
               <ShimmerRow />
               <ShimmerRow />
+            </View>
+          ) : kids.exploreError ? (
+            <View style={s.fallbackCard}>
+              <Text style={s.fallbackIcon}>🧭</Text>
+              <Text style={s.fallbackText}>Getting your adventure ready…</Text>
+              <Text style={s.fallbackSub}>Check your connection and try again</Text>
             </View>
           ) : (
             <Pressable
@@ -244,6 +280,29 @@ const s = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     gap: 12,
+  },
+  fallbackCard: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    gap: 6,
+  },
+  fallbackIcon: {
+    fontSize: 32,
+    marginBottom: 4,
+  },
+  fallbackText: {
+    fontFamily: F.bold,
+    fontSize: 16,
+    color: "#fff",
+    textAlign: "center",
+  },
+  fallbackSub: {
+    fontFamily: F.medium,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
   },
   shimmerRow: {
     height: 16,
