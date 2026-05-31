@@ -110,9 +110,10 @@ type TripData = {
 };
 
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
-type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue';
+type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food';
 type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'okay' | 'good' | 'amazing';
+type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
 
 // ─── Dev mock data ────────────────────────────────────────────────────────────
 
@@ -223,14 +224,48 @@ function buildStopTimes(stops: Stop[], startHour = 9): string[] {
   });
 }
 
-async function fetchWikiImage(name: string): Promise<string | null> {
+async function fetchWikiImages(name: string): Promise<string[]> {
   try {
     const q = encodeURIComponent(name);
-    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${q}`);
-    if (!res.ok) return null;
-    const data = (await res.json()) as { thumbnail?: { source: string } };
-    return data.thumbnail?.source ?? null;
-  } catch { return null; }
+    const [sumRes, mediaRes] = await Promise.all([
+      fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${q}`),
+      fetch(`https://en.wikipedia.org/api/rest_v1/page/media-list/${q}`),
+    ]);
+    const results: string[] = [];
+    if (sumRes.ok) {
+      const d = (await sumRes.json()) as { thumbnail?: { source: string } };
+      if (d.thumbnail?.source) results.push(d.thumbnail.source);
+    }
+    if (mediaRes.ok) {
+      type MI = { type: string; srcset?: { src: string }[]; src?: string };
+      const d = (await mediaRes.json()) as { items?: MI[] };
+      const extra = (d.items ?? [])
+        .filter(i => i.type === 'image')
+        .map(i => { const s = i.srcset?.[0]?.src ?? i.src ?? ''; return s.startsWith('//') ? 'https:' + s : s; })
+        .filter(s => s && !/icon|logo|silhouette|map|flag|seal|coat|symbol/i.test(s));
+      results.push(...extra);
+    }
+    return [...new Set(results)].filter(Boolean).slice(0, 3);
+  } catch { return []; }
+}
+
+async function loadFoodNearby(address: string): Promise<FoodPlace[]> {
+  try {
+    const geoRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
+      { headers: { 'User-Agent': 'RoamUsApp/1.0' } }
+    );
+    const geoData = (await geoRes.json()) as Array<{ lat: string; lon: string }>;
+    if (!geoData[0]) return [];
+    const { lat, lon } = geoData[0];
+    const query = `[out:json][timeout:10];node["amenity"~"^(restaurant|cafe|fast_food|food_court)$"](around:600,${lat},${lon});out 8;`;
+    const ovRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+    const ovData = (await ovRes.json()) as { elements?: Array<{ id: number; lat: number; lon: number; tags?: Record<string,string> }> };
+    return (ovData.elements ?? [])
+      .filter(e => e.tags?.name)
+      .slice(0, 5)
+      .map(e => ({ id: String(e.id), name: e.tags!.name!, cuisine: e.tags?.cuisine ?? e.tags?.amenity ?? 'restaurant', lat: e.lat, lon: e.lon }));
+  } catch { return []; }
 }
 
 function mapsUrl(query: string): string {
@@ -285,6 +320,7 @@ export default function AtStopScreen() {
 
   // ── Detail state ──
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [stopImages, setStopImages]     = useState<(string | null)[]>([null, null, null]);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [rescueType, setRescueType]     = useState<RescueType>('behind');
   const [feedbackRating, setFeedbackRating] = useState<FeedbackRating>('amazing');
@@ -292,12 +328,21 @@ export default function AtStopScreen() {
   const [exploreOpen, setExploreOpen]       = useState(false);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackInputFocused, setFeedbackInputFocused] = useState(false);
+  const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
+  const [foodLoading, setFoodLoading]   = useState(false);
+  const [foodLoaded, setFoodLoaded]     = useState(false);
 
-  // ── Fetch Wikipedia image whenever stop changes ──
+  // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
     if (!currentStop) return;
     setHeroImageUrl(null);
-    fetchWikiImage(currentStop.name).then(url => { if (url) setHeroImageUrl(url); });
+    setStopImages([null, null, null]);
+    fetchWikiImages(currentStop.name).then(urls => {
+      if (urls[0]) setHeroImageUrl(urls[0]);
+      setStopImages([urls[0] ?? null, urls[1] ?? null, urls[2] ?? null]);
+    });
+    // Reset food state for new stop
+    setFoodPlaces([]); setFoodLoaded(false);
   }, [currentStop?.id]);
 
   // ── Load on focus ──
@@ -604,33 +649,42 @@ export default function AtStopScreen() {
 
         {/* ── Quick action buttons ─────────────────────────────────────────── */}
         <View style={dt.actionsRow}>
-          {[
-            { icon: '↗', label: 'Directions',
-              onPress: () => address ? Linking.openURL(mapsUrl(address)) : null },
-            { icon: '🎫', label: 'Tickets',
-              onPress: () => Linking.openURL(ticketUrl(currentStop.name)) },
-            { icon: '🍕', label: 'Food nearby',
-              onPress: () => address ? Linking.openURL(mapsUrl('food near ' + address)) : null },
-          ].map(a => (
-            <TouchableOpacity key={a.label} style={dt.actBtn} activeOpacity={0.8} onPress={a.onPress}>
-              <Text style={dt.actIcon}>{a.icon}</Text>
-              <Text style={dt.actLabel}>{a.label}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
+            onPress={() => address ? Linking.openURL(mapsUrl(address)) : null}>
+            <Text style={dt.actIcon}>↗</Text>
+            <Text style={dt.actLabel}>Directions</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
+            onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
+            <Text style={dt.actIcon}>🎫</Text>
+            <Text style={dt.actLabel}>Tickets</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
+            onPress={() => {
+              openSheet('food');
+              if (!foodLoaded && address) {
+                setFoodLoading(true);
+                loadFoodNearby(address).then(places => {
+                  setFoodPlaces(places); setFoodLoading(false); setFoodLoaded(true);
+                });
+              }
+            }}>
+            <Text style={dt.actIcon}>🍕</Text>
+            <Text style={dt.actLabel}>Food nearby</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── Photos strip ─────────────────────────────────────────────────── */}
         <View style={dt.photoSection}>
-          <Text style={dt.photoSectionLabel}>PHOTOS · GOOGLE PLACES</Text>
+          <Text style={dt.photoSectionLabel}>PHOTOS</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8 }}>
-            {[bgColor, bgColor, bgColor].map((bg, i) => (
-              <View key={i} style={[dt.photoThumb, { backgroundColor: bg }]}>
-                {heroImageUrl ? (
-                  <Image source={{ uri: heroImageUrl }} style={[StyleSheet.absoluteFill,
-                    { borderRadius: 12 }]} resizeMode="cover" />
+            {stopImages.map((imgUrl, i) => (
+              <View key={i} style={[dt.photoThumb, { backgroundColor: bgColor }]}>
+                {imgUrl ? (
+                  <Image source={{ uri: imgUrl }} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} resizeMode="cover" />
                 ) : (
-                  <Text style={{ fontSize: 34 }}>{emoji}</Text>
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor, borderRadius: 12 }]} />
                 )}
               </View>
             ))}
@@ -693,28 +747,26 @@ export default function AtStopScreen() {
 
               {/* Timing & logistics */}
               <Text style={dt.exploreSubLabel}>Timing {'&'} logistics</Text>
-              {[
+              {([
                 ['Recommended duration', `${duration} min`],
-                ['Best for', meta.sessionFit ?? '—'],
-                ['Crowd level now', enrichment.bestTimeOfDay ?? '—'],
-                ['Stroller friendly', enrichment.strollerFriendly ? 'Yes ✓' : '—'],
-              ].map(([k, v]) => (
+                meta.sessionFit ? ['Best for', meta.sessionFit] : null,
+                enrichment.bestTimeOfDay ? ['Crowd level now', enrichment.bestTimeOfDay] : null,
+                enrichment.strollerFriendly != null
+                  ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes ✓' : 'No'] : null,
+              ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x)).map(([k, v]) => (
                 <View key={k} style={dt.exploreRow}>
                   <Text style={dt.exploreKey}>{k}</Text>
-                  <Text style={[dt.exploreVal,
-                    k === 'Crowd level now' && !!enrichment.bestTimeOfDay && { color: C.green }]}>
-                    {v}
-                  </Text>
+                  <Text style={[dt.exploreVal, k === 'Crowd level now' && { color: C.green }]}>{v}</Text>
                 </View>
               ))}
 
               {/* Parking & access */}
               <Text style={dt.exploreSubLabel}>Parking {'&'} access</Text>
-              {[
-                ['Parking', enrichment.parkingNotes ?? '—'],
-                ['Restrooms', meta.restroomConfidence ?? '—'],
-                ['Address', address || '—'],
-              ].map(([k, v]) => (
+              {([
+                enrichment.parkingNotes ? ['Parking', enrichment.parkingNotes] : null,
+                meta.restroomConfidence ? ['Restrooms', meta.restroomConfidence] : null,
+                address ? ['Address', address] : null,
+              ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x)).map(([k, v]) => (
                 <View key={k} style={dt.exploreRow}>
                   <Text style={dt.exploreKey}>{k}</Text>
                   <Text style={dt.exploreVal}>{v}</Text>
@@ -852,6 +904,58 @@ export default function AtStopScreen() {
         ))}
         <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
           <Text style={sh.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+      </SheetModal>
+
+      {/* ── SHEET: Food Nearby ───────────────────────────────────────────── */}
+      <SheetModal visible={activeSheet === 'food'} onClose={() => setActiveSheet('none')}>
+        <Text style={sh.title}>Food nearby</Text>
+        <Text style={sh.sub}>Near {currentStop.name}</Text>
+        {foodLoading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+            <ActivityIndicator size="large" color={C.orange} />
+            <Text style={[sh.sub, { marginTop: 10 }]}>Finding restaurants…</Text>
+          </View>
+        ) : foodPlaces.length > 0 ? (
+          <>
+            {foodPlaces.map(place => (
+              <View key={place.id} style={sh.foodRow}>
+                <View style={[sh.rowIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Text>🍽</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={sh.rowName}>{place.name}</Text>
+                  <Text style={sh.rowDesc}>{place.cuisine.charAt(0).toUpperCase() + place.cuisine.slice(1)}</Text>
+                </View>
+                <TouchableOpacity style={sh.dirBtn} activeOpacity={0.8}
+                  onPress={() => Linking.openURL(mapsUrl(`${place.name} near ${address}`))}>
+                  <Text style={sh.dirBtnText}>Directions</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={sh.seeAllBtn} activeOpacity={0.85}
+              onPress={() => { Linking.openURL(mapsUrl('restaurants near ' + address)); setActiveSheet('none'); }}>
+              <Text style={sh.seeAllText}>See all on Google Maps →</Text>
+            </TouchableOpacity>
+          </>
+        ) : foodLoaded ? (
+          <>
+            <Text style={[sh.sub, { textAlign: 'center', paddingVertical: 20 }]}>
+              No results found nearby. Try Google Maps for more options.
+            </Text>
+            <TouchableOpacity style={sh.seeAllBtn} activeOpacity={0.85}
+              onPress={() => { Linking.openURL(mapsUrl('restaurants near ' + address)); setActiveSheet('none'); }}>
+              <Text style={sh.seeAllText}>Search on Google Maps →</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity style={sh.seeAllBtn} activeOpacity={0.85}
+            onPress={() => { Linking.openURL(mapsUrl('restaurants near ' + address)); setActiveSheet('none'); }}>
+            <Text style={sh.seeAllText}>Open in Google Maps →</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
+          <Text style={sh.cancelText}>Close</Text>
         </TouchableOpacity>
       </SheetModal>
 
@@ -1170,4 +1274,13 @@ const sh = StyleSheet.create({
   feedbackSubmitText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   skipBtn: { paddingVertical: 12, alignItems: 'center' },
   skipText: { fontFamily: F.semibold, fontSize: 13, color: C.muted },
+  // Food nearby
+  foodRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: C.border },
+  dirBtn: { backgroundColor: C.orangeLt, borderRadius: 20, paddingHorizontal: 14,
+    paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(232,105,42,0.25)' },
+  dirBtnText: { fontFamily: F.semibold, fontSize: 12, color: C.orange },
+  seeAllBtn: { marginTop: 16, borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card },
+  seeAllText: { fontFamily: F.semibold, fontSize: 14, color: C.deep },
 });
