@@ -215,6 +215,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 20,
     marginBottom: 12,
     shadowColor: K.purple,
     shadowOffset: { width: 0, height: 6 },
