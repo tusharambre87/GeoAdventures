@@ -15,7 +15,7 @@ import {
   Alert,
   Animated,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   LayoutAnimation,
   Linking,
   Platform,
@@ -399,6 +399,7 @@ export default function AtStopScreen() {
   // ── Feedback / mark complete ──
   async function handleMarkComplete(skipFeedback = false) {
     if (!currentStop) return;
+    Keyboard.dismiss();
     setSubmittingFeedback(true);
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
@@ -728,7 +729,26 @@ export default function AtStopScreen() {
           {exploreOpen && (
             <View style={dt.exploreBody}>
 
-              {/* Best way to do this stop — practicalTips as orange bullet list */}
+              {/* What you'll experience — numbered bullets from whyNow */}
+              {!!enrichment.whyNow && (
+                <>
+                  <Text style={dt.exploreSubLabel}>{"What you'll experience"}</Text>
+                  {enrichment.whyNow
+                    .split(/\.\s+/)
+                    .map((s: string) => s.replace(/\.$/, '').trim())
+                    .filter((s: string) => s.length > 8)
+                    .map((line: string, i: number) => (
+                      <View key={i} style={dt.bulletRow}>
+                        <View style={dt.numBadge}>
+                          <Text style={dt.numBadgeText}>{i + 1}</Text>
+                        </View>
+                        <Text style={dt.bulletText}>{line}.</Text>
+                      </View>
+                    ))}
+                </>
+              )}
+
+              {/* Best way to do this stop — practicalTips as dot bullet list */}
               {!!enrichment.practicalTips && (
                 <>
                   <Text style={dt.exploreSubLabel}>Best way to do this stop</Text>
@@ -960,49 +980,48 @@ export default function AtStopScreen() {
       </SheetModal>
 
       {/* ── SHEET: Feedback / Mark Complete ─────────────────────────────── */}
-      <SheetModal visible={activeSheet === 'feedback'} onClose={() => setActiveSheet('none')}>
+      <SheetModal visible={activeSheet === 'feedback'} onClose={() => { Keyboard.dismiss(); setActiveSheet('none'); }}>
         <Text style={sh.title}>How was it?</Text>
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={20}>
-          <View style={sh.emojiRow}>
-            {([
-              { emoji: '😐', label: 'Okay',    val: 'okay'    as FeedbackRating },
-              { emoji: '😊', label: 'Good',    val: 'good'    as FeedbackRating },
-              { emoji: '🤩', label: 'Amazing', val: 'amazing' as FeedbackRating },
-            ] as const).map(opt => (
-              <TouchableOpacity key={opt.val}
-                style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
-                activeOpacity={0.8}
-                onPress={() => setFeedbackRating(opt.val)}>
-                <Text style={sh.emojiOptIcon}>{opt.emoji}</Text>
-                <Text style={sh.emojiOptLabel}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            style={[sh.feedbackInput, feedbackInputFocused && { borderColor: C.orange }]}
-            placeholder="Anything to add? (optional)"
-            placeholderTextColor={C.muted}
-            multiline
-            numberOfLines={2}
-            value={feedbackText}
-            onChangeText={setFeedbackText}
-            onFocus={() => setFeedbackInputFocused(true)}
-            onBlur={() => setFeedbackInputFocused(false)}
-          />
-          <TouchableOpacity style={sh.feedbackSubmit} activeOpacity={0.88}
-            onPress={() => handleMarkComplete(false)}
-            disabled={submittingFeedback}>
-            {submittingFeedback
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={sh.feedbackSubmitText}>✓ Done — mark complete</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity style={sh.skipBtn} onPress={() => handleMarkComplete(true)}>
-            <Text style={sh.skipText}>Skip feedback</Text>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
+        <View style={sh.emojiRow}>
+          {([
+            { emoji: '😐', label: 'Okay',    val: 'okay'    as FeedbackRating },
+            { emoji: '😊', label: 'Good',    val: 'good'    as FeedbackRating },
+            { emoji: '🤩', label: 'Amazing', val: 'amazing' as FeedbackRating },
+          ] as const).map(opt => (
+            <TouchableOpacity key={opt.val}
+              style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
+              activeOpacity={0.8}
+              onPress={() => { Keyboard.dismiss(); setFeedbackRating(opt.val); }}>
+              <Text style={sh.emojiOptIcon}>{opt.emoji}</Text>
+              <Text style={sh.emojiOptLabel}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput
+          style={[sh.feedbackInput, feedbackInputFocused && { borderColor: C.orange }]}
+          placeholder="Anything to add? (optional)"
+          placeholderTextColor={C.muted}
+          multiline
+          numberOfLines={2}
+          value={feedbackText}
+          onChangeText={setFeedbackText}
+          onFocus={() => setFeedbackInputFocused(true)}
+          onBlur={() => setFeedbackInputFocused(false)}
+          blurOnSubmit
+          returnKeyType="done"
+          onSubmitEditing={() => Keyboard.dismiss()}
+        />
+        <TouchableOpacity style={sh.feedbackSubmit} activeOpacity={0.88}
+          onPress={() => handleMarkComplete(false)}
+          disabled={submittingFeedback}>
+          {submittingFeedback
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={sh.feedbackSubmitText}>Done — mark complete</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={sh.skipBtn} onPress={() => handleMarkComplete(true)}>
+          <Text style={sh.skipText}>Skip feedback</Text>
+        </TouchableOpacity>
       </SheetModal>
 
       {/* ── SHEET: Rescue ────────────────────────────────────────────────── */}
@@ -1225,6 +1244,9 @@ const dt = StyleSheet.create({
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   bulletDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.orange, marginTop: 6, flexShrink: 0 },
   bulletText: { fontFamily: F.regular, fontSize: 13, color: C.deep, lineHeight: 21, flex: 1 },
+  numBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.orangeLt,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1, flexShrink: 0 },
+  numBadgeText: { fontFamily: F.bold, fontSize: 11, color: C.orange },
   // CTAs
   ctaGroup: { marginHorizontal: 20, marginTop: 20, gap: 8 },
   ctaPrimary: { backgroundColor: C.orange, borderRadius: 16, paddingVertical: 18,
