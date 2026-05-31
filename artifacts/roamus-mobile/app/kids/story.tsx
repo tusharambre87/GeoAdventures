@@ -1,7 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -11,8 +12,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useKids } from "@/lib/kidsContext";
+import { API_BASE } from "@/lib/apiClient";
 import { F } from "@/lib/tokens";
 
 const K = {
@@ -35,90 +40,205 @@ const MOCK_TEXTS: Record<string, string> = {
   history: `The history of this remarkable place begins long before any of us were born.\n\nOriginal inhabitants of this land used this very spot for ceremonies and celebrations for thousands of years.\n\nWhen European settlers arrived, they recognized the special nature of this location and made it a place of commerce and community.\n\nThe famous structure you see today was built in the early 20th century, and has survived wars, floods, and great social change.\n\nIt has been a place of protest, of joy, of mourning, and of hope. Today, it stands as a symbol of everything your city has been through — and everything it hopes to become.`,
 };
 
-function fmtSec(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2, "0")}`;
+function fmtMs(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Parse "m:ss" string → total seconds
-function parseDuration(s: string): number {
-  const [m, sec] = s.split(":").map(Number);
-  return (m || 0) * 60 + (sec || 0);
+// ─── Audio helpers ────────────────────────────────────────────────────────────
+
+async function fetchAndCacheAudio(
+  stopId: string,
+  storyKey: string,
+  storyText: string
+): Promise<string> {
+  const localUri = `${FileSystem.cacheDirectory}kids_audio_${stopId}_${storyKey}.mp3`;
+
+  // Return cached file if it exists
+  const info = await FileSystem.getInfoAsync(localUri);
+  if (info.exists) return localUri;
+
+  // Fetch audio binary from API with auth
+  const token = await AsyncStorage.getItem("auth_token");
+  const res = await fetch(
+    `${API_BASE}/api/travel/stops/${stopId}/generate-audio`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text: storyText, voice: "eva" }),
+    }
+  );
+
+  if (!res.ok) throw new Error(`Audio fetch failed: ${res.status}`);
+
+  // Convert blob → base64 via FileReader
+  const blob = await res.blob();
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      // result = "data:audio/mpeg;base64,AAAA..."
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  await FileSystem.writeAsStringAsync(localUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  return localUri;
 }
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StoryPlayer() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+
   const [storyIdx, setStoryIdx] = useState(kids.currentStoryIndex);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Audio state
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
 
   const story = STORIES[storyIdx];
+  const storyKey = story.key;
+  const stopId = kids.stopId;
   const stopName = kids.stopName || "Millennium Park";
 
-  const storyKey = story.key;
   const transcript =
     kids.exploreContent?.stories?.[storyKey]?.text ?? MOCK_TEXTS[storyKey] ?? "";
   const rawDuration = kids.exploreContent?.stories?.[storyKey]?.durationSeconds;
-  const storyDuration = rawDuration ? fmtSec(rawDuration) : story.duration;
-  const totalSec = rawDuration ?? parseDuration(storyDuration);
-  const progressPct = totalSec > 0 ? Math.min((elapsed / totalSec) * 100, 100) : 0;
-  const remaining = Math.max(0, totalSec - elapsed);
 
   const stopLabel =
     kids.exploreContent?.stopIndex && kids.exploreContent?.totalStops
       ? `STOP ${kids.exploreContent.stopIndex} OF ${kids.exploreContent.totalStops}`
       : "STORY PACK";
 
-  const nextLabels = ["Quick Hits \u2192", "History \u2192", "Continue \u2192 Wonder Time"];
+  const nextLabels = ["Quick Hits →", "History →", "Continue → Wonder Time"];
 
-  function stopTimer() {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  const progressPct = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  const remainingMs = Math.max(0, durationMs - positionMs);
+
+  // ── Audio setup ──────────────────────────────────────────────────────────
+
+  const unloadSound = useCallback(async () => {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+      } catch {}
+      soundRef.current = null;
     }
-  }
-
-  function handlePlay() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isPlaying) {
-      stopTimer();
-      setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
-      timerRef.current = setInterval(() => {
-        setElapsed(e => {
-          const next = e + 1;
-          if (next >= totalSec) {
-            stopTimer();
-            setIsPlaying(false);
-            kids.markStoryComplete(storyIdx);
-            return totalSec;
-          }
-          return next;
-        });
-      }, 1000);
-    }
-  }
-
-  function resetStory() {
-    stopTimer();
-    setElapsed(0);
     setIsPlaying(false);
+    setPositionMs(0);
+    setDurationMs(0);
+  }, []);
+
+  const loadAudio = useCallback(async (idx: number) => {
+    await unloadSound();
+    setAudioError(null);
+    setAudioLoading(true);
+
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+      });
+
+      const key = STORIES[idx].key;
+      const text =
+        kids.exploreContent?.stories?.[key]?.text ?? MOCK_TEXTS[key] ?? "";
+
+      const uri = await fetchAndCacheAudio(stopId, key, text);
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: false, progressUpdateIntervalMillis: 250 },
+        (status) => {
+          if (!status.isLoaded) return;
+          setPositionMs(status.positionMillis);
+          setDurationMs(status.durationMillis ?? 0);
+          setIsPlaying(status.isPlaying);
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            kids.markStoryComplete(idx);
+          }
+        }
+      );
+
+      soundRef.current = sound;
+    } catch (e: any) {
+      setAudioError(e?.message ?? "Failed to load audio");
+    } finally {
+      setAudioLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopId, kids.exploreContent]);
+
+  // Load audio whenever story changes
+  useEffect(() => {
+    if (stopId) loadAudio(storyIdx);
+    return () => { unloadSound(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyIdx, stopId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { unloadSound(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Controls ─────────────────────────────────────────────────────────────
+
+  async function handlePlay() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!soundRef.current) return;
+    try {
+      if (isPlaying) {
+        await soundRef.current.pauseAsync();
+      } else {
+        await soundRef.current.playAsync();
+      }
+    } catch {}
+  }
+
+  async function handleRestart() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!soundRef.current) return;
+    try {
+      await soundRef.current.setPositionAsync(0);
+      setPositionMs(0);
+    } catch {}
+  }
+
+  async function handleSkipEnd() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    kids.markStoryComplete(storyIdx);
+    await unloadSound();
   }
 
   function handleBack() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (storyIdx > 0) {
-      resetStory();
       const prev = storyIdx - 1;
       setStoryIdx(prev);
       kids.setCurrentStoryIndex(prev);
     } else {
-      stopTimer();
+      unloadSound();
       router.back();
     }
   }
@@ -126,29 +246,39 @@ export default function StoryPlayer() {
   function handleNext() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     kids.markStoryComplete(storyIdx);
-    resetStory();
     if (storyIdx < 2) {
       const next = storyIdx + 1;
       setStoryIdx(next);
       kids.setCurrentStoryIndex(next);
     } else {
+      unloadSound();
       router.push("/kids/wonder");
     }
   }
 
-  // Reset timer when story changes
-  React.useEffect(() => {
-    resetStory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storyIdx]);
-
-  // Cleanup on unmount
-  React.useEffect(() => {
-    return () => stopTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function switchStory(i: number) {
+    if (i === storyIdx) return;
+    setStoryIdx(i);
+    kids.setCurrentStoryIndex(i);
+  }
 
   const doneCount = kids.completedStories.filter(Boolean).length;
+
+  // ── Status text ───────────────────────────────────────────────────────────
+
+  let statusText = "Tap ▶ to listen";
+  if (audioLoading) statusText = "Loading audio…";
+  else if (audioError) statusText = "Tap ▶ to retry";
+  else if (isPlaying) statusText = "Now playing…";
+  else if (positionMs > 0) statusText = "Paused";
+
+  // ── Duration display ──────────────────────────────────────────────────────
+
+  const durationLabel = durationMs > 0
+    ? fmtMs(durationMs)
+    : rawDuration
+      ? `${Math.floor(rawDuration / 60)}:${String(rawDuration % 60).padStart(2, "0")}`
+      : story.duration;
 
   return (
     <View style={[s.root, { backgroundColor: K.purple }]}>
@@ -181,11 +311,7 @@ export default function StoryPlayer() {
             <Pressable
               key={st.key}
               style={[s.pill, i === storyIdx && s.pillActive]}
-              onPress={() => {
-                setStoryIdx(i);
-                kids.setCurrentStoryIndex(i);
-                resetStory();
-              }}
+              onPress={() => switchStory(i)}
             >
               <Text style={[s.pillText, i === storyIdx && s.pillTextActive]}>
                 {st.label}
@@ -195,50 +321,50 @@ export default function StoryPlayer() {
         </View>
         <Text style={s.stopLbl}>{stopLabel}</Text>
         <Text style={s.stopName}>{stopName}</Text>
-        <Text style={s.duration}>{story.label} · ~{storyDuration}</Text>
+        <Text style={s.duration}>{story.label} · ~{durationLabel}</Text>
       </View>
 
-      {/* ── Body (purple, glass panel vertically centered) ── */}
+      {/* ── Body ── */}
       <View style={s.body}>
         {/* Glass panel */}
         <View style={s.glass}>
           {/* Controls */}
           <View style={s.controls}>
-            <Pressable
-              style={s.skipBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetStory();
-              }}
-            >
+            <Pressable style={s.skipBtn} onPress={handleRestart}>
               <Text style={{ color: "#fff", fontSize: 22 }}>{"⏮"}</Text>
             </Pressable>
-            <Pressable style={s.playBtn} onPress={handlePlay}>
-              <Text style={{ color: K.purple, fontSize: 32, paddingLeft: isPlaying ? 0 : 4 }}>
-                {isPlaying ? "⏸" : "\u25B6"}
-              </Text>
-            </Pressable>
+
             <Pressable
-              style={s.skipBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                kids.markStoryComplete(storyIdx);
-                resetStory();
-              }}
+              style={s.playBtn}
+              onPress={audioError ? () => loadAudio(storyIdx) : handlePlay}
+              disabled={audioLoading}
             >
+              {audioLoading ? (
+                <ActivityIndicator color={K.purple} size="large" />
+              ) : (
+                <Text style={{ color: K.purple, fontSize: 32, paddingLeft: isPlaying ? 0 : 4 }}>
+                  {audioError ? "↺" : isPlaying ? "⏸" : "▶"}
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable style={s.skipBtn} onPress={handleSkipEnd}>
               <Text style={{ color: "#fff", fontSize: 22 }}>{"⏭"}</Text>
             </Pressable>
           </View>
-          <Text style={s.status}>{isPlaying ? "Now playing…" : elapsed > 0 ? "Paused" : "Tap to listen"}</Text>
-          {/* Progress bar — state-based for reliable updates */}
+
+          <Text style={s.status}>{statusText}</Text>
+
+          {/* Progress bar */}
           <View style={s.progTrack}>
             <View style={[s.progFill, { width: `${progressPct}%` }]} />
           </View>
           <View style={s.timeRow}>
-            <Text style={s.timeText}>{fmtSec(elapsed)}</Text>
-            <Text style={s.timeText}>{fmtSec(remaining)} remaining</Text>
+            <Text style={s.timeText}>{fmtMs(positionMs)}</Text>
+            <Text style={s.timeText}>{fmtMs(remainingMs)} remaining</Text>
           </View>
         </View>
+
         {/* Voice + transcript row */}
         <View style={s.auxRow}>
           <View style={s.voicePill}>
@@ -252,7 +378,7 @@ export default function StoryPlayer() {
         </View>
       </View>
 
-      {/* ── Bottom nav (purple) ── */}
+      {/* ── Bottom nav ── */}
       <View style={[s.nav, { paddingBottom: insets.bottom + 12 }]}>
         <View style={s.navRow}>
           <Pressable style={s.backBtn} onPress={handleBack}>
@@ -268,7 +394,7 @@ export default function StoryPlayer() {
             router.back();
           }}
         >
-          <Text style={s.handBack}>{"\u2190 Back"}</Text>
+          <Text style={s.handBack}>{"← Back"}</Text>
         </Pressable>
       </View>
 
@@ -318,12 +444,7 @@ const s = StyleSheet.create({
     borderRadius: 80,
     backgroundColor: "rgba(255,255,255,0.07)",
   },
-  dots: {
-    flexDirection: "row",
-    gap: 5,
-    marginBottom: 18,
-    zIndex: 2,
-  },
+  dots: { flexDirection: "row", gap: 5, marginBottom: 18, zIndex: 2 },
   dot: {
     flex: 1,
     height: 4,
@@ -335,27 +456,18 @@ const s = StyleSheet.create({
   dotCur: { backgroundColor: "rgba(255,255,255,0.25)" },
   dotFull: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "#fff",
     borderRadius: 2,
   },
   dotPulse: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    width: "60%",
-    height: "100%",
+    top: 0, left: 0,
+    width: "60%", height: "100%",
     backgroundColor: "#fff",
     borderRadius: 2,
   },
-  pills: {
-    flexDirection: "row",
-    gap: 6,
-    marginBottom: 16,
-  },
+  pills: { flexDirection: "row", gap: 6, marginBottom: 16 },
   pill: {
     flex: 1,
     paddingHorizontal: 10,
@@ -365,38 +477,17 @@ const s = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
   },
-  pillActive: {
-    backgroundColor: "#fff",
-    borderColor: "#fff",
-  },
-  pillText: {
-    fontFamily: F.bold,
-    fontSize: 13,
-    color: "rgba(255,255,255,0.6)",
-  },
-  pillTextActive: {
-    color: K.purple,
-  },
+  pillActive: { backgroundColor: "#fff", borderColor: "#fff" },
+  pillText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.6)" },
+  pillTextActive: { color: K.purple },
   stopLbl: {
-    fontFamily: F.bold,
-    fontSize: 11,
+    fontFamily: F.bold, fontSize: 11,
     color: "rgba(255,255,255,0.6)",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 5,
+    letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 5,
   },
-  stopName: {
-    fontFamily: F.bold,
-    fontSize: 22,
-    color: "#fff",
-    lineHeight: 28,
-  },
-  duration: {
-    fontFamily: F.medium,
-    fontSize: 13,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 3,
-  },
+  stopName: { fontFamily: F.bold, fontSize: 22, color: "#fff", lineHeight: 28 },
+  duration: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 3 },
+
   body: {
     flex: 1,
     backgroundColor: K.purple,
@@ -422,34 +513,23 @@ const s = StyleSheet.create({
     marginBottom: 20,
   },
   skipBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 56, height: 56, borderRadius: 28,
     backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center", justifyContent: "center",
   },
   playBtn: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 88, height: 88, borderRadius: 44,
     backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },
   status: {
-    fontFamily: F.bold,
-    fontSize: 15,
+    fontFamily: F.bold, fontSize: 15,
     color: "rgba(255,255,255,0.75)",
-    textAlign: "center",
-    marginBottom: 16,
+    textAlign: "center", marginBottom: 16,
   },
   progTrack: {
     height: 6,
@@ -458,20 +538,9 @@ const s = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 8,
   },
-  progFill: {
-    height: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 3,
-  },
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  timeText: {
-    fontFamily: F.semibold,
-    fontSize: 12,
-    color: "rgba(255,255,255,0.7)",
-  },
+  progFill: { height: "100%", backgroundColor: "#fff", borderRadius: 3 },
+  timeRow: { flexDirection: "row", justifyContent: "space-between" },
+  timeText: { fontFamily: F.semibold, fontSize: 12, color: "rgba(255,255,255,0.7)" },
   auxRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -483,15 +552,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  voiceText: {
-    fontFamily: F.semibold,
-    fontSize: 13,
-    color: K.deep,
-  },
+  voiceText: { fontFamily: F.semibold, fontSize: 13, color: K.deep },
   transcriptBtn: {
-    fontFamily: F.semibold,
-    fontSize: 13,
-    color: "#fff",
+    fontFamily: F.semibold, fontSize: 13, color: "#fff",
     textDecorationLine: "underline",
     textDecorationColor: "rgba(255,255,255,0.5)",
   },
@@ -502,45 +565,27 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
   },
-  navRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
-  },
+  navRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   backBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.2)",
+    width: 54, height: 54, borderRadius: 16,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
     backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   nextBtn: {
-    flex: 1,
-    height: 54,
+    flex: 1, height: 54,
     backgroundColor: "#fff",
     borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.2, shadowRadius: 12, elevation: 4,
   },
-  nextBtnText: {
-    fontFamily: F.bold,
-    fontSize: 17,
-    color: K.purple,
-  },
+  nextBtnText: { fontFamily: F.bold, fontSize: 17, color: K.purple },
   handBack: {
-    fontFamily: F.semibold,
-    fontSize: 12,
+    fontFamily: F.semibold, fontSize: 12,
     color: "rgba(255,255,255,0.55)",
-    textAlign: "center",
-    paddingVertical: 6,
+    textAlign: "center", paddingVertical: 6,
   },
   tsOverlay: {
     flex: 1,
@@ -549,13 +594,11 @@ const s = StyleSheet.create({
   },
   tsSheet: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     height: "78%",
   },
   tsHandle: {
-    width: 36,
-    height: 4,
+    width: 36, height: 4,
     backgroundColor: "rgba(28,25,23,0.15)",
     borderRadius: 2,
     alignSelf: "center",
@@ -565,30 +608,19 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(28,25,23,0.08)",
   },
-  tsTitle: {
-    fontFamily: F.bold,
-    fontSize: 17,
-    color: K.deep,
-  },
+  tsTitle: { fontFamily: F.bold, fontSize: 17, color: K.deep },
   tsClose: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 30, height: 30, borderRadius: 15,
     backgroundColor: "#F5F2EE",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   tsScroll: { flex: 1 },
   tsBody: {
-    fontFamily: F.medium,
-    fontSize: 16,
-    color: K.deep,
-    lineHeight: 28,
-    marginBottom: 4,
+    fontFamily: F.medium, fontSize: 16, color: K.deep,
+    lineHeight: 28, marginBottom: 4,
   },
 });

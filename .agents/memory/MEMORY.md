@@ -1,0 +1,1 @@
+- [expo-file-system v56 legacy API](expo-file-system-v56.md) — use `expo-file-system/legacy` for cacheDirectory, writeAsStringAsync, getInfoAsync (v56 broke the top-level export)
