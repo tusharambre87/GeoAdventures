@@ -165,6 +165,58 @@ export const kidsAPI = {
     ),
 };
 
+export type Moment = {
+  id: string;
+  tripId: string;
+  stopId?: string | null;
+  photoUrl?: string | null;
+  photoUrls?: string[];
+  kidPromptResponse?: string | null;
+  parentPromptResponse?: string | null;
+  geoFact?: string | null;
+  isFavorite?: boolean;
+  isSharedCommunity?: boolean;
+  createdAt?: string;
+};
+
+export type TripStory = {
+  id: string;
+  tripId: string;
+  title: string;
+  storyHtml?: string | null;
+  storySummary?: string | null;
+  highlights?: string[];
+  photoUrls?: string[];
+  geoFactsUsed?: string[];
+  generatedAt?: string;
+  regeneratedAt?: string | null;
+};
+
+export const memoriesAPI = {
+  getMoments: (tripId: string) =>
+    apiFetch<Moment[]>(`/api/travel/trips/${tripId}/moments`),
+  createMoment: (data: {
+    tripId: string;
+    stopId?: string | null;
+    photoUrls?: string[];
+    photoUrl?: string | null;
+    kidPromptResponse?: string | null;
+    parentPromptResponse?: string | null;
+  }) =>
+    apiFetch<Moment>('/api/travel/moments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteMoment: (momentId: string) =>
+    apiFetch(`/api/travel/moments/${momentId}`, { method: 'DELETE' }),
+  getStory: (tripId: string) =>
+    apiFetch<TripStory>(`/api/travel/trips/${tripId}/story`),
+  regenerateStory: (tripId: string) =>
+    apiFetch<TripStory>(`/api/travel/trips/${tripId}/story/regenerate`, {
+      method: 'POST',
+    }),
+};
+
 export const travelAPI = {
   getTrips: () => apiFetch<TripsResponse>("/api/travel/trips"),
   getTrip: (tripId: string) => apiFetch<Trip>(`/api/travel/trips/${tripId}`),
