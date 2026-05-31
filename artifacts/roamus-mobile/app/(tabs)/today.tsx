@@ -144,6 +144,7 @@ type Stop = {
   visited?: boolean;
   tip?: string | null;
   address?: string | null;
+  travelMinsFromPrevious?: number | null;
   enrichment?: StopEnrichment | null;
   metadata?: StopMetadata | null;
 };
@@ -387,6 +388,9 @@ export default function TodayScreen() {
   const [error, setError]                   = useState<string | null>(null);
   const [resolvedTripId, setResolvedTripId] = useState<string | null>(params.tripId ?? null);
   const [resolvedDayIndex, setResolvedDayIndex] = useState<number>(
+    params.dayIndex != null ? parseInt(params.dayIndex, 10) : 0
+  );
+  const [viewingDay, setViewingDay]             = useState<number>(
     params.dayIndex != null ? parseInt(params.dayIndex, 10) : 0
   );
   const [activeSheet, setActiveSheet]       = useState<'none' | 'rescue'>('none');
@@ -660,6 +664,143 @@ export default function TodayScreen() {
 
   const currentStop = dayStops[currentStopIndex] ?? null;
 
+  // ─── Day navigation ────────────────────────────────────────────────────────
+  const currentDayIndex = resolvedDayIndex;
+  const viewingDayStops = trip
+    ? (trip.stops ?? [])
+        .filter(s => (s.dayIndex ?? 0) === viewingDay)
+        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+    : [];
+
+  // Day strip pill row (reused in preday + alternate views)
+  const dayStripEl = totalDays > 1 ? (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={ds.strip}
+      contentContainerStyle={ds.stripContent}
+    >
+      {Array.from({ length: totalDays }, (_, i) => {
+        const isPast    = i < currentDayIndex;
+        const isCurrent = i === currentDayIndex;
+        const isViewing = i === viewingDay;
+        return (
+          <Pressable
+            key={i}
+            style={[
+              ds.pill,
+              isCurrent && ds.pillCurrent,
+              isPast    && ds.pillPast,
+              isViewing && ds.pillViewing,
+              isViewing && isCurrent && ds.pillViewingCurrent,
+            ]}
+            onPress={() => {
+              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setViewingDay(i);
+            }}
+          >
+            <Text style={[
+              ds.pillText,
+              isCurrent && ds.pillTextCurrent,
+              isPast    && ds.pillTextPast,
+            ]}>
+              {isPast ? '✓ ' : ''}Day {i + 1}{isCurrent ? ' · Today' : ''}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  ) : null;
+
+  // Alternate day view (past or future)
+  if (viewingDay !== currentDayIndex && trip) {
+    const isPast = viewingDay < currentDayIndex;
+    const visitedCount = viewingDayStops.filter(s => s.isVisited || s.visited).length;
+    const dayMins = viewingDayStops.reduce((sum, s) => sum + (s.durationMinutes ?? 60), 0);
+    const dayHrs = Math.floor(dayMins / 60);
+    const dayMinRem = dayMins % 60;
+    const timeStr = dayHrs > 0
+      ? (dayMinRem > 0 ? `${dayHrs}h ${dayMinRem}m` : `${dayHrs}h`)
+      : `${dayMins}m`;
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+          <View style={[ds.stripWrap, { paddingTop: insets.top + 8, backgroundColor: '#fff' }]}>
+            {dayStripEl}
+          </View>
+
+          {isPast ? (
+            <View style={alt.card}>
+              <View style={alt.doneRow}>
+                <Text style={alt.doneIcon}>✓</Text>
+                <Text style={alt.doneTitle}>Day {viewingDay + 1} Complete</Text>
+              </View>
+              <Text style={alt.doneSub}>
+                {city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}
+              </Text>
+              <View style={alt.statRow}>
+                <View style={alt.stat}>
+                  <Text style={alt.statVal}>🗺 {visitedCount}</Text>
+                  <Text style={alt.statLbl}>stops visited</Text>
+                </View>
+                <View style={alt.stat}>
+                  <Text style={alt.statVal}>⏱ {timeStr}</Text>
+                  <Text style={alt.statLbl}>time planned</Text>
+                </View>
+                <View style={alt.stat}>
+                  <Text style={alt.statVal}>📍 {viewingDayStops.length}</Text>
+                  <Text style={alt.statLbl}>total stops</Text>
+                </View>
+              </View>
+              {viewingDayStops.map((stop, i) => (
+                <View key={stop.id} style={alt.stopRow}>
+                  <View style={[alt.stopCheck, (stop.isVisited || stop.visited) && alt.stopCheckDone]}>
+                    <Text style={alt.stopCheckText}>{(stop.isVisited || stop.visited) ? '✓' : String(i + 1)}</Text>
+                  </View>
+                  <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
+                </View>
+              ))}
+              <Pressable style={alt.linkBtn} onPress={() => router.push(`/trip/${trip.id}` as never)}>
+                <Text style={alt.linkBtnText}>View full day recap →</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={alt.card}>
+              <Text style={alt.futureTitle}>Day {viewingDay + 1}</Text>
+              <Text style={alt.futureSub}>
+                {city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}
+                {' · '}{viewingDayStops.length} stop{viewingDayStops.length !== 1 ? 's' : ''}
+                {' · '}~{timeStr}
+              </Text>
+              {viewingDayStops.map((stop, i) => (
+                <View key={stop.id} style={alt.stopRow}>
+                  <View style={alt.stopNum}><Text style={alt.stopNumText}>{i + 1}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
+                    {stop.travelMinsFromPrevious ? (
+                      <Text style={alt.stopTravel}>🚗 {stop.travelMinsFromPrevious} min from prev</Text>
+                    ) : null}
+                  </View>
+                  <Text style={alt.stopDur}>{stop.durationMinutes ?? 60}m</Text>
+                </View>
+              ))}
+              {viewingDayStops.length === 0 && (
+                <Text style={alt.emptyText}>No stops planned for this day yet.</Text>
+              )}
+              <Pressable style={alt.linkBtn} onPress={() => router.push(`/trip/${trip.id}` as never)}>
+                <Text style={alt.linkBtnText}>See full plan →</Text>
+              </Pressable>
+            </View>
+          )}
+
+          <Pressable style={alt.backBtn} onPress={() => setViewingDay(currentDayIndex)}>
+            <Text style={alt.backBtnText}>← Back to Day {currentDayIndex + 1} (Today)</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // DAY WRAP
   // ────────────────────────────────────────────────────────────────────────────
@@ -891,7 +1032,7 @@ export default function TodayScreen() {
                   ? nextStop!.stopType.charAt(0).toUpperCase() + nextStop!.stopType.slice(1)
                   : 'Stop'
                 }
-                {' · '}~{parseMetadata(nextStop!.metadata).travelMinutes ?? 15} min away
+                {' · '}~{nextStop!.travelMinsFromPrevious ?? parseMetadata(nextStop!.metadata).travelMinutes ?? 15} min away
               </Text>
               <TouchableOpacity
                 style={vi.headThereBtn}
@@ -1141,7 +1282,7 @@ export default function TodayScreen() {
     const doFirst    = stop.enrichment?.whyNow ?? meta.doThisFirst;
     const parking    = stop.enrichment?.parkingNotes ?? null;
     const restrooms  = meta.restroomConfidence ?? null;
-    const travelMins = meta.travelMinutes;
+    const travelMins = stop.travelMinsFromPrevious ?? meta.travelMinutes;
     const stopLabel  = stop.stopType
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
@@ -1339,6 +1480,13 @@ export default function TodayScreen() {
           </View>
         </LinearGradient>
 
+        {/* ── Day strip ────────────────────────────────────────────────────── */}
+        {totalDays > 1 && (
+          <View style={ds.stripWrap}>
+            {dayStripEl}
+          </View>
+        )}
+
         {/* ── Pace selector ────────────────────────────────────────────────── */}
         <View style={pd.paceSection}>
           <Text style={pd.paceLabel}>TODAY'S PACE</Text>
@@ -1468,6 +1616,57 @@ export default function TodayScreen() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
+// Day strip
+const ds = StyleSheet.create({
+  stripWrap:    { backgroundColor: '#fff', paddingBottom: 4 },
+  strip:        { paddingVertical: 10 },
+  stripContent: { paddingHorizontal: 16, gap: 8, flexDirection: 'row' },
+  pill: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.15)',
+    backgroundColor: '#F5F2EE',
+  },
+  pillPast:          { backgroundColor: '#EBEBEB', borderColor: 'rgba(26,31,46,0.10)' },
+  pillCurrent:       { backgroundColor: '#FDF0E9', borderColor: C.orange },
+  pillViewing:       { borderWidth: 2 },
+  pillViewingCurrent:{ borderColor: C.orange },
+  pillText:          { fontFamily: F.semibold, fontSize: 13, color: C.muted },
+  pillTextPast:      { color: '#9AA0B2' },
+  pillTextCurrent:   { color: C.orange },
+});
+
+// Alternate day view
+const alt = StyleSheet.create({
+  card: {
+    margin: 16, backgroundColor: '#fff', borderRadius: 16, padding: 20,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  doneRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  doneIcon: { fontSize: 20, color: C.green },
+  doneTitle:{ fontFamily: F.bold, fontSize: 20, color: C.deep },
+  doneSub:  { fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 16 },
+  statRow:  { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  stat:     { flex: 1, backgroundColor: '#F5F2EE', borderRadius: 12, padding: 12, alignItems: 'center' },
+  statVal:  { fontFamily: F.bold, fontSize: 15, color: C.deep, marginBottom: 2 },
+  statLbl:  { fontFamily: F.medium, fontSize: 11, color: C.muted },
+  stopRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.06)' },
+  stopNum:  { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F5F2EE', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stopNumText: { fontFamily: F.bold, fontSize: 12, color: C.muted },
+  stopCheck: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F5F2EE', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stopCheckDone: { backgroundColor: '#DCFCE7' },
+  stopCheckText: { fontFamily: F.bold, fontSize: 12, color: C.muted },
+  stopName: { fontFamily: F.semibold, fontSize: 14, color: C.deep, flex: 1 },
+  stopTravel:{ fontFamily: F.medium, fontSize: 11, color: C.muted, marginTop: 1 },
+  stopDur:  { fontFamily: F.medium, fontSize: 12, color: C.muted, flexShrink: 0 },
+  linkBtn:  { marginTop: 16, alignItems: 'center', paddingVertical: 12, backgroundColor: '#F5F2EE', borderRadius: 12 },
+  linkBtnText: { fontFamily: F.semibold, fontSize: 14, color: C.orange },
+  emptyText: { fontFamily: F.medium, fontSize: 13, color: C.muted, textAlign: 'center', paddingVertical: 16 },
+  futureTitle: { fontFamily: F.bold, fontSize: 20, color: C.deep, marginBottom: 4 },
+  futureSub:   { fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 16 },
+  backBtn:  { alignItems: 'center', paddingVertical: 14 },
+  backBtnText: { fontFamily: F.semibold, fontSize: 14, color: C.muted },
+});
 
 const misc = StyleSheet.create({
   center: {

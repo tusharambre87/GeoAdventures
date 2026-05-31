@@ -119,6 +119,7 @@ type Stop = {
   storyPack?: { story?: string; audioUrl?: string } | null;
   enrichment?: StopEnrichment | null;
   journeyPackCompleted?: boolean;
+  travelMinsFromPrevious?: number | null;
   metadata?: StopMetadata | null;
   stopMissions?: Array<{
     type: string;
@@ -1207,6 +1208,9 @@ function DayDetail({
               onDelete={onDelete}
               onMoveStop={onMoveStop}
             />
+            {i < contentStops.length - 1 && (
+              <TravelConnector travelMins={contentStops[i + 1].travelMinsFromPrevious} />
+            )}
             {i === 0 && mealStops.map(ms => (
               <MealCard key={ms.id} stop={ms} />
             ))}
@@ -1252,6 +1256,29 @@ function DayDetail({
     </View>
   );
 }
+
+// ─── TravelConnector ──────────────────────────────────────────────────────────
+
+function TravelConnector({ travelMins }: { travelMins?: number | null }) {
+  if (!travelMins) return null;
+  const isLong = travelMins > 20;
+  return (
+    <View style={tc.row}>
+      <View style={tc.line} />
+      <Text style={[tc.label, isLong && tc.labelAmber]}>
+        🚗 {travelMins} min drive
+      </Text>
+      <View style={tc.line} />
+    </View>
+  );
+}
+
+const tc = StyleSheet.create({
+  row:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginVertical: 4 },
+  line:       { flex: 1, height: 1, backgroundColor: C.border },
+  label:      { fontFamily: F.medium, fontSize: 12, color: C.muted, marginHorizontal: 8 },
+  labelAmber: { color: C.amber },
+});
 
 // ─── StopDetailSheet ──────────────────────────────────────────────────────────
 

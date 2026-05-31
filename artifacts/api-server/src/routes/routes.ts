@@ -6332,6 +6332,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         journeyPackCompleted: packsByStopId.get(stop.id)?.isCompleted || false,
       }));
 
+      // Compute travelMinsFromPrevious for each stop at read time using haversine
+      (() => {
+        function hKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+          const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+        const sorted = [...stopsWithPackStatus].sort((a, b) => {
+          const dd = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
+          return dd !== 0 ? dd : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+        });
+        sorted.forEach((stop, i) => {
+          if (i === 0 || (sorted[i - 1].dayIndex ?? 0) !== (stop.dayIndex ?? 0)) {
+            (stop as any).travelMinsFromPrevious = null;
+          } else {
+            const prev = sorted[i - 1];
+            const pLat = prev.latitude ? parseFloat(String(prev.latitude)) : null;
+            const pLon = prev.longitude ? parseFloat(String(prev.longitude)) : null;
+            const sLat = stop.latitude ? parseFloat(String(stop.latitude)) : null;
+            const sLon = stop.longitude ? parseFloat(String(stop.longitude)) : null;
+            if (pLat && pLon && sLat && sLon) {
+              (stop as any).travelMinsFromPrevious = Math.round((hKm(pLat, pLon, sLat, sLon) / 35) * 60);
+            } else {
+              (stop as any).travelMinsFromPrevious = null;
+            }
+          }
+        });
+      })();
+
       // Batch-enrich stops from stop_library: merge storyPack, audioUrl, keepsake, enrichment
       try {
         const namePairs = stops

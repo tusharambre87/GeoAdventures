@@ -2288,6 +2288,11 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function estimateTravelMins(km: number, mode: string): number {
+  const speeds: Record<string, number> = { driving: 35, walking: 5, transit: 20, cycling: 15 };
+  return Math.round((km / (speeds[mode] ?? 35)) * 60);
+}
+
 export function selectStopsFromPool(
   pool: CachedStopCandidate[],
   input: PlannerInput,
@@ -2481,6 +2486,7 @@ export function selectStopsFromPool(
   let dailyDurationMins = 0;
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
   let dailyTravelKm = 0;
+  let dailyTravelMins = 0;
   let lastLat: number | null = null;
   let lastLon: number | null = null;
 
@@ -2497,6 +2503,7 @@ export function selectStopsFromPool(
       zonesInCurrentDay = new Set<string>();
       dailyDurationMins = 0;
       dailyTravelKm = 0;
+      dailyTravelMins = 0;
       lastLat = null;
       lastLon = null;
     }
@@ -2564,14 +2571,19 @@ export function selectStopsFromPool(
         const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
         if (cLat && cLon) {
           const distKm = haversineKm(lastLat, lastLon, cLat, cLon);
-          // Heavy penalty for stops > 25 km from last stop (suburb jumps)
+          const legMins = estimateTravelMins(distKm, input.transportMode ?? 'driving');
+
+          // Hard reject: single leg exceeds pace-based travel cap
+          const legCap = input.pace === 'chill' ? 20 : input.pace === 'packed' ? 40 : 30;
+          const dayCap = input.pace === 'chill' ? 60 : input.pace === 'packed' ? 120 : 90;
+          if (legMins > legCap) continue;
+          if (dailyTravelMins + legMins > dayCap) continue;
+
+          // Soft scoring
           if (distKm > 25) adjustedScore -= 15;
-          // Moderate penalty for 10–25 km
           else if (distKm > 10) adjustedScore -= 5;
-          // Bonus for stops within 5 km (walkable / same neighbourhood)
           else if (distKm < 5) adjustedScore += 6;
 
-          // Daily travel budget: penalise stops that push cumulative km > 30 km/day
           if (dailyTravelKm + distKm > 30) adjustedScore -= 10;
         }
       }
@@ -2592,7 +2604,9 @@ export function selectStopsFromPool(
     const selLat = bestCandidate.latitude ? parseFloat(String(bestCandidate.latitude)) : null;
     const selLon = bestCandidate.longitude ? parseFloat(String(bestCandidate.longitude)) : null;
     if (lastLat !== null && lastLon !== null && selLat && selLon) {
-      dailyTravelKm += haversineKm(lastLat, lastLon, selLat, selLon);
+      const legKm = haversineKm(lastLat, lastLon, selLat, selLon);
+      dailyTravelKm += legKm;
+      dailyTravelMins += estimateTravelMins(legKm, input.transportMode ?? 'driving');
     }
     lastLat = selLat;
     lastLon = selLon;
