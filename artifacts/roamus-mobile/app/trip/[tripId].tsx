@@ -22,8 +22,10 @@ import {
   type TextStyle,
 } from "react-native";
 import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +36,8 @@ import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 import { travelAPI } from "@/lib/apiClient";
 import { API_BASE } from "@/lib/authContext";
 import { F } from "@/lib/tokens";
+
+const TAB_BAR_H = 49;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -983,7 +987,7 @@ function TripOverview({
 
       {/* Day cards scroll */}
       <ScrollView
-        contentContainerStyle={[ov.body, { paddingBottom: insets.bottom + 120 }]}
+        contentContainerStyle={[ov.body, { paddingBottom: insets.bottom + 120 + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
         {Array.from({ length: totalDays }, (_, i) => i + 1)
@@ -1017,7 +1021,7 @@ function TripOverview({
 
       {/* Footer — Run Today (only if trip has started) */}
       {tripStarted && (
-        <View style={[ov.footer, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={[ov.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
           <Pressable style={ov.runTodayBtn} onPress={onRunToday}>
             <IconPlay />
             <Text style={ov.runTodayText}>Run Today — Day {activeTripDay}</Text>
@@ -1154,7 +1158,7 @@ function DayDetail({
 
       {/* Body */}
       <ScrollView
-        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) }]}
+        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Locked banner */}
@@ -1231,7 +1235,7 @@ function DayDetail({
 
       {/* Footer — always show when active day has stops */}
       {activeDayStops.length > 0 && (
-        <View style={[dd.footer, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={[dd.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
           <Pressable
             style={[dd.runBtn, runBtnDisabled && dd.runBtnDone]}
             onPress={runBtnDisabled ? undefined : onRunDay}
@@ -2467,9 +2471,52 @@ export default function TripPlanScreen() {
           />
         </SheetModal>
       )}
+      <TripTabBar />
     </View>
   );
 }
+
+// ─── TripTabBar ───────────────────────────────────────────────────────────────
+
+const TAB_ITEMS = [
+  { name: 'Trips',    route: '/(tabs)/',         icon: 'map-outline' as const,      iconActive: 'map' as const,      active: true  },
+  { name: 'Today',    route: '/(tabs)/today',    icon: 'calendar-outline' as const, iconActive: 'calendar' as const, active: false },
+  { name: 'At Stop',  route: '/(tabs)/atstop',   icon: 'location-outline' as const, iconActive: 'location' as const, active: false },
+  { name: 'Memories', route: '/(tabs)/memories', icon: 'images-outline' as const,   iconActive: 'images' as const,   active: false },
+  { name: 'Me',       route: '/(tabs)/me',       icon: 'person-outline' as const,   iconActive: 'person' as const,   active: false },
+];
+
+function TripTabBar() {
+  const insets = useSafeAreaInsets();
+  const isIOS  = Platform.OS === 'ios';
+
+  return (
+    <View style={[tb.wrap, { height: TAB_BAR_H + insets.bottom, paddingBottom: insets.bottom }]}
+      pointerEvents="box-none">
+      {isIOS
+        ? <BlurView intensity={100} tint="light" style={StyleSheet.absoluteFill} />
+        : <View style={[StyleSheet.absoluteFill, { backgroundColor: C.card }]} />}
+      <View style={tb.border} />
+      {TAB_ITEMS.map(t => (
+        <Pressable key={t.name} style={tb.tab} onPress={() => router.navigate(t.route as any)}>
+          <Ionicons name={t.active ? t.iconActive : t.icon} size={22}
+            color={t.active ? C.orange : C.muted} />
+          <Text style={[tb.label, t.active && tb.labelActive]}>{t.name}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const tb = StyleSheet.create({
+  wrap:        { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row',
+                 alignItems: 'flex-start', zIndex: 200, overflow: 'hidden' },
+  border:      { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth,
+                 backgroundColor: C.border },
+  tab:         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 8, gap: 3 },
+  label:       { fontFamily: F.medium, fontSize: 10, color: C.muted },
+  labelActive: { color: C.orange },
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
