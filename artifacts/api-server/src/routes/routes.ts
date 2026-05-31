@@ -5971,7 +5971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         name: tripName,
         destination,
-        country,
+        country: country ?? '',
         city: city || null,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
