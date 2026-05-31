@@ -62,11 +62,13 @@ export default function ExplorerHome() {
 
   useEffect(() => {
     if (!stopId) return;
+    if (kids.exploreContent && kids.exploreContent.stopId === stopId) return;
+
     kids.setLoadingExplore(true);
     kids.setExploreError(false);
 
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 3000)
+      setTimeout(() => reject(new Error("timeout")), 4000)
     );
 
     Promise.race([kidsAPI.getExplore(stopId), timeout])
@@ -74,9 +76,8 @@ export default function ExplorerHome() {
         kids.setExploreContent(content);
         kids.setLoadingExplore(false);
       })
-      .catch((err: Error & { status?: number }) => {
+      .catch(() => {
         kids.setLoadingExplore(false);
-        kids.setExploreError(true);
       });
 
     if (tripId) {
@@ -121,12 +122,6 @@ export default function ExplorerHome() {
               <ShimmerRow />
               <ShimmerRow />
               <ShimmerRow />
-            </View>
-          ) : kids.exploreError ? (
-            <View style={s.fallbackCard}>
-              <Text style={s.fallbackIcon}>🧭</Text>
-              <Text style={s.fallbackText}>Getting your adventure ready…</Text>
-              <Text style={s.fallbackSub}>Check your connection and try again</Text>
             </View>
           ) : (
             <Pressable

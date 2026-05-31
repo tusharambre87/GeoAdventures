@@ -153,10 +153,8 @@ export default function StoryPlayer() {
         <Text style={s.duration}>{story.label} · ~{story.duration}</Text>
       </View>
 
-      {/* ── Body (purple, pushes glass panel to bottom) ── */}
+      {/* ── Body (purple, glass panel vertically centered) ── */}
       <View style={s.body}>
-        {/* spacer */}
-        <View style={{ flex: 1 }} />
         {/* Glass panel */}
         <View style={s.glass}>
           {/* Controls */}
@@ -312,16 +310,17 @@ const s = StyleSheet.create({
   },
   pills: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     marginBottom: 16,
-    flexWrap: "wrap",
   },
   pill: {
-    paddingHorizontal: 16,
+    flex: 1,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
   },
   pillActive: {
     backgroundColor: "#fff",
@@ -360,6 +359,7 @@ const s = StyleSheet.create({
     backgroundColor: K.purple,
     paddingHorizontal: 24,
     paddingBottom: 20,
+    justifyContent: "center",
   },
   glass: {
     backgroundColor: "rgba(255,255,255,0.08)",

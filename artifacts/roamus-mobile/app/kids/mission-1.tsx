@@ -112,7 +112,7 @@ export default function Mission1() {
     <View style={[s.root, { backgroundColor: K.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingVertical: 16 }}
       >
         {/* ── Header ── */}
         <View style={[s.header, { paddingTop: insets.top + 16 }]}>
