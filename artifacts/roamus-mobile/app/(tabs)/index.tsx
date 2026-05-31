@@ -31,48 +31,83 @@ function greeting() {
 
 function ActiveHeroCard({ trip }: { trip: Trip }) {
   const city = trip.destination ?? trip.name ?? "";
-  const bg = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
-  const progressPct = trip.totalStops > 0 ? Math.round((trip.visitedStops / trip.totalStops) * 100) : 0;
+  const bg   = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
 
-  function handlePress() {
+  // ── Active day computation ──────────────────────────────────────────────────
+  const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const tripStart = trip.startDate
+    ? (() => { const d = new Date(trip.startDate); d.setHours(0, 0, 0, 0); return d; })()
+    : null;
+  const totalDays = trip.tripDays
+    ?? (trip.startDate && trip.endDate
+      ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate!).getTime()) / 86_400_000) + 1
+      : 0);
+  const isActiveNow   = tripStart ? tripStart <= today : false;
+  const daysSince     = tripStart ? Math.floor((today.getTime() - tripStart.getTime()) / 86_400_000) : 0;
+  const activeDayIdx  = Math.max(0, Math.min(daysSince, Math.max(totalDays - 1, 0)));
+  const activeDay     = activeDayIdx + 1;
+
+  // ── Next unvisited stop for active day ─────────────────────────────────────
+  const dayStops = [...(trip.stops ?? [])]
+    .filter(s => s.dayIndex === activeDayIdx)
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  const nextStop = dayStops.find(s => !s.isVisited && !s.visited) ?? dayStops[0];
+
+  function handleContinue() {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isActiveNow) router.push("/(tabs)/today" as any);
+    else router.push(`/trip/${trip.id}` as any);
+  }
+
+  function handleViewPlan() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/trip/${trip.id}` as any);
   }
 
   return (
-    <Pressable
-      style={({ pressed }) => [s.heroCard, { opacity: pressed ? 0.96 : 1 }]}
-      onPress={handlePress}
-    >
-      {bg ? (
-        <Image source={{ uri: bg }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: G.deep }]} />
+    <View style={s.heroCard}>
+      {/* Dark green base */}
+      <LinearGradient colors={['#1A3A2A', '#0D2118']} style={StyleSheet.absoluteFill} />
+      {bg && (
+        <>
+          <Image source={{ uri: bg }} style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} contentFit="cover" />
+          <LinearGradient colors={["transparent", "rgba(8,22,14,0.94)"]} locations={[0.15, 1]} style={StyleSheet.absoluteFill} />
+        </>
       )}
-      <LinearGradient
-        colors={["transparent", "rgba(6,8,16,0.82)"]}
-        locations={[0.3, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+
+      {/* Badge */}
       <View style={s.heroBadge}>
-        <View style={s.inProgressDot} />
-        <Text style={s.inProgressText}>IN PROGRESS</Text>
+        <View style={s.activeDot} />
+        <Text style={s.activeBadgeText}>ACTIVE TRIP</Text>
       </View>
+
+      {/* Trip name */}
       <Text style={s.heroTripName}>{trip.name}</Text>
-      {trip.totalStops > 0 && (
-        <Text style={s.heroMeta}>
-          {trip.visitedStops}/{trip.totalStops} stops · {progressPct}% complete
+
+      {/* Day + next stop */}
+      <Text style={s.heroMeta} numberOfLines={1}>
+        {totalDays > 0 ? `Day ${activeDay} of ${totalDays}` : ''}
+        {nextStop ? ` · Next: ${nextStop.name}` : ''}
+      </Text>
+
+      {/* Primary CTA */}
+      <Pressable
+        style={({ pressed }) => [s.continueBtn, { opacity: pressed ? 0.88 : 1 }]}
+        onPress={handleContinue}>
+        <Text style={s.continueBtnText}>
+          {isActiveNow ? `\u25B6 Continue Day ${activeDay}` : 'View plan \u2192'}
         </Text>
+      </Pressable>
+
+      {/* Ghost link — only when active */}
+      {isActiveNow && (
+        <Pressable
+          style={({ pressed }) => [s.viewPlanLink, { opacity: pressed ? 0.7 : 1 }]}
+          onPress={handleViewPlan}>
+          <Text style={s.viewPlanLinkText}>View full plan \u2192</Text>
+        </Pressable>
       )}
-      <View style={s.heroFooter}>
-        <View style={s.heroTrack}>
-          <View style={[s.heroFill, { width: `${progressPct}%` as any }]} />
-        </View>
-        <View style={s.continueBtn}>
-          <Text style={s.continueBtnText}>Continue →</Text>
-        </View>
-      </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -264,20 +299,19 @@ const s = StyleSheet.create({
   loadingText: { fontFamily: F.regular, fontSize: 15, color: G.muted },
 
   heroCard: {
-    height: 200, borderRadius: 20, overflow: "hidden", marginBottom: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
-    padding: 20, justifyContent: "flex-end",
+    borderRadius: 20, overflow: "hidden", marginBottom: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6,
+    padding: 20, paddingBottom: 18, justifyContent: "flex-end", minHeight: 220,
   },
   heroBadge: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  inProgressDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: G.orange },
-  inProgressText: { fontFamily: F.bold, fontSize: 11, fontWeight: "700", color: G.orange, letterSpacing: 0.5 },
+  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: G.green },
+  activeBadgeText: { fontFamily: F.bold, fontSize: 11, fontWeight: "700", color: G.green, letterSpacing: 0.8 },
   heroTripName: { fontFamily: F.bold, fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5, marginBottom: 4 },
-  heroMeta: { fontFamily: F.regular, fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 12 },
-  heroFooter: { flexDirection: "row", alignItems: "center", gap: 12 },
-  heroTrack: { flex: 1, height: 3, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, overflow: "hidden" },
-  heroFill: { height: "100%", backgroundColor: G.orange, borderRadius: 2 },
-  continueBtn: { backgroundColor: G.orange, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7 },
-  continueBtnText: { fontFamily: F.bold, fontSize: 13, fontWeight: "700", color: "#fff" },
+  heroMeta: { fontFamily: F.regular, fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 14 },
+  continueBtn: { backgroundColor: G.orange, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, alignItems: "center" },
+  continueBtnText: { fontFamily: F.bold, fontSize: 15, fontWeight: "700", color: "#fff" },
+  viewPlanLink: { alignItems: "center", paddingTop: 10 },
+  viewPlanLinkText: { fontFamily: F.semibold, fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.55)" },
 
   switchRow: { alignItems: "center", marginBottom: 24 },
   switchText: { fontFamily: F.semibold, fontSize: 14, fontWeight: "600", color: G.orange },
