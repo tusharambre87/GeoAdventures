@@ -141,7 +141,6 @@ export default function GameHub() {
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.dismissAll();
-              router.navigate("/(tabs)/today" as never);
             }}
           >
             <Text style={s.handBackText}>{"Hand to parent \u2192"}</Text>
