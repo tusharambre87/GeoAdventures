@@ -251,11 +251,28 @@ function getStopDuration(stop: Stop): number {
   return stop.durationMinutes ?? 60;
 }
 
+/** Faster pace trims 15 min off each stop (min 30). Balanced/Easier use planned duration. */
+function effectiveDuration(stop: Stop, pace: Pace): number {
+  const base = getStopDuration(stop);
+  if (pace === 'faster') return Math.max(30, base - 15);
+  return base;
+}
+
+/**
+ * Travel time FROM stop[idx] TO stop[idx+1].
+ * Stored in the NEXT stop's metadata.travelMinutes; defaults to 20 min.
+ */
+function getTravelToNext(stops: Stop[], idx: number): number {
+  if (idx >= stops.length - 1) return 0;
+  const nextMeta = parseMetadata(stops[idx + 1].metadata);
+  return nextMeta.travelMinutes ?? 20;
+}
+
 function isMealStop(type?: string | null): boolean {
   return ['meal', 'restaurant', 'lunch', 'dinner', 'breakfast', 'cafe'].includes(type ?? '');
 }
 
-function buildStopTimes(stops: Stop[]): string[] {
+function buildStopTimes(stops: Stop[], pace: Pace = 'balanced'): string[] {
   let cursor = 9 * 60; // 9:00 AM
   return stops.map((s, i) => {
     const h = Math.floor(cursor / 60);
@@ -263,15 +280,16 @@ function buildStopTimes(stops: Stop[]): string[] {
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
     const label = `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-    cursor += getStopDuration(s) + (i < stops.length - 1 ? 15 : 0);
+    cursor += effectiveDuration(s, pace) + getTravelToNext(stops, i);
     return label;
   });
 }
 
-function estimateTotalTime(stops: Stop[]): string {
+function estimateTotalTime(stops: Stop[], pace: Pace = 'balanced'): string {
   const content = stops.filter(s => !isMealStop(s.stopType));
-  const total = content.reduce((sum, s) => sum + getStopDuration(s), 0) +
-    Math.max(0, (content.length - 1) * 15);
+  const total = content.reduce((sum, s, i) => {
+    return sum + effectiveDuration(s, pace) + getTravelToNext(content, i);
+  }, 0);
   if (total < 60) return `~${total} min`;
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -616,7 +634,7 @@ export default function TodayScreen() {
   const city = trip?.city ?? trip?.destination ?? '';
   const dayLabel = formatDayDate(trip?.startDate, resolvedDayIndex);
   const ticketStops = dayStops.filter(s => hasTicketSignal(s.metadata));
-  const stopTimes = buildStopTimes(dayStops);
+  const stopTimes = buildStopTimes(dayStops, selectedPace);
 
   // ── Loading ──
   if (loading) {
@@ -1307,7 +1325,7 @@ export default function TodayScreen() {
               </Text>
             </View>
             <View style={pd.metaPill}>
-              <Text style={pd.metaText}>⏱ {estimateTotalTime(dayStops)}</Text>
+              <Text style={pd.metaText}>⏱ {estimateTotalTime(dayStops, selectedPace)}</Text>
             </View>
           </View>
         </LinearGradient>
@@ -1326,7 +1344,7 @@ export default function TodayScreen() {
                   {p.charAt(0).toUpperCase() + p.slice(1)}
                 </Text>
                 <Text style={pd.paceChipSub}>
-                  {p === 'balanced' ? 'As planned' : p === 'easier' ? 'Drop 1 stop' : 'Less buffer'}
+                  {p === 'balanced' ? 'As planned' : p === 'easier' ? 'Drop 1 stop' : 'Less time/stop'}
                 </Text>
               </Pressable>
             ))}
@@ -1351,54 +1369,66 @@ export default function TodayScreen() {
             const isFreeStop = !hasTicket &&
               ['park', 'nature', 'landmark'].includes(stop.stopType ?? '');
             const isAnchor   = (meta.anchorScore ?? 0) >= 8;
+            const dispDur    = effectiveDuration(stop, selectedPace);
+            const travelNext = getTravelToNext(dayStops, i);
+            const isLast     = i === dayStops.length - 1;
 
             return (
-              <View
-                key={stop.id}
-                style={[pd.stopRow, isRemoved && pd.stopRowRemoved]}
-              >
-                <View style={pd.stopNum}>
-                  <Text style={pd.stopNumText}>{i + 1}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text
-                    style={[pd.stopName, isRemoved && pd.stopNameStruck]}
-                    numberOfLines={1}
-                  >
-                    {stop.name}
-                  </Text>
-                  <Text style={pd.stopMeta}>
-                    {stopTimes[i]} · {getStopDuration(stop)} min
-                  </Text>
-                  <View style={pd.tagRow}>
-                    {isRemoved && (
-                      <View style={pd.tagRemoved}>
-                        <Text style={pd.tagRemovedText}>Removed · Easier mode</Text>
-                      </View>
-                    )}
-                    {hasTicket && !isRemoved && (
-                      <TouchableOpacity
-                        style={pd.tagTicket}
-                        onPress={() => openTicketSearch(stop.name)}
-                        hitSlop={6}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={pd.tagTicketText}>🎫 Ticket needed</Text>
-                      </TouchableOpacity>
-                    )}
-                    {isFreeStop && !isRemoved && (
-                      <TouchableOpacity style={pd.tagFree} activeOpacity={0.8}>
-                        <Text style={pd.tagFreeText}>Free entry</Text>
-                      </TouchableOpacity>
-                    )}
-                    {isAnchor && !isRemoved && (
-                      <View style={pd.tagAnchor}>
-                        <Text style={pd.tagAnchorText}>⭐ Anchor</Text>
-                      </View>
-                    )}
+              <React.Fragment key={stop.id}>
+                <View style={[pd.stopRow, isRemoved && pd.stopRowRemoved]}>
+                  <View style={pd.stopNum}>
+                    <Text style={pd.stopNumText}>{i + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={[pd.stopName, isRemoved && pd.stopNameStruck]}
+                      numberOfLines={1}
+                    >
+                      {stop.name}
+                    </Text>
+                    <Text style={pd.stopMeta}>
+                      {stopTimes[i]} · {dispDur} min
+                      {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
+                        <Text style={pd.stopMetaSaved}> (was {getStopDuration(stop)} min)</Text>
+                      )}
+                    </Text>
+                    <View style={pd.tagRow}>
+                      {isRemoved && (
+                        <View style={pd.tagRemoved}>
+                          <Text style={pd.tagRemovedText}>Removed · Easier mode</Text>
+                        </View>
+                      )}
+                      {hasTicket && !isRemoved && (
+                        <TouchableOpacity
+                          style={pd.tagTicket}
+                          onPress={() => openTicketSearch(stop.name)}
+                          hitSlop={6}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={pd.tagTicketText}>🎫 Ticket needed</Text>
+                        </TouchableOpacity>
+                      )}
+                      {isFreeStop && !isRemoved && (
+                        <TouchableOpacity style={pd.tagFree} activeOpacity={0.8}>
+                          <Text style={pd.tagFreeText}>Free entry</Text>
+                        </TouchableOpacity>
+                      )}
+                      {isAnchor && !isRemoved && (
+                        <View style={pd.tagAnchor}>
+                          <Text style={pd.tagAnchorText}>⭐ Anchor</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                 </View>
-              </View>
+                {!isLast && (
+                  <View style={pd.travelConnector}>
+                    <View style={pd.travelLine} />
+                    <Text style={pd.travelLabel}>🚗 {travelNext} min</Text>
+                    <View style={pd.travelLine} />
+                  </View>
+                )}
+              </React.Fragment>
             );
           })}
         </View>
@@ -1495,8 +1525,17 @@ const pd = StyleSheet.create({
   stopNumText:    { fontFamily: F.bold, fontSize: 12, color: C.muted },
   stopName:       { fontFamily: F.bold, fontSize: 14, color: C.deep, marginBottom: 2 },
   stopNameStruck: { textDecorationLine: 'line-through', color: C.muted },
-  stopMeta:       { fontFamily: F.medium, fontSize: 12, color: C.muted },
-  tagRow:         { flexDirection: 'row', gap: 5, marginTop: 5, flexWrap: 'wrap' },
+  stopMeta:        { fontFamily: F.medium, fontSize: 12, color: C.muted },
+  stopMetaSaved:   { fontFamily: F.medium, fontSize: 11, color: C.orange },
+  tagRow:          { flexDirection: 'row', gap: 5, marginTop: 5, flexWrap: 'wrap' },
+
+  // Travel connector between stops
+  travelConnector: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, marginBottom: 4,
+  },
+  travelLine:      { flex: 1, height: 1, backgroundColor: C.border },
+  travelLabel:     { fontFamily: F.medium, fontSize: 11, color: C.muted },
 
   // Tags
   tagTicket:      { backgroundColor: '#FEF2F1', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
