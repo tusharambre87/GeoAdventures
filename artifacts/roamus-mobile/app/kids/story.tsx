@@ -35,9 +35,37 @@ const STORIES = [
 ];
 
 const MOCK_TEXTS: Record<string, string> = {
-  main: `Welcome to this incredible stop on your adventure!\n\nThis place has a fascinating story that stretches back hundreds of years. Explorers just like you have stood here and marveled at what they saw.\n\nThe architecture, the sounds, the smells — everything here tells a story. Look around. What do you notice first?\n\nLegend has it that if you look carefully, you can spot secret symbols hidden by the original builders. They left clues for curious young adventurers to find.\n\nYour mission today starts with simply being present — look up, look around, and let the story come to you.`,
-  quickHits: `🌟 This place is one of the most visited spots in the entire city — over 2 million people each year!\n\n🎨 The design took 14 years to complete.\n\n🌍 People come from over 50 countries to visit here.\n\n🦉 At night, owls sometimes nest in the towers!\n\n🎵 On special days, you can hear live music echoing through the halls.`,
-  history: `The history of this remarkable place begins long before any of us were born.\n\nOriginal inhabitants of this land used this very spot for ceremonies and celebrations for thousands of years.\n\nWhen European settlers arrived, they recognized the special nature of this location and made it a place of commerce and community.\n\nThe famous structure you see today was built in the early 20th century, and has survived wars, floods, and great social change.\n\nIt has been a place of protest, of joy, of mourning, and of hope. Today, it stands as a symbol of everything your city has been through — and everything it hopes to become.`,
+  main: `[Warm voice] You are about to step into a place that has drawn people from across the world for generations. [pause] Before you go in, take one breath and notice something: the way the air feels here, the sounds around you, the light hitting the walls or the ground. [pause] That is the beginning of really seeing a place, not just visiting it.
+
+This stop has a story that goes back much further than most people realize. Long before it looked the way it does today, people were gathering here. They came to trade, to learn, to celebrate, to argue, to create. [pause] The layers of those lives are still here, invisible but real, right beneath your feet and all around you.
+
+As you explore, there are details that most visitors walk right past. The things that seem ordinary at first glance often turn out to be the most interesting when you stop and look closely. Textures in the walls. The way a doorway is shaped. The angle of a staircase. People made deliberate choices about all of it. [pause] Every choice had a reason.
+
+One of the most fascinating things about places like this is how many contradictions they hold at once. They can be both very old and very alive. Very grand and very human. Very famous and, if you look carefully enough, still full of secrets that nobody talks about on the official tour.
+
+[Warm voice] Here is your challenge for today: find one thing that surprises you. Not the most obvious thing, not the thing printed on the brochure. Something small. Something that makes you think, wait, why is that there? [pause] That question is the beginning of the best kind of curiosity. [pause] What will you find?`,
+
+  quickHits: `Places like this one see enormous numbers of visitors every year, but here is something interesting: most of them take the exact same route, look at the exact same things, and leave having missed most of what makes it genuinely remarkable. The people who slow down always find more.
+
+The materials used to build and maintain a place like this come from all over the world. Stone, metal, wood, glass — each with its own origin story. If you look at different surfaces closely, you can sometimes see where materials from very different places were joined together, each brought here for a specific reason.
+
+Sounds behave differently in different parts of a space like this. Architects and builders have always known this. Some areas were designed to carry sound a long distance so that many people could hear a single voice. Others were built to absorb it, creating pockets of quiet in the middle of crowds.
+
+The people who work here every day see things that visitors never notice. If you get a chance, ask someone who works here what their favorite detail is. The answers are almost always surprising, and usually reveal something completely invisible to a first-time visitor.
+
+Every place like this has a version of its history that is told officially, and another version that exists in the memories of the people who have lived near it for decades. Both versions are true. Both are incomplete.`,
+
+  history: `[Warm voice] The story of this place does not begin the day it was built. It begins much earlier, with the question of why anyone decided to build here at all. [pause] Location is never random. People choose places for reasons — because of water, or elevation, or the crossing of roads, or because something important had already happened there.
+
+By the time the first stone was laid, or the first structure raised, the location already had a history. Other people had stood on this same ground, made decisions, built things, lost things. [pause] Understanding that gives a different feeling to being here.
+
+The people who created what you see today were working without many of the tools we take for granted. They had to solve problems using ingenuity, hard physical labor, and a particular kind of stubbornness that comes from believing something is worth doing even when it is extremely difficult. Some of them did not live to see it finished.
+
+There were also failures along the way. Plans that had to be abandoned, materials that did not behave as expected, ideas that seemed good in theory but fell apart in practice. The final result you see today is not the first version. It is the version that survived disagreement, compromise, and the slow test of time.
+
+[Gentle voice] What is most remarkable is that places like this have outlasted so much. Wars. Economic collapses. Decades of changing fashion and shifting priorities. Someone in every generation made the decision to maintain it, to restore it, to keep it going. [pause] That decision is still being made today, by people whose names most visitors will never know.
+
+Standing here, you are part of a very long line of people who came to this same spot and felt something. Curiosity. Wonder. History moving through a place that refuses to forget.`,
 };
 
 function fmtMs(ms: number): string {
@@ -45,6 +73,19 @@ function fmtMs(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function stripEmojis(text: string): string {
+  return text
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+    .replace(/[\u{2600}-\u{27BF}]/gu, "")
+    .replace(/[\u{FE00}-\u{FEFF}]/gu, "")
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, "")
+    .replace(/[^\x00-\x7F\u00A0-\u024F\u2000-\u206F\u2600-\u26FF]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ─── Audio helpers ────────────────────────────────────────────────────────────
@@ -163,7 +204,7 @@ export default function StoryPlayer() {
       const text =
         kids.exploreContent?.stories?.[key]?.text ?? MOCK_TEXTS[key] ?? "";
 
-      const uri = await fetchAndCacheAudio(stopId, key, text);
+      const uri = await fetchAndCacheAudio(stopId, key, stripEmojis(text));
 
       const { sound } = await Audio.Sound.createAsync(
         { uri },

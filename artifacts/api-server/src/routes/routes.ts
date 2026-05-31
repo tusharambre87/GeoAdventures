@@ -8526,7 +8526,7 @@ Return ONLY valid JSON in this exact format:
       // Check if journey pack already has explore data cached (with new fields)
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
       const cached = journeyPack?.exploreData as any;
-      if (cached && cached.reviews !== undefined) {
+      if (cached && cached.reviews !== undefined && cached.stories !== undefined) {
         return res.json(cached);
       }
       
