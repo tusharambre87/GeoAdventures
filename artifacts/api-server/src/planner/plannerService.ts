@@ -3025,7 +3025,7 @@ export async function generateItinerary(
         return storage.saveCityStopPool({
           city: cityName,
           country: countryName,
-          normalizedKey: `${cityName.toLowerCase().trim()}:${countryName.toLowerCase().trim()}`,
+          normalizedKey: `${(cityName ?? '').toLowerCase().trim()}:${(countryName ?? '').toLowerCase().trim()}`,
           stopPool: pool,
         });
       })

@@ -6069,7 +6069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   // Save AI results to stop library asynchronously
                   if (stopsToUse.length > 0) {
-                    const nk = `${capturedCity.toLowerCase().trim()}:${capturedCountry.toLowerCase().trim()}`;
+                    const nk = `${(capturedCity ?? '').toLowerCase().trim()}:${(capturedCountry ?? '').toLowerCase().trim()}`;
                     const entries = stopsToUse.map((s: any) => ({
                       city: capturedCity,
                       country: capturedCountry,
@@ -6821,6 +6821,83 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
     } catch (error) {
       console.error("[Travel] Replace suggestions error:", error);
       res.status(500).json({ message: "Failed to load replace suggestions" });
+    }
+  });
+
+  // GET /api/travel/trips/:tripId/replacement-suggestions?stopId=...
+  // Returns AI-generated replacement groups (shorter/easier/indoor/moreActive/sameVibe)
+  // using the shared generateReplacementSuggestions function from plannerService.
+  app.get('/api/travel/trips/:tripId/replacement-suggestions', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const stopId = req.query.stopId as string | undefined;
+      if (!stopId) return res.status(400).json({ message: 'stopId is required' });
+
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+      const stops = await storage.getStopsByTripId(tripId);
+      const stop = stops.find(s => s.id === stopId);
+      if (!stop) return res.status(404).json({ message: 'Stop not found' });
+
+      const { generateReplacementSuggestions } = await import('../planner/plannerService.js');
+      const destination = (trip as any).city ?? trip.destination ?? '';
+
+      const grouped = await generateReplacementSuggestions(
+        stopId,
+        destination,
+        {
+          id: stop.id,
+          name: stop.name ?? '',
+          type: stop.stopType ?? 'landmark',
+          durationMinutes: stop.durationMinutes ?? 60,
+          effortLevel: 'moderate',
+          indoorOutdoor: 'outdoor',
+        } as any
+      );
+
+      const suggestions = [
+        ...grouped.shorter.map(s => ({ ...s, filterGroup: 'shorter' })),
+        ...grouped.easier.map(s => ({ ...s, filterGroup: 'easier' })),
+        ...grouped.indoor.map(s => ({ ...s, filterGroup: 'indoor' })),
+        ...grouped.moreActive.map(s => ({ ...s, filterGroup: 'moreActive' })),
+        ...grouped.sameVibe.map(s => ({ ...s, filterGroup: 'sameVibe' })),
+      ];
+
+      res.json({ suggestions });
+    } catch (err) {
+      console.error('[Travel] Replacement suggestions error:', err);
+      res.status(500).json({ message: 'Failed to generate replacement suggestions' });
+    }
+  });
+
+  // POST /api/travel/trips/:tripId/stops/:stopId/replace
+  // Commits a stop swap: creates the replacement in the same slot then deletes the original.
+  app.post('/api/travel/trips/:tripId/stops/:stopId/replace', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId, stopId } = req.params;
+      const { name, stopType, durationMinutes } = req.body;
+      if (!name) return res.status(400).json({ message: 'name is required' });
+
+      const stops = await storage.getStopsByTripId(tripId);
+      const original = stops.find(s => s.id === stopId);
+      if (!original) return res.status(404).json({ message: 'Stop not found' });
+
+      const newStop = await storage.createStop({
+        tripId,
+        name,
+        stopType: stopType ?? original.stopType ?? 'landmark',
+        durationMinutes: durationMinutes ?? original.durationMinutes ?? 60,
+        dayIndex: original.dayIndex,
+        displayOrder: original.displayOrder,
+        cityGroup: (original as any).cityGroup ?? null,
+      });
+
+      await storage.deleteStop(stopId);
+      res.json({ success: true, newStop });
+    } catch (err) {
+      console.error('[Travel] Replace stop error:', err);
+      res.status(500).json({ message: 'Failed to replace stop' });
     }
   });
 
@@ -13734,7 +13811,7 @@ CRITICAL RULES:
           await storage.saveCityStopPool({
             city,
             country,
-            normalizedKey: `${city.toLowerCase().trim()}:${country.toLowerCase().trim()}`,
+            normalizedKey: `${(city ?? '').toLowerCase().trim()}:${(country ?? '').toLowerCase().trim()}`,
             stopPool: pool,
           });
           console.log(`[CityPool Admin] ✅ ${city}: ${pool.length} stops`);
