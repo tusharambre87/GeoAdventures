@@ -6871,6 +6871,50 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
     }
   });
 
+  // GET /api/travel/trips/:tripId/stops/:stopId/replacement-suggestions (path-param variant)
+  // Same as the query-param variant above — supports both URL shapes.
+  app.get('/api/travel/trips/:tripId/stops/:stopId/replacement-suggestions', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId, stopId } = req.params;
+
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+      const stops = await storage.getStopsByTripId(tripId);
+      const stop = stops.find(s => s.id === stopId);
+      if (!stop) return res.status(404).json({ message: 'Stop not found' });
+
+      const { generateReplacementSuggestions } = await import('../planner/plannerService.js');
+      const destination = (trip as any).city ?? trip.destination ?? '';
+
+      const grouped = await generateReplacementSuggestions(
+        stopId,
+        destination,
+        {
+          id: stop.id,
+          name: stop.name ?? '',
+          type: stop.stopType ?? 'landmark',
+          durationMinutes: stop.durationMinutes ?? 60,
+          effortLevel: 'moderate',
+          indoorOutdoor: 'outdoor',
+        } as any
+      );
+
+      const suggestions = [
+        ...grouped.shorter.map(s => ({ ...s, filterGroup: 'shorter' })),
+        ...grouped.easier.map(s => ({ ...s, filterGroup: 'easier' })),
+        ...grouped.indoor.map(s => ({ ...s, filterGroup: 'indoor' })),
+        ...grouped.moreActive.map(s => ({ ...s, filterGroup: 'moreActive' })),
+        ...grouped.sameVibe.map(s => ({ ...s, filterGroup: 'sameVibe' })),
+      ];
+
+      res.json({ suggestions });
+    } catch (err) {
+      console.error('[Travel] Replacement suggestions error:', err);
+      res.status(500).json({ message: 'Failed to generate replacement suggestions' });
+    }
+  });
+
   // POST /api/travel/trips/:tripId/stops/:stopId/replace
   // Commits a stop swap: creates the replacement in the same slot then deletes the original.
   app.post('/api/travel/trips/:tripId/stops/:stopId/replace', isAuthenticated, travelModeGuard, async (req: any, res) => {
