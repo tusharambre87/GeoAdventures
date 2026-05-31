@@ -140,6 +140,7 @@ export default function GameHub() {
             style={s.handBackLink}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.dismissAll();
               router.navigate("/(tabs)/today" as never);
             }}
           >
