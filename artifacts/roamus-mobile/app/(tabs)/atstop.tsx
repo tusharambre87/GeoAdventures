@@ -29,6 +29,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_BASE } from '@/lib/apiClient';
@@ -733,7 +734,35 @@ export default function AtStopScreen() {
       <View style={[dt.ctaBar, { paddingBottom: insets.bottom + 8 }]}>
         {/* 1. Primary — Capture a moment */}
         <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-          onPress={() => Alert.alert('Photo capture coming soon')}>
+          onPress={() => {
+            Alert.alert('Add a photo', 'Choose a source', [
+              {
+                text: '📷  Camera',
+                onPress: async () => {
+                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                  if (status !== 'granted') {
+                    Alert.alert('Permission needed', 'Allow camera access in Settings to take photos.');
+                    return;
+                  }
+                  await ImagePicker.launchCameraAsync({ mediaTypes: ['images'],
+                    allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                },
+              },
+              {
+                text: '🖼  Photo Library',
+                onPress: async () => {
+                  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (status !== 'granted') {
+                    Alert.alert('Permission needed', 'Allow photo library access in Settings.');
+                    return;
+                  }
+                  await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'],
+                    allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                },
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]);
+          }}>
           <Text style={dt.ctaPrimaryText}>📸 Capture a moment</Text>
         </TouchableOpacity>
 
