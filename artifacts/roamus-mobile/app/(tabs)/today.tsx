@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -319,6 +321,8 @@ export default function TodayScreen() {
   const [kidQuotes, setKidQuotes]               = useState<Record<string, string>>({});
   const [dayRating, setDayRating]               = useState<'okay' | 'good' | 'amazing' | null>(null);
   const [submittingRating, setSubmittingRating] = useState(false);
+  const [visitedPhotos, setVisitedPhotos] = useState<(string | null)[]>([null, null, null]);
+  const [wrapPhotos, setWrapPhotos]       = useState<(string | null)[]>([null, null, null, null, null, null]);
 
   // ── Pulse animation for En Route dot ──
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -480,8 +484,62 @@ export default function TodayScreen() {
     setSubmittingRating(false);
   }
 
-  function handlePhotoSlot() {
-    Alert.alert('Photos coming soon', 'Photo capture will be available in the next update.');
+  async function handlePhotoSlot(source: 'visited' | 'wrap', idx: number) {
+    Alert.alert(
+      'Add photo',
+      'Choose a source',
+      [
+        {
+          text: '📷  Camera',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Camera access is required to take photos.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const uri = result.assets[0].uri;
+              if (source === 'visited') {
+                setVisitedPhotos(prev => { const next = [...prev]; next[idx] = uri; return next; });
+              } else {
+                setWrapPhotos(prev => { const next = [...prev]; next[idx] = uri; return next; });
+              }
+            }
+          },
+        },
+        {
+          text: '🖼  Photo Library',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permission needed', 'Photo library access is required to pick photos.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const uri = result.assets[0].uri;
+              if (source === 'visited') {
+                setVisitedPhotos(prev => { const next = [...prev]; next[idx] = uri; return next; });
+              } else {
+                setWrapPhotos(prev => { const next = [...prev]; next[idx] = uri; return next; });
+              }
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   }
 
   // ── Derived ──
@@ -575,13 +633,19 @@ export default function TodayScreen() {
                   key={idx}
                   style={dw.photoSlot}
                   activeOpacity={0.7}
-                  onPress={handlePhotoSlot}
+                  onPress={() => handlePhotoSlot('wrap', idx)}
                 >
-                  <Text style={dw.photoPlus}>+</Text>
+                  {wrapPhotos[idx] ? (
+                    <Image source={{ uri: wrapPhotos[idx]! }} style={dw.photoImg} />
+                  ) : (
+                    <Text style={dw.photoPlus}>+</Text>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={dw.photoCount}>0 of 6 added · Tap to add more</Text>
+            <Text style={dw.photoCount}>
+              {wrapPhotos.filter(Boolean).length} of 6 added · Tap to add more
+            </Text>
           </View>
 
           {/* ── Kid quotes ───────────────────────────────────────────────── */}
@@ -718,9 +782,13 @@ export default function TodayScreen() {
                   key={idx}
                   style={vi.photoSlot}
                   activeOpacity={0.7}
-                  onPress={handlePhotoSlot}
+                  onPress={() => handlePhotoSlot('visited', idx)}
                 >
-                  <Text style={vi.photoPlus}>+</Text>
+                  {visitedPhotos[idx] ? (
+                    <Image source={{ uri: visitedPhotos[idx]! }} style={vi.photoImg} />
+                  ) : (
+                    <Text style={vi.photoPlus}>+</Text>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -1596,6 +1664,7 @@ const vi = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   photoPlus: { fontSize: 24, color: C.muted },
+  photoImg:  { width: '100%', height: '100%', borderRadius: 10 },
 
   // Next stop card
   nextStopName: { fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 },
@@ -1656,6 +1725,7 @@ const dw = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   photoPlus:  { fontSize: 22, color: C.muted },
+  photoImg:   { width: '100%', height: '100%', borderRadius: 8 },
   photoCount: { fontFamily: F.medium, fontSize: 12, color: C.muted, marginTop: 10, textAlign: 'center' },
 
   // Kid quotes
