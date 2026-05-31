@@ -107,6 +107,7 @@ type TripData = {
   plannerTripDays?: number | null;
   tripDays?: number | null;
   stops: Stop[];
+  travelers?: Array<{ name: string }> | null;
 };
 
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
@@ -835,8 +836,18 @@ export default function AtStopScreen() {
 
           {/* 2. Secondary — Let kids explore */}
           <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
-            onPress={() => router.push({ pathname: '/kids' as never,
-              params: { stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name), tripId: trip?.id ?? '' } })}>
+            onPress={() => {
+              const firstExplorer = trip?.travelers?.[0];
+              router.push({ pathname: '/kids' as never,
+                params: {
+                  stopId: currentStop.id,
+                  stopName: encodeURIComponent(currentStop.name),
+                  tripId: trip?.id ?? '',
+                  explorerId: firstExplorer?.name ?? 'explorer',
+                  explorerName: encodeURIComponent(firstExplorer?.name ?? 'Explorer'),
+                },
+              });
+            }}>
             <Text style={dt.ctaSecondaryText}>🧭 Let kids explore</Text>
           </TouchableOpacity>
 

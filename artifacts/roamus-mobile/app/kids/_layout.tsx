@@ -8,8 +8,10 @@ function KidsLayoutInner() {
     stopId?: string;
     stopName?: string;
     tripId?: string;
+    explorerId?: string;
+    explorerName?: string;
   }>();
-  const { setStopInfo, setKidName } = useKids();
+  const { setStopInfo, setKidName, setExplorerId } = useKids();
 
   useEffect(() => {
     if (params.stopId) {
@@ -19,10 +21,15 @@ function KidsLayoutInner() {
         params.tripId ?? ""
       );
     }
-    if (params.stopName) {
+    if (params.explorerId) {
+      setExplorerId(params.explorerId);
+    }
+    if (params.explorerName) {
+      setKidName(decodeURIComponent(params.explorerName));
+    } else if (params.stopName) {
       setKidName("Explorer");
     }
-  }, [params.stopId]);
+  }, [params.stopId, params.explorerId]);
 
   return (
     <Stack

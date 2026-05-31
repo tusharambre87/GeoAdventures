@@ -36,6 +36,12 @@ const MOCK_TEXTS: Record<string, string> = {
   history: `The history of this remarkable place begins long before any of us were born.\n\nOriginal inhabitants of this land used this very spot for ceremonies and celebrations for thousands of years.\n\nWhen European settlers arrived, they recognized the special nature of this location and made it a place of commerce and community.\n\nThe famous structure you see today was built in the early 20th century, and has survived wars, floods, and great social change.\n\nIt has been a place of protest, of joy, of mourning, and of hope. Today, it stands as a symbol of everything your city has been through — and everything it hopes to become.`,
 };
 
+function fmtSec(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
 export default function StoryPlayer() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
@@ -47,6 +53,16 @@ export default function StoryPlayer() {
 
   const story = STORIES[storyIdx];
   const stopName = kids.stopName || "Millennium Park";
+
+  const storyKey = story.key;
+  const transcript =
+    kids.exploreContent?.stories?.[storyKey]?.text ?? MOCK_TEXTS[storyKey] ?? "";
+  const rawDuration = kids.exploreContent?.stories?.[storyKey]?.durationSeconds;
+  const storyDuration = rawDuration ? fmtSec(rawDuration) : story.duration;
+  const stopLabel =
+    kids.exploreContent?.stopIndex && kids.exploreContent?.totalStops
+      ? `STOP ${kids.exploreContent.stopIndex} OF ${kids.exploreContent.totalStops}`
+      : "STORY PACK";
 
   const nextLabels = ["Quick Hits \u2192", "History \u2192", "Continue \u2192 Wonder Time"];
 
@@ -148,9 +164,9 @@ export default function StoryPlayer() {
             </Pressable>
           ))}
         </View>
-        <Text style={s.stopLbl}>STOP 1 OF 5</Text>
+        <Text style={s.stopLbl}>{stopLabel}</Text>
         <Text style={s.stopName}>{stopName}</Text>
-        <Text style={s.duration}>{story.label} · ~{story.duration}</Text>
+        <Text style={s.duration}>{story.label} · ~{storyDuration}</Text>
       </View>
 
       {/* ── Body (purple, glass panel vertically centered) ── */}
@@ -193,7 +209,7 @@ export default function StoryPlayer() {
           </View>
           <View style={s.timeRow}>
             <Text style={s.timeText}>0:00</Text>
-            <Text style={s.timeText}>{story.duration} remaining</Text>
+            <Text style={s.timeText}>{storyDuration} remaining</Text>
           </View>
         </View>
         {/* Voice + transcript row */}
@@ -247,7 +263,7 @@ export default function StoryPlayer() {
               </Pressable>
             </View>
             <ScrollView style={s.tsScroll} contentContainerStyle={{ padding: 20 }}>
-              {(MOCK_TEXTS[story.key] ?? "").split("\n\n").map((para, i) => (
+              {transcript.split("\n\n").map((para, i) => (
                 <Text key={i} style={s.tsBody}>{para}{"\n"}</Text>
               ))}
             </ScrollView>

@@ -1070,7 +1070,16 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={as.kidsBtn}
             activeOpacity={0.85}
-            onPress={() => router.push({ pathname: '/kids' as never, params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' } })}
+            onPress={() => {
+              const firstExplorer = (trip?.travelers ?? [])[0];
+              router.push({ pathname: '/kids' as never, params: {
+                stopId: stop.id,
+                stopName: encodeURIComponent(stop.name ?? ''),
+                tripId: trip?.id ?? '',
+                explorerId: firstExplorer?.name ?? 'explorer',
+                explorerName: encodeURIComponent(firstExplorer?.name ?? 'Explorer'),
+              }});
+            }}
           >
             <Text style={as.kidsBtnText}>🧭  Let kids explore</Text>
           </TouchableOpacity>

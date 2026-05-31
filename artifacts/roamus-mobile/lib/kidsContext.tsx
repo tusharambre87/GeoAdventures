@@ -9,6 +9,7 @@ interface KidsState {
   stopName: string;
   tripId: string;
   kidName: string;
+  explorerId: string;
   xpToday: number;
   currentStoryIndex: number;
   completedStories: [boolean, boolean, boolean];
@@ -30,6 +31,7 @@ interface KidsCtx extends KidsState {
   setExploreError: (b: boolean) => void;
   setKidName: (name: string) => void;
   setXpToday: (xp: number) => void;
+  setExplorerId: (id: string) => void;
 }
 
 const KidsContext = createContext<KidsCtx>({} as KidsCtx);
@@ -40,6 +42,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
     stopName: "Millennium Park",
     tripId: "",
     kidName: "Explorer",
+    explorerId: "",
     xpToday: 0,
     currentStoryIndex: 0,
     completedStories: [false, false, false],
@@ -74,6 +77,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, exploreError })),
     setKidName: (kidName) => setState((s) => ({ ...s, kidName })),
     setXpToday: (xpToday) => setState((s) => ({ ...s, xpToday })),
+    setExplorerId: (explorerId) => setState((s) => ({ ...s, explorerId })),
   };
 
   return <KidsContext.Provider value={ctx}>{children}</KidsContext.Provider>;

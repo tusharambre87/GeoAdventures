@@ -3,26 +3,24 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/lib/authContext";
-import { travelAPI } from "@/lib/apiClient";
+import { kidsAPI, travelAPI } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 
 const K = { purple: "#7C3AED", purpleLt: "#F5F3FF" } as const;
-
-const MOCK_EXPLORERS = [
-  { name: "Priya", xp: 145, initial: "P", color: "#7C3AED" },
-  { name: "Arjun", xp: 80, initial: "A", color: G.orange },
-];
+const EXPLORER_COLORS = ["#7C3AED", "#E8692A", "#16A34A", "#DC2626"];
 
 function Divider() {
   return <View style={s.divider} />;
@@ -63,6 +61,8 @@ export default function MeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data } = useQuery({ queryKey: ["trips"], queryFn: () => travelAPI.getTrips() });
+  const [explorerXp, setExplorerXp] = useState<Record<string, number>>({});
+  const [kidsPickerOpen, setKidsPickerOpen] = useState(false);
 
   const trips = data?.trips ?? [];
   const heroTrip =
@@ -71,6 +71,8 @@ export default function MeScreen() {
     null;
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.totalStops ?? 0), 0);
+  const travelers = heroTrip?.travelers ?? [];
+  const travelerCount = travelers.length;
 
   const firstLetter = (user?.firstName ?? user?.username ?? user?.email ?? "U")[0];
   const initials = firstLetter.toUpperCase();
@@ -79,6 +81,44 @@ export default function MeScreen() {
 
   const heroCity = heroTrip?.destination ?? "Chicago";
   const heroBg = heroTrip?.coverImageUrl ?? heroTrip?.firstPhotoUrl ?? CITY_IMGS[heroCity] ?? null;
+
+  useEffect(() => {
+    if (!heroTrip?.id || !travelers.length) return;
+    travelers.forEach((t) => {
+      kidsAPI
+        .getProgress(heroTrip.id, t.name)
+        .then((prog) => setExplorerXp((prev) => ({ ...prev, [t.name]: prog.xp })))
+        .catch(() => {});
+    });
+  }, [heroTrip?.id]);
+
+  function launchKids(travelerName: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setKidsPickerOpen(false);
+    if (!heroTrip) return;
+    const currentStop = heroTrip.stops.find((s) => !s.visited && !s.isVisited) ?? heroTrip.stops[0];
+    if (!currentStop) return;
+    router.push({
+      pathname: "/kids" as never,
+      params: {
+        stopId: currentStop.id,
+        stopName: encodeURIComponent(currentStop.name ?? "This Stop"),
+        tripId: heroTrip.id,
+        explorerId: travelerName,
+        explorerName: encodeURIComponent(travelerName),
+      },
+    });
+  }
+
+  function handleKidsZonePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!heroTrip) return;
+    if (travelers.length > 1) {
+      setKidsPickerOpen(true);
+    } else {
+      launchKids(travelers[0]?.name ?? "Explorer");
+    }
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: G.bg }}>
@@ -107,7 +147,7 @@ export default function MeScreen() {
               [
                 ["Trips", String(tripCount)],
                 ["Stops", String(stopCount)],
-                ["Explorers", "2"],
+                ["Explorers", String(travelerCount || 0)],
               ] as [string, string][]
             ).map(([label, val]) => (
               <View key={label} style={s.statCard}>
@@ -154,7 +194,7 @@ export default function MeScreen() {
                         day: "numeric",
                       })
                     : "Jun 1"}{" "}
-                  · 2 explorers
+                  {travelerCount > 0 ? `· ${travelerCount} explorer${travelerCount === 1 ? "" : "s"}` : ""}
                 </Text>
                 <View style={s.sharePill}>
                   <Text style={s.sharePillText}>{"↗ Share"}</Text>
@@ -184,40 +224,61 @@ export default function MeScreen() {
         {/* ── 4. For the Kids ── */}
         <Text style={s.sectionLabel}>FOR THE KIDS</Text>
         <View style={s.card}>
-          {/* Explorer chips */}
-          <View style={s.explorerStrip}>
-            {MOCK_EXPLORERS.map((e) => (
-              <View key={e.name} style={s.explorerChip}>
-                <View style={[s.explorerCircle, { backgroundColor: e.color }]}>
-                  <Text style={s.explorerInitial}>{e.initial}</Text>
+          {/* Explorer chips — real travelers with XP */}
+          {travelers.length > 0 ? (
+            <View style={s.explorerStrip}>
+              {travelers.map((t, i) => (
+                <View key={t.name} style={s.explorerChip}>
+                  <View
+                    style={[
+                      s.explorerCircle,
+                      { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length] },
+                    ]}
+                  >
+                    <Text style={s.explorerInitial}>{t.name[0]?.toUpperCase() ?? "?"}</Text>
+                  </View>
+                  <Text style={s.explorerName}>{t.name}</Text>
+                  <Text style={s.explorerXp}>
+                    {"⚡"} {explorerXp[t.name] ?? 0} XP
+                  </Text>
                 </View>
-                <Text style={s.explorerName}>{e.name}</Text>
-                <Text style={s.explorerXp}>{"⚡"} {e.xp} XP</Text>
-              </View>
-            ))}
-          </View>
-          <Divider />
+              ))}
+            </View>
+          ) : null}
+          {travelers.length > 0 && <Divider />}
           {/* Kids Explorer Zone */}
           <Pressable
-            style={({ pressed }) => [s.kidsZoneRow, pressed && { opacity: 0.88 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/kids" as never);
-            }}
+            style={({ pressed }) => [
+              s.kidsZoneRow,
+              pressed && { opacity: 0.88 },
+              !heroTrip && s.kidsZoneDisabled,
+            ]}
+            onPress={heroTrip ? handleKidsZonePress : undefined}
+            disabled={!heroTrip}
           >
             <View style={[s.rowIconWrap, { backgroundColor: K.purpleLt }]}>
               <Text style={s.rowIconText}>{"🧭"}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.kidsZoneTitleRow}>
-                <Text style={s.kidsZoneTitle}>Kids Explorer Zone</Text>
-                <View style={s.newStopBadge}>
-                  <Text style={s.newStopText}>NEW STOP</Text>
-                </View>
+                <Text style={[s.kidsZoneTitle, !heroTrip && { color: G.muted }]}>
+                  Kids Explorer Zone
+                </Text>
+                {heroTrip ? (
+                  <View style={s.newStopBadge}>
+                    <Text style={s.newStopText}>
+                      {travelers.length > 1 ? "PICK EXPLORER" : "LET'S GO"}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              <Text style={s.kidsZoneSub}>Stories · Missions · Wonder Time · Games</Text>
+              <Text style={[s.kidsZoneSub, !heroTrip && { color: G.muted, opacity: 0.6 }]}>
+                {heroTrip
+                  ? "Stories · Missions · Wonder Time · Games"
+                  : "Start a trip first to unlock"}
+              </Text>
             </View>
-            <Text style={[s.rowArrow, { color: K.purple }]}>{"›"}</Text>
+            <Text style={[s.rowArrow, { color: heroTrip ? K.purple : G.muted }]}>{"›"}</Text>
           </Pressable>
           <Divider />
           <MenuRow
@@ -262,6 +323,53 @@ export default function MeScreen() {
           <MenuRow icon="ℹ️" iconBg="#F5F2EE" title="About Us" noDivider />
         </View>
       </ScrollView>
+
+      {/* ── Explorer Picker Sheet ── */}
+      <Modal
+        visible={kidsPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setKidsPickerOpen(false)}
+      >
+        <View style={s.pickerOverlay}>
+          <Pressable style={{ flex: 1 }} onPress={() => setKidsPickerOpen(false)} />
+          <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={s.pickerHandle} />
+            <Text style={s.pickerTitle}>Who's exploring?</Text>
+            <Text style={s.pickerSub}>Pick the explorer for this stop</Text>
+            <View style={s.pickerList}>
+              {travelers.map((t, i) => (
+                <TouchableOpacity
+                  key={t.name}
+                  style={s.pickerRow}
+                  activeOpacity={0.75}
+                  onPress={() => launchKids(t.name)}
+                >
+                  <View
+                    style={[
+                      s.pickerCircle,
+                      { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length] },
+                    ]}
+                  >
+                    <Text style={s.pickerInitial}>{t.name[0]?.toUpperCase() ?? "?"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.pickerName}>{t.name}</Text>
+                    <Text style={s.pickerXp}>{"⚡"} {explorerXp[t.name] ?? 0} XP earned</Text>
+                  </View>
+                  <Text style={s.pickerArrow}>{"›"}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={s.pickerDismiss}
+              onPress={() => setKidsPickerOpen(false)}
+            >
+              <Text style={s.pickerDismissText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -530,6 +638,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
+  kidsZoneDisabled: {
+    backgroundColor: G.bg,
+    opacity: 0.6,
+  },
   kidsZoneTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -570,5 +682,88 @@ const s = StyleSheet.create({
     fontFamily: F.bold,
     fontSize: 12,
     color: "#16A34A",
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  pickerSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: "rgba(28,25,23,0.15)",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 18,
+  },
+  pickerTitle: {
+    fontFamily: F.bold,
+    fontSize: 20,
+    color: "#1C1917",
+    marginBottom: 4,
+  },
+  pickerSub: {
+    fontFamily: F.medium,
+    fontSize: 13,
+    color: G.muted,
+    marginBottom: 20,
+  },
+  pickerList: {
+    gap: 10,
+  },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: G.bg,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  pickerCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  pickerInitial: {
+    fontFamily: F.bold,
+    fontSize: 18,
+    color: "#fff",
+  },
+  pickerName: {
+    fontFamily: F.bold,
+    fontSize: 16,
+    color: "#1C1917",
+    marginBottom: 2,
+  },
+  pickerXp: {
+    fontFamily: F.semibold,
+    fontSize: 12,
+    color: "#D97706",
+  },
+  pickerArrow: {
+    fontFamily: F.regular,
+    fontSize: 22,
+    color: "#C4C9D4",
+  },
+  pickerDismiss: {
+    alignItems: "center",
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  pickerDismissText: {
+    fontFamily: F.semibold,
+    fontSize: 15,
+    color: G.muted,
   },
 });

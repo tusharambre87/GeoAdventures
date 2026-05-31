@@ -44,6 +44,10 @@ export default function WonderTime() {
   const [submitting, setSubmitting] = useState(false);
 
   const stopName = kids.stopName || "Millennium Park";
+  const topicChips =
+    kids.exploreContent?.wonderTopics?.length
+      ? kids.exploreContent.wonderTopics
+      : TOPIC_CHIPS;
 
   function toggleChip(chip: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -60,7 +64,7 @@ export default function WonderTime() {
     try {
       if (kids.stopId) {
         await kidsAPI.postWonderResponse(kids.stopId, {
-          explorerId: "default",
+          explorerId: kids.explorerId || "explorer",
           topic: selected.join(", ") || "general",
           observation: text || "—",
         });
@@ -93,7 +97,7 @@ export default function WonderTime() {
           </Text>
           {/* Topic chips */}
           <View style={s.chips}>
-            {TOPIC_CHIPS.map((chip) => {
+            {topicChips.map((chip) => {
               const on = selected.includes(chip);
               return (
                 <Pressable

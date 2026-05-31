@@ -146,7 +146,7 @@ export default function Mission3() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
               if (kids.stopId) {
                 kidsAPI.completeMission(kids.stopId, {
-                  explorerId: "default",
+                  explorerId: kids.explorerId || "explorer",
                   missionId: "photo",
                   answer: photoUri ?? "skipped",
                 }).catch(() => {});

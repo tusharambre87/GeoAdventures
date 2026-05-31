@@ -46,11 +46,12 @@ export default function Mission2() {
 
   async function handleSubmit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    kids.setWonderObservation(obs);
     setSubmitting(true);
     try {
       if (kids.stopId) {
         await kidsAPI.completeMission(kids.stopId, {
-          explorerId: "default",
+          explorerId: kids.explorerId || "explorer",
           missionId: "observation",
           answer: obs || "—",
         });

@@ -74,7 +74,7 @@ export default function Mission1() {
 
     if (kids.stopId) {
       kidsAPI.completeMission(kids.stopId, {
-        explorerId: "default",
+        explorerId: kids.explorerId || "explorer",
         missionId: "quiz",
         answer: quiz.options[idx] ?? String(idx),
       }).catch(() => {});

@@ -99,6 +99,8 @@ export type ReplacementSuggestion = {
 export interface ExploreContent {
   stopId: string;
   stopName: string;
+  stopIndex?: number;
+  totalStops?: number;
   stories: {
     main: { text: string; durationSeconds: number };
     quickHits: { text: string; durationSeconds: number };

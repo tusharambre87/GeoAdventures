@@ -81,7 +81,7 @@ export default function ExplorerHome() {
       });
 
     if (tripId) {
-      kidsAPI.getProgress(tripId, "default")
+      kidsAPI.getProgress(tripId, kids.explorerId || "explorer")
         .then((prog) => kids.setXpToday(prog.xp))
         .catch(() => {});
     }
@@ -90,6 +90,21 @@ export default function ExplorerHome() {
   const stopName = kids.stopName || (params.stopName ? decodeURIComponent(params.stopName) : "Explorer");
   const kidName = kids.kidName || "Explorer";
   const xpToday = kids.xpToday;
+
+  function fmtSec(s: number) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  const stopIndex = kids.exploreContent?.stopIndex;
+  const totalStops = kids.exploreContent?.totalStops;
+  const stopBadge = stopIndex && totalStops
+    ? `📖 Story Pack · Stop ${stopIndex} of ${totalStops}`
+    : "📖 Story Pack";
+  const mainDuration = kids.exploreContent?.stories?.main?.durationSeconds
+    ? fmtSec(kids.exploreContent.stories.main.durationSeconds)
+    : "5:00";
 
   const allDone = kids.completedStories.every(Boolean);
   const storyProgress = kids.completedStories.filter(Boolean).length;
@@ -132,7 +147,7 @@ export default function ExplorerHome() {
               }}
             >
               <View style={s.scTop}>
-                <Text style={s.scBadge}>{"📖 Story Pack · Stop 1 of 5"}</Text>
+                <Text style={s.scBadge}>{stopBadge}</Text>
                 <View style={s.scXpPill}>
                   <Text style={s.scXpText}>+5 XP</Text>
                 </View>
@@ -147,7 +162,7 @@ export default function ExplorerHome() {
                   <Text style={s.scPlayLabel}>
                     {allDone ? "All stories complete!" : "Tap to start"}
                   </Text>
-                  <Text style={s.scPlaySub}>Main Story · ~5 min</Text>
+                  <Text style={s.scPlaySub}>Main Story · ~{mainDuration}</Text>
                 </View>
               </View>
               <View style={s.scProgBar}>
