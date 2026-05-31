@@ -695,7 +695,7 @@ export default function AtStopScreen() {
               )}
 
               {/* Timing & logistics */}
-              <Text style={dt.exploreSubLabel}>Timing & logistics</Text>
+              <Text style={dt.exploreSubLabel}>Timing {'&'} logistics</Text>
               {[
                 ['Recommended duration', `${duration} min`],
                 ['Best for', meta.sessionFit ?? '—'],
@@ -712,7 +712,7 @@ export default function AtStopScreen() {
               ))}
 
               {/* Parking & access */}
-              <Text style={dt.exploreSubLabel}>Parking & access</Text>
+              <Text style={dt.exploreSubLabel}>Parking {'&'} access</Text>
               {[
                 ['Parking', enrichment.parkingNotes ?? '—'],
                 ['Restrooms', meta.restroomConfidence ?? '—'],
