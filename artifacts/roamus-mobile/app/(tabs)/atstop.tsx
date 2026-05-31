@@ -29,7 +29,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_BASE } from '@/lib/apiClient';
@@ -631,15 +630,7 @@ export default function AtStopScreen() {
               </View>
             ))}
             <TouchableOpacity style={dt.photoAdd} activeOpacity={0.8}
-              onPress={async () => {
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== 'granted') {
-                  Alert.alert('Permission needed', 'Photo library access is required to pick photos.');
-                  return;
-                }
-                await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'],
-                  allowsEditing: true, aspect: [1, 1], quality: 0.8 });
-              }}>
+              onPress={() => Alert.alert('Photo capture coming soon')}>
               <Text style={dt.photoAddIcon}>📷</Text>
               <Text style={dt.photoAddLabel}>Add yours</Text>
             </TouchableOpacity>
@@ -677,6 +668,7 @@ export default function AtStopScreen() {
 
           {exploreOpen && (
             <View style={dt.exploreBody}>
+
               {/* What you'll experience */}
               {!!enrichment.practicalTips && (
                 <>
@@ -685,8 +677,24 @@ export default function AtStopScreen() {
                 </>
               )}
 
+              {/* Best way to do this stop — orange bullet list */}
+              {[enrichment.whyNow, enrichment.bestTimeOfDay, enrichment.parkingNotes]
+                .filter(Boolean).length > 0 && (
+                <>
+                  <Text style={dt.exploreSubLabel}>Best way to do this stop</Text>
+                  {[enrichment.whyNow, enrichment.bestTimeOfDay, enrichment.parkingNotes]
+                    .filter((t): t is string => !!t)
+                    .map((tip, i) => (
+                      <View key={i} style={dt.bulletRow}>
+                        <View style={dt.bulletDot} />
+                        <Text style={dt.bulletText}>{tip}</Text>
+                      </View>
+                    ))}
+                </>
+              )}
+
               {/* Timing & logistics */}
-              <Text style={dt.exploreSubLabel}>Timing &amp; logistics</Text>
+              <Text style={dt.exploreSubLabel}>Timing & logistics</Text>
               {[
                 ['Recommended duration', `${duration} min`],
                 ['Best for', meta.sessionFit ?? '—'],
@@ -703,7 +711,7 @@ export default function AtStopScreen() {
               ))}
 
               {/* Parking & access */}
-              <Text style={dt.exploreSubLabel}>Parking &amp; access</Text>
+              <Text style={dt.exploreSubLabel}>Parking & access</Text>
               {[
                 ['Parking', enrichment.parkingNotes ?? '—'],
                 ['Restrooms', meta.restroomConfidence ?? '—'],
@@ -715,45 +723,6 @@ export default function AtStopScreen() {
                 </View>
               ))}
 
-              {/* Nearby essentials */}
-              <Text style={dt.exploreSubLabel}>Nearby essentials</Text>
-              {[
-                { icon: '🍔', name: 'Food nearby', url: mapsUrl('food near ' + address) },
-                { icon: '🛋', name: 'Quick break spots', url: mapsUrl('park near ' + address) },
-                { icon: '👶', name: 'Kid-friendly extras', url: mapsUrl('activities for kids near ' + address) },
-              ].map(row => (
-                <TouchableOpacity key={row.name} style={dt.nearbyRow} activeOpacity={0.8}
-                  onPress={() => address && Linking.openURL(row.url)}>
-                  <Text style={dt.nearbyIcon}>{row.icon}</Text>
-                  <Text style={dt.nearbyName}>{row.name}</Text>
-                  <Text style={dt.nearbyChev}>›</Text>
-                </TouchableOpacity>
-              ))}
-
-              {/* Hours & entry tiles */}
-              <Text style={dt.exploreSubLabel}>Hours &amp; entry</Text>
-              <View style={dt.tilesRow}>
-                {[
-                  { icon: '🕙', label: 'HOURS', val: '9AM–5PM' },
-                  { icon: '💵', label: 'ENTRY', val: hasTicket ? 'Ticket required' : 'Free admission' },
-                  { icon: '🅿️', label: 'PARKING', val: enrichment.parkingNotes
-                    ? enrichment.parkingNotes.split('·')[0].trim() : '—' },
-                ].map(tile => (
-                  <View key={tile.label} style={dt.infoTile}>
-                    <Text style={dt.infoTileIcon}>{tile.icon}</Text>
-                    <Text style={dt.infoTileLabel}>{tile.label}</Text>
-                    <Text style={dt.infoTileVal}>{tile.val}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Getting there */}
-              <Text style={dt.exploreSubLabel}>Getting there</Text>
-              <TouchableOpacity style={dt.exploreRow} activeOpacity={0.8}
-                onPress={() => address && Linking.openURL(mapsUrl(address))}>
-                <Text style={dt.exploreKey}>Directions</Text>
-                <Text style={[dt.exploreVal, { color: C.orange }]}>Tap for Maps ↗</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -764,21 +733,7 @@ export default function AtStopScreen() {
       <View style={[dt.ctaBar, { paddingBottom: insets.bottom + 8 }]}>
         {/* 1. Primary — Capture a moment */}
         <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-          onPress={async () => {
-            Alert.alert('Add photo', 'Choose a source', [
-              { text: '📷  Camera', onPress: async () => {
-                const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access is required.'); return; }
-                await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1,1], quality: 0.8 });
-              }},
-              { text: '🖼  Photo Library', onPress: async () => {
-                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (status !== 'granted') { Alert.alert('Permission needed', 'Library access is required.'); return; }
-                await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1,1], quality: 0.8 });
-              }},
-              { text: 'Cancel', style: 'cancel' },
-            ]);
-          }}>
+          onPress={() => Alert.alert('Photo capture coming soon')}>
           <Text style={dt.ctaPrimaryText}>📸 Capture a moment</Text>
         </TouchableOpacity>
 
@@ -1132,6 +1087,10 @@ const dt = StyleSheet.create({
   infoTileLabel: { fontFamily: F.bold, fontSize: 9, color: C.muted, letterSpacing: 0.8,
     textTransform: 'uppercase', marginBottom: 3 },
   infoTileVal: { fontFamily: F.semibold, fontSize: 11, color: C.deep, textAlign: 'center', lineHeight: 15 },
+  // Bullet list (Best way section)
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
+  bulletDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.orange, marginTop: 6, flexShrink: 0 },
+  bulletText: { fontFamily: F.regular, fontSize: 13, color: C.deep, lineHeight: 21, flex: 1 },
   // CTAs
   ctaBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(245,242,238,0.97)',
     borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 20, paddingTop: 12, gap: 8 },
