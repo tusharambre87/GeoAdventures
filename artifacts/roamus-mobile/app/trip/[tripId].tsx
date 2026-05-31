@@ -1274,6 +1274,7 @@ function StopDetailSheet({
 }) {
   const [expanded, setExpanded] = useState(false);
   const rotAnim = useRef(new Animated.Value(0)).current;
+  const insets  = useSafeAreaInsets();
 
   // ⚠️ Hook must be above early return — rules of hooks
   const heroImg = useStopHeroImage(stop?.id ?? null);
@@ -1477,7 +1478,7 @@ function StopDetailSheet({
       </ScrollView>
 
       {/* Footer */}
-      <View style={sds.footer}>
+      <View style={[sds.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
         <Pressable style={sds.doneBtn} onPress={onClose}>
           <Text style={sds.doneBtnText}>
             {isEditable ? 'Done planning this stop' : 'Done viewing this stop'}
@@ -1757,6 +1758,7 @@ function RunDaySheet({
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const [applying, setApplying] = useState(false);
+  const insets  = useSafeAreaInsets();
   const anchor  = getAnchorStop(dayStops);
   const dropSt  = getDropStop(dayStops);
   const keptStops = dayStops.filter(s => s.id !== dropSt?.id);
@@ -1927,7 +1929,7 @@ function RunDaySheet({
       </ScrollView>
 
       {/* Footer */}
-      <View style={rds.footer}>
+      <View style={[rds.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
         <Pressable style={rds.startBtn} onPress={applyStart} disabled={applying}>
           {applying
             ? <ActivityIndicator color="#fff" />

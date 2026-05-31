@@ -129,16 +129,6 @@ export default function Celebration() {
           <Text style={s.gameLinkText}>{"🎮 Play a quick game \u2192"}</Text>
         </Pressable>
 
-        {/* Hand back */}
-        <Pressable
-          style={s.handBackLink}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.dismiss();
-          }}
-        >
-          <Text style={s.handBackText}>{"\u2190 Hand back to parent"}</Text>
-        </Pressable>
       </ScrollView>
     </View>
   );

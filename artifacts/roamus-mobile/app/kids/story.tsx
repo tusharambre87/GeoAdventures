@@ -222,10 +222,10 @@ export default function StoryPlayer() {
         <Pressable
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.dismiss();
+            router.back();
           }}
         >
-          <Text style={s.handBack}>{"\u2190 Hand back to parent"}</Text>
+          <Text style={s.handBack}>{"\u2190 Back"}</Text>
         </Pressable>
       </View>
 

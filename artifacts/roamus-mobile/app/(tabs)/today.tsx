@@ -1265,12 +1265,15 @@ export default function TodayScreen() {
   const maxDropPriority = selectedPace === 'easier'
     ? Math.max(...dayStops.map(s => s.metadata?.dropPriority ?? -Infinity))
     : -Infinity;
+  const easierFallbackIdx = selectedPace === 'easier' && !isFinite(maxDropPriority)
+    ? dayStops.length - 1
+    : -1;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
       >
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <LinearGradient
@@ -1340,9 +1343,10 @@ export default function TodayScreen() {
 
           {dayStops.map((stop, i) => {
             const meta = parseMetadata(stop.metadata);
-            const isRemoved = selectedPace === 'easier' &&
-              isFinite(maxDropPriority) &&
-              (meta.dropPriority ?? -Infinity) === maxDropPriority;
+            const isRemoved = selectedPace === 'easier' && (
+              (isFinite(maxDropPriority) && (meta.dropPriority ?? -Infinity) === maxDropPriority) ||
+              easierFallbackIdx === i
+            );
             const hasTicket  = hasTicketSignal(stop.metadata);
             const isFreeStop = !hasTicket &&
               ['park', 'nature', 'landmark'].includes(stop.stopType ?? '');
