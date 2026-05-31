@@ -1036,6 +1036,7 @@ function DayDetail({
   stops,
   totalDays,
   selectedDay,
+  activeTripDay,
   getDayStatus,
   getStopsForDay,
   getAnchorStopForDay,
@@ -1053,6 +1054,7 @@ function DayDetail({
   stops: Stop[];
   totalDays: number;
   selectedDay: number;
+  activeTripDay: number;
   getDayStatus: (d: number) => DayStatus;
   getStopsForDay: (d: number) => Stop[];
   getAnchorStopForDay: (d: number) => Stop | null;
@@ -1069,6 +1071,15 @@ function DayDetail({
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
   const isEditable = status !== 'past';
+
+  // Run Day button — always tracks active (real-world today) day
+  const activeDayIndex = activeTripDay - 1;
+  const activeDay      = activeTripDay;
+  const activeDayStops = getStopsForDay(activeDay);
+  const isDayComplete  = activeDayStops.length > 0 &&
+    activeDayStops.every(s => s.isVisited || s.visited);
+  const isViewingPast  = selectedDay - 1 < activeDayIndex;
+  const runBtnDisabled = isViewingPast || isDayComplete;
   const dayStops = getStopsForDay(selectedDay);
   const anchor   = getAnchorStopForDay(selectedDay);
   const theme    = dayTheme(dayStops);
@@ -1218,14 +1229,20 @@ function DayDetail({
         )}
       </ScrollView>
 
-      {/* Footer — editable days with stops only */}
-      {isEditable && dayStops.length > 0 && (
+      {/* Footer — always show when active day has stops */}
+      {activeDayStops.length > 0 && (
         <View style={[dd.footer, { paddingBottom: insets.bottom + 12 }]}>
-          <Pressable style={dd.runBtn} onPress={onRunDay}>
-            <IconPlay />
-            <Text style={dd.runBtnText}>  Run Day {selectedDay}</Text>
+          <Pressable
+            style={[dd.runBtn, runBtnDisabled && dd.runBtnDone]}
+            onPress={runBtnDisabled ? undefined : onRunDay}
+            disabled={runBtnDisabled}>
+            {isDayComplete
+              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'✓'} Day {activeDay} Complete</Text>
+              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run Day {activeDay}</Text></>}
           </Pressable>
-          <Text style={dd.runSub}>Switches to Today tab — live mode</Text>
+          {!isDayComplete && (
+            <Text style={dd.runSub}>Switches to Today tab — live mode</Text>
+          )}
         </View>
       )}
     </View>
@@ -2364,6 +2381,7 @@ export default function TripPlanScreen() {
           stops={localStops}
           totalDays={totalDays}
           selectedDay={selectedDay}
+          activeTripDay={activeTripDay}
           getDayStatus={getDayStatus}
           getStopsForDay={getStopsForDay}
           getAnchorStopForDay={getAnchorStopForDay}
@@ -2679,7 +2697,9 @@ const dd = StyleSheet.create({
   addStopText: { fontFamily: F.semibold, fontSize: 13, color: C.orange },
   footer: { paddingHorizontal: 16, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
   runBtn: { backgroundColor: C.orange, borderRadius: 14, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: C.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 20, elevation: 6 },
+  runBtnDone: { backgroundColor: C.border, shadowOpacity: 0 },
   runBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  runBtnTextDone: { color: C.muted },
   runSub: { fontFamily: F.regular, fontSize: 10, color: C.muted, textAlign: 'center', marginTop: 6 },
 });
 
