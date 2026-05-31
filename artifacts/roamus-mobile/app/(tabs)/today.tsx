@@ -53,6 +53,64 @@ const C = {
   border:   'rgba(26,31,46,0.09)',
 } as const;
 
+// ─── Stop-type thumbnail helpers ──────────────────────────────────────────────
+const STOP_TYPE_EMOJI: Record<string, string> = {
+  museum:        '🏛️',
+  nature:        '🌿',
+  park:          '🌳',
+  garden:        '🌸',
+  beach:         '🏖️',
+  restaurant:    '🍽️',
+  food:          '🍜',
+  street_food:   '🥢',
+  viewpoint:     '🔭',
+  landmark:      '📍',
+  temple:        '⛩️',
+  market:        '🛍️',
+  zoo:           '🦁',
+  aquarium:      '🐠',
+  palace:        '🏰',
+  plaza:         '🏛️',
+  bridge:        '🌉',
+  waterfall:     '💧',
+  volcano:       '🌋',
+  mountain:      '🏔️',
+  adventure:     '⚡',
+  neighborhood:  '🏘️',
+  street:        '🛤️',
+  city:          '🏙️',
+  culture:       '🎭',
+  other:         '📍',
+};
+const STOP_TYPE_COLOR: Record<string, string> = {
+  museum:        '#3B82F6',
+  nature:        '#3DAA6E',
+  park:          '#3DAA6E',
+  garden:        '#3DAA6E',
+  beach:         '#0EA5E9',
+  restaurant:    '#E8692A',
+  food:          '#E8692A',
+  street_food:   '#F5A623',
+  viewpoint:     '#6B4FA8',
+  landmark:      '#E8692A',
+  temple:        '#E8433A',
+  market:        '#F5A623',
+  zoo:           '#3DAA6E',
+  aquarium:      '#0EA5E9',
+  palace:        '#6B4FA8',
+  plaza:         '#6B4FA8',
+  bridge:        '#8A8FA8',
+  waterfall:     '#0EA5E9',
+  volcano:       '#E8433A',
+  mountain:      '#8A8FA8',
+  adventure:     '#E8692A',
+  neighborhood:  '#7A9E8E',
+  street:        '#8A8FA8',
+  city:          '#3B82F6',
+  culture:       '#6B4FA8',
+  other:         '#E8692A',
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type StopMetadata = {
@@ -1160,20 +1218,37 @@ export default function TodayScreen() {
           {afterStops.length > 0 && (
             <View style={er.afterSection}>
               <Text style={er.afterLabel}>AFTER THIS</Text>
-              {afterStops.map((s, idx) => (
-                <View key={s.id} style={er.afterRow}>
-                  <View style={er.afterNum}>
-                    <Text style={er.afterNumText}>{currentStopIndex + 2 + idx}</Text>
-                  </View>
-                  <Text style={er.afterName} numberOfLines={1}>{s.name}</Text>
-                  {hasTicketSignal(s.metadata) && (
-                    <View style={er.afterTicket}>
-                      <Text style={er.afterTicketText}>🎫</Text>
+              {afterStops.map((s, idx) => {
+                const imgUrl = (s.metadata as Record<string, unknown> | null)?.imageUrl as string | undefined;
+                const stopNum = currentStopIndex + 2 + idx;
+                const typeKey = s.stopType ?? 'other';
+                const typeEmoji = STOP_TYPE_EMOJI[typeKey] ?? '📍';
+                const typeBg   = STOP_TYPE_COLOR[typeKey] ?? C.orange;
+                return (
+                  <View key={s.id} style={er.afterRow}>
+                    {/* Thumbnail */}
+                    <View style={er.afterThumb}>
+                      {imgUrl ? (
+                        <Image source={{ uri: imgUrl }} style={er.afterThumbImg} />
+                      ) : (
+                        <View style={[er.afterThumbPlaceholder, { backgroundColor: typeBg }]}>
+                          <Text style={er.afterThumbEmoji}>{typeEmoji}</Text>
+                        </View>
+                      )}
+                      <View style={er.afterThumbBadge}>
+                        <Text style={er.afterThumbBadgeText}>{stopNum}</Text>
+                      </View>
                     </View>
-                  )}
-                  <Text style={er.afterDur}>{getStopDuration(s)} min</Text>
-                </View>
-              ))}
+                    <Text style={er.afterName} numberOfLines={1}>{s.name}</Text>
+                    {hasTicketSignal(s.metadata) && (
+                      <View style={er.afterTicket}>
+                        <Text style={er.afterTicketText}>🎫</Text>
+                      </View>
+                    )}
+                    <Text style={er.afterDur}>{getStopDuration(s)} min</Text>
+                  </View>
+                );
+              })}
             </View>
           )}
 
@@ -1520,11 +1595,16 @@ const er = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 12, padding: 12,
     borderWidth: 1, borderColor: C.border, marginBottom: 6,
   },
-  afterNum:        {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: C.bg,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  afterThumb:            { width: 46, height: 46, borderRadius: 8, flexShrink: 0 },
+  afterThumbImg:         { width: 46, height: 46, borderRadius: 8 },
+  afterThumbPlaceholder: { width: 46, height: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  afterThumbEmoji:       { fontSize: 22 },
+  afterThumbBadge:       {
+    position: 'absolute', bottom: 3, right: 3,
+    backgroundColor: 'rgba(0,0,0,0.52)', borderRadius: 4,
+    paddingHorizontal: 4, paddingVertical: 1,
   },
-  afterNumText:    { fontFamily: F.bold, fontSize: 11, color: C.muted },
+  afterThumbBadgeText:   { fontFamily: F.bold, fontSize: 9, color: '#fff' },
   afterName:       { fontFamily: F.semibold, fontSize: 13, color: C.deep, flex: 1 },
   afterTicket:     { backgroundColor: C.redLt, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
   afterTicketText: { fontSize: 10 },
