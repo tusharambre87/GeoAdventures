@@ -27,7 +27,7 @@ const GRID_GAMES = [
   {
     icon: "🔍",
     name: "Scavenger Hunt",
-    desc: "Find hidden items at this stop",
+    desc: "Find hidden things at this stop",
     tag: "TEAM",
     tagBg: "#DCFCE7",
     tagColor: "#16A34A",
@@ -36,8 +36,8 @@ const GRID_GAMES = [
   {
     icon: "🌍",
     name: "GeoGuess",
-    desc: "This or that at your stop",
-    tag: "SOLO",
+    desc: "Ask yes/no clues to guess a place",
+    tag: "FAMILY",
     tagBg: "#EFF6FF",
     tagColor: "#2563EB",
     type: "geoguess",
@@ -45,20 +45,20 @@ const GRID_GAMES = [
   {
     icon: "👁",
     name: "GeoSpy",
-    desc: "Spot the difference challenge",
+    desc: "I Spy — observation prompts",
     tag: "FAMILY",
     tagBg: "#FDF0E9",
     tagColor: "#E8692A",
     type: "geospy",
   },
   {
-    icon: "🗺️",
-    name: "Guess the Place",
-    desc: "Name that landmark!",
-    tag: "TRIVIA",
+    icon: "👜",
+    name: "What's In My Bag",
+    desc: "Memory chain game",
+    tag: "FAMILY",
     tagBg: "#F5F3FF",
     tagColor: "#7C3AED",
-    type: "guess-place",
+    type: "bag",
   },
 ];
 
@@ -77,7 +77,7 @@ export default function GameHub() {
           {/* ── Header ── */}
           <View style={s.hdr}>
             <Text style={s.hdrTitle}>Travel Games</Text>
-            <Text style={s.hdrSub}>Quick family games · any time</Text>
+            <Text style={s.hdrSub}>Quick family games · {stopName}</Text>
           </View>
 
           {/* ── Hero game ── */}
@@ -116,9 +116,7 @@ export default function GameHub() {
               >
                 <Text style={s.gridIcon}>{game.icon}</Text>
                 <Text style={s.gridName}>{game.name}</Text>
-                <Text style={s.gridDesc} numberOfLines={2}>
-                  {game.desc}
-                </Text>
+                <Text style={s.gridDesc} numberOfLines={2}>{game.desc}</Text>
                 <View style={[s.gridTag, { backgroundColor: game.tagBg }]}>
                   <Text style={[s.gridTagText, { color: game.tagColor }]}>{game.tag}</Text>
                 </View>
@@ -154,130 +152,41 @@ export default function GameHub() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  hdr: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  hdrTitle: {
-    fontFamily: F.bold,
-    fontSize: 24,
-    color: K.deep,
-    marginBottom: 4,
-  },
-  hdrSub: {
-    fontFamily: F.medium,
-    fontSize: 13,
-    color: K.muted,
-  },
+  hdr: { paddingHorizontal: 20, paddingBottom: 16 },
+  hdrTitle: { fontFamily: F.bold, fontSize: 24, color: "#1C1917", marginBottom: 4 },
+  hdrSub: { fontFamily: F.medium, fontSize: 13, color: "#78716C" },
   heroCard: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 22,
-    overflow: "hidden",
-    height: 190,
-    position: "relative",
+    marginHorizontal: 20, marginBottom: 16, borderRadius: 22,
+    overflow: "hidden", height: 190, position: "relative",
   },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "transparent",
-  },
+  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
   heroPlayPill: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    position: "absolute", top: 14, right: 14,
+    backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8,
   },
-  heroPlayText: {
-    fontFamily: F.bold,
-    fontSize: 13,
-    color: K.deep,
-  },
-  heroContent: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
+  heroPlayText: { fontFamily: F.bold, fontSize: 13, color: "#1C1917" },
+  heroContent: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 20 },
   heroMeta: {
-    fontFamily: F.bold,
-    fontSize: 10,
-    color: "rgba(255,255,255,0.6)",
-    letterSpacing: 0.6,
-    marginBottom: 4,
+    fontFamily: F.bold, fontSize: 10,
+    color: "rgba(255,255,255,0.6)", letterSpacing: 0.6, marginBottom: 4,
   },
-  heroName: {
-    fontFamily: F.bold,
-    fontSize: 26,
-    color: "#fff",
-    marginBottom: 4,
-  },
-  heroDesc: {
-    fontFamily: F.medium,
-    fontSize: 14,
-    color: "rgba(255,255,255,0.75)",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: 20,
-    gap: 12,
-  },
+  heroName: { fontFamily: F.bold, fontSize: 26, color: "#fff", marginBottom: 4 },
+  heroDesc: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.75)" },
+  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: 20, gap: 12 },
   gridCard: {
-    width: "47%",
-    backgroundColor: K.card,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: K.border,
+    width: "47%", backgroundColor: "#FFFFFF", borderRadius: 18,
+    padding: 16, borderWidth: 1, borderColor: "rgba(28,25,23,0.08)",
   },
-  gridIcon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  gridName: {
-    fontFamily: F.bold,
-    fontSize: 15,
-    color: K.deep,
-    marginBottom: 4,
-  },
+  gridIcon: { fontSize: 28, marginBottom: 8 },
+  gridName: { fontFamily: F.bold, fontSize: 15, color: "#1C1917", marginBottom: 4 },
   gridDesc: {
-    fontFamily: F.medium,
-    fontSize: 12,
-    color: K.muted,
-    lineHeight: 17,
-    marginBottom: 10,
+    fontFamily: F.medium, fontSize: 12, color: "#78716C",
+    lineHeight: 17, marginBottom: 10,
   },
-  gridTag: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  gridTagText: {
-    fontFamily: F.bold,
-    fontSize: 10,
-    letterSpacing: 0.4,
-  },
-  backLink: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  backLinkText: {
-    fontFamily: F.semibold,
-    fontSize: 14,
-    color: K.muted,
-  },
-  handBackLink: {
-    alignItems: "center",
-    paddingBottom: 20,
-  },
-  handBackText: {
-    fontFamily: F.semibold,
-    fontSize: 13,
-    color: K.muted,
-  },
+  gridTag: { alignSelf: "flex-start", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  gridTagText: { fontFamily: F.bold, fontSize: 10, letterSpacing: 0.4 },
+  backLink: { alignItems: "center", paddingVertical: 16 },
+  backLinkText: { fontFamily: F.semibold, fontSize: 14, color: "#78716C" },
+  handBackLink: { alignItems: "center", paddingBottom: 20 },
+  handBackText: { fontFamily: F.semibold, fontSize: 13, color: "#78716C" },
 });
