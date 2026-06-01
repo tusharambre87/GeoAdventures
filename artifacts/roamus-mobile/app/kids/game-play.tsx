@@ -1510,56 +1510,62 @@ function GeoSpy() {
     setUsedPrompts((prev) => [...prev, p]);
   };
 
+  // ── INTRO ──
   if (phase === "intro") {
     return (
-      <IntroScreen
-        icon="👁"
-        title="GeoSpy"
-        subtitle="The travel I Spy game"
-        description="Everyone looks around. Tap 'Next Prompt' whenever you're ready for a new challenge!"
-        note="Look carefully — things are everywhere!"
-        btnLabel="Start"
-        btnColor="#E8692A"
-        onStart={startSpy}
-        onBack={() => router.back()}
-      />
+      <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+        <Text style={{ fontSize: 64, marginBottom: 12 }}>👁</Text>
+        <Text style={spy.introTitle}>GeoSpy</Text>
+        <Text style={spy.introSub}>Look around and call out what you see!</Text>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#3DAA6E", marginTop: 32, paddingHorizontal: 40 }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startSpy(); }}
+        >
+          <Text style={sh.btnText}>Start Spying</Text>
+        </Pressable>
+        <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
+          <Text style={sh.backBtnText}>← Back to Games</Text>
+        </Pressable>
+      </View>
     );
   }
 
+  // ── PLAYING (infinite) ──
   return (
-    <View style={{ flex: 1, backgroundColor: "#FDF0E9" }}>
+    <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24,
-          paddingHorizontal: 24, alignItems: "center", flexGrow: 1, justifyContent: "center",
+          paddingTop: insets.top + 32,
+          paddingBottom: insets.bottom + 32,
+          paddingHorizontal: 24,
+          alignItems: "center",
+          flexGrow: 1,
+          justifyContent: "center",
         }}
       >
-        <Text style={{ fontSize: 52, marginBottom: 16 }}>👁</Text>
-        <Text style={[sh.gameTitle, { color: "#E8692A" }]}>GeoSpy</Text>
-        <Text style={spy.look}>Everyone look around…</Text>
+        <Text style={spy.title}>👁 GeoSpy</Text>
 
         <View style={spy.promptCard}>
+          <Text style={spy.promptIcon}>🔊</Text>
           <Text style={spy.promptText}>{currentPrompt}</Text>
         </View>
 
-        <Text style={spy.hint}>Look for it, then tap Next for a new prompt!</Text>
+        <Text style={spy.hint}>Call out what you see — no need to tap anything!</Text>
 
         <Pressable
-          style={[sh.btn, { backgroundColor: "#E8692A", alignSelf: "stretch", marginTop: 28 }]}
+          style={[sh.btn, { backgroundColor: "#3DAA6E", alignSelf: "stretch", marginTop: 28 }]}
           onPress={nextPrompt}
         >
-          <Text style={sh.btnText}>Next Prompt →</Text>
+          <Text style={sh.btnText}>✨ Next one →</Text>
         </Pressable>
 
         <Pressable
-          style={[sh.btn, { backgroundColor: "#E5E7EB", alignSelf: "stretch", marginTop: 12 }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPhase("intro"); }}
+          style={spy.doneBtn}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
         >
-          <Text style={[sh.btnText, { color: "#374151" }]}>End GeoSpy</Text>
+          <Text style={spy.doneBtnText}>Done</Text>
         </Pressable>
-
-        <BackBtn onPress={() => router.back()} />
       </ScrollView>
     </View>
   );
@@ -1765,8 +1771,21 @@ const bag = StyleSheet.create({
 });
 
 const spy = StyleSheet.create({
-  look: { fontFamily: F.medium, fontSize: 15, color: "#78716C", marginBottom: 24 },
-  promptCard: { backgroundColor: "#fff", borderRadius: 24, borderWidth: 2, borderColor: "#FBD0B8", padding: 32, alignItems: "center", width: "100%", marginBottom: 16 },
-  promptText: { fontFamily: F.bold, fontSize: 22, color: "#1C1917", textAlign: "center", lineHeight: 32 },
-  hint: { fontFamily: F.medium, fontSize: 13, color: "#9CA3AF", textAlign: "center" },
+  // Intro
+  introTitle: { fontFamily: F.bold, fontSize: 26, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
+  introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", maxWidth: 260 },
+  // Playing
+  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 28 },
+  promptCard: {
+    backgroundColor: "#3DAA6E", borderRadius: 24, padding: 36,
+    alignItems: "center", width: "100%", marginBottom: 20,
+  },
+  promptIcon: { fontSize: 36, marginBottom: 16 },
+  promptText: { fontFamily: F.bold, fontSize: 24, color: "#fff", textAlign: "center", lineHeight: 34 },
+  hint: { fontFamily: F.medium, fontSize: 13, color: "#9CA3AF", textAlign: "center", marginBottom: 4 },
+  doneBtn: {
+    alignSelf: "stretch", marginTop: 12, borderRadius: 16, borderWidth: 2,
+    borderColor: "#7C3AED", alignItems: "center", justifyContent: "center", paddingVertical: 14,
+  },
+  doneBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
 });
