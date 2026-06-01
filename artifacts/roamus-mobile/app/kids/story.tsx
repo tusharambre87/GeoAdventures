@@ -90,14 +90,27 @@ function stripEmojis(text: string): string {
 
 // ─── Audio helpers ────────────────────────────────────────────────────────────
 
+/** Fast djb2 hash of the first 600 chars — enough to detect story text changes */
+function textHash(text: string): string {
+  let h = 5381;
+  const limit = Math.min(text.length, 600);
+  for (let i = 0; i < limit; i++) {
+    h = ((h << 5) + h) ^ text.charCodeAt(i);
+  }
+  return (h >>> 0).toString(36);
+}
+
 async function fetchAndCacheAudio(
   stopId: string,
   storyKey: string,
   storyText: string
 ): Promise<string> {
-  const localUri = `${FileSystem.cacheDirectory}kids_audio_${stopId}_${storyKey}.mp3`;
+  // Cache key includes a hash of the story text so stale audio is busted
+  // when the API returns a longer story than what was previously cached.
+  const hash = textHash(storyText);
+  const localUri = `${FileSystem.cacheDirectory}kids_audio_${stopId}_${storyKey}_${hash}.mp3`;
 
-  // Return cached file if it exists
+  // Return cached file if it exists and matches the current story
   const info = await FileSystem.getInfoAsync(localUri);
   if (info.exists) return localUri;
 

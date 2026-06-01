@@ -837,14 +837,21 @@ export default function AtStopScreen() {
           {/* 2. Secondary — Let kids explore */}
           <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
             onPress={() => {
-              const firstExplorer = trip?.travelers?.[0];
+              const travelers = trip?.travelers ?? [];
+              // Prefer a traveler who isn't named "You" (likely a child or named family member)
+              const kidExplorer =
+                travelers.find(t => t.name && t.name !== 'You') ??
+                travelers[0];
+              const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
+                ? kidExplorer.name
+                : travelers[0]?.name ?? 'Explorer';
               router.push({ pathname: '/kids' as never,
                 params: {
                   stopId: currentStop.id,
                   stopName: encodeURIComponent(currentStop.name),
                   tripId: trip?.id ?? '',
-                  explorerId: firstExplorer?.name ?? 'explorer',
-                  explorerName: encodeURIComponent(firstExplorer?.name ?? 'Explorer'),
+                  explorerId: explorerName,
+                  explorerName: encodeURIComponent(explorerName),
                 },
               });
             }}>
