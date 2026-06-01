@@ -5042,6 +5042,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return result;
   }
 
+  // Background story preloader — called after all stops for a trip have been generated.
+  // Iterates over every stop sequentially and generates + caches Kids Explore content
+  // (stories, practical info) so the first visit to Kids Mode is instant.
+  async function preloadStoriesForTrip(tripId: string, destination: string): Promise<void> {
+    const stops = await storage.getStopsByTripId(tripId);
+    if (stops.length === 0) return;
+
+    console.log(`📚 [StoryPreload] Starting preload for ${stops.length} stops (trip: ${tripId})`);
+    const { getExploreContent } = await import('../exploreContentService');
+
+    let generated = 0;
+    for (const stop of stops) {
+      try {
+        // Skip if already has a full-length story (≥ 5 min = 300 s)
+        const pack = await storage.getJourneyPackByStopId(stop.id);
+        const cached = (pack?.exploreData) as any;
+        const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 300;
+        if (hasRichStories) {
+          console.log(`📚 [StoryPreload] "${stop.name}" already cached — skipping`);
+          continue;
+        }
+
+        console.log(`📚 [StoryPreload] Generating for "${stop.name}"…`);
+        const exploreData = await getExploreContent(
+          stop.name,
+          stop.stopType || 'landmark',
+          destination
+        );
+
+        // Cache in the journey pack — create it first if it doesn't exist yet
+        let targetPack = pack;
+        if (!targetPack) {
+          targetPack = await storage.createJourneyPack({ stopId: stop.id });
+        }
+        if (targetPack) {
+          await storage.updateJourneyPack(targetPack.id, { exploreData });
+        }
+        generated++;
+        console.log(`✅ [StoryPreload] "${stop.name}" ready — ${exploreData.stories?.main?.durationSeconds ?? 0}s main story`);
+
+        // Small gap between stops so we don't hammer the OpenAI API
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (err) {
+        console.error(`❌ [StoryPreload] Failed for "${stop.name}":`, err);
+        // Continue with remaining stops regardless
+      }
+    }
+    console.log(`✅ [StoryPreload] Complete: ${generated}/${stops.length} stops preloaded for trip ${tripId}`);
+  }
+
   // Background stop generation — called after trip is created and response already sent.
   // All AI calls (OpenAI) happen here so they never block the HTTP response.
   async function generateStopsInBackground(
@@ -5469,6 +5519,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })();
         }
       }
+      // Fire-and-forget: preload Kids Explore stories for every stop so users
+      // never wait 15–20 seconds when they first open Kids Mode.
+      preloadStoriesForTrip(tripId, destination).catch(e =>
+        console.error("[StoryPreload] Background preload failed:", e)
+      );
     } catch (err) {
       console.error(`❌ [Travel] [bg] Stop generation failed for tripId=${tripId}:`, err);
     }
@@ -8550,6 +8605,28 @@ Return ONLY valid JSON in this exact format:
     } catch (error) {
       console.error("Error fetching explore content:", error);
       res.status(500).json({ message: "Failed to fetch explore content" });
+    }
+  });
+
+  // On-demand story preload — lets the client trigger background story generation
+  // for all stops in a trip (e.g. for trips created before auto-preloading was added).
+  // Returns 202 immediately; work happens in background.
+  app.post('/api/travel/trips/:tripId/preload-stories', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      if (trip.userId && trip.userId !== userId) return res.status(403).json({ message: "Not authorized" });
+
+      res.status(202).json({ message: "Story preload started" });
+
+      preloadStoriesForTrip(tripId, trip.destination || '').catch(e =>
+        console.error("[StoryPreload] On-demand preload failed:", e)
+      );
+    } catch (err) {
+      console.error("[StoryPreload] Error starting on-demand preload:", err);
+      res.status(500).json({ message: "Failed to start preload" });
     }
   });
 

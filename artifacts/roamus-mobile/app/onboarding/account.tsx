@@ -68,6 +68,12 @@ export default function AccountScreen() {
       if (res.ok) {
         const trip = await res.json();
         set({ createdTripId: trip.id });
+        // Fire-and-forget: warm up Kids Explore stories for all stops in the
+        // background so users never wait when they first open Kids Mode.
+        fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${jwt}` },
+        }).catch(() => {});
       }
     } catch {
       // Trip creation is best-effort here; user is already registered
