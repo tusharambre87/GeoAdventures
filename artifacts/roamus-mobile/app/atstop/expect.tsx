@@ -6,6 +6,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { G, F } from '@/lib/tokens';
 
+// ── Types ───────────────────────────────────────────────────────────────────
+type NearbyStopItem = {
+  name: string;
+  distance: string;
+  description: string;
+  agesNote?: string;
+  type: string;
+};
+
+type NearbySheet = 'food' | 'breaks' | 'kids' | null;
+
 export default function ExpectScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -40,11 +51,9 @@ export default function ExpectScreen() {
   const tripId       = params.tripId ?? "";
   const stopId       = params.stopId  ?? "";
 
-  // ── Nearby sub-sheet state ─────────────────────────────────────────────────
-  type NearbySheet = 'food' | 'breaks' | 'kids' | null;
   const [nearbySheet, setNearbySheet] = useState<NearbySheet>(null);
 
-  // ── Directions + Tickets ───────────────────────────────────────────────────
+  // ── Directions ─────────────────────────────────────────────────────────────
   const openDirections = () => {
     if (lat && lon) {
       const url = Platform.OS === "ios"
@@ -98,101 +107,81 @@ export default function ExpectScreen() {
   const priceRange = pRef.priceRange ?? enrichment.priceRange;
   const admissionVal = priceRange
     ? priceRange
-    : meta.ticketSignal === true
-      ? "Ticket required"
-      : meta.ticketSignal === false
-        ? "Free entry"
-        : "Free";
+    : meta.ticketSignal === true ? "Ticket required"
+    : meta.ticketSignal === false ? "Free entry"
+    : "Free";
   const admissionColor = (meta.ticketSignal === false || (!priceRange && meta.ticketSignal !== true))
     ? G.green : G.deep;
   const accessRows: AccessRow[] = [
-    parking != null
-      ? { key: "Parking", val: parking || "Nearby", color: "#D97706" }
-      : null,
-    { key: "Stroller friendly", val: stroller ? "Yes" : "Check ahead",
-      color: stroller ? G.green : G.muted },
+    parking != null ? { key: "Parking", val: parking || "Nearby", color: "#D97706" } : null,
+    { key: "Stroller friendly", val: stroller ? "Yes" : "Check ahead", color: stroller ? G.green : G.muted },
     { key: "Restrooms",  val: restrooms || "On site" },
     { key: "Admission",  val: admissionVal, color: admissionColor },
     address ? { key: "Address", val: address } : null,
   ].filter((x): x is AccessRow => x !== null);
 
-  // ── Nearby Essentials data helpers ────────────────────────────────────────
-  const foodOptions  = enrichment.foodOptions ?? pProf.foodOptions ?? "";
-  const nearbyStops: string[] = pProf.nearbyStops ?? enrichment.nearbyStops ?? [];
+  // ── Nearby Essentials ─────────────────────────────────────────────────────
+  // Normalise: API may return NearbyStopItem[] or legacy string[]
+  const rawNearby: unknown[] = pProf.nearbyStops ?? enrichment.nearbyStops ?? [];
+  const nearbyStops: NearbyStopItem[] = rawNearby.map((item: unknown) =>
+    typeof item === 'string'
+      ? { name: item as string, distance: 'Nearby', description: '', type: 'other' }
+      : (item as NearbyStopItem)
+  );
 
-  type FoodItem  = { name: string; distance: string; cuisine: string; price: string };
-  type PlaceItem = { name: string; distance: string; ageRange?: string; description: string | null };
+  const FOOD_TYPES  = ['restaurant', 'cafe', 'food', 'ice_cream', 'dining'];
+  const BREAK_TYPES = ['park', 'garden', 'plaza', 'bench_area', 'rest_area', 'cafe', 'coffee'];
+  const KID_TYPES   = ['kid_attraction', 'playground', 'museum', 'theatre', 'theater', 'activity', 'zoo', 'aquarium'];
 
-  const getFoodNearby = (): FoodItem[] => {
-    if (!foodOptions) return [{ name: "Restaurants nearby", distance: "Nearby", cuisine: "Various", price: "$$" }];
-    return String(foodOptions)
-      .split(/[\n;]/)
-      .filter(Boolean)
-      .slice(0, 4)
-      .map(line => {
-        const parts = line.split(" - ");
-        return {
-          name:     parts[0]?.trim() ?? line.trim(),
-          distance: parts[1]?.trim() ?? "Nearby",
-          cuisine:  parts[2]?.trim() ?? "Restaurant",
-          price:    parts[3]?.trim() ?? "$$",
-        };
-      });
+  const filterOrAll = (types: string[]): NearbyStopItem[] => {
+    const filtered = nearbyStops.filter(p => types.includes(p.type));
+    return filtered.length > 0 ? filtered.slice(0, 5) : nearbyStops.slice(0, 5);
   };
 
-  const getBreakSpots = (): PlaceItem[] => {
-    const breakTypes = ["park", "cafe", "coffee", "garden", "plaza", "bench", "rest"];
-    const filtered = nearbyStops
-      .filter(s => breakTypes.some(t => s.toLowerCase().includes(t)))
-      .slice(0, 4)
-      .map(s => ({ name: s, distance: "Nearby", description: null }));
-    if (filtered.length === 0) return [
-      { name: "Parks nearby",  distance: "Tap Maps to find one", description: null },
-      { name: "Cafes nearby",  distance: "Tap Maps to find one", description: null },
-    ];
-    return filtered;
+  const foodPlaces  = filterOrAll(FOOD_TYPES);
+  const breakPlaces = filterOrAll(BREAK_TYPES);
+  const kidPlaces   = filterOrAll(KID_TYPES);
+
+  // Maps helper
+  const openMaps = (placeName: string) => {
+    const query = encodeURIComponent(placeName + (address ? ' near ' + address : ''));
+    Linking.openURL('maps://maps.apple.com/?q=' + query).catch(() => {
+      // Fallback to Apple Maps web
+      Linking.openURL('https://maps.apple.com/?q=' + query).catch(() => {});
+    });
   };
 
-  const getKidExtras = (): PlaceItem[] => {
-    const kidTypes = ["museum", "playground", "zoo", "aquarium", "theatre", "theater",
-      "ice cream", "children", "kids", "play", "game", "library"];
-    const filtered = nearbyStops
-      .filter(s => kidTypes.some(t => s.toLowerCase().includes(t)))
-      .slice(0, 4)
-      .map(s => ({ name: s, distance: "Nearby", ageRange: "All ages", description: null }));
-    if (filtered.length === 0) return [
-      { name: "Kid-friendly places nearby", distance: "Tap Maps to explore", ageRange: "All ages", description: null },
-    ];
-    return filtered;
+  const openMapsCategory = (q: string) => {
+    const query = lat && lon
+      ? encodeURIComponent(q) + (lat && lon ? '&sll=' + lat + ',' + lon + '&z=14' : '')
+      : encodeURIComponent(q + (address ? ' near ' + address : ''));
+    const url = lat && lon
+      ? 'https://maps.apple.com/?q=' + encodeURIComponent(q) + '&sll=' + lat + ',' + lon + '&z=14'
+      : 'https://maps.apple.com/?q=' + encodeURIComponent(q + (address ? ' near ' + address : ''));
+    Linking.openURL(url).catch(() => {});
   };
 
-  const handleAddFoodToPlan = async (restaurant: FoodItem) => {
+  // Add food stop to trip
+  const handleAddFoodToPlan = async (place: NearbyStopItem) => {
     try {
-      const res = await fetch(`/api/travel/trips/${tripId}/add-stop`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+      const res = await fetch('/api/travel/trips/' + tripId + '/add-stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          name: restaurant.name, type: "restaurant",
+          name: place.name, type: 'restaurant',
           latitude: lat, longitude: lon,
           dayIndex: 0,
           insertAfterStopId: stopId || undefined,
         }),
       });
-      if (!res.ok) throw new Error("not ok");
+      if (!res.ok) throw new Error('not ok');
       setNearbySheet(null);
     } catch {
-      // Endpoint not ready — open Maps as fallback
-      if (lat && lon)
-        Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(restaurant.name)}&sll=${lat},${lon}`).catch(() => {});
+      openMaps(place.name);
       setNearbySheet(null);
     }
   };
-
-  const mapsCoords = (q: string, z = 14) =>
-    lat && lon
-      ? `https://maps.apple.com/?q=${encodeURIComponent(q)}&sll=${lat},${lon}&z=${z}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q + " near " + (address || stopName))}`;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -201,7 +190,7 @@ export default function ExpectScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.nav}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>{"←"} At Stop</Text>
+            <Text style={styles.backText}>← At Stop</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.stopLabel} numberOfLines={1}>{stopName}</Text>
@@ -213,10 +202,10 @@ export default function ExpectScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Directions + Tickets */}
+        {/* Actions */}
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionBtn} onPress={openDirections}>
-            <Text style={styles.actionBtnText}>{"↗"}  Directions</Text>
+            <Text style={styles.actionBtnText}>↗  Directions</Text>
           </TouchableOpacity>
           {showTickets && (
             <TouchableOpacity
@@ -252,7 +241,7 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        {/* Timing & Logistics */}
+        {/* Timing */}
         {timingRows.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{"TIMING & LOGISTICS"}</Text>
@@ -281,30 +270,24 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        {/* Nearby Essentials — 3 rows open sub-sheets */}
+        {/* Nearby Essentials */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>NEARBY ESSENTIALS</Text>
 
-          <TouchableOpacity
-            style={styles.essRow}
-            onPress={() => setNearbySheet('food')}
-          >
+          <TouchableOpacity style={styles.essRow} onPress={() => setNearbySheet('food')}>
             <Text style={styles.essIcon}>🍔</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.essTitle}>Food nearby</Text>
               <Text style={styles.essSub}>
-                {foodOptions
-                  ? `${String(foodOptions).split(/[\n;]/).filter(Boolean).length} options found`
-                  : "Family-friendly options nearby"}
+                {foodPlaces.length > 0
+                  ? foodPlaces.length + ' options found'
+                  : 'Family-friendly options nearby'}
               </Text>
             </View>
             <Text style={styles.essArrow}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.essRow}
-            onPress={() => setNearbySheet('breaks')}
-          >
+          <TouchableOpacity style={styles.essRow} onPress={() => setNearbySheet('breaks')}>
             <Text style={styles.essIcon}>🌿</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.essTitle}>Quick break spots</Text>
@@ -338,27 +321,35 @@ export default function ExpectScreen() {
               <Text style={styles.sheetTitle}>Food nearby</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {getFoodNearby().map((r, i) => (
-                <View key={i} style={styles.placeCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={styles.placeName} numberOfLines={1}>{r.name}</Text>
-                    <TouchableOpacity onPress={() =>
-                      Linking.openURL(mapsCoords(r.name)).catch(() => {})}>
-                      <Text style={styles.mapsLink}>Maps →</Text>
+              {foodPlaces.length === 0 ? (
+                <Text style={styles.emptyMsg}>No food spots found nearby</Text>
+              ) : (
+                foodPlaces.map((place, i) => (
+                  <View key={i} style={styles.placeCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                        {place.name}
+                      </Text>
+                      <TouchableOpacity onPress={() => openMaps(place.name)}>
+                        <Text style={styles.mapsLink}>Maps →</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.placeMeta}>{place.distance}</Text>
+                    {place.description ? (
+                      <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.addBtn}
+                      onPress={() => handleAddFoodToPlan(place)}
+                    >
+                      <Text style={styles.addBtnText}>+ Add to plan</Text>
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.placeMeta}>{r.distance} · {r.cuisine} · {r.price}</Text>
-                  <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={() => handleAddFoodToPlan(r)}
-                  >
-                    <Text style={styles.addBtnText}>+ Add to plan</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                ))
+              )}
               <TouchableOpacity
                 style={{ paddingVertical: 16, alignItems: 'center' }}
-                onPress={() => Linking.openURL(mapsCoords("family restaurant", 14)).catch(() => {})}>
+                onPress={() => openMapsCategory('family restaurant')}>
                 <Text style={styles.seeMore}>See more on Apple Maps →</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -377,24 +368,29 @@ export default function ExpectScreen() {
               <Text style={styles.sheetTitle}>Quick break spots</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {getBreakSpots().map((place, i) => (
-                <View key={i} style={styles.placeCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={styles.placeName} numberOfLines={1}>{place.name}</Text>
-                    <TouchableOpacity onPress={() =>
-                      Linking.openURL(mapsCoords(place.name)).catch(() => {})}>
-                      <Text style={styles.mapsLink}>Maps →</Text>
-                    </TouchableOpacity>
+              {breakPlaces.length === 0 ? (
+                <Text style={styles.emptyMsg}>No break spots found nearby</Text>
+              ) : (
+                breakPlaces.map((place, i) => (
+                  <View key={i} style={styles.placeCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                        {place.name}
+                      </Text>
+                      <TouchableOpacity onPress={() => openMaps(place.name)}>
+                        <Text style={styles.mapsLink}>Maps →</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.placeMeta, { color: '#3DAA6E' }]}>{place.distance}</Text>
+                    {place.description ? (
+                      <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
+                    ) : null}
                   </View>
-                  <Text style={styles.placeMeta}>{place.distance}</Text>
-                  {place.description ? (
-                    <Text style={styles.placeDesc}>{place.description}</Text>
-                  ) : null}
-                </View>
-              ))}
+                ))
+              )}
               <TouchableOpacity
                 style={{ paddingVertical: 16, alignItems: 'center' }}
-                onPress={() => Linking.openURL(mapsCoords("park cafe", 14)).catch(() => {})}>
+                onPress={() => openMapsCategory('park cafe')}>
                 <Text style={styles.seeMore}>See more on Apple Maps →</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -413,26 +409,31 @@ export default function ExpectScreen() {
               <Text style={styles.sheetTitle}>Kid-friendly extras</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {getKidExtras().map((place, i) => (
-                <View key={i} style={styles.placeCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={styles.placeName} numberOfLines={1}>{place.name}</Text>
-                    <TouchableOpacity onPress={() =>
-                      Linking.openURL(mapsCoords(place.name)).catch(() => {})}>
-                      <Text style={styles.mapsLink}>Maps →</Text>
-                    </TouchableOpacity>
+              {kidPlaces.length === 0 ? (
+                <Text style={styles.emptyMsg}>No kid-friendly spots found nearby</Text>
+              ) : (
+                kidPlaces.map((place, i) => (
+                  <View key={i} style={styles.placeCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                        {place.name}
+                      </Text>
+                      <TouchableOpacity onPress={() => openMaps(place.name)}>
+                        <Text style={styles.mapsLink}>Maps →</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.placeMeta}>
+                      {place.distance}{place.agesNote ? ' · ' + place.agesNote : ''}
+                    </Text>
+                    {place.description ? (
+                      <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
+                    ) : null}
                   </View>
-                  <Text style={styles.placeMeta}>
-                    {place.distance}{place.ageRange ? ` · ${place.ageRange}` : ""}
-                  </Text>
-                  {place.description ? (
-                    <Text style={styles.placeDesc}>{place.description}</Text>
-                  ) : null}
-                </View>
-              ))}
+                ))
+              )}
               <TouchableOpacity
                 style={{ paddingVertical: 16, alignItems: 'center' }}
-                onPress={() => Linking.openURL(mapsCoords("kids activities", 13)).catch(() => {})}>
+                onPress={() => openMapsCategory('kids activities')}>
                 <Text style={styles.seeMore}>See more on Apple Maps →</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -444,7 +445,7 @@ export default function ExpectScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ── Screen ─────────────────────────────────────────────────────────────────
+  // Screen
   container:     { flex: 1, backgroundColor: G.bg },
   header:        { backgroundColor: "#1A1F2E", paddingHorizontal: 20, paddingBottom: 24 },
   nav:           { flexDirection: "row", marginBottom: 16 },
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { fontFamily: F.bold, fontSize: 13, color: G.deep },
   ticketBtn:     { borderWidth: 1.5, borderColor: "rgba(245,166,35,0.4)" },
-  // ── Sections ───────────────────────────────────────────────────────────────
+  // Sections
   section:       {
     backgroundColor: "#fff", borderRadius: 16, padding: 18, marginBottom: 12,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10,
@@ -478,13 +479,13 @@ const styles = StyleSheet.create({
   },
   infoKey:       { fontFamily: F.medium, fontSize: 13, color: G.muted, flex: 1 },
   infoVal:       { fontFamily: F.bold, fontSize: 13, color: G.deep, textAlign: "right", flex: 1 },
-  // ── Nearby Essentials rows ─────────────────────────────────────────────────
+  // Nearby Essentials rows
   essRow:        { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)" },
   essIcon:       { fontSize: 20, width: 36 },
   essTitle:      { fontFamily: F.bold, fontSize: 14, color: G.deep, marginBottom: 2 },
   essSub:        { fontFamily: F.medium, fontSize: 12, color: G.muted },
   essArrow:      { fontSize: 20, color: "#C4C9D4" },
-  // ── Sheet overlay ──────────────────────────────────────────────────────────
+  // Sheet overlay
   overlay:       {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", zIndex: 300,
@@ -494,19 +495,19 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, paddingBottom: 40, maxHeight: "82%",
   },
-  handle:        { width: 36, height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  handle:        { width: 40, height: 4, backgroundColor: "#E5E7EB", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
   sheetTitle:    { fontFamily: F.bold, fontSize: 18, color: G.deep },
-  // ── Place cards ────────────────────────────────────────────────────────────
+  emptyMsg:      { fontFamily: F.medium, fontSize: 14, color: G.muted, textAlign: "center", marginVertical: 24 },
+  // Place cards — cream bg per brief
   placeCard:     {
-    backgroundColor: "white", borderRadius: 14, padding: 16, marginBottom: 10,
-    shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-    borderWidth: 1, borderColor: "rgba(0,0,0,0.05)",
+    backgroundColor: "#F5F2EE", borderRadius: 12, padding: 14, marginBottom: 10,
   },
-  placeName:     { fontFamily: F.bold, fontSize: 15, color: G.deep, flex: 1, marginBottom: 2 },
-  placeMeta:     { fontFamily: F.medium, fontSize: 12, color: G.muted, marginBottom: 10 },
-  placeDesc:     { fontFamily: F.medium, fontSize: 13, color: "#4B5563", lineHeight: 18 },
+  placeName:     { fontFamily: F.semibold, fontSize: 15, color: G.deep },
+  placeMeta:     { fontFamily: F.medium, fontSize: 13, color: G.muted, marginBottom: 6 },
+  placeDesc:     { fontFamily: F.medium, fontSize: 13, color: "#4B5563", lineHeight: 18, marginBottom: 6 },
   mapsLink:      { fontFamily: F.bold, fontSize: 13, color: G.orange },
-  addBtn:        { backgroundColor: G.orange, borderRadius: 10, paddingVertical: 11, alignItems: "center" },
+  // Add to plan button — pill shape, height 44
+  addBtn:        { backgroundColor: G.orange, borderRadius: 24, height: 44, alignItems: "center", justifyContent: "center", marginTop: 4 },
   addBtnText:    { fontFamily: F.bold, fontSize: 14, color: "white" },
   seeMore:       { fontFamily: F.medium, fontSize: 13, color: G.muted },
 });
