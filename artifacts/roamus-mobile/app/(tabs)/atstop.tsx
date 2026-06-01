@@ -94,6 +94,7 @@ type Stop = {
   visited?: boolean;
   address?: string | null;
   cityGroup?: string | null;
+  openingHours?: string | null;
   enrichment?: StopEnrichment | null;
   metadata?: StopMetadata | null;
 };
@@ -117,6 +118,7 @@ type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'okay' | 'good' | 'amazing';
 type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
 type ExtraPlace     = { name: string; distance: string; description: string; stopType: string; ages?: string };
+type Moment         = { id: string; photoUrl: string };
 
 // ─── Dev mock data ────────────────────────────────────────────────────────────
 
@@ -339,6 +341,7 @@ export default function AtStopScreen() {
   const [kidPlaces, setKidPlaces]       = useState<ExtraPlace[]>([]);
   const [kidLoading, setKidLoading]     = useState(false);
   const [addingStop, setAddingStop]     = useState<string | null>(null);
+  const [stopMoments, setStopMoments]   = useState<Moment[]>([]);
 
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
@@ -349,9 +352,16 @@ export default function AtStopScreen() {
       if (urls[0]) setHeroImageUrl(urls[0]);
       setStopImages([urls[0] ?? null, urls[1] ?? null, urls[2] ?? null]);
     });
-    // Reset food state for new stop
+    // Reset food + extras + moments state for new stop
     setFoodPlaces([]); setFoodLoaded(false);
-  }, [currentStop?.id]);
+    setBreakPlaces([]); setKidPlaces([]);
+    setStopMoments([]);
+    if (trip?.id && currentStop?.id) {
+      apiFetch<{ moments?: Moment[] }>(`/api/travel/trips/${trip.id}/moments?stopId=${currentStop.id}`)
+        .then(d => setStopMoments(d.moments ?? []))
+        .catch(() => {});
+    }
+  }, [currentStop?.id, trip?.id]);
 
   // ── Load on focus ──
   useFocusEffect(
@@ -659,6 +669,37 @@ export default function AtStopScreen() {
             </View>
           </View>
 
+          {/* Hours pill — conditional, bottom-left of nav row */}
+          {currentStop.openingHours ? (
+            <View style={{
+              position: 'absolute', top: paddingTop + 48, left: 16, zIndex: 10,
+              flexDirection: 'row', alignItems: 'center', gap: 5,
+              backgroundColor: 'rgba(61,170,110,0.2)', borderWidth: 1,
+              borderColor: 'rgba(61,170,110,0.4)', borderRadius: 20,
+              paddingHorizontal: 12, paddingVertical: 6,
+            }}>
+              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#3DAA6E' }} />
+              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#6EE7B7' }}>
+                {'Open · '}{currentStop.openingHours}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* SOS pill — always visible, top-right below nav row */}
+          <TouchableOpacity
+            style={{
+              position: 'absolute', top: paddingTop + 48, right: 16, zIndex: 10,
+              flexDirection: 'row', alignItems: 'center', gap: 5,
+              backgroundColor: 'rgba(239,68,68,0.18)', borderWidth: 1,
+              borderColor: 'rgba(239,68,68,0.4)', borderRadius: 20,
+              paddingHorizontal: 12, paddingVertical: 6,
+            }}
+            onPress={() => router.push({ pathname: '/atstop/sos' as never,
+              params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } })}>
+            <Text style={{ fontSize: 12 }}>🆘</Text>
+            <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
+          </TouchableOpacity>
+
           {/* Stop info at hero bottom */}
           <View style={dt.heroBottom}>
             <Text style={dt.heroType}>{stopTypeLabel} · Stop {(currentStop.displayOrder ?? stopIdx) + 1} of {totalStops}</Text>
@@ -687,7 +728,7 @@ export default function AtStopScreen() {
         {/* ── Why This Stop card ───────────────────────────────────────────── */}
         {!!enrichment.whyNow && (
           <View style={dt.card}>
-            <Text style={dt.cardLabelOrange}>WHY THIS STOP WORKS</Text>
+            <Text style={dt.cardLabelOrange}>DO THIS FIRST</Text>
             <Text style={dt.cardText}>{enrichment.whyNow}</Text>
           </View>
         )}
@@ -732,7 +773,7 @@ export default function AtStopScreen() {
 
         {/* ── Photos strip ─────────────────────────────────────────────────── */}
         <View style={dt.photoSection}>
-          <Text style={dt.photoSectionLabel}>PHOTOS</Text>
+          <Text style={dt.photoSectionLabel}>PHOTOS FROM FAMILIES</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8 }}>
             {stopImages.map((imgUrl, i) => (
@@ -754,7 +795,7 @@ export default function AtStopScreen() {
 
         {/* ── Need Help? rescue rows ───────────────────────────────────────── */}
         <View style={dt.rescueSection}>
-          <Text style={dt.sectionLabel}>NEED HELP?</Text>
+          <Text style={dt.sectionLabel}>NEED SOMETHING?</Text>
           {([
             { icon: '⏩', label: 'Running behind',   type: 'behind' as RescueType },
             { icon: '😴', label: 'Kids are tired',   type: 'tired'  as RescueType },
@@ -852,6 +893,23 @@ export default function AtStopScreen() {
           )}
         </View>
 
+        {/* ── What to Expect tile ─────────────────────────────────────────── */}
+        <TouchableOpacity style={[dt.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+          activeOpacity={0.8}
+          onPress={() => router.push({ pathname: '/atstop/expect' as never, params: {
+            stopName: encodeURIComponent(currentStop.name),
+            address: encodeURIComponent(address),
+            enrichment: encodeURIComponent(JSON.stringify(enrichment)),
+            meta: encodeURIComponent(JSON.stringify(meta)),
+            duration: String(duration),
+          }})}>
+          <View style={{ flex: 1 }}>
+            <Text style={dt.cardLabelOrange}>WHAT TO EXPECT</Text>
+            <Text style={dt.bestTimeText}>Full timing, tips {'&'} logistics</Text>
+          </View>
+          <Text style={{ fontSize: 18, color: C.muted }}>›</Text>
+        </TouchableOpacity>
+
         {/* ── CTA buttons (scroll with content) ───────────────────────────── */}
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
           {/* 1. Primary — Capture a moment */}
@@ -924,7 +982,7 @@ export default function AtStopScreen() {
       {/* ── SHEET: Change Stop ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'change'} onClose={() => setActiveSheet('none')}>
         <Text style={sh.title}>Where to next?</Text>
-        <Text style={sh.sub}>Follow your planned route or pick any stop from today.</Text>
+        <Text style={sh.sub}>Follow your planned route or pick any stop from the trip.</Text>
 
         {/* Follow planned route — highlighted */}
         {nextStop && (
@@ -939,31 +997,65 @@ export default function AtStopScreen() {
           </TouchableOpacity>
         )}
 
-        <Text style={sh.dividerLabel}>ALL TODAY’S STOPS</Text>
-
-        {dayStops.map(stop => {
-          const isCurrent = stop.id === currentStop.id;
-          const isNext    = stop.id === nextStop?.id;
-          const bgCol     = STOP_HERO_BG[stop.stopType ?? ''] ?? STOP_HERO_BG.default;
-          const em        = STOP_HERO_EMOJI[stop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
+        {(() => {
+          const allStops = trip?.stops ?? [];
+          const byDay: Record<number, typeof allStops> = {};
+          allStops.forEach(s => { const di = s.dayIndex ?? 0; if (!byDay[di]) byDay[di] = []; byDay[di].push(s); });
+          const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+          const dest = (trip?.destination ?? trip?.city ?? '').toUpperCase();
           return (
-            <TouchableOpacity key={stop.id} activeOpacity={isCurrent ? 1 : 0.8}
-              style={[sh.row, isNext && sh.rowHighlighted]}
-              onPress={() => {
-                if (isCurrent) return;
-                setCurrentStop(stop); setActiveSheet('none');
-              }}>
-              <View style={[sh.rowIcon, { backgroundColor: bgCol }]}><Text>{em}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={[sh.rowName, isNext && { color: C.orange }]}>{stop.name}</Text>
-                <Text style={[sh.rowDesc, isNext && { color: 'rgba(232,105,42,0.65)' }]}>
-                  {stopTypeLabel} · {isCurrent ? 'current stop' : isNext ? 'next up' : `stop ${dayStops.indexOf(stop) + 1}`}
-                </Text>
-              </View>
-              {!isCurrent && <Text style={[sh.rowChev, isNext && { color: C.orange }]}>›</Text>}
-            </TouchableOpacity>
+            <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
+              {days.map(di => {
+                const header = di === dayIndex ? "TODAY’S STOPS" : `DAY ${di + 1} · ${dest}`;
+                const stopsForDay = (byDay[di] ?? []).slice().sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+                return (
+                  <React.Fragment key={di}>
+                    <Text style={sh.dividerLabel}>{header}</Text>
+                    {stopsForDay.map(stop => {
+                      const isCurrent = stop.id === currentStop.id;
+                      const isNext    = stop.id === nextStop?.id && !isCurrent;
+                      const isVisited = isStopVisited(stop);
+                      const bgCol     = STOP_HERO_BG[stop.stopType ?? ''] ?? STOP_HERO_BG.default;
+                      const em        = STOP_HERO_EMOJI[stop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
+                      const stLabel   = (stop.stopType ?? 'stop').charAt(0).toUpperCase() + (stop.stopType ?? 'stop').slice(1);
+                      return (
+                        <TouchableOpacity key={stop.id}
+                          activeOpacity={(isCurrent || isVisited) ? 1 : 0.8}
+                          style={[sh.row, isNext && sh.rowHighlighted,
+                            (isCurrent || isVisited) && { opacity: 0.45 }]}
+                          onPress={() => {
+                            if (isCurrent || isVisited) return;
+                            setCurrentStop(stop);
+                            if (di !== dayIndex) {
+                              setDayIndex(di);
+                              setDayStops((trip?.stops ?? [])
+                                .filter(s => (s.dayIndex ?? 0) === di)
+                                .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)));
+                            }
+                            setActiveSheet('none');
+                          }}>
+                          <View style={[sh.rowIcon, { backgroundColor: bgCol }]}><Text>{em}</Text></View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[sh.rowName, isNext && { color: C.orange },
+                              isVisited && { textDecorationLine: 'line-through' }]}>
+                              {stop.name}
+                            </Text>
+                            <Text style={[sh.rowDesc, isNext && { color: 'rgba(232,105,42,0.65)' }]}>
+                              {isCurrent ? 'current stop' : isVisited ? '✓ Visited' : isNext ? 'next up' : stLabel}
+                            </Text>
+                          </View>
+                          {!isCurrent && !isVisited && (
+                            <Text style={[sh.rowChev, isNext && { color: C.orange }]}>›</Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </ScrollView>
           );
-        })}
+        })()}
         <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
           <Text style={sh.cancelText}>Cancel</Text>
         </TouchableOpacity>
