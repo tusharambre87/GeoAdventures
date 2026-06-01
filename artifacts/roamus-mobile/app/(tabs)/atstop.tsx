@@ -1071,22 +1071,43 @@ export default function AtStopScreen() {
           <>
             <Text style={sh.title}>Kids running low?</Text>
             <Text style={sh.sub}>Let’s give everyone a break</Text>
-            {[
-              { icon: '☕', bg: C.orangeLt, name: 'Find a nearby cafe',   url: address ? mapsUrl('cafe near ' + address) : null },
-              { icon: '🌳', bg: C.sageLt,   name: 'Quick outdoor break',  url: address ? mapsUrl('park near ' + address) : null },
-              { icon: '🏠', bg: C.bg,        name: 'Head back early',       url: null, isWrap: true },
-            ].map(row => (
-              <TouchableOpacity key={row.name} style={sh.row} activeOpacity={0.8}
-                onPress={() => {
-                  if (row.isWrap) { setActiveSheet('none'); router.push('/(tabs)/today'); return; }
-                  if (row.url) Linking.openURL(row.url);
-                  setActiveSheet('none');
-                }}>
-                <View style={[sh.rowIcon, { backgroundColor: row.bg }]}><Text>{row.icon}</Text></View>
-                <View style={{ flex: 1 }}><Text style={sh.rowName}>{row.name}</Text></View>
-                <Text style={sh.rowChev}>›</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => setActiveSheet('food')}>
+              <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>☕</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Find a nearby cafe</Text>
+                <Text style={sh.rowDesc}>Browse cafes and snack spots close by</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => {
+                setActiveSheet('none');
+                Alert.alert(
+                  'Quick outdoor break',
+                  'Find a shady bench, plaza, or patch of grass within a 5-minute walk. Even 10 minutes outside recharges kids fast.',
+                  [
+                    { text: 'Got it', style: 'cancel' },
+                    { text: 'Open Maps', onPress: () => { if (address) Linking.openURL(mapsUrl('park near ' + address)); } },
+                  ]
+                );
+              }}>
+              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🌳</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Quick outdoor break</Text>
+                <Text style={sh.rowDesc}>10 min outside works wonders</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => { setActiveSheet('none'); router.push('/(tabs)/today'); }}>
+              <View style={[sh.rowIcon, { backgroundColor: C.bg }]}><Text>🏠</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Head back early</Text>
+                <Text style={sh.rowDesc}>Wrap up — great job today!</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
           </>
         )}
         {rescueType === 'skip' && (
@@ -1113,17 +1134,34 @@ export default function AtStopScreen() {
           <>
             <Text style={sh.title}>Need more excitement?</Text>
             <Text style={sh.sub}>Let’s turn it up</Text>
-            {[
-              { icon: '🍕', bg: C.sageLt,   name: 'Upgrade lunch',         url: address ? mapsUrl('great restaurants near ' + address) : null },
-              { icon: '🎭', bg: C.purpleLt, name: 'Find something active',  url: address ? mapsUrl('activities near ' + address) : null },
-            ].map(row => (
-              <TouchableOpacity key={row.name} style={sh.row} activeOpacity={0.8}
-                onPress={() => { if (row.url) Linking.openURL(row.url); setActiveSheet('none'); }}>
-                <View style={[sh.rowIcon, { backgroundColor: row.bg }]}><Text>{row.icon}</Text></View>
-                <View style={{ flex: 1 }}><Text style={sh.rowName}>{row.name}</Text></View>
-                <Text style={sh.rowChev}>›</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => setActiveSheet('food')}>
+              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🍕</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Upgrade lunch</Text>
+                <Text style={sh.rowDesc}>Find great restaurants nearby</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => {
+                setActiveSheet('none');
+                Alert.alert(
+                  'Find something active',
+                  'Look for a nearby trampoline park, mini golf, bowling alley, or arcade to add some energy to your day.',
+                  [
+                    { text: 'Got it', style: 'cancel' },
+                    { text: 'Open Maps', onPress: () => { if (address) Linking.openURL(mapsUrl('activities near ' + address)); } },
+                  ]
+                );
+              }}>
+              <View style={[sh.rowIcon, { backgroundColor: C.purpleLt }]}><Text>🎭</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Find something active</Text>
+                <Text style={sh.rowDesc}>Trampoline park, mini golf, arcade…</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
           </>
         )}
         <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>

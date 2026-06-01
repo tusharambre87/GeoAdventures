@@ -6834,7 +6834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Replace suggestions — AI-curated alternatives for swapping an existing stop
   app.post('/api/travel/stops/replace-suggestions', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
-      const { stopName, stopType, destination, chipFilter } = req.body;
+      const { stopName, stopType, destination, chipFilter, search } = req.body;
       if (!stopName || !destination) return res.status(400).json({ message: "stopName and destination are required" });
 
       const openai = getOpenAI();
@@ -6845,6 +6845,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       else if (chipFilter === "fun") chipHint = "Prioritize highly entertaining, interactive stops that kids love.";
       else if (chipFilter === "free") chipHint = "Only suggest free or no-cost stops (public parks, free museums, plazas, markets, viewpoints, etc.).";
       else if (chipFilter === "indoor") chipHint = "Only suggest indoor stops (museums, aquariums, science centers, indoor playgrounds, theaters, galleries). No parks, outdoor landmarks, or outdoor activities.";
+
+      const searchHint = search
+        ? `The parent searched for "${search}" — prioritize results that match or are closely related to this query. Include "${search}" or similar named places if they exist in ${destination}.`
+        : "";
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -6858,16 +6862,17 @@ Return a JSON object with two arrays:
 - similar: 4 same-category nearby options in ${destination}
 
 ${chipHint}
+${searchHint}
 
 Each item must have:
-- name: the well-known name of the place (no made-up places, real places in ${destination})
+- name: the well-known name of the place (no made-up places, real places in ${destination} or the immediately surrounding area)
 - stopType: one of [landmark, museum, park, beach, restaurant, zoo, aquarium, playground, food, adventure, nature, other]
 - duration: estimated visit duration e.g. "60–90 min"
 - description: 1 sentence about why this is a great alternative
 
 Return ONLY real, well-known places in or near ${destination}. Return valid JSON only.`,
           },
-          { role: "user", content: `Replace "${stopName}" in ${destination}` },
+          { role: "user", content: `Replace "${stopName}" in ${destination}${search ? ` — parent searched for "${search}"` : ""}` },
         ],
         response_format: { type: "json_object" },
         max_tokens: 700,

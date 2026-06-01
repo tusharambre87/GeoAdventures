@@ -1551,7 +1551,8 @@ function ReplaceSheet({
   const [search, setSearch]   = useState('');
   const [loading, setLoading] = useState(false);
   const [alts, setAlts]       = useState<Array<{ id: string; name: string; stopType?: string; description?: string; duration?: string; durationMinutes?: number }>>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const altsCacheRef = useRef<Map<string, typeof alts>>(new Map());
 
   const queryClient = useQueryClient();
 
@@ -1566,6 +1567,9 @@ function ReplaceSheet({
 
   async function loadAlts(chipVal: ReplaceChip, searchVal: string) {
     if (!stop) return;
+    const cacheKey = `${stop.id}:${chipVal}:${searchVal}`;
+    const cached = altsCacheRef.current.get(cacheKey);
+    if (cached) { setAlts(cached); return; }
     setLoading(true);
     try {
       const res = await apiFetch<{ better?: typeof alts; similar?: typeof alts; suggestions?: typeof alts }>(
@@ -1584,7 +1588,9 @@ function ReplaceSheet({
       const combined = [...(res.better ?? []), ...(res.similar ?? []), ...(res.suggestions ?? [])];
       const existingNames = new Set(allStops.map(s => s.name?.toLowerCase().trim()));
       const filtered = combined.filter(a => !existingNames.has(a.name?.toLowerCase().trim()));
-      setAlts(filtered.slice(0, 8));
+      const result = filtered.slice(0, 8);
+      altsCacheRef.current.set(cacheKey, result);
+      setAlts(result);
     } catch {
       setAlts([]);
     } finally {
@@ -2205,7 +2211,7 @@ function SheetModal({
           bottom: 0,
           left: 0,
           right: 0,
-          maxHeight: '91%',
+          height: '88%',
           backgroundColor: C.card,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
