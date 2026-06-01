@@ -385,7 +385,7 @@ export default function StoryPlayer() {
           {/* Controls */}
           <View style={s.controls}>
             <Pressable style={s.skipBtn} onPress={handleRestart}>
-              <Text style={{ color: "#fff", fontSize: 22 }}>{"⏮"}</Text>
+              <Text style={{ color: K.purple, fontSize: 22 }}>{"⏮"}</Text>
             </Pressable>
 
             <Pressable
@@ -403,7 +403,7 @@ export default function StoryPlayer() {
             </Pressable>
 
             <Pressable style={s.skipBtn} onPress={handleSkipEnd}>
-              <Text style={{ color: "#fff", fontSize: 22 }}>{"⏭"}</Text>
+              <Text style={{ color: K.purple, fontSize: 22 }}>{"⏭"}</Text>
             </Pressable>
           </View>
 
@@ -568,9 +568,11 @@ const s = StyleSheet.create({
   },
   skipBtn: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
   },
   playBtn: {
     width: 88, height: 88, borderRadius: 44,
