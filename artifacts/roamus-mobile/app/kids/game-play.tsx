@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -686,6 +687,63 @@ function DoneScreen({
   );
 }
 
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+
+const CONFETTI_COLORS = ["#7C3AED", "#E8692A", "#22C55E", "#F59E0B", "#2563EB", "#EC4899"];
+
+function Confetti() {
+  const pieces = useRef(
+    Array.from({ length: 24 }, (_, i) => ({
+      x: Math.random() * 340,
+      size: 7 + Math.random() * 8,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      isCircle: i % 3 !== 0,
+      delay: Math.floor(Math.random() * 500),
+      duration: 1800 + Math.floor(Math.random() * 800),
+      anim: new Animated.Value(0),
+    }))
+  ).current;
+
+  useEffect(() => {
+    pieces.forEach(({ anim, delay, duration }) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ])
+      ).start();
+    });
+    return () => pieces.forEach(({ anim }) => anim.stopAnimation());
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {pieces.map((p, i) => {
+        const translateY = p.anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 700] });
+        const rotate = p.anim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "720deg"] });
+        const opacity = p.anim.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
+        return (
+          <Animated.View
+            key={i}
+            style={{
+              position: "absolute",
+              left: p.x,
+              top: 0,
+              width: p.size,
+              height: p.size,
+              borderRadius: p.isCircle ? p.size / 2 : 2,
+              backgroundColor: p.color,
+              transform: [{ translateY }, { rotate }],
+              opacity,
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Think Fast! ─────────────────────────────────────────────────────────────
 
 function ThinkFast({ stopName }: { stopName: string }) {
@@ -715,7 +773,12 @@ function ThinkFast({ stopName }: { stopName: string }) {
     if (phase !== "playing") { clearTimer(); return; }
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
-        if (t <= 1) { clearTimer(); setPhase("reveal"); return 0; }
+        if (t <= 1) {
+          clearTimer();
+          // tapCount captured via closure is stale; use functional updater to read it
+          setTapCount((c) => { setPhase(c >= 10 ? "complete" : "reveal"); return c; });
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -724,30 +787,33 @@ function ThinkFast({ stopName }: { stopName: string }) {
 
   useEffect(() => () => clearTimer(), []);
 
+  // ── INTRO ──
   if (phase === "intro" || !prompt) {
     return (
       <IntroScreen
         icon="⚡"
         title="Think Fast!"
         subtitle="Name 10 things in 30 seconds"
-        description="Everyone shouts answers as fast as they can. Tap the button once for each answer you name!"
+        description="Everyone shouts answers as fast as they can. Tap once for each answer you name!"
         note="No wrong answers — just keep going!"
-        btnLabel="Start!"
-        btnColor="#F59E0B"
+        btnLabel="Start — 30 seconds!"
+        btnColor="#7C3AED"
         onStart={startGame}
         onBack={() => router.back()}
       />
     );
   }
 
+  // ── PLAYING ──
   if (phase === "playing") {
-    const timerColor = timeLeft <= 10 ? "#DC2626" : "#F59E0B";
+    const timerColor = timeLeft <= 5 ? "#DC2626" : timeLeft <= 10 ? "#F59E0B" : "#22C55E";
     return (
       <ScrollView
         style={{ flex: 1, backgroundColor: "#FFFBEB" }}
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Timer + counter */}
         <View style={tf.timerRow}>
           <View style={[tf.timerCircle, { borderColor: timerColor }]}>
             <Text style={[tf.timerNum, { color: timerColor }]}>{timeLeft}</Text>
@@ -758,9 +824,11 @@ function ThinkFast({ stopName }: { stopName: string }) {
           </View>
         </View>
 
+        {/* Prompt */}
         <Text style={tf.promptLabel}>⚡ Name 10 things…</Text>
         <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
 
+        {/* 10 progress dots */}
         <View style={tf.dots}>
           {Array.from({ length: 10 }).map((_, i) => (
             <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#22C55E" : "#E5E7EB" }]}>
@@ -769,30 +837,35 @@ function ThinkFast({ stopName }: { stopName: string }) {
           ))}
         </View>
 
+        {/* Big orange tap button */}
         <Pressable
-          style={[tf.tapBtn, tapCount >= 10 && { backgroundColor: "#22C55E" }]}
+          style={tf.tapBtn}
           onPress={() => {
             if (tapCount >= 10) return;
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setTapCount((n) => n + 1);
+            const next = tapCount + 1;
+            setTapCount(next);
+            if (next >= 10) { clearTimer(); setPhase("complete"); }
           }}
           disabled={tapCount >= 10}
         >
-          <Text style={tf.tapBtnText}>{tapCount >= 10 ? "🎉 Amazing!" : "👆 Tap!"}</Text>
+          <Text style={tf.tapBtnText}>👆 Tap!</Text>
         </Pressable>
 
+        {/* Bottom row — Close first, Show Me Answers second */}
         <View style={tf.rowBtns}>
-          <Pressable style={tf.smBtn} onPress={() => { clearTimer(); setPhase("reveal"); }}>
-            <Text style={tf.smBtnText}>Show Answers</Text>
-          </Pressable>
           <Pressable style={tf.smBtn} onPress={() => { clearTimer(); setPhase("intro"); setPrompt(null); }}>
             <Text style={tf.smBtnText}>Close</Text>
+          </Pressable>
+          <Pressable style={tf.smBtn} onPress={() => { clearTimer(); setPhase("reveal"); }}>
+            <Text style={tf.smBtnText}>Show Me Answers</Text>
           </Pressable>
         </View>
       </ScrollView>
     );
   }
 
+  // ── REVEAL (timer ran out, didn't get all 10) ──
   if (phase === "reveal" && prompt) {
     return (
       <ScrollView
@@ -800,17 +873,18 @@ function ThinkFast({ stopName }: { stopName: string }) {
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 24, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={{ fontSize: 52, marginBottom: 8 }}>{tapCount >= 10 ? "🎉" : "⏰"}</Text>
-        <Text style={sh.doneTitle}>{tapCount >= 10 ? "Amazing teamwork!" : "Nice thinking!"}</Text>
-        <Text style={sh.doneSub}>You counted {tapCount} together!</Text>
+        <Text style={{ fontSize: 52, marginBottom: 8 }}>⏰</Text>
+        <Text style={[sh.doneTitle, { color: "#F59E0B" }]}>Time's up!</Text>
+        <Text style={sh.doneSub}>You named {tapCount} / 10</Text>
 
         <View style={tf.revealBox}>
-          <Text style={tf.revealLabel}>If you guessed some of these — great job! 🌟</Text>
-          <View style={tf.revealGrid}>
+          <Text style={tf.revealLabel}>Some example answers — great job if you got any! 🌟</Text>
+          {/* Answer chips */}
+          <View style={tf.chipRow}>
             {prompt.exampleAnswers.map((a, i) => (
-              <View key={i} style={tf.revealItem}>
-                <Text style={{ fontSize: 20 }}>{a.emoji}</Text>
-                <Text style={tf.revealItemText}>{a.answer}</Text>
+              <View key={i} style={tf.chip}>
+                <Text style={{ fontSize: 16 }}>{a.emoji}</Text>
+                <Text style={tf.chipText}>{a.answer}</Text>
               </View>
             ))}
           </View>
@@ -818,25 +892,43 @@ function ThinkFast({ stopName }: { stopName: string }) {
         </View>
 
         <Pressable
-          style={[sh.btn, { backgroundColor: "#22C55E", marginTop: 24, alignSelf: "stretch" }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPhase("complete"); }}
+          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 24, alignSelf: "stretch" }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
         >
-          <Text style={sh.btnText}>Continue</Text>
+          <Text style={sh.btnText}>⚡ Play Again</Text>
+        </Pressable>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#E5E7EB", marginTop: 12, alignSelf: "stretch" }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        >
+          <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
         </Pressable>
       </ScrollView>
     );
   }
 
+  // ── COMPLETE (got all 10!) ──
   return (
-    <DoneScreen
-      emoji="🎉"
-      title="That was fun!"
-      subtitle="Want to try another one?"
-      accent="#F59E0B"
-      onPlayAgain={startGame}
-      onBack={() => router.back()}
-      playAgainLabel="⚡ Play Again"
-    />
+    <View style={{ flex: 1, backgroundColor: "#FFFBEB" }}>
+      <Confetti />
+      <View style={[sh.centered, { backgroundColor: "transparent" }]}>
+        <Text style={{ fontSize: 72, marginBottom: 12 }}>⚡</Text>
+        <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>Amazing!</Text>
+        <Text style={[sh.doneSub, { marginBottom: 0 }]}>You named them all!</Text>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32 }]}
+          onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); startGame(); }}
+        >
+          <Text style={sh.btnText}>⚡ Play Again</Text>
+        </Pressable>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#E5E7EB", marginTop: 12 }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        >
+          <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -1396,16 +1488,16 @@ const tf = StyleSheet.create({
   dots: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
   dot: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   dotCheck: { fontFamily: F.bold, fontSize: 16, color: "#fff" },
-  tapBtn: { backgroundColor: "#F59E0B", borderRadius: 20, paddingVertical: 24, alignItems: "center", marginBottom: 16 },
+  tapBtn: { backgroundColor: "#E8692A", borderRadius: 20, paddingVertical: 24, alignItems: "center", marginBottom: 16 },
   tapBtnText: { fontFamily: F.bold, fontSize: 20, color: "#fff" },
   rowBtns: { flexDirection: "row", gap: 12 },
   smBtn: { flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14, paddingVertical: 13, alignItems: "center" },
   smBtnText: { fontFamily: F.semibold, fontSize: 14, color: "#374151" },
   revealBox: { backgroundColor: "#FFFBEB", borderRadius: 20, borderWidth: 1.5, borderColor: "#FCD34D", padding: 20, width: "100%", marginTop: 20 },
   revealLabel: { fontFamily: F.semibold, fontSize: 13, color: "#92400E", marginBottom: 12, textAlign: "center" },
-  revealGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  revealItem: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#fff", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, width: "47%" },
-  revealItemText: { fontFamily: F.medium, fontSize: 12, color: "#374151", flexShrink: 1 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#fff", borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: "#FCD34D" },
+  chipText: { fontFamily: F.semibold, fontSize: 13, color: "#374151" },
   revealNote: { fontFamily: F.medium, fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 12, fontStyle: "italic" },
 });
 
