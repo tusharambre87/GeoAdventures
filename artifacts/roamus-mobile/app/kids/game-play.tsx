@@ -1141,12 +1141,13 @@ function answerColor(a: string): string {
   return "#F59E0B";
 }
 
-function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
+function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: string; tripId: string }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
   const [target, setTarget] = useState("");
   const [usedTargets, setUsedTargets] = useState<string[]>([]);
+  const [tripStopNames, setTripStopNames] = useState<string[]>([]);
   const [cards, setCards] = useState<QCard[]>([]);
   const [seenQuestions, setSeenQuestions] = useState<string[]>([]);
   const [questionsAsked, setQuestionsAsked] = useState(0);
@@ -1156,14 +1157,38 @@ function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
   const [isCorrect, setIsCorrect] = useState(false);
   const wrongMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fetch other stops in this trip so we can use real city places as targets
+  useEffect(() => {
+    if (!tripId) return;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("authToken");
+        const res = await fetch(`${API_BASE}/api/travel/trips/${tripId}/stops`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json();
+        const names: string[] = (data.stops ?? [])
+          .map((s: { name: string }) => s.name)
+          .filter((n: string) => n.toLowerCase() !== stopName.toLowerCase());
+        if (names.length > 0) setTripStopNames(names);
+      } catch {
+        // Fall back to GLOBAL_LANDMARKS silently
+      }
+    })();
+  }, [tripId, stopName]);
+
   const pickTarget = useCallback((): string => {
-    const candidates = stopName
-      ? [stopName, ...GLOBAL_LANDMARKS.filter((l) => l !== stopName)]
-      : GLOBAL_LANDMARKS;
-    const available = candidates.filter((t) => !usedTargets.includes(t));
-    const pool = available.length > 0 ? available : candidates;
+    // Use other trip stops (same city/trip) first; fall back to world landmarks.
+    // NEVER pick the current stop — the player is already there.
+    const base = tripStopNames.length > 0 ? tripStopNames : GLOBAL_LANDMARKS;
+    const available = base.filter(
+      (t) => t.toLowerCase() !== stopName.toLowerCase() && !usedTargets.includes(t)
+    );
+    const pool = available.length > 0 ? available : base.filter(
+      (t) => t.toLowerCase() !== stopName.toLowerCase()
+    );
     return pool[Math.floor(Math.random() * pool.length)];
-  }, [stopName, usedTargets]);
+  }, [stopName, usedTargets, tripStopNames]);
 
   const pickCards = useCallback((seen: string[]): QCard[] => {
     const pool = GEOGUESS_QUESTIONS.filter((q) => !seen.includes(q));
@@ -1636,7 +1661,7 @@ export default function GamePlay() {
       : "think-fast";
 
   if (gameType === "scavenger") return <ScavengerHunt stopName={stopName} tripId={tripId} />;
-  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} stopId={stopId} />;
+  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} stopId={stopId} tripId={tripId} />;
   if (gameType === "geospy")    return <GeoSpy />;
   if (gameType === "bag")       return <WhatsInMyBag stopName={stopName} />;
   return <ThinkFast stopName={stopName} />;
