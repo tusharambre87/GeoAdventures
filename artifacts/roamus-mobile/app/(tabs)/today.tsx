@@ -4,7 +4,7 @@
  * Steps 1-5 complete: Pre-Day · En Route · At Stop · Visited · Day Wrap
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 
@@ -248,8 +248,17 @@ async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): P
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const DURATION_BY_TYPE: Record<string, number> = {
+  museum: 90, aquarium: 90, zoo: 90, theater: 90, science_center: 90,
+  restaurant: 45, meal: 45, lunch: 45, dinner: 45, breakfast: 45, cafe: 45,
+  park: 45, nature: 45, garden: 45, beach: 45,
+  landmark: 60, viewpoint: 60, observation: 60, bridge: 60,
+};
+
 function getStopDuration(stop: Stop): number {
-  return stop.durationMinutes ?? 60;
+  if (stop.durationMinutes) return stop.durationMinutes;
+  const t = stop.stopType ?? '';
+  return DURATION_BY_TYPE[t] ?? 60;
 }
 
 /** Faster pace trims 15 min off each stop (min 30). Balanced/Easier use planned duration. */
@@ -260,13 +269,19 @@ function effectiveDuration(stop: Stop, pace: Pace): number {
 }
 
 /**
- * Travel time FROM stop[idx] TO stop[idx+1].
- * Stored in the NEXT stop's metadata.travelMinutes; defaults to 20 min.
+ * Travel time FROM stop[idx] TO stop[idx+1] — family-adjusted.
+ * Uses the API-computed travelMinsFromPrevious (haversine-based) and adds a
+ * 15-min family overhead buffer (parking, bathrooms, getting everyone moving).
+ * Minimum 25 min between stops, default 30 min when no coord data exists.
  */
 function getTravelToNext(stops: Stop[], idx: number): number {
   if (idx >= stops.length - 1) return 0;
-  const nextMeta = parseMetadata(stops[idx + 1].metadata);
-  return nextMeta.travelMinutes ?? 20;
+  const next = stops[idx + 1];
+  const fromAPI = (next as Stop & { travelMinsFromPrevious?: number | null }).travelMinsFromPrevious;
+  const fromMeta = parseMetadata(next.metadata).travelMinutes;
+  if (fromMeta != null) return Math.max(25, fromMeta + 15);
+  if (fromAPI != null) return Math.max(25, fromAPI + 15);
+  return 30;
 }
 
 function isMealStop(type?: string | null): boolean {
@@ -444,53 +459,52 @@ export default function TodayScreen() {
     else if (todayState === 'enroute' || todayState === 'preday') setAtStopStartTime(null);
   }, [todayState]);
 
-  // ── Load trip on mount ──
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        let tid = resolvedTripId;
-        if (!tid) {
-          const data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
-          const active = data.trips?.find(t => t.status === 'active') ?? data.trips?.[0];
-          if (!active) { setError('No trips found — plan a trip first.'); return; }
-          tid = active.id;
-          setResolvedTripId(tid);
-        }
-        const t = await apiFetch<TripData>(`/api/travel/trips/${tid}`);
-        setTrip(t);
+  // ── Load trip — extracted so useFocusEffect can re-run it ──
+  const loadTrip = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let tid = resolvedTripId;
+      if (!tid) {
+        const data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
+        const active = data.trips?.find(t => t.status === 'active') ?? data.trips?.[0];
+        if (!active) { setError('No trips found — plan a trip first.'); return; }
+        tid = active.id;
+        setResolvedTripId(tid);
+      }
+      const t = await apiFetch<TripData>(`/api/travel/trips/${tid}`);
+      setTrip(t);
 
-        const stops = (t.stops ?? [])
+      const stops = (t.stops ?? [])
+        .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
+        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      setDayStops(stops);
+
+      // Resume from last visited
+      const lastVisited = stops.reduce(
+        (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
+      );
+      if (lastVisited >= 0 && lastVisited < stops.length - 1) {
+        setCurrentStopIndex(lastVisited + 1);
+        setTodayState('enroute');
+      }
+    } catch (e: unknown) {
+      if (__DEV__) {
+        const mockStops = MOCK_TRIP.stops
           .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
           .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        setDayStops(stops);
-
-        // Resume from last visited
-        const lastVisited = stops.reduce(
-          (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
-        );
-        if (lastVisited >= 0 && lastVisited < stops.length - 1) {
-          setCurrentStopIndex(lastVisited + 1);
-          setTodayState('enroute');
-        }
-      } catch (e: unknown) {
-        // In dev, fall back to mock data so the screen is previewable without auth
-        if (__DEV__) {
-          const mockStops = MOCK_TRIP.stops
-            .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
-            .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-          setTrip(MOCK_TRIP);
-          setDayStops(mockStops);
-        } else {
-          setError(e instanceof Error ? e.message : 'Failed to load trip');
-        }
-      } finally {
-        setLoading(false);
+        setTrip(MOCK_TRIP);
+        setDayStops(mockStops);
+      } else {
+        setError(e instanceof Error ? e.message : 'Failed to load trip');
       }
+    } finally {
+      setLoading(false);
     }
-    load();
   }, [resolvedTripId, resolvedDayIndex]);
+
+  // ── Re-fetch whenever the Today tab gains focus (catches stops added elsewhere) ──
+  useFocusEffect(useCallback(() => { loadTrip(); }, [loadTrip]));
 
   // ── Start Day handler ──
   async function handleStartDay() {

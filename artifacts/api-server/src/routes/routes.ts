@@ -6408,7 +6408,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const sLat = stop.latitude ? parseFloat(String(stop.latitude)) : null;
             const sLon = stop.longitude ? parseFloat(String(stop.longitude)) : null;
             if (pLat && pLon && sLat && sLon) {
-              (stop as any).travelMinsFromPrevious = Math.round((hKm(pLat, pLon, sLat, sLon) / 35) * 60);
+              // 12 km/h accounts for city driving + road factor vs crow-flies + parking.
+              // The front-end then adds a 15-min family overhead buffer on top.
+              const rawMins = Math.round((hKm(pLat, pLon, sLat, sLon) / 12) * 60);
+              (stop as any).travelMinsFromPrevious = Math.max(10, rawMins);
             } else {
               (stop as any).travelMinsFromPrevious = null;
             }
