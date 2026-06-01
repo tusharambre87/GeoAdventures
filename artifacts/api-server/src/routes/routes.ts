@@ -7204,6 +7204,58 @@ Example structure:
     }
   });
 
+  // ─── Rescue Extras — AI-generated break spots & kid-friendly places ─────────
+  // POST /api/travel/stops/rescue-extras
+  app.post('/api/travel/stops/rescue-extras', async (req: any, res) => {
+    try {
+      const { type, destination, stopName } = req.body;
+      if (!destination) return res.status(400).json({ message: 'destination is required' });
+      if (!['break', 'kids'].includes(type)) return res.status(400).json({ message: "type must be 'break' or 'kids'" });
+
+      const openai = getOpenAI();
+      const isBreak = type === 'break';
+      const contextHint = stopName ? `near "${stopName}" in ${destination}` : `in ${destination}`;
+
+      const prompt = isBreak
+        ? `You are a family travel expert. A family needs a quick outdoor break ${contextHint}. Return a JSON object with a "places" array of 4 real nearby break spots (parks, plazas, waterfronts, botanical gardens, playgrounds).
+
+Each item must have:
+- name: real place name (no made-up places)
+- distance: estimated walk/drive time e.g. "5 min walk" or "10 min drive"
+- description: 1–2 sentences on why it's great for a quick family break
+- stopType: one of [park, playground, nature, other]
+
+Return valid JSON only. No markdown.`
+        : `You are a family travel expert. A family with kids wants extra kid-friendly activities ${contextHint}. Return a JSON object with a "places" array of 4 real nearby kid-friendly attractions.
+
+Each item must have:
+- name: real place name (no made-up places)
+- distance: estimated walk/drive time e.g. "5 min walk" or "15 min drive"
+- description: 1–2 sentences on the kid appeal
+- stopType: one of [museum, playground, zoo, aquarium, park, other]
+- ages: age range e.g. "Ages 3–12" or "All ages"
+
+Return valid JSON only. No markdown.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 800,
+        response_format: { type: 'json_object' },
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? '{}';
+      let parsed: { places?: unknown[] } = {};
+      try { parsed = JSON.parse(raw); } catch {}
+
+      return res.json({ places: Array.isArray(parsed.places) ? parsed.places : [] });
+    } catch (error) {
+      req.log?.error({ error }, '[Travel] Rescue extras error');
+      return res.status(500).json({ message: 'Failed to load extras' });
+    }
+  });
+
   // ─── Weather Smart Rerouting — server-authoritative per-stop conflict check ──
   // GET /api/travel/trips/:tripId/weather-check?dayIndex=N
   // Fetches the trip's stops server-side for a given dayIndex, then runs conflict analysis.

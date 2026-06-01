@@ -93,6 +93,7 @@ type Stop = {
   isVisited?: boolean;
   visited?: boolean;
   address?: string | null;
+  cityGroup?: string | null;
   enrichment?: StopEnrichment | null;
   metadata?: StopMetadata | null;
 };
@@ -111,10 +112,11 @@ type TripData = {
 };
 
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
-type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food';
+type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food' | 'break' | 'kidExtras';
 type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'okay' | 'good' | 'amazing';
 type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
+type ExtraPlace     = { name: string; distance: string; description: string; stopType: string; ages?: string };
 
 // ─── Dev mock data ────────────────────────────────────────────────────────────
 
@@ -332,6 +334,11 @@ export default function AtStopScreen() {
   const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
   const [foodLoading, setFoodLoading]   = useState(false);
   const [foodLoaded, setFoodLoaded]     = useState(false);
+  const [breakPlaces, setBreakPlaces]   = useState<ExtraPlace[]>([]);
+  const [breakLoading, setBreakLoading] = useState(false);
+  const [kidPlaces, setKidPlaces]       = useState<ExtraPlace[]>([]);
+  const [kidLoading, setKidLoading]     = useState(false);
+  const [addingStop, setAddingStop]     = useState<string | null>(null);
 
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
@@ -442,6 +449,53 @@ export default function AtStopScreen() {
   function openSheet(s: ActiveSheet) {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveSheet(s);
+  }
+
+  async function addStopToPlan(name: string, stopType: string, durationMinutes: number) {
+    if (!trip?.id) return;
+    setAddingStop(name);
+    try {
+      await apiFetch(`/api/travel/trips/${trip.id}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({ name, stopType, durationMinutes, dayIndex, cityGroup: currentStop?.cityGroup ?? null }),
+      });
+      setActiveSheet('none');
+      Alert.alert('Added to plan!', `${name} added to Day ${dayIndex + 1}.`);
+    } catch {
+      Alert.alert('Error', "Couldn’t add stop — try again.");
+    } finally {
+      setAddingStop(null);
+    }
+  }
+
+  async function loadBreakPlaces() {
+    if (breakPlaces.length > 0) { setActiveSheet('break'); return; }
+    const dest = trip?.city ?? trip?.destination ?? '';
+    setBreakLoading(true);
+    setActiveSheet('break');
+    try {
+      const data = await apiFetch<{ places: ExtraPlace[] }>('/api/travel/stops/rescue-extras', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'break', destination: dest, stopName: currentStop?.name ?? '' }),
+      });
+      setBreakPlaces(data.places ?? []);
+    } catch { setBreakPlaces([]); }
+    finally { setBreakLoading(false); }
+  }
+
+  async function loadKidPlaces() {
+    if (kidPlaces.length > 0) { setActiveSheet('kidExtras'); return; }
+    const dest = trip?.city ?? trip?.destination ?? '';
+    setKidLoading(true);
+    setActiveSheet('kidExtras');
+    try {
+      const data = await apiFetch<{ places: ExtraPlace[] }>('/api/travel/stops/rescue-extras', {
+        method: 'POST',
+        body: JSON.stringify({ type: 'kids', destination: dest, stopName: currentStop?.name ?? '' }),
+      });
+      setKidPlaces(data.places ?? []);
+    } catch { setKidPlaces([]); }
+    finally { setKidLoading(false); }
   }
 
   // ── Loading ──
@@ -947,7 +1001,7 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Food Nearby ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'food'} onClose={() => setActiveSheet('none')}>
-        <Text style={sh.title}>Food nearby</Text>
+        <Text style={sh.title}>🍔 Food nearby</Text>
         <Text style={sh.sub}>Near {currentStop.name}</Text>
         {foodLoading ? (
           <View style={{ alignItems: 'center', paddingVertical: 32 }}>
@@ -957,17 +1011,25 @@ export default function AtStopScreen() {
         ) : foodPlaces.length > 0 ? (
           <>
             {foodPlaces.map(place => (
-              <View key={place.id} style={sh.foodRow}>
-                <View style={[sh.rowIcon, { backgroundColor: '#FFF3E0' }]}>
-                  <Text>🍽</Text>
+              <View key={place.id} style={sh.extraCard}>
+                <View style={sh.extraCardTop}>
+                  <View style={[sh.rowIcon, { backgroundColor: '#FFF3E0' }]}>
+                    <Text>🍽</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={sh.rowName}>{place.name}</Text>
+                    <Text style={sh.rowDesc}>{place.cuisine.charAt(0).toUpperCase() + place.cuisine.slice(1)}</Text>
+                  </View>
+                  <TouchableOpacity activeOpacity={0.7}
+                    onPress={() => Linking.openURL(mapsUrl(`${place.name} near ${address}`))}>
+                    <Text style={sh.mapsLink}>Maps →</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={sh.rowName}>{place.name}</Text>
-                  <Text style={sh.rowDesc}>{place.cuisine.charAt(0).toUpperCase() + place.cuisine.slice(1)}</Text>
-                </View>
-                <TouchableOpacity style={sh.dirBtn} activeOpacity={0.8}
-                  onPress={() => Linking.openURL(mapsUrl(`${place.name} near ${address}`))}>
-                  <Text style={sh.dirBtnText}>Directions</Text>
+                <TouchableOpacity
+                  style={[sh.addBtn, addingStop === place.id ? { opacity: 0.6 } : {}]}
+                  disabled={addingStop === place.id}
+                  onPress={() => addStopToPlan(place.name, 'food', 45)}>
+                  <Text style={sh.addBtnText}>{addingStop === place.id ? 'Adding…' : '+ Add to plan'}</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -992,6 +1054,108 @@ export default function AtStopScreen() {
             <Text style={sh.seeAllText}>Open in Google Maps →</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
+          <Text style={sh.cancelText}>Close</Text>
+        </TouchableOpacity>
+      </SheetModal>
+
+      {/* ── SHEET: Quick Break ──────────────────────────────────────────────── */}
+      <SheetModal visible={activeSheet === 'break'} onClose={() => setActiveSheet('none')}>
+        <Text style={sh.title}>🛋 Quick break spots</Text>
+        <Text style={sh.sub}>Near {currentStop.name}</Text>
+        <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+          {breakLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <ActivityIndicator size="large" color={C.orange} />
+              <Text style={[sh.sub, { marginTop: 10 }]}>Finding break spots…</Text>
+            </View>
+          ) : breakPlaces.length > 0 ? (
+            <>
+              {breakPlaces.map(place => (
+                <View key={place.name} style={sh.extraCard}>
+                  <View style={sh.extraCardTop}>
+                    <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🌳</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={sh.rowName}>{place.name}</Text>
+                      <Text style={sh.rowDesc}>{place.distance}</Text>
+                    </View>
+                    <TouchableOpacity activeOpacity={0.7}
+                      onPress={() => Linking.openURL(mapsUrl(place.name + ' near ' + address))}>
+                      <Text style={sh.mapsLink}>Maps →</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {!!place.description && <Text style={sh.extraDesc}>{place.description}</Text>}
+                  <TouchableOpacity
+                    style={[sh.addBtn, addingStop === place.name ? { opacity: 0.6 } : {}]}
+                    disabled={addingStop === place.name}
+                    onPress={() => addStopToPlan(place.name, place.stopType, 20)}>
+                    <Text style={sh.addBtnText}>{addingStop === place.name ? 'Adding…' : '+ Add to plan'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[sh.seeAllBtn, { marginBottom: 8 }]} activeOpacity={0.85}
+                onPress={() => { Linking.openURL(mapsUrl('parks near ' + address)); setActiveSheet('none'); }}>
+                <Text style={sh.seeAllText}>See more on Google Maps →</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={sh.seeAllBtn} activeOpacity={0.85}
+              onPress={() => { Linking.openURL(mapsUrl('parks near ' + address)); setActiveSheet('none'); }}>
+              <Text style={sh.seeAllText}>Search on Google Maps →</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+        <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
+          <Text style={sh.cancelText}>Close</Text>
+        </TouchableOpacity>
+      </SheetModal>
+
+      {/* ── SHEET: Kid-Friendly Extras ────────────────────────────────────── */}
+      <SheetModal visible={activeSheet === 'kidExtras'} onClose={() => setActiveSheet('none')}>
+        <Text style={sh.title}>🐻 Kid-friendly extras</Text>
+        <Text style={sh.sub}>Near {currentStop.name}</Text>
+        <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+          {kidLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <ActivityIndicator size="large" color={C.orange} />
+              <Text style={[sh.sub, { marginTop: 10 }]}>Finding kid-friendly spots…</Text>
+            </View>
+          ) : kidPlaces.length > 0 ? (
+            <>
+              {kidPlaces.map(place => (
+                <View key={place.name} style={sh.extraCard}>
+                  <View style={sh.extraCardTop}>
+                    <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>🎠</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={sh.rowName}>{place.name}</Text>
+                      <Text style={sh.rowDesc}>{place.distance}{place.ages ? ` · ${place.ages}` : ''}</Text>
+                    </View>
+                    <TouchableOpacity activeOpacity={0.7}
+                      onPress={() => Linking.openURL(mapsUrl(place.name + ' near ' + address))}>
+                      <Text style={sh.mapsLink}>Maps →</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {!!place.description && <Text style={sh.extraDesc}>{place.description}</Text>}
+                  <TouchableOpacity
+                    style={[sh.addBtn, addingStop === place.name ? { opacity: 0.6 } : {}]}
+                    disabled={addingStop === place.name}
+                    onPress={() => addStopToPlan(place.name, place.stopType, 60)}>
+                    <Text style={sh.addBtnText}>{addingStop === place.name ? 'Adding…' : '+ Add to plan'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[sh.seeAllBtn, { marginBottom: 8 }]} activeOpacity={0.85}
+                onPress={() => { Linking.openURL(mapsUrl('kid-friendly activities near ' + address)); setActiveSheet('none'); }}>
+                <Text style={sh.seeAllText}>See more on Google Maps →</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={sh.seeAllBtn} activeOpacity={0.85}
+              onPress={() => { Linking.openURL(mapsUrl('kid-friendly activities near ' + address)); setActiveSheet('none'); }}>
+              <Text style={sh.seeAllText}>Search on Google Maps →</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
         <TouchableOpacity style={sh.cancelBtn} onPress={() => setActiveSheet('none')}>
           <Text style={sh.cancelText}>Close</Text>
         </TouchableOpacity>
@@ -1072,7 +1236,15 @@ export default function AtStopScreen() {
             <Text style={sh.title}>Kids running low?</Text>
             <Text style={sh.sub}>Let’s give everyone a break</Text>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
-              onPress={() => setActiveSheet('food')}>
+              onPress={() => {
+                if (!foodLoaded && !foodLoading && address) {
+                  setFoodLoading(true);
+                  loadFoodNearby(address).then(places => {
+                    setFoodPlaces(places); setFoodLoaded(true); setFoodLoading(false);
+                  });
+                }
+                setActiveSheet('food');
+              }}>
               <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>☕</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Find a nearby cafe</Text>
@@ -1081,21 +1253,20 @@ export default function AtStopScreen() {
               <Text style={sh.rowChev}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
-              onPress={() => {
-                setActiveSheet('none');
-                Alert.alert(
-                  'Quick outdoor break',
-                  'Find a shady bench, plaza, or patch of grass within a 5-minute walk. Even 10 minutes outside recharges kids fast.',
-                  [
-                    { text: 'Got it', style: 'cancel' },
-                    { text: 'Open Maps', onPress: () => { if (address) Linking.openURL(mapsUrl('park near ' + address)); } },
-                  ]
-                );
-              }}>
+              onPress={() => loadBreakPlaces()}>
               <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🌳</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Quick outdoor break</Text>
-                <Text style={sh.rowDesc}>10 min outside works wonders</Text>
+                <Text style={sh.rowDesc}>Find a nearby park or break spot</Text>
+              </View>
+              <Text style={sh.rowChev}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={sh.row} activeOpacity={0.8}
+              onPress={() => loadKidPlaces()}>
+              <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>🐻</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>Kid-friendly extras</Text>
+                <Text style={sh.rowDesc}>Museums, play spots &amp; treats nearby</Text>
               </View>
               <Text style={sh.rowChev}>›</Text>
             </TouchableOpacity>
@@ -1361,4 +1532,12 @@ const sh = StyleSheet.create({
   seeAllBtn: { marginTop: 16, borderRadius: 14, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card },
   seeAllText: { fontFamily: F.semibold, fontSize: 14, color: C.deep },
+  // Extra place cards (break / kid extras / food enhanced)
+  extraCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1.5, borderColor: C.border,
+    padding: 14, marginBottom: 12 },
+  extraCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  extraDesc: { fontFamily: F.regular, fontSize: 13, color: C.muted, lineHeight: 19, marginBottom: 10 },
+  addBtn: { backgroundColor: C.orange, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  addBtnText: { fontFamily: F.bold, fontSize: 14, color: '#fff' },
+  mapsLink: { fontFamily: F.semibold, fontSize: 13, color: '#2563EB' },
 });
