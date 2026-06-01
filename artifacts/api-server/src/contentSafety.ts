@@ -35,6 +35,30 @@ const PROHIBITED_CONTENT_TERMS = [
   'terrorist', 'terrorism',
 ];
 
+// ─── Story-specific safety check ──────────────────────────────────────────────
+// Applied to AI-generated story text. This is MUCH narrower than the general
+// PROHIBITED_CONTENT_TERMS list because the AI is already instructed by
+// GEOQUEST_SAFETY_PROMPT. Historical prose legitimately contains words like
+// "terrorist attacks", "violence", "suicide" — those should not block a story.
+// This list only catches content that should NEVER appear in a kids' story under
+// any circumstances: actual sexual terms, explicit profanity, and slurs.
+const PROHIBITED_STORY_TERMS = [
+  // Explicit sexual content — always wrong
+  'pornography', 'porn', 'xxx',
+  'erotic', 'erotica',
+  'sex act', 'sexual intercourse', 'genitals',
+  'masturbat', 'orgasm',
+  'prostitut', 'sex worker',
+  'strip club', 'brothel', 'escort service',
+  'sex show', 'sex tourism',
+  // Profanity / slurs — always wrong
+  'fuck', 'shit', 'cunt', 'cock', 'pussy', 'bitch', 'asshole',
+  'nigger', 'nigga', 'faggot', 'retard',
+  // Child-specific harm — always wrong
+  'child abuse', 'child porn', 'paedophil', 'pedophil',
+  'molest', 'sexual assault',
+];
+
 function normalizeForCheck(text: string): string {
   return text
     .toLowerCase()
@@ -55,6 +79,17 @@ function normalizeForCheck(text: string): string {
 export function isProhibitedContent(text: string): boolean {
   const normalized = normalizeForCheck(text);
   return PROHIBITED_CONTENT_TERMS.some(term => normalized.includes(term));
+}
+
+/**
+ * Safety check specifically for AI-generated story text.
+ * Only blocks terms that are truly always inappropriate for children —
+ * not historical/contextual words that appear in legitimate educational content.
+ * The model's GEOQUEST_SAFETY_PROMPT is the primary defence; this is the backstop.
+ */
+export function isProhibitedStoryContent(text: string): boolean {
+  const normalized = normalizeForCheck(text);
+  return PROHIBITED_STORY_TERMS.some(term => normalized.includes(term));
 }
 
 export function isProhibitedLocation(text: string): boolean {

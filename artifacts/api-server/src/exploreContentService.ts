@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { GEOQUEST_SAFETY_PROMPT, isProhibitedContent } from "./contentSafety";
+import { GEOQUEST_SAFETY_PROMPT, isProhibitedContent, isProhibitedStoryContent } from "./contentSafety";
 
 const MODEL = "gpt-4o-mini";
 const STORY_MODEL = "gpt-4o";
@@ -351,16 +351,23 @@ Return JSON with exactly these three fields. Every field is a single string of p
 
     const data = JSON.parse(content);
 
-    // The LLM output is already constrained by GEOQUEST_SAFETY_PROMPT — do NOT
-    // run isProhibitedContent on story text. Historical prose legitimately
-    // contains words like "violence", "terrorism", "suicide" in context, and the
-    // simple string match would blank a 900-word story on a single word hit.
+    // Primary guard: GEOQUEST_SAFETY_PROMPT on the model call.
+    // Backstop: isProhibitedStoryContent checks only truly explicit terms
+    // (sexual content, real profanity, slurs) — NOT historical words like
+    // "terrorism" or "violence" that appear in legitimate kids' history stories.
     const mainRaw = (data.main || "").trim();
     const quickHitsRaw = (data.quickHits || "").trim();
     const historyRaw = (data.history || "").trim();
 
     if (!mainRaw || !quickHitsRaw || !historyRaw) {
       throw new Error("Missing story tracks in response");
+    }
+
+    for (const [key, val] of [["main", mainRaw], ["quickHits", quickHitsRaw], ["history", historyRaw]]) {
+      if (isProhibitedStoryContent(val)) {
+        console.error(`[generateStories] Prohibited content detected in "${key}" track — discarding`);
+        throw new Error(`Prohibited content in story track: ${key}`);
+      }
     }
 
     const mainText = stripForTTS(mainRaw);
