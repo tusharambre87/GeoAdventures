@@ -76,11 +76,42 @@ type StopMetadata = {
 
 type StopEnrichment = {
   whyNow?: string;
+  whyItWorks?: string;
   parkingNotes?: string;
   bathroomNotes?: string;
   bestTimeOfDay?: string;
-  practicalTips?: string;
+  practicalTips?: string | string[];
   strollerFriendly?: boolean;
+  keepGoingSuggestion?: string;
+  priceRange?: string;
+  bookingRequired?: boolean;
+  bookingUrl?: string;
+};
+
+type PlaceProfileData = {
+  whyItWorks?: string;
+  bathroomNotes?: string;
+  foodOptions?: string;
+  parkingNotes?: string;
+  bestTimeOfDay?: string;
+  strollerFriendly?: boolean;
+  practicalTips?: string | string[];
+};
+
+type PlaceReferenceData = {
+  openingHours?: string;
+  priceRange?: string;
+  bookingRequired?: boolean;
+  bookingUrl?: string;
+  directionsNote?: string;
+};
+
+type ParentSupportData = {
+  keepGoingSuggestion?: string;
+  breakSuggestion?: string;
+  foodSuggestion?: string;
+  moreFunSuggestion?: string;
+  shortenSuggestion?: string;
 };
 
 type Stop = {
@@ -95,8 +126,14 @@ type Stop = {
   address?: string | null;
   cityGroup?: string | null;
   openingHours?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  minAge?: number | null;
   enrichment?: StopEnrichment | null;
   metadata?: StopMetadata | null;
+  placeProfileData?: PlaceProfileData | null;
+  placeReferenceData?: PlaceReferenceData | null;
+  parentSupportData?: ParentSupportData | null;
 };
 
 type TripData = {
@@ -105,11 +142,14 @@ type TripData = {
   status: string;
   destination?: string | null;
   city?: string | null;
+  country?: string | null;
   startDate?: string | null;
   plannerTripDays?: number | null;
   tripDays?: number | null;
+  currentDayIndex?: number | null;
+  accommodationAddress?: string | null;
   stops: Stop[];
-  travelers?: Array<{ name: string }> | null;
+  travelers?: Array<{ name: string; type?: string; id?: string }> | null;
 };
 
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
@@ -277,8 +317,35 @@ function mapsUrl(query: string): string {
   return `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
 }
 
-function ticketUrl(name: string): string {
+function ticketUrl(name: string, bookingUrl?: string | null): string {
+  if (bookingUrl) return bookingUrl;
   return `https://www.google.com/search?q=${encodeURIComponent(name + ' tickets')}`;
+}
+
+function formatOpenStatus(hours?: string | null): string {
+  if (!hours) return 'Open now';
+  // If it's already a short "H:MM AM – H:MM PM" or "HH:MM–HH:MM" style string, show as-is
+  const trimmed = hours.trim();
+  if (trimmed.length < 30) return trimmed;
+  // Multi-day string — try to extract today's hours
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = days[new Date().getDay()];
+  const re = new RegExp(today + '[^:]*:\s*([^,;\n]+)', 'i');
+  const m = trimmed.match(re);
+  if (m) return m[1].trim();
+  // Fallback: return first segment
+  const seg = trimmed.split(/[,;\n]/)[0].replace(/^[A-Za-z]+[–-][A-Za-z]+:\s*/, '').trim();
+  return seg || 'Open now';
+}
+
+function mapsDirectionsUrl(stop: Stop): string {
+  const lat = stop.latitude ? parseFloat(stop.latitude) : null;
+  const lon = stop.longitude ? parseFloat(stop.longitude) : null;
+  if (lat && lon) {
+    // Platform.select is called at render time; we return both keys here
+    return `${lat},${lon}`;
+  }
+  return encodeURIComponent(stop.address ?? stop.name);
 }
 
 // ─── SheetModal ───────────────────────────────────────────────────────────────
@@ -626,16 +693,29 @@ export default function AtStopScreen() {
   if (!currentStop) return null;
   const meta        = parseMetadata(currentStop.metadata);
   const enrichment  = parseEnrichment(currentStop.enrichment);
+  const pRef        = currentStop.placeReferenceData ?? {};
+  const pProf       = currentStop.placeProfileData ?? {};
   const bgColor     = STOP_HERO_BG[currentStop.stopType ?? ''] ?? STOP_HERO_BG.default;
   const emoji       = STOP_HERO_EMOJI[currentStop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
-  const hasTicket   = meta.ticketSignal === true;
-  const isFree      = meta.ticketSignal === false;
+  // Ticket: prefer placeReferenceData, fall back to metadata.ticketSignal
+  const hasTicket   = pRef.bookingRequired === true || meta.ticketSignal === true;
+  const isFree      = pRef.bookingRequired === false || meta.ticketSignal === false;
   const stopOrderNum = stopIdx + 1;
   const totalStops   = dayStops.length;
   const stopTypeLabel = (currentStop.stopType ?? 'stop').charAt(0).toUpperCase()
     + (currentStop.stopType ?? 'stop').slice(1);
   const duration     = currentStop.durationMinutes ?? 60;
   const address      = currentStop.address ?? '';
+  // Open status from real API hours field
+  const openStatus   = formatOpenStatus(pRef.openingHours ?? currentStop.openingHours);
+  // "Do this first" card text — prefer whyItWorks, then whyNow
+  const doThisFirst  = enrichment.whyItWorks ?? pProf.whyItWorks
+    ?? currentStop.parentSupportData?.keepGoingSuggestion ?? enrichment.whyNow;
+  // Booking URL for ticket button
+  const bookingHref  = pRef.bookingUrl ?? enrichment.bookingUrl;
+  // Lat/lon for directions
+  const stopLat      = currentStop.latitude ? parseFloat(currentStop.latitude) : null;
+  const stopLon      = currentStop.longitude ? parseFloat(currentStop.longitude) : null;
 
   return (
     <View style={sc.screen}>
@@ -685,16 +765,16 @@ export default function AtStopScreen() {
           <View style={dt.heroBottom}>
             <Text style={dt.heroType}>{stopTypeLabel} · Stop {(currentStop.displayOrder ?? stopIdx) + 1} of {totalStops}</Text>
             <Text style={dt.heroName} numberOfLines={2}>{currentStop.name}</Text>
-            <Text style={dt.heroSub}>{duration} min · Open now</Text>
+            <Text style={dt.heroSub}>{duration} min · {openStatus}</Text>
           </View>
         </View>
 
 
         {/* ── Why This Stop card ───────────────────────────────────────────── */}
-        {!!enrichment.whyNow && (
+        {!!doThisFirst && (
           <View style={dt.card}>
             <Text style={dt.cardLabelOrange}>DO THIS FIRST</Text>
-            <Text style={dt.cardText}>{enrichment.whyNow}</Text>
+            <Text style={dt.cardText}>{doThisFirst}</Text>
           </View>
         )}
 
@@ -702,16 +782,27 @@ export default function AtStopScreen() {
         {/* ── Flat action buttons: Directions + Tickets ────────────────────────────── */}
         <View style={dt.actionsRow}>
           <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6 }]} activeOpacity={0.8}
-            onPress={() => address ? Linking.openURL(mapsUrl(address)) : null}>
+            onPress={() => {
+              const url = stopLat && stopLon
+                ? (Platform.OS === 'ios'
+                    ? `maps://app?daddr=${stopLat},${stopLon}&dirflg=d`
+                    : `google.navigation:q=${stopLat},${stopLon}`)
+                : address
+                  ? mapsUrl(address)
+                  : null;
+              if (url) Linking.openURL(url);
+            }}>
             <Text style={dt.actIcon}>↗</Text>
             <Text style={[dt.actLabel, { fontSize: 13, color: C.deep }]}>Directions</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
-            borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
-            onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
-            <Text style={dt.actIcon}>🎟</Text>
-            <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
-          </TouchableOpacity>
+          {hasTicket && (
+            <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
+              borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
+              onPress={() => Linking.openURL(ticketUrl(currentStop.name, bookingHref))}>
+              <Text style={dt.actIcon}>🎟</Text>
+              <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── 2×2 action grid ────────────────────────────────────────────────────────────────────────────── */}
@@ -723,8 +814,14 @@ export default function AtStopScreen() {
               address: encodeURIComponent(address),
               enrichment: encodeURIComponent(JSON.stringify(enrichment)),
               meta: encodeURIComponent(JSON.stringify(meta)),
+              pRef: encodeURIComponent(JSON.stringify(pRef)),
+              pProf: encodeURIComponent(JSON.stringify(pProf)),
               duration: String(duration),
-              openingHours: encodeURIComponent(currentStop.openingHours ?? ''),
+              minAge: String(currentStop.minAge ?? ''),
+              openingHours: encodeURIComponent(pRef.openingHours ?? currentStop.openingHours ?? ''),
+              lat: currentStop.latitude ?? '',
+              lon: currentStop.longitude ?? '',
+              bookingUrl: encodeURIComponent(bookingHref ?? ''),
             }}); }}>
             <Text style={dt.gridIcon}>✨</Text>
             <Text style={dt.gridTitle}>What to expect</Text>
@@ -845,16 +942,17 @@ export default function AtStopScreen() {
               {!!enrichment.practicalTips && (
                 <>
                   <Text style={dt.exploreSubLabel}>Best way to do this stop</Text>
-                  {enrichment.practicalTips
-                    .split(/\.\s+/)
-                    .map(s => s.replace(/\.$/, '').trim())
-                    .filter(s => s.length > 8)
-                    .map((tip, i) => (
-                      <View key={i} style={dt.bulletRow}>
-                        <View style={dt.bulletDot} />
-                        <Text style={dt.bulletText}>{tip}.</Text>
-                      </View>
-                    ))}
+                  {(Array.isArray(enrichment.practicalTips)
+                    ? enrichment.practicalTips as string[]
+                    : (enrichment.practicalTips as string).split(/\.\s+/)
+                        .map((s: string) => s.replace(/\.$/, '').trim())
+                        .filter((s: string) => s.length > 8)
+                  ).map((tip: string, i: number) => (
+                    <View key={i} style={dt.bulletRow}>
+                      <View style={dt.bulletDot} />
+                      <Text style={dt.bulletText}>{tip}{Array.isArray(enrichment.practicalTips) ? '' : '.'}</Text>
+                    </View>
+                  ))}
                 </>
               )}
 
