@@ -351,9 +351,13 @@ Return JSON with exactly these three fields. Every field is a single string of p
 
     const data = JSON.parse(content);
 
-    const mainRaw = isProhibitedContent(data.main || "") ? "" : (data.main || "");
-    const quickHitsRaw = isProhibitedContent(data.quickHits || "") ? "" : (data.quickHits || "");
-    const historyRaw = isProhibitedContent(data.history || "") ? "" : (data.history || "");
+    // The LLM output is already constrained by GEOQUEST_SAFETY_PROMPT — do NOT
+    // run isProhibitedContent on story text. Historical prose legitimately
+    // contains words like "violence", "terrorism", "suicide" in context, and the
+    // simple string match would blank a 900-word story on a single word hit.
+    const mainRaw = (data.main || "").trim();
+    const quickHitsRaw = (data.quickHits || "").trim();
+    const historyRaw = (data.history || "").trim();
 
     if (!mainRaw || !quickHitsRaw || !historyRaw) {
       throw new Error("Missing story tracks in response");
