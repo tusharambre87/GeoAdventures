@@ -304,27 +304,27 @@ ${GEOQUEST_SAFETY_PROMPT}`,
 ${factsContext}
 
 ──────────────────────────────────────────────────────
-TRACK 1: MAIN STORY — target 500 to 700 words (about 4 to 5 minutes spoken)
+TRACK 1: MAIN STORY — target 650 to 900 words (about 5 to 7 minutes spoken)
 ──────────────────────────────────────────────────────
 This is the primary experience. Write it as one flowing narrative, not chapters.
 
-Opening (about 100 words): Start with something specific and vivid about THIS place — a sensory detail, a striking fact, or a moment in history. Do not open with "Welcome to" or "Today we are visiting". Drop the listener straight into the story.
+Opening (about 120 words): Start with something specific and vivid about THIS place — a sensory detail, a striking fact, or a moment in history. Do not open with "Welcome to" or "Today we are visiting". Drop the listener straight into the story.
 
-Middle (about 400 words): Weave the real facts into a narrative that builds. Include at least one moment of genuine surprise — something that makes a child say "wait, really?". Include the human story: who made this, why, what was hard about it. Connect what happened in the past to what the child will see with their own eyes.
+Middle (about 600 words): Weave the real facts into a narrative that builds. Include at least one moment of genuine surprise — something that makes a child say "wait, really?". Include the human story: who made this, why, what was hard about it. Connect what happened in the past to what the child will see with their own eyes.
 
-Close (about 100 words): End with one specific, compelling question they can think about while exploring. Make it connected to something real they will actually see.
+Close (about 150 words): End with one specific, compelling question they can think about while exploring. Make it connected to something real they will actually see.
 
 ──────────────────────────────────────────────────────
-TRACK 2: QUICK HITS — target 200 to 280 words (about 1.5 to 2 minutes spoken)
+TRACK 2: QUICK HITS — target 260 to 390 words (about 2 to 3 minutes spoken)
 ──────────────────────────────────────────────────────
-Five to six surprising facts about ${stopName}, written as spoken paragraphs.
+Six to eight surprising facts about ${stopName}, written as spoken paragraphs.
 Each fact gets two to four natural sentences. Write them as flowing speech, NOT as a list.
 Each one should be a genuine "wait, I did not know that" moment.
 Each should connect to something the child can actually see or look for at the stop.
 Transition naturally between facts — use phrases like "And here is something even more surprising..." or "But that is not all...".
 
 ──────────────────────────────────────────────────────
-TRACK 3: HISTORY — target 220 to 350 words (about 1.5 to 2.5 minutes spoken)
+TRACK 3: HISTORY — target 260 to 390 words (about 2 to 3 minutes spoken)
 ──────────────────────────────────────────────────────
 The human story behind ${stopName}. Focus on real people and the decisions they made.
 Include: who had the original idea and why, at least one specific challenge or setback they faced, and one moment where a person's choice changed what this place became.
@@ -335,13 +335,13 @@ End by connecting that history to the child standing there today — why does it
 
 Return JSON with exactly these three fields. Every field is a single string of plain prose:
 {
-  "main": "The main story text. Plain prose. Narrator cues allowed. No emojis. No markdown. 500 to 700 words.",
-  "quickHits": "The quick hits text. Spoken paragraphs. No emojis. No markdown. 200 to 280 words.",
-  "history": "The history text. Spoken paragraphs. No emojis. No markdown. 220 to 350 words."
+  "main": "The main story text. Plain prose. Narrator cues allowed. No emojis. No markdown. 650 to 900 words.",
+  "quickHits": "The quick hits text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words.",
+  "history": "The history text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words."
 }`,
         },
       ],
-      max_tokens: 4000,
+      max_tokens: 7000,
       temperature: 0.72,
       response_format: { type: "json_object" },
     });

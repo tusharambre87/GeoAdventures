@@ -8526,9 +8526,9 @@ Return ONLY valid JSON in this exact format:
       // Check if journey pack already has explore data cached (with new fields)
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
       const cached = journeyPack?.exploreData as any;
-      // Require stories with a proper main track of at least 3 minutes (240s).
+      // Require stories with a proper main track of at least 5 minutes (300s).
       // This busts cached entries from before the two-step fact-grounded generation.
-      const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 240;
+      const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 300;
       if (cached && cached.reviews !== undefined && hasRichStories) {
         return res.json(cached);
       }
