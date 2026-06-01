@@ -935,106 +935,140 @@ function ThinkFast({ stopName }: { stopName: string }) {
 // ─── Scavenger Hunt ───────────────────────────────────────────────────────────
 
 function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string }) {
-  type Phase = "intro" | "hunting" | "complete";
+  type Phase = "hunting" | "complete";
   const insets = useSafeAreaInsets();
-  const [phase, setPhase] = useState<Phase>("intro");
+  const [phase, setPhase] = useState<Phase>("hunting");
   const [items, setItems] = useState<{ text: string; found: boolean }[]>([]);
   const [usedTexts, setUsedTexts] = useState<string[]>([]);
 
-  const startHunt = useCallback(() => {
-    const prompts = generateScavengerPrompts(stopName, tripId, usedTexts);
+  const seedHunt = useCallback((used: string[]) => {
+    const prompts = generateScavengerPrompts(stopName, tripId, used);
     setItems(prompts.map((text) => ({ text, found: false })));
     setPhase("hunting");
-  }, [stopName, tripId, usedTexts]);
+  }, [stopName, tripId]);
 
-  if (phase === "intro") {
-    return (
-      <IntroScreen
-        icon="🔍"
-        title="Scavenger Hunt"
-        subtitle="Explore together and see what you notice"
-        description="Work as a family to find each item. Tap when you spot something!"
-        note="No rush — take your time and have fun."
-        btnLabel="Start Hunt"
-        btnColor="#16A34A"
-        onStart={startHunt}
-        onBack={() => router.back()}
-      />
-    );
-  }
+  // Seed immediately on mount — no intro screen
+  useEffect(() => { seedHunt([]); }, []);
 
+  // Auto-complete when every item is found
+  useEffect(() => {
+    if (items.length === 0) return;
+    if (items.every((item) => item.found)) {
+      const t = setTimeout(() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setUsedTexts((prev) => [...prev, ...items.map((i) => i.text)]);
+        setPhase("complete");
+      }, 450);
+      return () => clearTimeout(t);
+    }
+  }, [items]);
+
+  const foundCount = items.filter((i) => i.found).length;
+
+  // ── HUNTING ──
   if (phase === "hunting") {
-    const foundCount = items.filter((i) => i.found).length;
     return (
-      <View style={{ flex: 1, backgroundColor: "#F0FDF4" }}>
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 100, paddingHorizontal: 20 }}
+          contentContainerStyle={{
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 88,
+            paddingHorizontal: 20,
+          }}
         >
-          <Text style={[sh.gameTitle, { color: "#16A34A" }]}>🔍 Your Hunt</Text>
-          <Text style={sc.hint}>Tap when you find something!</Text>
-          <Text style={[sc.count, { color: "#16A34A" }]}>{foundCount} / {items.length} found</Text>
+          <Text style={sc.title}>🔍 Your Hunt</Text>
+          <Text style={sc.sub}>
+            {foundCount > 0
+              ? `${foundCount} / ${items.length} found`
+              : "Tap when you find something!"}
+          </Text>
 
           {items.map((item, i) => (
             <Pressable
               key={i}
-              style={[sc.item, item.found && sc.itemFound]}
+              style={[sc.card, item.found && sc.cardFound]}
               onPress={() => {
                 if (item.found) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setItems((prev) => prev.map((p, j) => j === i ? { ...p, found: true } : p));
               }}
+              disabled={item.found}
             >
-              <View style={[sc.circle, item.found && { backgroundColor: "#16A34A", borderColor: "#16A34A" }]}>
-                <Text style={{ color: item.found ? "#fff" : "#9CA3AF", fontFamily: F.bold, fontSize: 13 }}>
-                  {item.found ? "✓" : (i + 1).toString()}
+              {/* Icon box */}
+              <View style={[sc.iconBox, item.found && sc.iconBoxFound]}>
+                <Text style={[sc.iconGlyph, item.found && sc.iconGlyphFound]}>
+                  {item.found ? "✓" : "📍"}
                 </Text>
               </View>
-              <Text style={[sc.itemText, item.found && sc.itemTextDone]}>{item.text}</Text>
+
+              {/* Prompt text */}
+              <Text style={[sc.cardText, item.found && sc.cardTextFound]} numberOfLines={3}>
+                {item.text}
+              </Text>
+
+              {/* CTA — disappears when found */}
               {!item.found && (
-                <View style={sc.foundBadge}>
-                  <Text style={sc.foundBadgeText}>Found!</Text>
+                <View style={sc.foundBtn}>
+                  <Text style={sc.foundBtnText}>We found it! →</Text>
                 </View>
               )}
             </Pressable>
           ))}
         </ScrollView>
 
+        {/* End Hunt — outline only */}
         <View style={[sc.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Pressable
-            style={[sh.btn, { backgroundColor: "#E5E7EB", flex: 1 }]}
-            onPress={() => setPhase("intro")}
-          >
-            <Text style={[sh.btnText, { color: "#374151" }]}>End Hunt</Text>
+          <Pressable style={sc.endBtn} onPress={() => router.back()}>
+            <Text style={sc.endBtnText}>End Hunt</Text>
           </Pressable>
-          {foundCount > 0 && (
-            <Pressable
-              style={[sh.btn, { backgroundColor: "#16A34A", flex: 1 }]}
-              onPress={() => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                const texts = items.map((i) => i.text);
-                setUsedTexts((prev) => [...prev, ...texts]);
-                setPhase("complete");
-              }}
-            >
-              <Text style={sh.btnText}>Done Exploring ✓</Text>
-            </Pressable>
-          )}
         </View>
       </View>
     );
   }
 
+  // ── COMPLETE ──
   return (
-    <DoneScreen
-      emoji="🌿"
-      title="Nice exploring together!"
-      subtitle="Want to try another hunt or keep exploring?"
-      accent="#16A34A"
-      onPlayAgain={startHunt}
-      onBack={() => router.back()}
-      playAgainLabel="🔍 New Hunt"
-    />
+    <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 32,
+          paddingBottom: insets.bottom + 40,
+          paddingHorizontal: 20,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ fontSize: 56, marginBottom: 8 }}>🎉</Text>
+        <Text style={[sc.title, { textAlign: "center" }]}>Hunt Complete!</Text>
+        <Text style={[sc.sub, { marginBottom: 28 }]}>You found everything!</Text>
+
+        {/* All items shown with green ✓ */}
+        <View style={{ width: "100%", marginBottom: 32 }}>
+          {items.map((item, i) => (
+            <View key={i} style={[sc.card, sc.cardFound, { marginBottom: 8 }]}>
+              <View style={sc.iconBoxFound}>
+                <Text style={sc.iconGlyphFound}>✓</Text>
+              </View>
+              <Text style={sc.cardTextFound}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#7C3AED", alignSelf: "stretch" }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); seedHunt(usedTexts); }}
+        >
+          <Text style={sh.btnText}>🔍 New Hunt</Text>
+        </Pressable>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#F3F4F6", alignSelf: "stretch", marginTop: 12 }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        >
+          <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1502,16 +1536,46 @@ const tf = StyleSheet.create({
 });
 
 const sc = StyleSheet.create({
-  hint: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 4 },
-  count: { fontFamily: F.bold, fontSize: 14, marginBottom: 16 },
-  item: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 10 },
-  itemFound: { backgroundColor: "#F0FDF4", borderColor: "#86EFAC" },
-  circle: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  itemText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1, lineHeight: 20 },
-  itemTextDone: { textDecorationLine: "line-through", opacity: 0.5 },
-  foundBadge: { backgroundColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  foundBadgeText: { fontFamily: F.bold, fontSize: 11, color: "#065F46" },
-  footer: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 12, backgroundColor: "#F0FDF4", borderTopWidth: 1, borderTopColor: "#D1FAE5" },
+  // Header
+  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 4 },
+  sub: { fontFamily: F.medium, fontSize: 14, color: "#78716C", marginBottom: 20 },
+  // Item cards
+  card: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "rgba(28,25,23,0.08)", padding: 14, marginBottom: 10,
+  },
+  cardFound: {
+    backgroundColor: "#E8F7EF", borderColor: "#3DAA6E",
+  },
+  iconBox: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: "#F3F4F6",
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  iconBoxFound: {
+    backgroundColor: "#3DAA6E",
+  },
+  iconGlyph: { fontSize: 18 },
+  iconGlyphFound: { fontSize: 16, color: "#fff", fontFamily: F.bold },
+  cardText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1, lineHeight: 20 },
+  cardTextFound: { fontFamily: F.medium, fontSize: 14, color: "#1A6643", flex: 1, lineHeight: 20 },
+  // "We found it!" pill
+  foundBtn: {
+    backgroundColor: "#7C3AED", borderRadius: 14,
+    paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0,
+  },
+  foundBtnText: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
+  // Bottom bar
+  footer: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 20, paddingTop: 12,
+    backgroundColor: "#FFF8F0", borderTopWidth: 1, borderTopColor: "rgba(28,25,23,0.06)",
+  },
+  endBtn: {
+    borderRadius: 16, paddingVertical: 15, alignItems: "center",
+    borderWidth: 1.5, borderColor: "#7C3AED",
+  },
+  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
 });
 
 const gg = StyleSheet.create({
