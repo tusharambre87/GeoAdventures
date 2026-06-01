@@ -102,22 +102,22 @@ export default function NeedScreen() {
       onPress: openRunning,
     },
     {
-      icon: '\U0001F625',
+      icon: '😥',
       title: 'Kids are tired',
       sub: 'Find a break spot or easier next stop',
-      onPress: () => Linking.openURL(parkUrl),
+      onPress: () => Linking.openURL(parkUrl).catch(() => {}),
     },
     {
-      icon: '\U0001F389',
+      icon: '🎉',
       title: 'Need more fun',
       sub: 'Swap for something more exciting nearby',
-      onPress: () => Linking.openURL(activityUrl),
+      onPress: () => Linking.openURL(activityUrl).catch(() => {}),
     },
     {
-      icon: '\U0001F355',
+      icon: '🍕',
       title: 'Find food nearby',
       sub: '4 family options within 0.3 mi',
-      onPress: () => Linking.openURL(foodUrl),
+      onPress: () => Linking.openURL(foodUrl).catch(() => {}),
     },
     {
       icon: '\u23ED',
@@ -138,10 +138,10 @@ export default function NeedScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.nav}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>{'\u2190'} At Stop</Text>
+            <Text style={styles.backText}>{'←'} At Stop</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-            <Text style={styles.closeText}>{'\u00D7'}</Text>
+            <Text style={styles.closeText}>{'×'}</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.stopLabel} numberOfLines={1}>{stopName}</Text>
@@ -168,7 +168,7 @@ export default function NeedScreen() {
               <Text style={[styles.cardTitle, item.muted && { color: G.muted }]}>{item.title}</Text>
               <Text style={styles.cardSub}>{item.sub}</Text>
             </View>
-            <Text style={styles.chevron}>{'\u203A'}</Text>
+            <Text style={styles.chevron}>{'›'}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -190,7 +190,7 @@ export default function NeedScreen() {
             {/* Dark header */}
             <View style={styles.sheetDarkHeader}>
               <TouchableOpacity onPress={closeRunning} style={styles.sheetBackWrap}>
-                <Text style={styles.sheetBackBtn}>{'\u2190'} Back</Text>
+                <Text style={styles.sheetBackBtn}>{'←'} Back</Text>
               </TouchableOpacity>
               <Text style={styles.sheetTitle}>Running behind?</Text>
               <Text style={styles.sheetSubtitle}>Here's how to catch up</Text>
@@ -200,35 +200,35 @@ export default function NeedScreen() {
             <View style={styles.sheetOptions}>
               <TouchableOpacity style={styles.sheetOption} activeOpacity={0.8} onPress={handleTightenSchedule}>
                 <View style={[styles.sheetOptIcon, { backgroundColor: '#FFF7ED' }]}>
-                  <Text style={{ fontSize: 20 }}>{'\u23E9'}</Text>
+                  <Text style={{ fontSize: 20 }}>{'⏩'}</Text>
                 </View>
                 <View style={styles.sheetOptBody}>
                   <Text style={styles.sheetOptTitle}>Tighten travel gaps</Text>
                   <Text style={styles.sheetOptSub}>We'll compress the gaps between stops</Text>
                 </View>
-                <Text style={styles.sheetOptArrow}>{'\u203A'}</Text>
+                <Text style={styles.sheetOptArrow}>{'›'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.sheetOption} activeOpacity={0.8} onPress={handleHighlightsOnly}>
                 <View style={[styles.sheetOptIcon, { backgroundColor: '#EEF5F2' }]}>
-                  <Text style={{ fontSize: 20 }}>{'\u26A1'}</Text>
+                  <Text style={{ fontSize: 20 }}>{'⚡'}</Text>
                 </View>
                 <View style={styles.sheetOptBody}>
                   <Text style={styles.sheetOptTitle}>Highlights only — 45 min</Text>
                   <Text style={styles.sheetOptSub}>Shorten this stop to essentials only</Text>
                 </View>
-                <Text style={styles.sheetOptArrow}>{'\u203A'}</Text>
+                <Text style={styles.sheetOptArrow}>{'›'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={[styles.sheetOption, styles.sheetOptionLast]} activeOpacity={0.8} onPress={handleSkipStop}>
                 <View style={[styles.sheetOptIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Text style={{ fontSize: 20 }}>{'\u23ED'}</Text>
+                  <Text style={{ fontSize: 20 }}>{'⏭'}</Text>
                 </View>
                 <View style={styles.sheetOptBody}>
                   <Text style={[styles.sheetOptTitle, { color: '#DC2626' }]}>Skip this stop</Text>
                   <Text style={styles.sheetOptSub}>Move on to the next one</Text>
                 </View>
-                <Text style={styles.sheetOptArrow}>{'\u203A'}</Text>
+                <Text style={styles.sheetOptArrow}>{'›'}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
