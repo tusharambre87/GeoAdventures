@@ -8022,6 +8022,115 @@ Return ONLY valid JSON in this exact format:
     }
   });
   
+  // ── INSERT STOP — check schedule + optionally insert ─────────────────────────
+  app.post('/api/travel/trips/:tripId/insert-stop', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const { insertAfterStopId, place, confirmed = false, removeStopId, moveTomorrow = false } = req.body;
+
+      if (!insertAfterStopId || !place?.name || !place?.type) {
+        return res.status(400).json({ message: 'insertAfterStopId, place.name and place.type are required' });
+      }
+
+      const DEFAULT_DURATIONS: Record<string, number> = { food: 45, break: 20, kid_attraction: 90 };
+      const estDuration: number = place.estimatedDurationMinutes ?? DEFAULT_DURATIONS[place.type] ?? 60;
+
+      const allStops = await storage.getStopsByTripId(tripId);
+      const refStop = allStops.find((s: any) => s.id === insertAfterStopId);
+      if (!refStop) return res.status(404).json({ message: 'Reference stop not found' });
+
+      const refDayIdx: number = refStop.dayIndex ?? 0;
+      const dayStops = allStops
+        .filter((s: any) => (s.dayIndex ?? 0) === refDayIdx)
+        .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+      const refPos = dayStops.findIndex((s: any) => s.id === insertAfterStopId);
+      const nextStop = dayStops[refPos + 1] ?? null;
+      const lastDayStop = dayStops[dayStops.length - 1];
+      const tomorrowExists = allStops.some((s: any) => (s.dayIndex ?? 0) === refDayIdx + 1);
+
+      // ── Determine check result ───────────────────────────────────────────────
+      let checkResult: Record<string, unknown>;
+
+      if (!nextStop) {
+        checkResult = { canInsert: true, position: 'end_of_day', warning: null };
+      } else if (dayStops.length >= 5 && place.type === 'kid_attraction') {
+        checkResult = {
+          canInsert: false,
+          reason: 'day_full',
+          options: ['remove_last_stop', 'add_anyway', ...(tomorrowExists ? ['move_to_tomorrow'] : [])],
+          lastStop: { name: lastDayStop.name, stopId: lastDayStop.id },
+          tomorrowExists,
+        };
+      } else {
+        const isTimeSensitive = !!(nextStop as any).metadata?.timeSensitive;
+        if (isTimeSensitive) {
+          checkResult = {
+            canInsert: true, position: 'middle', warning: 'tight_timing',
+            affectedStop: { name: nextStop.name, isTimeSensitive: true },
+          };
+        } else {
+          checkResult = { canInsert: true, position: 'middle', warning: null };
+        }
+      }
+
+      // ── Dry-run: return check result only ───────────────────────────────────
+      if (!confirmed) return res.json(checkResult);
+
+      // ── Confirmed — perform the insert ──────────────────────────────────────
+      const stopTypeMap: Record<string, string> = {
+        food: 'restaurant', break: 'park', kid_attraction: 'landmark',
+      };
+
+      let insertDayIdx = refDayIdx;
+      let insertOrder: number;
+
+      if (moveTomorrow) {
+        insertDayIdx = refDayIdx + 1;
+        const tomorrowStops = allStops.filter((s: any) => (s.dayIndex ?? 0) === insertDayIdx);
+        insertOrder = tomorrowStops.length > 0
+          ? Math.min(...tomorrowStops.map((s: any) => s.displayOrder ?? 0))
+          : 0;
+        // Shift tomorrow's stops up
+        for (const s of tomorrowStops) {
+          await storage.updateStop(s.id, { displayOrder: (s.displayOrder ?? 0) + 1 });
+        }
+      } else {
+        insertOrder = (refStop.displayOrder ?? 0) + 1;
+        // Optionally remove last stop of day first
+        if (removeStopId) {
+          await storage.deleteStop(removeStopId);
+        }
+        // Shift same-day stops after insertion point
+        const stopsToShift = allStops.filter((s: any) =>
+          (s.dayIndex ?? 0) === refDayIdx &&
+          (s.displayOrder ?? 0) >= insertOrder &&
+          s.id !== removeStopId
+        );
+        for (const s of stopsToShift) {
+          await storage.updateStop(s.id, { displayOrder: (s.displayOrder ?? 0) + 1 });
+        }
+      }
+
+      const newStop = await storage.createStop({
+        tripId,
+        name: place.name,
+        stopType: stopTypeMap[place.type] || 'landmark',
+        displayOrder: insertOrder,
+        dayIndex: insertDayIdx,
+        address: place.address || null,
+        durationMinutes: estDuration,
+        isMealStop: place.type === 'food',
+        cityGroup: refStop.cityGroup || null,
+      } as any);
+
+      res.json({ ...checkResult, inserted: true, newStop });
+    } catch (error) {
+      req.log?.error({ error }, 'insert-stop failed');
+      res.status(500).json({ message: 'Failed to insert stop' });
+    }
+  });
+
   // GET a single stop — enriched with stop_library data (storyPack, enrichment, stopMissions)
   app.get('/api/travel/stops/:stopId', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {

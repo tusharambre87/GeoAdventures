@@ -16,11 +16,36 @@ type KidItem   = { name: string; distance: string; agesNote?: string; descriptio
 type NearbyData = { food: FoodItem[]; breaks: BreakItem[]; kids: KidItem[] } | null;
 type NearbySheet = 'food' | 'breaks' | 'kids' | null;
 
-async function apiFetch<T>(path: string): Promise<T> {
+type StopType = 'food' | 'break' | 'kid_attraction';
+
+type CheckResult = {
+  canInsert: boolean;
+  position?: 'middle' | 'end_of_day';
+  warning?: 'tight_timing' | null;
+  affectedStop?: { name: string; isTimeSensitive: boolean };
+  reason?: 'day_full';
+  options?: string[];
+  lastStop?: { name: string; stopId: string };
+  tomorrowExists?: boolean;
+};
+
+type CardPhase =
+  | 'idle' | 'checking' | 'confirming' | 'added'
+  | 'warn_tight' | 'warn_end_of_day' | 'warn_day_full_soft' | 'warn_day_full_hard';
+
+type CardState = { phase: CardPhase; check?: CheckResult };
+
+const DEFAULT_DURATIONS: Record<StopType, number> = { food: 45, break: 20, kid_attraction: 90 };
+
+// ── Auth-aware fetch ─────────────────────────────────────────────────────────
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await AsyncStorage.getItem('auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}${path}`, { headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -28,20 +53,10 @@ async function apiFetch<T>(path: string): Promise<T> {
 export default function ExpectScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
-    stopName?: string;
-    address?: string;
-    enrichment?: string;
-    meta?: string;
-    pRef?: string;
-    pProf?: string;
-    duration?: string;
-    minAge?: string;
-    openingHours?: string;
-    lat?: string;
-    lon?: string;
-    bookingUrl?: string;
-    tripId?: string;
-    stopId?: string;
+    stopName?: string; address?: string; enrichment?: string; meta?: string;
+    pRef?: string; pProf?: string; duration?: string; minAge?: string;
+    openingHours?: string; lat?: string; lon?: string; bookingUrl?: string;
+    tripId?: string; stopId?: string;
   }>();
 
   const stopName     = params.stopName ? decodeURIComponent(params.stopName) : 'This Stop';
@@ -59,28 +74,23 @@ export default function ExpectScreen() {
   const tripId       = params.tripId ?? '';
   const stopId       = params.stopId  ?? '';
 
-  const [nearbySheet, setNearbySheet]   = useState<NearbySheet>(null);
-  const [nearbyData,  setNearbyData]    = useState<NearbyData>(null);
+  const [nearbySheet,   setNearbySheet]   = useState<NearbySheet>(null);
+  const [nearbyData,    setNearbyData]    = useState<NearbyData>(null);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError,   setNearbyError]   = useState(false);
+  const [cardStates,    setCardStates]    = useState<Record<string, CardState>>({});
 
-  // ── Fetch nearby data from GPT-generated endpoint ─────────────────────────
+  // ── Fetch nearby data ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!stopId) return;
     setNearbyLoading(true);
     setNearbyError(false);
     apiFetch<NearbyData>(`/api/travel/stops/${stopId}/nearby`)
-      .then(data => {
-        setNearbyData(data);
-        setNearbyLoading(false);
-      })
-      .catch(() => {
-        setNearbyError(true);
-        setNearbyLoading(false);
-      });
+      .then(data => { setNearbyData(data); setNearbyLoading(false); })
+      .catch(() => { setNearbyError(true); setNearbyLoading(false); });
   }, [stopId]);
 
-  // ── Directions ─────────────────────────────────────────────────────────────
+  // ── Maps helpers ───────────────────────────────────────────────────────────
   const openDirections = () => {
     if (lat && lon) {
       const url = Platform.OS === 'ios'
@@ -110,84 +120,241 @@ export default function ExpectScreen() {
       Linking.openURL('https://maps.apple.com/?q=' + q).catch(() => {}));
   };
 
-  const showTickets = pRef.bookingRequired === true || meta.ticketSignal === true;
-  const ticketHref  = bookingUrl ||
-    'https://www.google.com/search?q=' + encodeURIComponent(stopName + ' tickets');
+  // ── Add-to-plan core logic ─────────────────────────────────────────────────
+  const setCard = (key: string, state: CardState) =>
+    setCardStates(prev => ({ ...prev, [key]: state }));
 
-  // ── Experience + Tips ─────────────────────────────────────────────────────
-  const experienceText =
-    enrichment.whyItWorks ?? pProf.whyItWorks ?? enrichment.whyNow ??
-    (stopName + ' is a great stop for the whole family — explore at your own pace and look out for the highlights as you go.');
-
-  const rawTips = enrichment.practicalTips ?? pProf.practicalTips;
-  const practicalTips: string[] = rawTips
-    ? (Array.isArray(rawTips)
-        ? (rawTips as string[]).filter((s: string) => s.length > 2)
-        : String(rawTips)
-            .split(/\.\s+/)
-            .map((s: string) => s.replace(/\.$/, '').trim())
-            .filter((s: string) => s.length > 8))
-    : [];
-
-  // ── Timing rows ───────────────────────────────────────────────────────────
-  const hours = openingHours || pRef.openingHours || '';
-  type TimingRow = [string, string, string?];
-  const timingRows: TimingRow[] = [
-    ['Recommended time', '~' + duration + ' min'],
-    ['Best for', 'Ages ' + (minAge ?? 3) + '–12'],
-    ['Crowd level now', 'Good timing', '#3DAA6E'],
-    ...(enrichment.bestTimeOfDay ?? pProf.bestTimeOfDay
-        ? [['Best time to visit', enrichment.bestTimeOfDay ?? pProf.bestTimeOfDay] as TimingRow]
-        : []),
-    ...(hours ? [['Hours today', hours] as TimingRow] : []),
-  ];
-
-  // ── Access rows ───────────────────────────────────────────────────────────
-  type AccessRow = { key: string; val: string; color?: string };
-  const parking    = enrichment.parkingNotes ?? pProf.parkingNotes;
-  const stroller   = enrichment.strollerFriendly ?? pProf.strollerFriendly;
-  const restrooms  = enrichment.bathroomNotes ?? meta.restroomConfidence;
-  const priceRange = pRef.priceRange ?? enrichment.priceRange;
-  const admissionVal = priceRange ? priceRange
-    : meta.ticketSignal === true  ? 'Ticket required'
-    : meta.ticketSignal === false ? 'Free entry'
-    : 'Free';
-  const admissionColor =
-    (meta.ticketSignal === false || (!priceRange && meta.ticketSignal !== true))
-      ? G.green : G.deep;
-  const accessRows: AccessRow[] = [
-    parking != null ? { key: 'Parking', val: parking || 'Nearby', color: '#D97706' } : null,
-    { key: 'Stroller friendly', val: stroller ? 'Yes' : 'Check ahead', color: stroller ? G.green : G.muted },
-    { key: 'Restrooms', val: restrooms || 'On site' },
-    { key: 'Admission', val: admissionVal, color: admissionColor },
-    address ? { key: 'Address', val: address } : null,
-  ].filter((x): x is AccessRow => x !== null);
-
-  // ── Handle add food to plan ───────────────────────────────────────────────
-  const handleAddFoodToPlan = async (place: FoodItem) => {
+  const doInsert = async (
+    key: string,
+    placeName: string,
+    placeAddress: string,
+    type: StopType,
+    opts: { removeStopId?: string; moveTomorrow?: boolean } = {}
+  ) => {
+    setCard(key, { phase: 'confirming' });
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/api/travel/trips/${tripId}/add-stop`, {
+      await apiFetch(`/api/travel/trips/${tripId}/insert-stop`, {
         method: 'POST',
-        headers,
         body: JSON.stringify({
-          name: place.name, type: 'restaurant',
-          latitude: lat, longitude: lon,
-          dayIndex: 0,
-          insertAfterStopId: stopId || undefined,
+          insertAfterStopId: stopId,
+          place: {
+            name: placeName,
+            address: placeAddress,
+            type,
+            estimatedDurationMinutes: DEFAULT_DURATIONS[type],
+          },
+          confirmed: true,
+          removeStopId: opts.removeStopId,
+          moveTomorrow: opts.moveTomorrow ?? false,
         }),
       });
-      if (!res.ok) throw new Error('not ok');
-      setNearbySheet(null);
+      setCard(key, { phase: 'added' });
     } catch {
-      openMaps(place.name);
-      setNearbySheet(null);
+      setCard(key, { phase: 'idle' });
     }
   };
 
-  // ── Nearby sheet content ──────────────────────────────────────────────────
+  const handleAddToPlan = async (
+    key: string,
+    placeName: string,
+    placeAddress: string,
+    type: StopType
+  ) => {
+    if (!tripId || !stopId) {
+      // Fallback: no IDs, open maps
+      openMaps(placeName);
+      return;
+    }
+    setCard(key, { phase: 'checking' });
+    try {
+      const check = await apiFetch<CheckResult>(`/api/travel/trips/${tripId}/insert-stop`, {
+        method: 'POST',
+        body: JSON.stringify({
+          insertAfterStopId: stopId,
+          place: { name: placeName, address: placeAddress, type, estimatedDurationMinutes: DEFAULT_DURATIONS[type] },
+          confirmed: false,
+        }),
+      });
+
+      // Clean insert — auto-confirm
+      if (check.canInsert && !check.warning) {
+        await doInsert(key, placeName, placeAddress, type);
+        return;
+      }
+      // Tight timing warning
+      if (check.canInsert && check.warning === 'tight_timing') {
+        setCard(key, { phase: 'warn_tight', check });
+        return;
+      }
+      // End of day confirmation
+      if (check.canInsert && check.position === 'end_of_day') {
+        setCard(key, { phase: 'warn_end_of_day', check });
+        return;
+      }
+      // Day full — soft (food/break) vs hard (kid)
+      if (!check.canInsert && check.reason === 'day_full') {
+        setCard(key, {
+          phase: type === 'kid_attraction' ? 'warn_day_full_hard' : 'warn_day_full_soft',
+          check,
+        });
+        return;
+      }
+      // Fallback: just insert
+      await doInsert(key, placeName, placeAddress, type);
+    } catch {
+      setCard(key, { phase: 'idle' });
+    }
+  };
+
+  // ── Per-card add-button renderer ───────────────────────────────────────────
+  const renderAddBtn = (
+    key: string,
+    placeName: string,
+    placeAddress: string,
+    type: StopType,
+    label: string
+  ) => {
+    const cs = cardStates[key] ?? { phase: 'idle' };
+
+    if (cs.phase === 'added') {
+      return (
+        <View style={styles.addedRow}>
+          <Text style={styles.addedText}>{"✓"} Added to your day</Text>
+        </View>
+      );
+    }
+
+    if (cs.phase === 'checking' || cs.phase === 'confirming') {
+      return (
+        <View style={styles.addBtn}>
+          <ActivityIndicator size="small" color="white" />
+        </View>
+      );
+    }
+
+    if (cs.phase === 'warn_tight') {
+      const isStrong = cs.check?.affectedStop?.isTimeSensitive;
+      const nextName = cs.check?.affectedStop?.name ?? 'the next stop';
+      return (
+        <View style={styles.warnBox}>
+          <Text style={styles.warnText}>
+            {isStrong
+              ? `${nextName} has a set start time — adding this may cause you to miss it.`
+              : `This fits, but ${nextName} may run tight.`}
+          </Text>
+          <View style={styles.confirmRow}>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => doInsert(key, placeName, placeAddress, type)}
+            >
+              <Text style={styles.confirmBtnText}>Add anyway</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setCard(key, { phase: 'idle' })}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (cs.phase === 'warn_end_of_day') {
+      return (
+        <View style={styles.warnBox}>
+          <Text style={styles.warnText}>Add {placeName} to the end of today?</Text>
+          <View style={styles.confirmRow}>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => doInsert(key, placeName, placeAddress, type)}
+            >
+              <Text style={styles.confirmBtnText}>Yes, add it</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setCard(key, { phase: 'idle' })}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (cs.phase === 'warn_day_full_soft') {
+      return (
+        <View style={styles.warnBox}>
+          <Text style={styles.warnText}>Your day is full, but we{"'"}ll squeeze this in.</Text>
+          <View style={styles.confirmRow}>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => doInsert(key, placeName, placeAddress, type)}
+            >
+              <Text style={styles.confirmBtnText}>Add anyway</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setCard(key, { phase: 'idle' })}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (cs.phase === 'warn_day_full_hard') {
+      const ch = cs.check!;
+      return (
+        <View style={styles.dayFullPanel}>
+          <Text style={styles.dayFullTitle}>Your day is already full</Text>
+          <Text style={styles.dayFullSub}>Adding this makes it a long day.</Text>
+
+          <TouchableOpacity
+            style={styles.dayFullOption}
+            onPress={() => doInsert(key, placeName, placeAddress, type, { removeStopId: ch.lastStop?.stopId })}
+          >
+            <Text style={styles.dayFullOptionText}>Remove last stop + add this</Text>
+            {ch.lastStop && (
+              <Text style={styles.dayFullOptionSub}>Removes "{ch.lastStop.name}"</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dayFullOption}
+            onPress={() => doInsert(key, placeName, placeAddress, type)}
+          >
+            <Text style={styles.dayFullOptionText}>Add anyway — longer day</Text>
+          </TouchableOpacity>
+
+          {ch.tomorrowExists && (
+            <TouchableOpacity
+              style={styles.dayFullOption}
+              onPress={() => doInsert(key, placeName, placeAddress, type, { moveTomorrow: true })}
+            >
+              <Text style={styles.dayFullOptionText}>Move to tomorrow</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity onPress={() => setCard(key, { phase: 'idle' })}>
+            <Text style={styles.dayFullCancel}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => handleAddToPlan(key, placeName, placeAddress, type)}
+      >
+        <Text style={styles.addBtnText}>{label}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // ── Sheet content ──────────────────────────────────────────────────────────
   const renderNearbyContent = (category: 'food' | 'breaks' | 'kids') => {
     if (nearbyLoading) {
       return (
@@ -211,9 +378,7 @@ export default function ExpectScreen() {
               category === 'breaks' ? 'park cafe' : 'kid activities'
             )}
           >
-            <Text style={styles.mapsCtaText}>
-              Search on Apple Maps →
-            </Text>
+            <Text style={styles.mapsCtaText}>Search on Apple Maps →</Text>
           </TouchableOpacity>
         </View>
       );
@@ -221,17 +386,94 @@ export default function ExpectScreen() {
 
     if (category === 'food') {
       const items = nearbyData.food;
-      return items.length === 0 ? (
+      if (items.length === 0) return (
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyMsg}>No food spots found nearby</Text>
           <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('restaurant')}>
             <Text style={styles.mapsCtaText}>Find restaurants near {stopName} →</Text>
           </TouchableOpacity>
         </View>
-      ) : (
+      );
+      return (
         <>
-          {items.map((place, i) => (
-            <View key={i} style={styles.placeCard}>
+          {items.map((place, i) => {
+            const key = `food-${i}`;
+            return (
+              <View key={key} style={styles.placeCard}>
+                <View style={styles.cardTopRow}>
+                  <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                    {place.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => openMaps(place.name)}>
+                    <Text style={styles.mapsLink}>Maps →</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.placeMeta}>
+                  {place.distance}{place.cuisine ? ' · ' + place.cuisine : ''}{place.priceRange ? ' · ' + place.priceRange : ''}
+                </Text>
+                {place.description ? (
+                  <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
+                ) : null}
+                {renderAddBtn(key, place.name, address, 'food', '+ Add to plan')}
+              </View>
+            );
+          })}
+        </>
+      );
+    }
+
+    if (category === 'breaks') {
+      const items = nearbyData.breaks;
+      if (items.length === 0) return (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyMsg}>No break spots found nearby</Text>
+          <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('park cafe')}>
+            <Text style={styles.mapsCtaText}>Find parks & cafes near {stopName} →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+      return (
+        <>
+          {items.map((place, i) => {
+            const key = `breaks-${i}`;
+            return (
+              <View key={key} style={styles.placeCard}>
+                <View style={styles.cardTopRow}>
+                  <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
+                    {place.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => openMaps(place.name)}>
+                    <Text style={styles.mapsLink}>Maps →</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.placeMeta, { color: '#3DAA6E' }]}>{place.distance}</Text>
+                {place.description ? (
+                  <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
+                ) : null}
+                {renderAddBtn(key, place.name, address, 'break', '+ Add as break')}
+              </View>
+            );
+          })}
+        </>
+      );
+    }
+
+    // kids
+    const items = nearbyData.kids;
+    if (items.length === 0) return (
+      <View style={styles.emptyWrap}>
+        <Text style={styles.emptyMsg}>No kid activities found nearby</Text>
+        <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('kid activities')}>
+          <Text style={styles.mapsCtaText}>Find kid activities near {stopName} →</Text>
+        </TouchableOpacity>
+      </View>
+    );
+    return (
+      <>
+        {items.map((place, i) => {
+          const key = `kids-${i}`;
+          return (
+            <View key={key} style={styles.placeCard}>
               <View style={styles.cardTopRow}>
                 <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
                   {place.name}
@@ -241,95 +483,77 @@ export default function ExpectScreen() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.placeMeta}>
-                {place.distance}{place.cuisine ? ' · ' + place.cuisine : ''}{place.priceRange ? ' · ' + place.priceRange : ''}
+                {place.distance}{place.agesNote ? ' · ' + place.agesNote : ''}
               </Text>
               {place.description ? (
                 <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
               ) : null}
-              <TouchableOpacity
-                style={styles.addBtn}
-                onPress={() => handleAddFoodToPlan(place)}
-              >
-                <Text style={styles.addBtnText}>+ Add to plan</Text>
-              </TouchableOpacity>
+              {renderAddBtn(key, place.name, address, 'kid_attraction', '+ Add to plan')}
             </View>
-          ))}
-        </>
-      );
-    }
-
-    if (category === 'breaks') {
-      const items = nearbyData.breaks;
-      return items.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyMsg}>No break spots found nearby</Text>
-          <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('park cafe')}>
-            <Text style={styles.mapsCtaText}>Find parks & cafes near {stopName} →</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          {items.map((place, i) => (
-            <View key={i} style={styles.placeCard}>
-              <View style={styles.cardTopRow}>
-                <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
-                  {place.name}
-                </Text>
-                <TouchableOpacity onPress={() => openMaps(place.name)}>
-                  <Text style={styles.mapsLink}>Maps →</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.placeMeta, { color: '#3DAA6E' }]}>{place.distance}</Text>
-              {place.description ? (
-                <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
-              ) : null}
-            </View>
-          ))}
-        </>
-      );
-    }
-
-    // kids
-    const items = nearbyData.kids;
-    return items.length === 0 ? (
-      <View style={styles.emptyWrap}>
-        <Text style={styles.emptyMsg}>No kid activities found nearby</Text>
-        <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('kid activities')}>
-          <Text style={styles.mapsCtaText}>Find kid activities near {stopName} →</Text>
-        </TouchableOpacity>
-      </View>
-    ) : (
-      <>
-        {items.map((place, i) => (
-          <View key={i} style={styles.placeCard}>
-            <View style={styles.cardTopRow}>
-              <Text style={[styles.placeName, { flex: 1, marginRight: 8 }]} numberOfLines={2}>
-                {place.name}
-              </Text>
-              <TouchableOpacity onPress={() => openMaps(place.name)}>
-                <Text style={styles.mapsLink}>Maps →</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.placeMeta}>
-              {place.distance}{place.agesNote ? ' · ' + place.agesNote : ''}
-            </Text>
-            {place.description ? (
-              <Text style={styles.placeDesc} numberOfLines={2}>{place.description}</Text>
-            ) : null}
-          </View>
-        ))}
+          );
+        })}
       </>
     );
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Derived content ───────────────────────────────────────────────────────
+  const showTickets = pRef.bookingRequired === true || meta.ticketSignal === true;
+  const ticketHref  = bookingUrl ||
+    'https://www.google.com/search?q=' + encodeURIComponent(stopName + ' tickets');
+
+  const experienceText =
+    enrichment.whyItWorks ?? pProf.whyItWorks ?? enrichment.whyNow ??
+    (stopName + ' is a great stop for the whole family — explore at your own pace and look out for the highlights as you go.');
+
+  const rawTips = enrichment.practicalTips ?? pProf.practicalTips;
+  const practicalTips: string[] = rawTips
+    ? (Array.isArray(rawTips)
+        ? (rawTips as string[]).filter((s: string) => s.length > 2)
+        : String(rawTips)
+            .split(/\.\s+/)
+            .map((s: string) => s.replace(/\.$/, '').trim())
+            .filter((s: string) => s.length > 8))
+    : [];
+
+  const hours = openingHours || pRef.openingHours || '';
+  type TimingRow = [string, string, string?];
+  const timingRows: TimingRow[] = [
+    ['Recommended time', '~' + duration + ' min'],
+    ['Best for', 'Ages ' + (minAge ?? 3) + '–12'],
+    ['Crowd level now', 'Good timing', '#3DAA6E'],
+    ...(enrichment.bestTimeOfDay ?? pProf.bestTimeOfDay
+        ? [['Best time to visit', enrichment.bestTimeOfDay ?? pProf.bestTimeOfDay] as TimingRow]
+        : []),
+    ...(hours ? [['Hours today', hours] as TimingRow] : []),
+  ];
+
+  type AccessRow = { key: string; val: string; color?: string };
+  const parking    = enrichment.parkingNotes ?? pProf.parkingNotes;
+  const stroller   = enrichment.strollerFriendly ?? pProf.strollerFriendly;
+  const restrooms  = enrichment.bathroomNotes ?? meta.restroomConfidence;
+  const priceRange = pRef.priceRange ?? enrichment.priceRange;
+  const admissionVal = priceRange ? priceRange
+    : meta.ticketSignal === true  ? 'Ticket required'
+    : meta.ticketSignal === false ? 'Free entry'
+    : 'Free';
+  const admissionColor =
+    (meta.ticketSignal === false || (!priceRange && meta.ticketSignal !== true))
+      ? G.green : G.deep;
+  const accessRows: AccessRow[] = [
+    parking != null ? { key: 'Parking', val: parking || 'Nearby', color: '#D97706' } : null,
+    { key: 'Stroller friendly', val: stroller ? 'Yes' : 'Check ahead', color: stroller ? G.green : G.muted },
+    { key: 'Restrooms', val: restrooms || 'On site' },
+    { key: 'Admission', val: admissionVal, color: admissionColor },
+    address ? { key: 'Address', val: address } : null,
+  ].filter((x): x is AccessRow => x !== null);
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.nav}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>← At Stop</Text>
+            <Text style={styles.backText}>{"←"} At Stop</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.stopLabel} numberOfLines={1}>{stopName}</Text>
@@ -341,29 +565,25 @@ export default function ExpectScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Actions */}
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionBtn} onPress={openDirections}>
-            <Text style={styles.actionBtnText}>↗  Directions</Text>
+            <Text style={styles.actionBtnText}>{"↗  Directions"}</Text>
           </TouchableOpacity>
           {showTickets && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.ticketBtn]}
-              onPress={() => Linking.openURL(ticketHref).catch(() => {})}>
-              <Text style={[styles.actionBtnText, { color: '#D97706' }]}>
-                {"🏟"}  Book tickets
-              </Text>
+              onPress={() => Linking.openURL(ticketHref).catch(() => {})}
+            >
+              <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{"🏟  Book tickets"}</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* What you'll experience */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{"WHAT YOU'LL EXPERIENCE"}</Text>
           <Text style={styles.highlight}>{experienceText}</Text>
         </View>
 
-        {/* Best way */}
         {practicalTips.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>BEST WAY TO DO THIS STOP</Text>
@@ -380,7 +600,6 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        {/* Timing */}
         {timingRows.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{"TIMING & LOGISTICS"}</Text>
@@ -396,7 +615,6 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        {/* Access */}
         {accessRows.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{"PARKING & ACCESS"}</Text>
@@ -409,7 +627,6 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        {/* Nearby Essentials */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>NEARBY ESSENTIALS</Text>
 
@@ -457,7 +674,7 @@ export default function ExpectScreen() {
         </View>
       </ScrollView>
 
-      {/* ── SHEET: Food Nearby ──────────────────────────────────────────────── */}
+      {/* ── SHEET: Food Nearby ─────────────────────────────────────────────── */}
       {nearbySheet === 'food' && (
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
@@ -472,7 +689,8 @@ export default function ExpectScreen() {
               {nearbyData && nearbyData.food.length > 0 && (
                 <TouchableOpacity
                   style={{ paddingVertical: 16, alignItems: 'center' }}
-                  onPress={() => openMapsQuery('restaurant')}>
+                  onPress={() => openMapsQuery('restaurant')}
+                >
                   <Text style={styles.seeMore}>See more on Apple Maps →</Text>
                 </TouchableOpacity>
               )}
@@ -481,7 +699,7 @@ export default function ExpectScreen() {
         </View>
       )}
 
-      {/* ── SHEET: Quick Break Spots ────────────────────────────────────────── */}
+      {/* ── SHEET: Quick Break Spots ──────────────────────────────────────── */}
       {nearbySheet === 'breaks' && (
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
@@ -496,7 +714,8 @@ export default function ExpectScreen() {
               {nearbyData && nearbyData.breaks.length > 0 && (
                 <TouchableOpacity
                   style={{ paddingVertical: 16, alignItems: 'center' }}
-                  onPress={() => openMapsQuery('park cafe')}>
+                  onPress={() => openMapsQuery('park cafe')}
+                >
                   <Text style={styles.seeMore}>See more on Apple Maps →</Text>
                 </TouchableOpacity>
               )}
@@ -505,7 +724,7 @@ export default function ExpectScreen() {
         </View>
       )}
 
-      {/* ── SHEET: Kid-Friendly Extras ──────────────────────────────────────── */}
+      {/* ── SHEET: Kid-Friendly Extras ────────────────────────────────────── */}
       {nearbySheet === 'kids' && (
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
@@ -520,7 +739,8 @@ export default function ExpectScreen() {
               {nearbyData && nearbyData.kids.length > 0 && (
                 <TouchableOpacity
                   style={{ paddingVertical: 16, alignItems: 'center' }}
-                  onPress={() => openMapsQuery('kid activities')}>
+                  onPress={() => openMapsQuery('kid activities')}
+                >
                   <Text style={styles.seeMore}>See more on Apple Maps →</Text>
                 </TouchableOpacity>
               )}
@@ -533,72 +753,86 @@ export default function ExpectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: G.bg },
-  header:        { backgroundColor: '#1A1F2E', paddingHorizontal: 20, paddingBottom: 24 },
-  nav:           { flexDirection: 'row', marginBottom: 16 },
-  backBtn:       { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
-  backText:      { fontFamily: F.bold, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
-  stopLabel:     { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 },
-  title:         { fontFamily: F.bold, fontSize: 24, color: '#fff', lineHeight: 30 },
-  body:          { flex: 1, padding: 16 },
-  actionRow:     { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  actionBtn:     {
+  container:       { flex: 1, backgroundColor: G.bg },
+  header:          { backgroundColor: '#1A1F2E', paddingHorizontal: 20, paddingBottom: 24 },
+  nav:             { flexDirection: 'row', marginBottom: 16 },
+  backBtn:         { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  backText:        { fontFamily: F.bold, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+  stopLabel:       { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 4 },
+  title:           { fontFamily: F.bold, fontSize: 24, color: '#fff', lineHeight: 30 },
+  body:            { flex: 1, padding: 16 },
+  actionRow:       { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  actionBtn:       {
     flex: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8,
   },
-  actionBtnText: { fontFamily: F.bold, fontSize: 13, color: G.deep },
-  ticketBtn:     { borderWidth: 1.5, borderColor: 'rgba(245,166,35,0.4)' },
-  section:       {
+  actionBtnText:   { fontFamily: F.bold, fontSize: 13, color: G.deep },
+  ticketBtn:       { borderWidth: 1.5, borderColor: 'rgba(245,166,35,0.4)' },
+  section:         {
     backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10,
   },
-  sectionLabel:  { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-  highlight:     { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 22 },
-  tipsWrap:      { gap: 6 },
-  tipRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
-  tipDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: G.orange, marginTop: 7, flexShrink: 0 },
-  tipText:       { fontFamily: F.medium, fontSize: 13, color: G.muted, lineHeight: 20, flex: 1 },
-  infoRow:       {
+  sectionLabel:    { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  highlight:       { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 22 },
+  tipsWrap:        { gap: 6 },
+  tipRow:          { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
+  tipDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: G.orange, marginTop: 7, flexShrink: 0 },
+  tipText:         { fontFamily: F.medium, fontSize: 13, color: G.muted, lineHeight: 20, flex: 1 },
+  infoRow:         {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     paddingVertical: 9, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  infoKey:       { fontFamily: F.medium, fontSize: 13, color: G.muted, flex: 1 },
-  infoVal:       { fontFamily: F.bold, fontSize: 13, color: G.deep, textAlign: 'right', flex: 1 },
-  essRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  essIcon:       { fontSize: 20, width: 36 },
-  essTitle:      { fontFamily: F.bold, fontSize: 14, color: G.deep, marginBottom: 2 },
-  essSub:        { fontFamily: F.medium, fontSize: 12, color: G.muted },
-  essArrow:      { fontSize: 20, color: '#C4C9D4' },
-  overlay:       {
+  infoKey:         { fontFamily: F.medium, fontSize: 13, color: G.muted, flex: 1 },
+  infoVal:         { fontFamily: F.bold, fontSize: 13, color: G.deep, textAlign: 'right', flex: 1 },
+  essRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  essIcon:         { fontSize: 20, width: 36 },
+  essTitle:        { fontFamily: F.bold, fontSize: 14, color: G.deep, marginBottom: 2 },
+  essSub:          { fontFamily: F.medium, fontSize: 12, color: G.muted },
+  essArrow:        { fontSize: 20, color: '#C4C9D4' },
+  overlay:         {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', zIndex: 300,
   },
-  sheet:         {
+  sheet:           {
     backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, paddingBottom: 40, maxHeight: '82%',
   },
-  handle:        { width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  sheetHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  sheetTitle:    { fontFamily: F.bold, fontSize: 18, color: G.deep },
-  loadingWrap:   { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  loadingText:   { fontFamily: F.semibold, fontSize: 15, color: G.deep, marginTop: 4 },
-  loadingSubText:{ fontFamily: F.medium, fontSize: 13, color: G.muted },
-  emptyWrap:     { alignItems: 'center', paddingVertical: 32, gap: 12 },
-  emptyMsg:      { fontFamily: F.medium, fontSize: 14, color: G.muted, textAlign: 'center' },
-  mapsCta:       {
+  handle:          { width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  sheetHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sheetTitle:      { fontFamily: F.bold, fontSize: 18, color: G.deep },
+  loadingWrap:     { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  loadingText:     { fontFamily: F.semibold, fontSize: 15, color: G.deep, marginTop: 4 },
+  loadingSubText:  { fontFamily: F.medium, fontSize: 13, color: G.muted },
+  emptyWrap:       { alignItems: 'center', paddingVertical: 32, gap: 12 },
+  emptyMsg:        { fontFamily: F.medium, fontSize: 14, color: G.muted, textAlign: 'center' },
+  mapsCta:         {
     backgroundColor: G.orange, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 14,
     alignItems: 'center', marginTop: 4,
   },
-  mapsCtaText:   { fontFamily: F.bold, fontSize: 14, color: 'white' },
-  placeCard:     {
-    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14, marginBottom: 10,
-  },
-  cardTopRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  placeName:     { fontFamily: F.semibold, fontSize: 15, color: G.deep },
-  placeMeta:     { fontFamily: F.medium, fontSize: 13, color: G.muted, marginBottom: 6 },
-  placeDesc:     { fontFamily: F.medium, fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 6 },
-  mapsLink:      { fontFamily: F.bold, fontSize: 13, color: G.orange },
-  addBtn:        { backgroundColor: G.orange, borderRadius: 24, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  addBtnText:    { fontFamily: F.bold, fontSize: 14, color: 'white' },
-  seeMore:       { fontFamily: F.medium, fontSize: 13, color: G.muted },
+  mapsCtaText:     { fontFamily: F.bold, fontSize: 14, color: 'white' },
+  placeCard:       { backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14, marginBottom: 10 },
+  cardTopRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+  placeName:       { fontFamily: F.semibold, fontSize: 15, color: G.deep },
+  placeMeta:       { fontFamily: F.medium, fontSize: 13, color: G.muted, marginBottom: 6 },
+  placeDesc:       { fontFamily: F.medium, fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 6 },
+  mapsLink:        { fontFamily: F.bold, fontSize: 13, color: G.orange },
+  addBtn:          { backgroundColor: G.orange, borderRadius: 24, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  addBtnText:      { fontFamily: F.bold, fontSize: 14, color: 'white' },
+  addedRow:        { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, paddingVertical: 6 },
+  addedText:       { fontFamily: F.bold, fontSize: 14, color: '#3DAA6E' },
+  warnBox:         { backgroundColor: '#FFF8EC', borderRadius: 10, padding: 12, marginTop: 8 },
+  warnText:        { fontFamily: F.medium, fontSize: 13, color: '#92400E', lineHeight: 19, marginBottom: 10 },
+  confirmRow:      { flexDirection: 'row', gap: 8 },
+  confirmBtn:      { flex: 1, backgroundColor: G.orange, borderRadius: 20, height: 38, alignItems: 'center', justifyContent: 'center' },
+  confirmBtnText:  { fontFamily: F.bold, fontSize: 13, color: 'white' },
+  cancelBtn:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: 20, height: 38, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText:   { fontFamily: F.bold, fontSize: 13, color: G.muted },
+  dayFullPanel:    { backgroundColor: '#FFF8EC', borderRadius: 12, padding: 14, marginTop: 8, gap: 8 },
+  dayFullTitle:    { fontFamily: F.bold, fontSize: 14, color: G.deep },
+  dayFullSub:      { fontFamily: F.medium, fontSize: 13, color: G.muted, marginBottom: 4 },
+  dayFullOption:   { backgroundColor: 'white', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  dayFullOptionText: { fontFamily: F.semibold, fontSize: 13, color: G.deep },
+  dayFullOptionSub:  { fontFamily: F.medium, fontSize: 12, color: G.muted, marginTop: 2 },
+  dayFullCancel:   { fontFamily: F.medium, fontSize: 13, color: G.muted, textAlign: 'center', paddingVertical: 6 },
+  seeMore:         { fontFamily: F.medium, fontSize: 13, color: G.muted },
 });
