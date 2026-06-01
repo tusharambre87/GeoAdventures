@@ -790,33 +790,46 @@ function ThinkFast({ stopName }: { stopName: string }) {
   // ── INTRO ──
   if (phase === "intro" || !prompt) {
     return (
-      <IntroScreen
-        icon="⚡"
-        title="Think Fast!"
-        subtitle="Name 10 things in 30 seconds"
-        description="Everyone shouts answers as fast as they can. Tap once for each answer you name!"
-        note="No wrong answers — just keep going!"
-        btnLabel="Start — 30 seconds!"
-        btnColor="#7C3AED"
-        onStart={startGame}
-        onBack={() => router.back()}
-      />
+      <View style={{ flex: 1, backgroundColor: "#FF6B2B" }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40, paddingHorizontal: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={{ fontSize: 64, marginBottom: 12 }}>⚡</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: 26, color: "#fff", textAlign: "center", marginBottom: 6 }}>Think Fast!</Text>
+          <Text style={{ fontFamily: F.semibold, fontSize: 15, color: "rgba(255,255,255,0.8)", textAlign: "center", marginBottom: 12 }}>Name 10 things in 30 seconds</Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.75)", textAlign: "center", lineHeight: 22 }}>Everyone shouts answers as fast as they can. Tap once for each answer!</Text>
+          <View style={{ marginTop: 16, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
+            <Text style={{ fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.9)", textAlign: "center" }}>No wrong answers — just keep going!</Text>
+          </View>
+          <Pressable
+            style={{ backgroundColor: "#fff", borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, marginTop: 28 }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
+          >
+            <Text style={{ fontFamily: F.bold, fontSize: 15, color: "#FF6B2B" }}>Start — 30 seconds!</Text>
+          </Pressable>
+          <Pressable style={{ marginTop: 14 }} onPress={() => router.back()}>
+            <Text style={{ fontFamily: F.semibold, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>← Back to Games</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
     );
   }
 
   // ── PLAYING ──
   if (phase === "playing") {
-    const timerColor = timeLeft <= 5 ? "#DC2626" : timeLeft <= 10 ? "#F59E0B" : "#22C55E";
+    const timerColor = timeLeft <= 5 ? "#EF4444" : timeLeft <= 10 ? "#F59E0B" : "#fff";
     return (
       <ScrollView
-        style={{ flex: 1, backgroundColor: "#FFFBEB" }}
+        style={{ flex: 1, backgroundColor: "#FF6B2B" }}
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Timer + counter */}
         <View style={tf.timerRow}>
-          <View style={[tf.timerCircle, { borderColor: timerColor }]}>
+          <View style={tf.timerCircle}>
             <Text style={[tf.timerNum, { color: timerColor }]}>{timeLeft}</Text>
+            <Text style={tf.timerLabel}>sec</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={tf.tapHint}>Tap for each answer!</Text>
@@ -825,13 +838,15 @@ function ThinkFast({ stopName }: { stopName: string }) {
         </View>
 
         {/* Prompt */}
-        <Text style={tf.promptLabel}>⚡ Name 10 things…</Text>
-        <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
+        <View style={tf.promptCard}>
+          <Text style={tf.promptLabel}>⚡ NAME 10 THINGS…</Text>
+          <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
+        </View>
 
         {/* 10 progress dots */}
         <View style={tf.dots}>
           {Array.from({ length: 10 }).map((_, i) => (
-            <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#22C55E" : "#E5E7EB" }]}>
+            <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#fff" : "rgba(255,255,255,0.35)" }]}>
               {i < tapCount && <Text style={tf.dotCheck}>✓</Text>}
             </View>
           ))}
@@ -869,13 +884,13 @@ function ThinkFast({ stopName }: { stopName: string }) {
   if (phase === "reveal" && prompt) {
     return (
       <ScrollView
-        style={{ flex: 1, backgroundColor: "#FFFBEB" }}
+        style={{ flex: 1, backgroundColor: "#FF6B2B" }}
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 24, alignItems: "center" }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={{ fontSize: 52, marginBottom: 8 }}>⏰</Text>
-        <Text style={[sh.doneTitle, { color: "#F59E0B" }]}>Time's up!</Text>
-        <Text style={sh.doneSub}>You named {tapCount} / 10</Text>
+        <Text style={[sh.doneTitle, { color: "#fff" }]}>Time's up!</Text>
+        <Text style={[sh.doneSub, { color: "rgba(255,255,255,0.8)" }]}>You named {tapCount} / 10</Text>
 
         <View style={tf.revealBox}>
           <Text style={tf.revealLabel}>Some example answers — great job if you got any! 🌟</Text>
@@ -892,16 +907,16 @@ function ThinkFast({ stopName }: { stopName: string }) {
         </View>
 
         <Pressable
-          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 24, alignSelf: "stretch" }]}
+          style={[sh.btn, { backgroundColor: "#fff", marginTop: 24, alignSelf: "stretch" }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
         >
-          <Text style={sh.btnText}>⚡ Play Again</Text>
+          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>⚡ Play Again</Text>
         </Pressable>
         <Pressable
-          style={[sh.btn, { backgroundColor: "#E5E7EB", marginTop: 12, alignSelf: "stretch" }]}
+          style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.2)", marginTop: 12, alignSelf: "stretch" }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
         >
-          <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+          <Text style={sh.btnText}>← Back to Games</Text>
         </Pressable>
       </ScrollView>
     );
@@ -909,23 +924,23 @@ function ThinkFast({ stopName }: { stopName: string }) {
 
   // ── COMPLETE (got all 10!) ──
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFBEB" }}>
+    <View style={{ flex: 1, backgroundColor: "#FF6B2B" }}>
       <Confetti />
       <View style={[sh.centered, { backgroundColor: "transparent" }]}>
         <Text style={{ fontSize: 72, marginBottom: 12 }}>⚡</Text>
-        <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>Amazing!</Text>
-        <Text style={[sh.doneSub, { marginBottom: 0 }]}>You named them all!</Text>
+        <Text style={[sh.doneTitle, { color: "#fff" }]}>Amazing!</Text>
+        <Text style={[sh.doneSub, { marginBottom: 0, color: "rgba(255,255,255,0.8)" }]}>You named them all!</Text>
         <Pressable
-          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32 }]}
+          style={[sh.btn, { backgroundColor: "#fff", marginTop: 32 }]}
           onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); startGame(); }}
         >
-          <Text style={sh.btnText}>⚡ Play Again</Text>
+          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>⚡ Play Again</Text>
         </Pressable>
         <Pressable
-          style={[sh.btn, { backgroundColor: "#E5E7EB", marginTop: 12 }]}
+          style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.2)", marginTop: 12 }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
         >
-          <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+          <Text style={sh.btnText}>← Back to Games</Text>
         </Pressable>
       </View>
     </View>
@@ -967,23 +982,31 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
 
   // ── HUNTING ──
   if (phase === "hunting") {
+    const progressPct = items.length > 0 ? (foundCount / items.length) * 100 : 0;
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+        {/* Green header */}
+        <View style={[sc.hdr, { paddingTop: insets.top + 8 }]}>
+          <Pressable style={sc.hdrBack} onPress={() => router.back()}>
+            <Text style={sc.hdrBackText}>← Games</Text>
+          </Pressable>
+          <Text style={sc.hdrTitle}>🔍 Your Hunt</Text>
+          <Text style={sc.hdrSub}>
+            {foundCount > 0 ? `${foundCount} / ${items.length} found` : "Tap when you find something!"}
+          </Text>
+          <View style={sc.progBar}>
+            <View style={[sc.progFill, { width: `${progressPct}%` as any }]} />
+          </View>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: insets.top + 24,
+            paddingTop: 16,
             paddingBottom: insets.bottom + 88,
             paddingHorizontal: 20,
           }}
         >
-          <Text style={sc.title}>🔍 Your Hunt</Text>
-          <Text style={sc.sub}>
-            {foundCount > 0
-              ? `${foundCount} / ${items.length} found`
-              : "Tap when you find something!"}
-          </Text>
-
           {items.map((item, i) => (
             <Pressable
               key={i}
@@ -1030,18 +1053,26 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
   // ── COMPLETE ──
   return (
     <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+      {/* Green header */}
+      <View style={[sc.hdr, { paddingTop: insets.top + 8 }]}>
+        <Pressable style={sc.hdrBack} onPress={() => router.back()}>
+          <Text style={sc.hdrBackText}>← Games</Text>
+        </Pressable>
+        <Text style={sc.hdrTitle}>🎉 Hunt Complete!</Text>
+        <Text style={sc.hdrSub}>You found everything!</Text>
+        <View style={sc.progBar}>
+          <View style={[sc.progFill, { width: "100%" }]} />
+        </View>
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 32,
+          paddingTop: 20,
           paddingBottom: insets.bottom + 40,
           paddingHorizontal: 20,
           alignItems: "center",
         }}
       >
-        <Text style={{ fontSize: 56, marginBottom: 8 }}>🎉</Text>
-        <Text style={[sc.title, { textAlign: "center" }]}>Hunt Complete!</Text>
-        <Text style={[sc.sub, { marginBottom: 28 }]}>You found everything!</Text>
 
         {/* All items shown with green ✓ */}
         <View style={{ width: "100%", marginBottom: 32 }}>
@@ -1211,21 +1242,21 @@ function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
   // ── INTRO ──
   if (phase === "intro") {
     return (
-      <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+      <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
         <Text style={{ fontSize: 64, marginBottom: 12 }}>🌍</Text>
-        <Text style={[gg.introTitle]}>I'm thinking of a place...</Text>
-        <Text style={gg.introSub}>Ask yes/no questions to figure it out</Text>
-        <View style={gg.introCountBadge}>
-          <Text style={gg.introCountText}>Questions asked: 0 / 20</Text>
+        <Text style={[gg.introTitle, { color: "#fff" }]}>I'm thinking of a place...</Text>
+        <Text style={[gg.introSub, { color: "rgba(255,255,255,0.6)" }]}>Ask yes/no questions to figure it out</Text>
+        <View style={[gg.introCountBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
+          <Text style={[gg.introCountText, { color: "rgba(255,255,255,0.8)" }]}>Questions asked: 0 / 20</Text>
         </View>
         <Pressable
-          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32, paddingHorizontal: 40 }]}
+          style={[sh.btn, { backgroundColor: "#3B82F6", marginTop: 32, paddingHorizontal: 40 }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
         >
           <Text style={sh.btnText}>Start Guessing</Text>
         </Pressable>
         <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
-          <Text style={sh.backBtnText}>← Back to Games</Text>
+          <Text style={{ fontFamily: F.semibold, fontSize: 14, color: "rgba(255,255,255,0.5)" }}>← Back to Games</Text>
         </Pressable>
       </View>
     );
@@ -1236,7 +1267,7 @@ function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
     const allAnswered = cards.length > 0 && cards.every((c) => c.answer !== null);
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: "#FFF8F0" }}
+        style={{ flex: 1, backgroundColor: "#152D4A" }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
@@ -1330,24 +1361,24 @@ function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
 
   // ── COMPLETE ──
   return (
-    <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+    <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
       <Text style={{ fontSize: 72, marginBottom: 12 }}>🌍</Text>
-      <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>You got it!</Text>
+      <Text style={[sh.doneTitle, { color: "#fff" }]}>You got it!</Text>
       <View style={gg.revealBox}>
         <Text style={gg.revealLabel}>The place was</Text>
         <Text style={gg.revealPlace}>{target}</Text>
       </View>
       <Pressable
-        style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32 }]}
+        style={[sh.btn, { backgroundColor: "#3B82F6", marginTop: 32 }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
       >
         <Text style={sh.btnText}>🌍 Play Again</Text>
       </Pressable>
       <Pressable
-        style={[sh.btn, { backgroundColor: "#F3F4F6", marginTop: 12 }]}
+        style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.15)", marginTop: 12 }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
       >
-        <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+        <Text style={sh.btnText}>← Back to Games</Text>
       </Pressable>
     </View>
   );
@@ -1407,20 +1438,27 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
     const isLast = index >= MAX_BAG_ITEMS - 1;
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+        {/* Amber-brown header */}
+        <View style={[bag.hdr, { paddingTop: insets.top + 8 }]}>
+          <Pressable style={bag.hdrBack} onPress={() => router.back()}>
+            <Text style={bag.hdrBackText}>← Games</Text>
+          </Pressable>
+          <Text style={bag.hdrTitle}>👜 What's In My Bag?</Text>
+          <Text style={bag.hdrSub}>One person reads, everyone repeats!</Text>
+          <Text style={bag.hdrCount}>Item {index + 1} of {MAX_BAG_ITEMS}</Text>
+        </View>
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: insets.top + 24,
+            paddingTop: 20,
             paddingBottom: insets.bottom + 32,
             paddingHorizontal: 24,
           }}
         >
-          <Text style={bag.title}>👜 What's In My Bag?</Text>
-
           <View style={bag.readerBadge}>
             <Text style={bag.readerText}>🔊 Reader, say this out loud:</Text>
           </View>
-          <Text style={bag.itemNum}>Item {index + 1} of {MAX_BAG_ITEMS}</Text>
 
           <View style={bag.sentenceBox}>
             <Text style={bag.sentence}>"{sentence}"</Text>
@@ -1513,19 +1551,26 @@ function GeoSpy() {
   // ── INTRO ──
   if (phase === "intro") {
     return (
-      <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
-        <Text style={{ fontSize: 64, marginBottom: 12 }}>👁</Text>
-        <Text style={spy.introTitle}>GeoSpy</Text>
-        <Text style={spy.introSub}>Look around and call out what you see!</Text>
-        <Pressable
-          style={[sh.btn, { backgroundColor: "#3DAA6E", marginTop: 32, paddingHorizontal: 40 }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startSpy(); }}
-        >
-          <Text style={sh.btnText}>Start Spying</Text>
-        </Pressable>
-        <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
-          <Text style={sh.backBtnText}>← Back to Games</Text>
-        </Pressable>
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+        <View style={[spy.hdr, { paddingTop: insets.top + 8 }]}>
+          <Pressable style={spy.hdrBack} onPress={() => router.back()}>
+            <Text style={spy.hdrBackText}>← Games</Text>
+          </Pressable>
+          <Text style={spy.hdrTitle}>👁 GeoSpy</Text>
+          <Text style={spy.hdrSub}>Look around and call out what you see!</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 64, marginBottom: 28 }}>👁</Text>
+          <Pressable
+            style={[sh.btn, { backgroundColor: "#5B21B6", paddingHorizontal: 40, alignSelf: "stretch" }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startSpy(); }}
+          >
+            <Text style={sh.btnText}>Start Spying</Text>
+          </Pressable>
+          <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
+            <Text style={sh.backBtnText}>← Back to Games</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -1533,10 +1578,17 @@ function GeoSpy() {
   // ── PLAYING (infinite) ──
   return (
     <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
+      <View style={[spy.hdr, { paddingTop: insets.top + 8 }]}>
+        <Pressable style={spy.hdrBack} onPress={() => router.back()}>
+          <Text style={spy.hdrBackText}>← Games</Text>
+        </Pressable>
+        <Text style={spy.hdrTitle}>👁 GeoSpy</Text>
+        <Text style={spy.hdrSub}>Look around and call out what you see!</Text>
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 32,
+          paddingTop: 24,
           paddingBottom: insets.bottom + 32,
           paddingHorizontal: 24,
           alignItems: "center",
@@ -1544,8 +1596,6 @@ function GeoSpy() {
           justifyContent: "center",
         }}
       >
-        <Text style={spy.title}>👁 GeoSpy</Text>
-
         <View style={spy.promptCard}>
           <Text style={spy.promptIcon}>🔊</Text>
           <Text style={spy.promptText}>{currentPrompt}</Text>
@@ -1616,57 +1666,85 @@ const sh = StyleSheet.create({
 });
 
 const tf = StyleSheet.create({
-  timerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
-  timerCircle: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, alignItems: "center", justifyContent: "center" },
-  timerNum: { fontFamily: F.bold, fontSize: 28 },
-  tapHint: { fontFamily: F.medium, fontSize: 12, color: "#78716C", marginBottom: 2 },
-  tapCount: { fontFamily: F.bold, fontSize: 24, color: "#1C1917" },
-  promptLabel: { fontFamily: F.bold, fontSize: 17, color: "#1C1917", marginBottom: 4 },
-  promptText: { fontFamily: F.medium, fontSize: 16, color: "#4B5563", marginBottom: 20 },
-  dots: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
-  dot: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-  dotCheck: { fontFamily: F.bold, fontSize: 16, color: "#fff" },
-  tapBtn: { backgroundColor: "#E8692A", borderRadius: 20, paddingVertical: 24, alignItems: "center", marginBottom: 16 },
-  tapBtnText: { fontFamily: F.bold, fontSize: 20, color: "#fff" },
-  rowBtns: { flexDirection: "row", gap: 12 },
-  smBtn: { flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14, paddingVertical: 13, alignItems: "center" },
-  smBtnText: { fontFamily: F.semibold, fontSize: 14, color: "#374151" },
-  revealBox: { backgroundColor: "#FFFBEB", borderRadius: 20, borderWidth: 1.5, borderColor: "#FCD34D", padding: 20, width: "100%", marginTop: 20 },
-  revealLabel: { fontFamily: F.semibold, fontSize: 13, color: "#92400E", marginBottom: 12, textAlign: "center" },
+  timerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 28 },
+  timerCircle: {
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: "rgba(0,0,0,0.2)", borderWidth: 4,
+    borderColor: "rgba(255,255,255,0.3)",
+    alignItems: "center", justifyContent: "center",
+  },
+  timerNum: { fontFamily: F.bold, fontSize: 52, lineHeight: 58 },
+  timerLabel: { fontFamily: F.bold, fontSize: 11, color: "rgba(255,255,255,0.7)" },
+  tapHint: { fontFamily: F.medium, fontSize: 12, color: "rgba(255,255,255,0.7)", marginBottom: 2 },
+  tapCount: { fontFamily: F.bold, fontSize: 24, color: "#fff" },
+  promptCard: {
+    backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 20, padding: 20,
+    marginBottom: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
+  },
+  promptLabel: { fontFamily: F.bold, fontSize: 12, color: "rgba(255,255,255,0.8)", letterSpacing: 0.8, marginBottom: 6 },
+  promptText: { fontFamily: F.bold, fontSize: 28, color: "#fff", lineHeight: 36 },
+  dots: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
+  dot: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 2.5, borderColor: "rgba(255,255,255,0.7)",
+  },
+  dotCheck: { fontFamily: F.bold, fontSize: 14, color: "#FF6B2B" },
+  tapBtn: {
+    backgroundColor: "#fff", borderRadius: 18, paddingVertical: 22,
+    alignItems: "center", marginBottom: 16,
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+  },
+  tapBtnText: { fontFamily: F.bold, fontSize: 22, color: "#FF6B2B" },
+  rowBtns: { flexDirection: "row", gap: 10, marginTop: 0 },
+  smBtn: { flex: 1, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
+  smBtnText: { fontFamily: F.semibold, fontSize: 13, color: "#fff" },
+  revealBox: {
+    backgroundColor: "rgba(0,0,0,0.25)", borderRadius: 20, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)", padding: 20, width: "100%", marginTop: 20,
+  },
+  revealLabel: { fontFamily: F.semibold, fontSize: 13, color: "rgba(255,255,255,0.85)", marginBottom: 12, textAlign: "center" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#fff", borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: "#FCD34D" },
-  chipText: { fontFamily: F.semibold, fontSize: 13, color: "#374151" },
-  revealNote: { fontFamily: F.medium, fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 12, fontStyle: "italic" },
+  chip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12,
+  },
+  chipText: { fontFamily: F.semibold, fontSize: 13, color: "#fff" },
+  revealNote: { fontFamily: F.medium, fontSize: 11, color: "rgba(255,255,255,0.5)", textAlign: "center", marginTop: 12, fontStyle: "italic" },
 });
 
 const sc = StyleSheet.create({
-  // Header
-  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 4 },
-  sub: { fontFamily: F.medium, fontSize: 14, color: "#78716C", marginBottom: 20 },
+  // Green header
+  hdr: { backgroundColor: "#065F46", paddingHorizontal: 20, paddingBottom: 20, overflow: "hidden" },
+  hdrBack: {
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 7, alignSelf: "flex-start", marginBottom: 16,
+  },
+  hdrBackText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.8)" },
+  hdrTitle: { fontFamily: F.bold, fontSize: 30, color: "#fff", marginBottom: 4 },
+  hdrSub: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 14 },
+  progBar: { height: 4, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 2, overflow: "hidden" },
+  progFill: { height: 4, backgroundColor: "#fff", borderRadius: 2 },
   // Item cards
   card: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
     borderColor: "rgba(28,25,23,0.08)", padding: 14, marginBottom: 10,
   },
-  cardFound: {
-    backgroundColor: "#E8F7EF", borderColor: "#3DAA6E",
-  },
+  cardFound: { backgroundColor: "#ECFDF5", borderColor: "#6EE7B7" },
   iconBox: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: "#F3F4F6",
+    width: 44, height: 44, borderRadius: 12, backgroundColor: "#F0FDF4",
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  iconBoxFound: {
-    backgroundColor: "#3DAA6E",
-  },
-  iconGlyph: { fontSize: 18 },
-  iconGlyphFound: { fontSize: 16, color: "#fff", fontFamily: F.bold },
-  cardText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1, lineHeight: 20 },
-  cardTextFound: { fontFamily: F.medium, fontSize: 14, color: "#1A6643", flex: 1, lineHeight: 20 },
+  iconBoxFound: { backgroundColor: "#D1FAE5" },
+  iconGlyph: { fontSize: 20 },
+  iconGlyphFound: { fontSize: 16, color: "#16A34A", fontFamily: F.bold },
+  cardText: { fontFamily: F.bold, fontSize: 14, color: "#1C1917", flex: 1, lineHeight: 20 },
+  cardTextFound: { fontFamily: F.medium, fontSize: 14, color: "#6B7280", flex: 1, lineHeight: 20, textDecorationLine: "line-through" },
   // "We found it!" pill
   foundBtn: {
-    backgroundColor: "#7C3AED", borderRadius: 14,
-    paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0,
+    backgroundColor: "#065F46", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 9, flexShrink: 0,
   },
   foundBtnText: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
   // Bottom bar
@@ -1677,68 +1755,81 @@ const sc = StyleSheet.create({
   },
   endBtn: {
     borderRadius: 16, paddingVertical: 15, alignItems: "center",
-    borderWidth: 1.5, borderColor: "#7C3AED",
+    borderWidth: 2, borderColor: "#065F46",
   },
-  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
+  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#065F46" },
 });
 
 const gg = StyleSheet.create({
-  // Intro
+  // Intro (base styles — overridden inline for navy bg)
   introTitle: { fontFamily: F.bold, fontSize: 22, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
   introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", marginBottom: 20 },
   introCountBadge: { backgroundColor: "#F3F0FF", borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 },
   introCountText: { fontFamily: F.semibold, fontSize: 14, color: "#7C3AED" },
   // Playing header
-  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 4 },
-  asked: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 20 },
-  sectionLabel: { fontFamily: F.semibold, fontSize: 12, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 10 },
-  // Question cards
+  title: { fontFamily: F.bold, fontSize: 20, color: "#fff", marginBottom: 4 },
+  asked: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 20 },
+  sectionLabel: { fontFamily: F.semibold, fontSize: 12, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5, marginBottom: 10 },
+  // Question cards — dark translucent for navy bg
   qCard: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "rgba(28,25,23,0.08)", padding: 14, marginBottom: 8,
+    backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 14, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)", padding: 15, marginBottom: 8,
+    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
   },
-  qCardAnswered: { backgroundColor: "#F3F4F6", borderColor: "rgba(28,25,23,0.06)" },
-  qText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1 },
-  qTextAnswered: { color: "#9CA3AF" },
-  qArrow: { fontFamily: F.bold, fontSize: 15, color: "#C4B5FD" },
+  qCardAnswered: { backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.1)" },
+  qText: { fontFamily: F.bold, fontSize: 15, color: "#fff", flex: 1 },
+  qTextAnswered: { color: "rgba(255,255,255,0.45)" },
+  qArrow: { fontFamily: F.bold, fontSize: 18, color: "rgba(255,255,255,0.6)" },
   answerBadge: {
-    backgroundColor: "#E5E7EB", borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
     paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0,
   },
   answerBadgeText: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
   // Refresh
   refreshBtn: {
     alignSelf: "center", marginTop: 4, marginBottom: 8,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 12, borderWidth: 1.5, borderColor: "#C4B5FD",
+    paddingHorizontal: 18, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
-  refreshBtnText: { fontFamily: F.semibold, fontSize: 13, color: "#7C3AED" },
+  refreshBtnText: { fontFamily: F.semibold, fontSize: 12, color: "rgba(255,255,255,0.7)" },
   // Guess input
-  guessRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  guessRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   guessInput: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "rgba(28,25,23,0.1)", paddingHorizontal: 16, paddingVertical: 13,
-    fontFamily: F.medium, fontSize: 15, color: "#1C1917",
+    flex: 1, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 12, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 13,
+    fontFamily: F.medium, fontSize: 15, color: "#fff",
   },
-  guessBtn: { backgroundColor: "#3DAA6E", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13 },
+  guessBtn: { backgroundColor: "#3B82F6", borderRadius: 12, paddingHorizontal: 18, paddingVertical: 13 },
   guessBtnText: { fontFamily: F.bold, fontSize: 14, color: "#fff" },
   // Wrong guess toast
   wrongMsg: {
-    marginTop: 10, backgroundColor: "#FEF3C7", borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: "#FCD34D",
+    marginTop: 10, backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: "rgba(239,68,68,0.3)",
   },
-  wrongMsgText: { fontFamily: F.semibold, fontSize: 13, color: "#92400E", textAlign: "center" },
+  wrongMsgText: { fontFamily: F.semibold, fontSize: 13, color: "#F87171", textAlign: "center" },
   // Complete
   revealBox: {
-    marginTop: 20, backgroundColor: "#fff", borderRadius: 20, borderWidth: 2,
-    borderColor: "#C4B5FD", paddingHorizontal: 32, paddingVertical: 20, alignItems: "center",
+    marginTop: 20, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 20, borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)", paddingHorizontal: 32, paddingVertical: 20, alignItems: "center",
   },
-  revealLabel: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 6 },
-  revealPlace: { fontFamily: F.bold, fontSize: 24, color: "#7C3AED", textAlign: "center" },
+  revealLabel: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 6 },
+  revealPlace: { fontFamily: F.bold, fontSize: 24, color: "#fff", textAlign: "center" },
 });
 
 const bag = StyleSheet.create({
+  // Amber-brown header
+  hdr: { backgroundColor: "#92400E", paddingHorizontal: 20, paddingBottom: 20 },
+  hdrBack: {
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 7, alignSelf: "flex-start", marginBottom: 16,
+  },
+  hdrBackText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.8)" },
+  hdrTitle: { fontFamily: F.bold, fontSize: 30, color: "#fff", marginBottom: 4 },
+  hdrSub: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 4 },
+  hdrCount: { fontFamily: F.medium, fontSize: 12, color: "rgba(255,255,255,0.5)" },
   // Intro
   introTitle: { fontFamily: F.bold, fontSize: 22, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
   introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", marginBottom: 20 },
@@ -1749,43 +1840,55 @@ const bag = StyleSheet.create({
   },
   themeText: { fontFamily: F.medium, fontSize: 15, color: "#4B5563", textAlign: "center" },
   // Playing
-  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 16 },
   readerBadge: {
-    backgroundColor: "#EDE9FE", borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 8,
+    backgroundColor: "#FEF3C7", borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 16,
   },
-  readerText: { fontFamily: F.semibold, fontSize: 13, color: "#5B21B6" },
-  itemNum: { fontFamily: F.medium, fontSize: 12, color: "#9CA3AF", marginBottom: 16 },
+  readerText: { fontFamily: F.semibold, fontSize: 13, color: "#92400E" },
   sentenceBox: {
     backgroundColor: "#fff", borderRadius: 20, borderWidth: 2,
-    borderColor: "#C4B5FD", padding: 24, marginBottom: 20,
+    borderColor: "#F59E0B", borderLeftWidth: 4, borderLeftColor: "#F59E0B",
+    padding: 24, marginBottom: 20,
   },
   sentence: { fontFamily: F.semibold, fontSize: 18, color: "#1C1917", textAlign: "center", lineHeight: 28 },
-  repeatHint: { fontFamily: F.medium, fontSize: 14, color: "#78716C", textAlign: "center", marginBottom: 8 },
+  repeatHint: { fontFamily: F.medium, fontSize: 14, color: "#78716C", textAlign: "center", marginBottom: 8, fontStyle: "italic" },
   btnRow: { flexDirection: "row", gap: 12, marginTop: 24 },
   endBtn: {
-    flex: 1, borderRadius: 16, borderWidth: 2, borderColor: "#7C3AED",
+    flex: 1, borderRadius: 16, borderWidth: 2, borderColor: "#92400E",
     alignItems: "center", justifyContent: "center", paddingVertical: 14,
   },
-  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
+  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#92400E" },
 });
 
 const spy = StyleSheet.create({
-  // Intro
+  // Purple header
+  hdr: { backgroundColor: "#5B21B6", paddingHorizontal: 20, paddingBottom: 20 },
+  hdrBack: {
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 7, alignSelf: "flex-start", marginBottom: 16,
+  },
+  hdrBackText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.8)" },
+  hdrTitle: { fontFamily: F.bold, fontSize: 30, color: "#fff", marginBottom: 4 },
+  hdrSub: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)" },
+  // Intro / Playing (kept for stray refs)
   introTitle: { fontFamily: F.bold, fontSize: 26, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
   introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", maxWidth: 260 },
-  // Playing
   title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 28 },
+  // Prompt card — white with purple-tinted shadow
   promptCard: {
-    backgroundColor: "#3DAA6E", borderRadius: 24, padding: 36,
+    backgroundColor: "#fff", borderRadius: 24, padding: 36,
     alignItems: "center", width: "100%", marginBottom: 20,
+    borderWidth: 2, borderColor: "rgba(91,33,182,0.08)",
+    shadowColor: "#5B21B6", shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 8 },
   },
   promptIcon: { fontSize: 36, marginBottom: 16 },
-  promptText: { fontFamily: F.bold, fontSize: 24, color: "#fff", textAlign: "center", lineHeight: 34 },
+  promptText: { fontFamily: F.bold, fontSize: 24, color: "#1C1917", textAlign: "center", lineHeight: 34 },
   hint: { fontFamily: F.medium, fontSize: 13, color: "#9CA3AF", textAlign: "center", marginBottom: 4 },
+  nextBtn: { backgroundColor: "#5B21B6", borderRadius: 16, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 12 },
+  nextBtnText: { fontFamily: F.bold, fontSize: 15, color: "#fff", textAlign: "center" },
   doneBtn: {
     alignSelf: "stretch", marginTop: 12, borderRadius: 16, borderWidth: 2,
-    borderColor: "#7C3AED", alignItems: "center", justifyContent: "center", paddingVertical: 14,
+    borderColor: "#5B21B6", alignItems: "center", justifyContent: "center", paddingVertical: 14,
   },
-  doneBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
+  doneBtnText: { fontFamily: F.bold, fontSize: 15, color: "#5B21B6" },
 });
