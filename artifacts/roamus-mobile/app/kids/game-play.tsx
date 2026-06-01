@@ -1074,16 +1074,20 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
 
 // ─── GeoGuess ─────────────────────────────────────────────────────────────────
 
-async function fetchGeoGuessAnswer(target: string, question: string): Promise<string> {
+async function fetchGeoGuessAnswer(
+  target: string,
+  question: string,
+  stopId?: string,
+): Promise<string> {
   try {
-    const token = await AsyncStorage.getItem("auth_token");
+    const token = await AsyncStorage.getItem("authToken");
     const res = await fetch(`${API_BASE}/api/geoguess/answer`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ target, question }),
+      body: JSON.stringify({ target, question, stopId, token }),
     });
     const data = await res.json();
     return data.answer || "That depends";
@@ -1093,21 +1097,33 @@ async function fetchGeoGuessAnswer(target: string, question: string): Promise<st
   }
 }
 
-function GeoGuess({ stopName }: { stopName: string }) {
+interface QCard {
+  text: string;
+  answer: string | null;
+  loading: boolean;
+}
+
+function answerColor(a: string): string {
+  const l = a.toLowerCase();
+  if (l.startsWith("yes") || l === "correct" || l === "right") return "#3DAA6E";
+  if (l.startsWith("no") || l === "nope" || l === "never") return "#DC2626";
+  return "#F59E0B";
+}
+
+function GeoGuess({ stopName, stopId }: { stopName: string; stopId: string }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
-  const [target, setTarget] = useState<string>("");
+  const [target, setTarget] = useState("");
   const [usedTargets, setUsedTargets] = useState<string[]>([]);
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [usedQuestions, setUsedQuestions] = useState<string[]>([]);
+  const [cards, setCards] = useState<QCard[]>([]);
+  const [seenQuestions, setSeenQuestions] = useState<string[]>([]);
   const [questionsAsked, setQuestionsAsked] = useState(0);
-  const [guessesUsed, setGuessesUsed] = useState(0);
   const [guess, setGuess] = useState("");
-  const [response, setResponse] = useState<string | null>(null);
-  const [lastQuestion, setLastQuestion] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [wrongMsg, setWrongMsg] = useState<string | null>(null);
+  const [isGuessing, setIsGuessing] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  const wrongMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pickTarget = useCallback((): string => {
     const candidates = stopName
@@ -1118,50 +1134,59 @@ function GeoGuess({ stopName }: { stopName: string }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }, [stopName, usedTargets]);
 
-  const startGame = () => {
+  const pickCards = useCallback((seen: string[]): QCard[] => {
+    const pool = GEOGUESS_QUESTIONS.filter((q) => !seen.includes(q));
+    const source = pool.length >= VISIBLE_QUESTIONS ? pool : GEOGUESS_QUESTIONS;
+    return [...source]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, VISIBLE_QUESTIONS)
+      .map((text) => ({ text, answer: null, loading: false }));
+  }, []);
+
+  const startGame = useCallback(() => {
     const t = pickTarget();
-    const q = [...GEOGUESS_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, VISIBLE_QUESTIONS);
+    const initial = pickCards([]);
+    const seen = initial.map((c) => c.text);
     setTarget(t);
     setUsedTargets((prev) => [...prev, t]);
-    setQuestions(q);
-    setUsedQuestions([...q]);
+    setCards(initial);
+    setSeenQuestions(seen);
     setQuestionsAsked(0);
-    setGuessesUsed(0);
     setGuess("");
-    setResponse(null);
-    setLastQuestion(null);
+    setWrongMsg(null);
     setIsCorrect(false);
     setPhase("playing");
+  }, [pickTarget, pickCards]);
+
+  const refreshCards = () => {
+    const fresh = pickCards(seenQuestions);
+    const freshSeen = fresh.map((c) => c.text);
+    setCards(fresh);
+    setSeenQuestions((prev) => [...prev, ...freshSeen]);
   };
 
-  const handleQuestion = async (q: string) => {
-    if (isProcessing || questionsAsked >= 20) return;
-    setIsProcessing(true);
-    setLastQuestion(q);
+  const handleQuestion = async (idx: number) => {
+    if (cards[idx].answer !== null || cards[idx].loading) return;
+    if (questionsAsked >= 20) return;
+
+    // Mark loading
+    setCards((prev) => prev.map((c, i) => i === idx ? { ...c, loading: true } : c));
     setQuestionsAsked((n) => n + 1);
 
-    const remaining = GEOGUESS_QUESTIONS.filter((x) => !usedQuestions.includes(x));
-    const next = remaining.length > 0
-      ? remaining[Math.floor(Math.random() * remaining.length)]
-      : null;
-    setQuestions((prev) => {
-      const filtered = prev.filter((x) => x !== q);
-      return next ? [...filtered, next] : filtered;
-    });
-    if (next) setUsedQuestions((prev) => [...prev, next]);
+    const answer = await fetchGeoGuessAnswer(target, cards[idx].text, stopId);
 
-    const answer = await fetchGeoGuessAnswer(target, q);
-    setResponse(answer);
-    setTimeout(() => { setResponse(null); setLastQuestion(null); setIsProcessing(false); }, 2500);
+    // Set answer on this card, keep it in place
+    setCards((prev) => prev.map((c, i) =>
+      i === idx ? { ...c, answer, loading: false } : c
+    ));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleGuess = async () => {
     const g = guess.trim();
-    if (!g || isProcessing || guessesUsed >= MAX_GEOGUESS_GUESSES) return;
-    setIsProcessing(true);
+    if (!g || isGuessing) return;
+    setIsGuessing(true);
     setGuess("");
-    const newCount = guessesUsed + 1;
-    setGuessesUsed(newCount);
 
     const correct =
       g.toLowerCase() === target.toLowerCase() ||
@@ -1171,94 +1196,131 @@ function GeoGuess({ stopName }: { stopName: string }) {
     if (correct) {
       setIsCorrect(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setResponse(`Yes! I was thinking of ${target}.`);
-      setTimeout(() => { setPhase("complete"); setIsProcessing(false); }, 2000);
-    } else if (newCount >= MAX_GEOGUESS_GUESSES) {
-      setResponse(`Nice thinking — I was thinking of ${target}.`);
-      setTimeout(() => { setPhase("complete"); setIsProcessing(false); }, 2500);
+      setTimeout(() => { setPhase("complete"); setIsGuessing(false); }, 600);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setResponse("Not quite — keep asking questions.");
-      setTimeout(() => { setResponse(null); setIsProcessing(false); }, 2000);
+      if (wrongMsgTimer.current) clearTimeout(wrongMsgTimer.current);
+      setWrongMsg("Not quite! Keep asking questions…");
+      wrongMsgTimer.current = setTimeout(() => { setWrongMsg(null); }, 2500);
+      setIsGuessing(false);
     }
   };
 
+  useEffect(() => () => { if (wrongMsgTimer.current) clearTimeout(wrongMsgTimer.current); }, []);
+
+  // ── INTRO ──
   if (phase === "intro") {
     return (
-      <IntroScreen
-        icon="🌍"
-        title="GeoGuess"
-        subtitle="I'm thinking of a place"
-        description="Ask yes/no questions to narrow it down, then guess the place when you're ready!"
-        note="Work together as a family to figure it out!"
-        btnLabel="Start"
-        btnColor="#2563EB"
-        onStart={startGame}
-        onBack={() => router.back()}
-      />
+      <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+        <Text style={{ fontSize: 64, marginBottom: 12 }}>🌍</Text>
+        <Text style={[gg.introTitle]}>I'm thinking of a place...</Text>
+        <Text style={gg.introSub}>Ask yes/no questions to figure it out</Text>
+        <View style={gg.introCountBadge}>
+          <Text style={gg.introCountText}>Questions asked: 0 / 20</Text>
+        </View>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32, paddingHorizontal: 40 }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
+        >
+          <Text style={sh.btnText}>Start Guessing</Text>
+        </Pressable>
+        <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
+          <Text style={sh.backBtnText}>← Back to Games</Text>
+        </Pressable>
+      </View>
     );
   }
 
+  // ── PLAYING ──
   if (phase === "playing") {
+    const allAnswered = cards.length > 0 && cards.every((c) => c.answer !== null);
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: "#EFF6FF" }}
+        style={{ flex: 1, backgroundColor: "#FFF8F0" }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 20 }}
+          contentContainerStyle={{
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 32,
+            paddingHorizontal: 20,
+          }}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={[sh.gameTitle, { color: "#2563EB" }]}>🌍 GeoGuess</Text>
-          <Text style={gg.meta}>
-            {questionsAsked} question{questionsAsked !== 1 ? "s" : ""} asked · {MAX_GEOGUESS_GUESSES - guessesUsed} guess{MAX_GEOGUESS_GUESSES - guessesUsed !== 1 ? "es" : ""} left
-          </Text>
+          {/* Header */}
+          <Text style={gg.title}>🌍 I'm thinking of a place...</Text>
+          <Text style={gg.asked}>Questions asked: {questionsAsked} / 20</Text>
 
-          {response ? (
-            <View style={gg.bubble}>
-              {lastQuestion && <Text style={gg.bubbleQ}>{lastQuestion}</Text>}
-              <Text style={gg.bubbleA}>{response}</Text>
-            </View>
-          ) : (
-            <View style={gg.placeholder}>
-              <Text style={gg.placeholderText}>Tap a question to ask it →</Text>
-            </View>
-          )}
+          {/* Question cards */}
+          <Text style={gg.sectionLabel}>Tap a question to ask:</Text>
+          {cards.map((card, i) => {
+            const answered = card.answer !== null;
+            const ac = answered ? answerColor(card.answer!) : null;
+            return (
+              <Pressable
+                key={card.text}
+                style={[gg.qCard, answered && gg.qCardAnswered]}
+                onPress={() => handleQuestion(i)}
+                disabled={answered || card.loading}
+              >
+                <Text style={[gg.qText, answered && gg.qTextAnswered]} numberOfLines={2}>
+                  {card.text}
+                </Text>
+                {card.loading && (
+                  <View style={gg.answerBadge}>
+                    <Text style={gg.answerBadgeText}>…</Text>
+                  </View>
+                )}
+                {answered && (
+                  <View style={[gg.answerBadge, { backgroundColor: ac! }]}>
+                    <Text style={gg.answerBadgeText}>{card.answer}</Text>
+                  </View>
+                )}
+                {!answered && !card.loading && (
+                  <Text style={gg.qArrow}>→</Text>
+                )}
+              </Pressable>
+            );
+          })}
 
-          <Text style={gg.sectionLabel}>ASK A QUESTION</Text>
-          {questions.map((q) => (
-            <Pressable
-              key={q}
-              style={({ pressed }) => [gg.qCard, pressed && { backgroundColor: "#DBEAFE" }, isProcessing && { opacity: 0.5 }]}
-              onPress={() => handleQuestion(q)}
-              disabled={isProcessing}
-            >
-              <Text style={gg.qText}>{q}</Text>
-              <Text style={gg.qArrow}>→</Text>
-            </Pressable>
-          ))}
+          {/* Refresh questions */}
+          <Pressable
+            style={gg.refreshBtn}
+            onPress={refreshCards}
+            disabled={questionsAsked >= 20}
+          >
+            <Text style={gg.refreshBtnText}>↻ Get new questions</Text>
+          </Pressable>
 
-          <Text style={[gg.sectionLabel, { marginTop: 20 }]}>MAKE A GUESS</Text>
+          {/* Guess input */}
+          <Text style={[gg.sectionLabel, { marginTop: 24 }]}>Ready to guess?</Text>
           <View style={gg.guessRow}>
             <TextInput
               style={gg.guessInput}
-              placeholder="Type a place name…"
+              placeholder="Type or speak your guess"
               placeholderTextColor="#9CA3AF"
               value={guess}
               onChangeText={setGuess}
               onSubmitEditing={handleGuess}
               returnKeyType="done"
-              editable={!isProcessing && guessesUsed < MAX_GEOGUESS_GUESSES}
+              editable={!isGuessing}
             />
             <Pressable
-              style={[gg.guessBtn, { opacity: (!guess.trim() || isProcessing) ? 0.4 : 1 }]}
+              style={[gg.guessBtn, { opacity: (!guess.trim() || isGuessing) ? 0.4 : 1 }]}
               onPress={handleGuess}
-              disabled={!guess.trim() || isProcessing}
+              disabled={!guess.trim() || isGuessing}
             >
               <Text style={gg.guessBtnText}>Guess</Text>
             </Pressable>
           </View>
+
+          {/* Wrong guess toast */}
+          {wrongMsg && (
+            <View style={gg.wrongMsg}>
+              <Text style={gg.wrongMsgText}>{wrongMsg}</Text>
+            </View>
+          )}
 
           <BackBtn onPress={() => router.back()} />
         </ScrollView>
@@ -1266,16 +1328,28 @@ function GeoGuess({ stopName }: { stopName: string }) {
     );
   }
 
+  // ── COMPLETE ──
   return (
-    <DoneScreen
-      emoji={isCorrect ? "🎉" : "🌍"}
-      title={isCorrect ? "You got it!" : "Nice thinking!"}
-      subtitle={isCorrect ? `It was ${target}!` : `I was thinking of ${target}.`}
-      accent="#2563EB"
-      onPlayAgain={startGame}
-      onBack={() => router.back()}
-      playAgainLabel="🌍 New Round"
-    />
+    <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+      <Text style={{ fontSize: 72, marginBottom: 12 }}>🌍</Text>
+      <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>You got it!</Text>
+      <View style={gg.revealBox}>
+        <Text style={gg.revealLabel}>The place was</Text>
+        <Text style={gg.revealPlace}>{target}</Text>
+      </View>
+      <Pressable
+        style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32 }]}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
+      >
+        <Text style={sh.btnText}>🌍 Play Again</Text>
+      </Pressable>
+      <Pressable
+        style={[sh.btn, { backgroundColor: "#F3F4F6", marginTop: 12 }]}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+      >
+        <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1474,6 +1548,7 @@ export default function GamePlay() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const kids = useKids();
   const stopName = kids.stopName || "your stop";
+  const stopId = kids.stopId || "";
   const tripId = kids.tripId || "";
 
   const gameType: GameType =
@@ -1482,7 +1557,7 @@ export default function GamePlay() {
       : "think-fast";
 
   if (gameType === "scavenger") return <ScavengerHunt stopName={stopName} tripId={tripId} />;
-  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} />;
+  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} stopId={stopId} />;
   if (gameType === "geospy")    return <GeoSpy />;
   if (gameType === "bag")       return <WhatsInMyBag stopName={stopName} />;
   return <ThinkFast stopName={stopName} />;
@@ -1579,20 +1654,59 @@ const sc = StyleSheet.create({
 });
 
 const gg = StyleSheet.create({
-  meta: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 16 },
-  bubble: { backgroundColor: "#DBEAFE", borderRadius: 18, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: "#93C5FD" },
-  bubbleQ: { fontFamily: F.medium, fontSize: 12, color: "#1D4ED8", marginBottom: 4 },
-  bubbleA: { fontFamily: F.bold, fontSize: 20, color: "#1E3A8A", textAlign: "center" },
-  placeholder: { backgroundColor: "#EFF6FF", borderRadius: 18, padding: 20, marginBottom: 16, alignItems: "center" },
-  placeholderText: { fontFamily: F.medium, fontSize: 14, color: "#93C5FD" },
-  sectionLabel: { fontFamily: F.bold, fontSize: 10, color: "#9CA3AF", letterSpacing: 0.8, marginBottom: 8 },
-  qCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 8 },
+  // Intro
+  introTitle: { fontFamily: F.bold, fontSize: 22, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
+  introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", marginBottom: 20 },
+  introCountBadge: { backgroundColor: "#F3F0FF", borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 },
+  introCountText: { fontFamily: F.semibold, fontSize: 14, color: "#7C3AED" },
+  // Playing header
+  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 4 },
+  asked: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 20 },
+  sectionLabel: { fontFamily: F.semibold, fontSize: 12, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 10 },
+  // Question cards
+  qCard: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "rgba(28,25,23,0.08)", padding: 14, marginBottom: 8,
+  },
+  qCardAnswered: { backgroundColor: "#F3F4F6", borderColor: "rgba(28,25,23,0.06)" },
   qText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1 },
-  qArrow: { fontFamily: F.bold, fontSize: 16, color: "#93C5FD" },
+  qTextAnswered: { color: "#9CA3AF" },
+  qArrow: { fontFamily: F.bold, fontSize: 15, color: "#C4B5FD" },
+  answerBadge: {
+    backgroundColor: "#E5E7EB", borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0,
+  },
+  answerBadgeText: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
+  // Refresh
+  refreshBtn: {
+    alignSelf: "center", marginTop: 4, marginBottom: 8,
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1.5, borderColor: "#C4B5FD",
+  },
+  refreshBtnText: { fontFamily: F.semibold, fontSize: 13, color: "#7C3AED" },
+  // Guess input
   guessRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  guessInput: { flex: 1, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.1)", paddingHorizontal: 16, paddingVertical: 13, fontFamily: F.medium, fontSize: 15, color: "#1C1917" },
-  guessBtn: { backgroundColor: "#2563EB", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13 },
+  guessInput: {
+    flex: 1, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "rgba(28,25,23,0.1)", paddingHorizontal: 16, paddingVertical: 13,
+    fontFamily: F.medium, fontSize: 15, color: "#1C1917",
+  },
+  guessBtn: { backgroundColor: "#3DAA6E", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13 },
   guessBtnText: { fontFamily: F.bold, fontSize: 14, color: "#fff" },
+  // Wrong guess toast
+  wrongMsg: {
+    marginTop: 10, backgroundColor: "#FEF3C7", borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 10, borderWidth: 1, borderColor: "#FCD34D",
+  },
+  wrongMsgText: { fontFamily: F.semibold, fontSize: 13, color: "#92400E", textAlign: "center" },
+  // Complete
+  revealBox: {
+    marginTop: 20, backgroundColor: "#fff", borderRadius: 20, borderWidth: 2,
+    borderColor: "#C4B5FD", paddingHorizontal: 32, paddingVertical: 20, alignItems: "center",
+  },
+  revealLabel: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 6 },
+  revealPlace: { fontFamily: F.bold, fontSize: 24, color: "#7C3AED", textAlign: "center" },
 });
 
 const bag = StyleSheet.create({
