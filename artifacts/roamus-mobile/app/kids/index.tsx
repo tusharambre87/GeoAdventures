@@ -200,6 +200,19 @@ export default function ExplorerHome() {
           </Pressable>
         </View>
 
+        {/* ── Play a quick game ── */}
+        <View style={s.gameRow}>
+          <Pressable
+            style={({ pressed }) => [s.gameBtn, pressed && { opacity: 0.8 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/kids/games");
+            }}
+          >
+            <Text style={s.gameBtnText}>🎮 Play a quick game →</Text>
+          </Pressable>
+        </View>
+
         {/* ── Hand back ── */}
         <Pressable
           style={s.handBack}
@@ -431,6 +444,23 @@ const s = StyleSheet.create({
     fontFamily: F.bold,
     fontSize: 11,
     color: K.amber,
+  },
+  gameRow: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  gameBtn: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "rgba(232,105,42,0.25)",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  gameBtnText: {
+    fontFamily: F.bold,
+    fontSize: 15,
+    color: "#E8692A",
   },
   handBack: {
     alignItems: "center",
