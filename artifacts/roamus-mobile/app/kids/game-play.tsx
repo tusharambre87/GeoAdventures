@@ -22,7 +22,7 @@ import { F } from "@/lib/tokens";
 
 type GameType = "think-fast" | "scavenger" | "geoguess" | "geospy" | "bag";
 
-// ─── Think Fast — Prompt Data ─────────────────────────────────────────────────
+// ─── Think Fast — verbatim from PlayTogether.tsx ──────────────────────────────
 
 interface ThinkFastPrompt {
   category: string;
@@ -75,6 +75,28 @@ const GENERIC_PROMPTS: ThinkFastPrompt[] = [
       { emoji: "🫖", answer: "kettle" }, { emoji: "🔪", answer: "knives" },
       { emoji: "🧂", answer: "salt" }, { emoji: "🥣", answer: "bowls" },
       { emoji: "🧽", answer: "sponge" }, { emoji: "🍴", answer: "forks" },
+    ],
+  },
+  {
+    category: "breakfast",
+    prompt: "Name 10 things people eat for breakfast",
+    exampleAnswers: [
+      { emoji: "🥣", answer: "cereal" }, { emoji: "🍳", answer: "eggs" },
+      { emoji: "🥞", answer: "pancakes" }, { emoji: "🍞", answer: "toast" },
+      { emoji: "🍌", answer: "bananas" }, { emoji: "🥓", answer: "bacon" },
+      { emoji: "🧇", answer: "waffles" }, { emoji: "🍊", answer: "oranges" },
+      { emoji: "🥛", answer: "milk" }, { emoji: "🍩", answer: "donuts" },
+    ],
+  },
+  {
+    category: "playground",
+    prompt: "Name 10 things at a playground",
+    exampleAnswers: [
+      { emoji: "🛝", answer: "slide" }, { emoji: "🎠", answer: "swings" },
+      { emoji: "⚽", answer: "balls" }, { emoji: "🧗", answer: "climbing frame" },
+      { emoji: "🪣", answer: "sandbox" }, { emoji: "🌳", answer: "trees" },
+      { emoji: "🪢", answer: "ropes" }, { emoji: "🎡", answer: "merry-go-round" },
+      { emoji: "🪜", answer: "ladders" }, { emoji: "🏃", answer: "kids running" },
     ],
   },
   {
@@ -158,6 +180,17 @@ function getContextualPrompts(place: string): ThinkFastPrompt[] {
         { emoji: "🐕", answer: "dogs barking" }, { emoji: "💨", answer: "wind" },
       ],
     },
+    {
+      category: "daily_use",
+      prompt: `Name 10 things people in ${place} might use every day`,
+      exampleAnswers: [
+        { emoji: "📱", answer: "phone" }, { emoji: "🔑", answer: "keys" },
+        { emoji: "👜", answer: "bag" }, { emoji: "🚌", answer: "bus" },
+        { emoji: "☕", answer: "coffee" }, { emoji: "💳", answer: "card" },
+        { emoji: "🌂", answer: "umbrella" }, { emoji: "📰", answer: "newspaper" },
+        { emoji: "🚲", answer: "bicycle" }, { emoji: "🥗", answer: "lunch" },
+      ],
+    },
   ];
 }
 
@@ -169,7 +202,7 @@ function pickThinkFastPrompt(stopName: string, usedCategories: string[]): ThinkF
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ─── Scavenger Hunt — Data ────────────────────────────────────────────────────
+// ─── Scavenger Hunt — verbatim from PlayTogether.tsx ─────────────────────────
 
 const GENERIC_SCAVENGER_PROMPTS = [
   "Find something that makes a sound",
@@ -185,6 +218,24 @@ const GENERIC_SCAVENGER_PROMPTS = [
   "Find something that tells a story",
   "Find something you'd want to show a friend",
 ];
+
+const EXPERIENCE_SCAVENGER_PROMPTS: Record<string, string[]> = {
+  food_culture: [
+    "Find something that reminds you of a local meal",
+    "Find a place where people might share food",
+    "Find something sweet or savory looking",
+  ],
+  sounds: [
+    "Find something that makes an interesting sound",
+    "Find a place that sounds different from home",
+    "Find something that might ring, chime, or click",
+  ],
+  everyday_life: [
+    "Find something people here use every day",
+    "Find a sign of daily life",
+    "Find something that shows how people get around",
+  ],
+};
 
 const THEME_SCAVENGER_PROMPTS: Record<string, string[]> = {
   beach: [
@@ -214,13 +265,36 @@ const THEME_SCAVENGER_PROMPTS: Record<string, string[]> = {
   ],
 };
 
-function detectTheme(stopName: string): string | null {
-  const t = stopName.toLowerCase();
-  if (t.includes("beach") || t.includes("ocean") || t.includes("coast") || t.includes("sea")) return "beach";
-  if (t.includes("museum") || t.includes("gallery") || t.includes("exhibit")) return "museum";
-  if (t.includes("park") || t.includes("forest") || t.includes("trail") || t.includes("garden") || t.includes("nature")) return "nature";
-  if (t.includes("farm") || t.includes("ranch") || t.includes("orchard")) return "farm";
-  if (t.includes("bridge") || t.includes("tower") || t.includes("downtown") || t.includes("city")) return "city";
+// Verbatim from PlayTogether.tsx
+function detectContextFromStop(stopName: string): { context: string; key: string } | null {
+  const text = stopName.toLowerCase();
+  if (text.includes("beach") || text.includes("ocean") || text.includes("coast") || text.includes("sea") || text.includes("bondi")) {
+    return { context: "the beach", key: "beach" };
+  }
+  if (text.includes("zoo") || text.includes("aquarium") || text.includes("wildlife") || text.includes("safari") || text.includes("taronga")) {
+    return { context: "the zoo", key: "zoo" };
+  }
+  if (text.includes("museum") || text.includes("gallery") || text.includes("exhibit")) {
+    return { context: "the museum", key: "museum" };
+  }
+  if (text.includes("opera") || text.includes("theatre") || text.includes("theater") || text.includes("concert") || text.includes("symphony")) {
+    return { context: "the opera house", key: "opera_house" };
+  }
+  if (text.includes("bridge") || text.includes("harbour") || text.includes("harbor") || text.includes("tower") || text.includes("downtown")) {
+    return { context: "the city", key: "city" };
+  }
+  if (text.includes("waterfall") || text.includes("falls") || text.includes("cascade")) {
+    return { context: "the waterfall", key: "waterfall" };
+  }
+  if (text.includes("chocolate") || text.includes("cacao") || text.includes("cocoa")) {
+    return { context: "the chocolate farm", key: "chocolate_farm" };
+  }
+  if (text.includes("farm") || text.includes("ranch") || text.includes("orchard") || text.includes("vineyard")) {
+    return { context: "the farm", key: "farm" };
+  }
+  if (text.includes("park") || text.includes("forest") || text.includes("trail") || text.includes("mountain") || text.includes("hiking") || text.includes("nature") || text.includes("garden") || text.includes("botanical")) {
+    return { context: "the nature trail", key: "nature" };
+  }
   return null;
 }
 
@@ -236,7 +310,7 @@ function makeSeededRng(seed: string) {
   };
 }
 
-function generateScavengerPrompts(stopName: string, tripId: string): string[] {
+function generateScavengerPrompts(stopName: string, tripId: string, usedTexts: string[]): string[] {
   const today = new Date().toISOString().split("T")[0];
   const rng = makeSeededRng(`${tripId || "default"}-${today}-scavenger`);
   const shuffle = <T,>(arr: T[]): T[] => {
@@ -248,64 +322,133 @@ function generateScavengerPrompts(stopName: string, tripId: string): string[] {
     return r;
   };
 
-  const theme = detectTheme(stopName);
-  const themePool: string[] = theme ? (THEME_SCAVENGER_PROMPTS[theme] ?? []) : [];
-  const target = 3 + Math.floor(rng() * 3); // 3–5 items
+  const targetCount = 3 + Math.floor(rng() * 3); // 3–5
 
-  const contextual = shuffle(themePool);
-  const generic = shuffle([...GENERIC_SCAVENGER_PROMPTS]);
+  // Experience-based prompts (all categories combined)
+  const experiencePool: string[] = [];
+  Object.values(EXPERIENCE_SCAVENGER_PROMPTS).forEach((arr) => experiencePool.push(...arr));
+
+  // Theme-based prompts based on stop name
+  const themePool: string[] = [];
+  const lowerStop = stopName.toLowerCase();
+  if (lowerStop.includes("beach") || lowerStop.includes("coast")) themePool.push(...(THEME_SCAVENGER_PROMPTS.beach ?? []));
+  if (lowerStop.includes("museum") || lowerStop.includes("gallery")) themePool.push(...(THEME_SCAVENGER_PROMPTS.museum ?? []));
+  if (lowerStop.includes("park") || lowerStop.includes("forest") || lowerStop.includes("nature")) themePool.push(...(THEME_SCAVENGER_PROMPTS.nature ?? []));
+  if (lowerStop.includes("farm")) themePool.push(...(THEME_SCAVENGER_PROMPTS.farm ?? []));
+  if (themePool.length === 0) themePool.push(...(THEME_SCAVENGER_PROMPTS.city ?? []));
+
+  const contextualPool = shuffle([...experiencePool, ...themePool]).filter((p) => !usedTexts.includes(p));
+  const genericPool = shuffle([...GENERIC_SCAVENGER_PROMPTS]).filter((p) => !usedTexts.includes(p));
 
   const out: string[] = [];
-  while (out.length < target) {
-    if (contextual.length > 0 && out.length < Math.ceil(target * 0.6)) {
-      out.push(contextual.shift()!);
-    } else if (generic.length > 0) {
-      out.push(generic.shift()!);
-    } else if (contextual.length > 0) {
-      out.push(contextual.shift()!);
+  let promptId = 0;
+  while (out.length < targetCount) {
+    if (contextualPool.length > 0 && out.length < Math.ceil(targetCount * 0.6)) {
+      out.push(contextualPool.shift()!);
+    } else if (genericPool.length > 0) {
+      out.push(genericPool.shift()!);
+    } else if (contextualPool.length > 0) {
+      out.push(contextualPool.shift()!);
     } else {
-      break;
+      const all = shuffle([...GENERIC_SCAVENGER_PROMPTS]);
+      if (all.length > 0) out.push(all[0]);
+      else break;
     }
+    promptId++;
   }
   return out;
 }
 
-// ─── GeoGuess — Data ──────────────────────────────────────────────────────────
+// ─── GeoGuess — verbatim from PlayTogether.tsx ────────────────────────────────
 
 const GEOGUESS_QUESTIONS = [
-  "Is it in North America?", "Is it in Europe?", "Is it in Asia?",
-  "Is it in the Southern Hemisphere?", "Is it near an ocean?",
-  "Is it on an island?", "Is it in a hot climate?", "Is it in a cold place?",
-  "Is it near mountains?", "Is it in a desert?",
-  "Is it a wonder of the world?", "Is it a UNESCO World Heritage site?",
+  // Geography & Location
+  "Is it in North America?",
+  "Is it in Europe?",
+  "Is it in Asia?",
+  "Is it in the Southern Hemisphere?",
+  "Is it near an ocean?",
+  "Is it near a big lake?",
+  "Is it on an island?",
+  "Is it in a hot climate?",
+  "Is it in a cold place?",
+  "Is it in a snowy place?",
+  "Is it near mountains?",
+  "Is it in a desert?",
+  // Wonder & Famous places
+  "Is it a wonder of the world?",
+  "Is it a UNESCO World Heritage site?",
   "Is it one of the most famous places on Earth?",
-  "Is it outdoors?", "Is it near water?", "Do many people visit this place?",
-  "Can you walk around it?", "Is it more natural than man-made?",
-  "Is it famous for photos?", "Is it noisy most of the time?",
-  "Can you go inside?", "Is it very old?", "Would you find it in a city?",
-  "Is it taller than a house?", "Can you see it from far away?",
-  "Do people eat there?", "Is it colorful?", "Is it made of stone?",
-  "Do people come here to learn?", "Is it related to animals?",
-  "Would you bring a camera here?", "Is it free to visit?",
-  "Is it surrounded by nature?", "Is it a building?",
-  "Would families visit here?", "Is it a famous landmark?",
-  "Do people come here for fun?", "Is it peaceful and quiet?",
+  "Would you see it on a world map poster?",
+  // Experience-based
+  "Is it outdoors?",
+  "Is it near water?",
+  "Do many people visit this place?",
+  "Can you walk around it?",
+  "Is it more natural than man-made?",
+  "Is it famous for photos?",
+  "Is it noisy most of the time?",
+  "Is it used every day?",
+  "Can you go inside?",
+  "Is it very old?",
+  "Would you find it in a city?",
+  "Is it taller than a house?",
+  "Can you see it from far away?",
+  "Do people eat there?",
+  "Is it colorful?",
+  "Is it made of stone?",
+  "Do people come here to learn?",
+  "Is it related to animals?",
+  "Would you bring a camera here?",
+  "Is it free to visit?",
+  "Is it surrounded by nature?",
+  "Can you hear music there?",
+  "Do people live nearby?",
+  "Is it a building?",
+  "Would families visit here?",
+  "Is it a famous landmark?",
+  "Can you see the sky from there?",
+  "Do people come here for fun?",
+  "Is it peaceful and quiet?",
 ];
 
 const GLOBAL_LANDMARKS = [
-  "Eiffel Tower", "Colosseum", "Sydney Opera House", "Great Wall of China",
-  "Machu Picchu", "Taj Mahal", "Statue of Liberty", "Big Ben",
-  "Golden Gate Bridge", "Christ the Redeemer", "Pyramids of Giza",
-  "Tower of Pisa", "Mount Fuji", "Niagara Falls", "Grand Canyon",
-  "Stonehenge", "Acropolis", "Chichen Itza", "Petra", "Angkor Wat",
-  "Santorini", "Venice Canals", "Great Barrier Reef",
-  "Yellowstone National Park", "Disneyland",
+  "Eiffel Tower",
+  "Colosseum",
+  "Sydney Opera House",
+  "Great Wall of China",
+  "Machu Picchu",
+  "Taj Mahal",
+  "Statue of Liberty",
+  "Big Ben",
+  "Golden Gate Bridge",
+  "Christ the Redeemer",
+  "Pyramids of Giza",
+  "Tower of Pisa",
+  "Mount Fuji",
+  "Niagara Falls",
+  "Grand Canyon",
+  "Stonehenge",
+  "Acropolis",
+  "Chichen Itza",
+  "Petra",
+  "Angkor Wat",
+  "Santorini",
+  "Venice Canals",
+  "Northern Lights",
+  "Great Barrier Reef",
+  "Yellowstone National Park",
+  "Disneyland",
+  "Central Park",
+  "Times Square",
+  "Hollywood Sign",
+  "Tower Bridge",
 ];
 
 const VISIBLE_QUESTIONS = 5;
 const MAX_GEOGUESS_GUESSES = 5;
 
-// ─── What's In My Bag — Data ──────────────────────────────────────────────────
+// ─── What's In My Bag — verbatim from PlayTogether.tsx ────────────────────────
 
 const MAX_BAG_ITEMS = 8;
 
@@ -325,6 +468,11 @@ const IN_MY_BAG_ITEMS: Record<string, string[]> = {
     "a hat", "comfortable shoes", "a map", "a backpack", "sunglasses",
     "a raincoat", "a phone", "a notebook", "a picnic blanket", "a jacket",
   ],
+  opera_house: [
+    "a ticket", "nice clothes", "a jacket", "a phone", "mints",
+    "a wallet", "a small bag", "comfortable shoes", "a shawl", "glasses",
+    "a handkerchief", "a camera", "a program", "a watch", "keys",
+  ],
   nature: [
     "binoculars", "a water bottle", "trail mix", "a compass", "sunscreen",
     "hiking boots", "a raincoat", "a camera", "bug spray", "a hat",
@@ -340,28 +488,64 @@ const IN_MY_BAG_ITEMS: Record<string, string[]> = {
     "sunglasses", "a water bottle", "an umbrella", "a transit card", "snacks",
     "headphones", "a backpack", "a guidebook", "coins", "a jacket",
   ],
+  waterfall: [
+    "waterproof shoes", "a towel", "a camera", "a rain jacket", "a water bottle",
+    "sandals", "sunscreen", "bug spray", "a dry bag", "a hat",
+    "swimming clothes", "snacks", "a phone case", "flip flops", "a backpack",
+  ],
+  chocolate_farm: [
+    "a camera", "a notebook", "a water bottle", "comfortable shoes", "sunscreen",
+    "a hat", "a bag for samples", "a towel", "bug spray", "snacks",
+    "a backpack", "a jacket", "a pen", "sunglasses", "a phone",
+  ],
+  wedding: [
+    "nice clothes", "a gift", "comfortable shoes", "a camera", "tissues",
+    "a card", "an umbrella", "mints", "sunglasses", "flowers",
+    "a tie", "a dress", "a wallet", "a phone", "a jacket",
+  ],
   vacation: [
     "a suitcase", "a passport", "sunglasses", "a camera", "comfortable shoes",
     "a book", "snacks", "headphones", "a travel pillow", "a toothbrush",
     "a phone charger", "swimwear", "a hat", "a jacket", "a backpack",
   ],
+  grocery: [
+    "shopping bags", "a grocery list", "a wallet", "coupons", "a water bottle",
+    "keys", "a phone", "a cart quarter", "hand sanitizer", "reusable bags",
+    "a pen", "snacks", "sunglasses", "a jacket", "a backpack",
+  ],
 };
 
-function detectBagContext(stopName: string): { context: string; key: string } {
-  const t = stopName.toLowerCase();
-  if (t.includes("beach") || t.includes("ocean") || t.includes("coast") || t.includes("sea"))
-    return { context: "the beach", key: "beach" };
-  if (t.includes("museum") || t.includes("gallery"))
-    return { context: "the museum", key: "museum" };
-  if (t.includes("zoo") || t.includes("aquarium") || t.includes("wildlife"))
-    return { context: "the zoo", key: "zoo" };
-  if (t.includes("farm") || t.includes("ranch") || t.includes("orchard"))
-    return { context: "the farm", key: "farm" };
-  if (t.includes("park") || t.includes("forest") || t.includes("trail") || t.includes("nature"))
-    return { context: "the nature trail", key: "nature" };
-  if (t.includes("bridge") || t.includes("tower") || t.includes("downtown"))
-    return { context: "the city", key: "city" };
-  return { context: stopName || "a vacation", key: "vacation" };
+// Generic contexts for 2:1 mixing (verbatim from PlayTogether.tsx)
+const GENERIC_CONTEXTS = [
+  { context: "a grocery store", key: "grocery" },
+  { context: "a vacation", key: "vacation" },
+  { context: "a wedding", key: "wedding" },
+];
+
+function selectBagContext(
+  stopName: string,
+  usedKeys: string[],
+  playCount: number,
+): { context: string; key: string } {
+  // 2:1 pattern: plays 1,2 are contextual; play 3 is generic (then repeat)
+  const isGenericTurn = (playCount + 1) % 3 === 0;
+
+  const stopCtx = detectContextFromStop(stopName);
+  const availableStop = stopCtx && !usedKeys.includes(stopCtx.key) ? [stopCtx] : [];
+  const availableGeneric = GENERIC_CONTEXTS.filter((c) => !usedKeys.includes(c.key));
+
+  if (isGenericTurn && availableGeneric.length > 0) {
+    return availableGeneric[Math.floor(Math.random() * availableGeneric.length)];
+  }
+  if (availableStop.length > 0) {
+    return availableStop[0];
+  }
+  if (availableGeneric.length > 0) {
+    return availableGeneric[Math.floor(Math.random() * availableGeneric.length)];
+  }
+  // All used — reset
+  const all = stopCtx ? [stopCtx, ...GENERIC_CONTEXTS] : GENERIC_CONTEXTS;
+  return all[Math.floor(Math.random() * all.length)];
 }
 
 function getBagItems(key: string): string[] {
@@ -378,54 +562,70 @@ function buildBagSentence(context: string, items: string[], index: number): stri
   return `When going to ${context}, my bag has ${list}.`;
 }
 
-// ─── GeoSpy — Data ────────────────────────────────────────────────────────────
+// ─── GeoSpy — verbatim from PlayTogether.tsx ─────────────────────────────────
 
-const GEOSPY_PROMPTS = [
-  "I spy something that is moving",
-  "I spy something very tall",
-  "I spy something colorful",
-  "I spy something round",
-  "I spy something shiny",
-  "I spy something tiny",
-  "I spy something that has wheels",
-  "I spy something with a pattern",
-  "I spy something that is green",
-  "I spy something that is red",
-  "I spy something blue",
-  "I spy something that looks soft",
-  "I spy something that looks heavy",
-  "I spy something far away",
-  "I spy something with numbers on it",
-  "I spy something that makes a sound",
-  "I spy something that feels rough",
-  "I spy something that smells interesting",
-  "I spy something people use every day",
-  "I spy something that reminds me of food",
-  "I spy something that looks old",
-  "I spy something brand new",
-  "I spy something that makes people happy",
-  "I spy something an animal might like",
-  "I spy something that helps people",
-  "I spy something from nature",
-  "I spy something made by people",
-  "I spy something that tells a story",
-  "I spy something surprising",
-  "I spy something beautiful",
+const GEOSPY_PROMPTS = {
+  visual: [
+    "I spy something that is moving",
+    "I spy something very tall",
+    "I spy something colorful",
+    "I spy something round",
+    "I spy something shiny",
+    "I spy something tiny",
+    "I spy something that has wheels",
+    "I spy something with a pattern",
+    "I spy something that is green",
+    "I spy something that is red",
+    "I spy something blue",
+    "I spy something that looks soft",
+    "I spy something that looks heavy",
+    "I spy something far away",
+    "I spy something with numbers on it",
+  ],
+  sensory: [
+    "I spy something that makes a sound",
+    "I spy something that feels rough",
+    "I spy something that smells interesting",
+    "I spy something that feels smooth",
+    "I spy something that might be warm",
+    "I spy something that might be cold",
+    "I spy something you can hear",
+    "I spy something that feels bumpy",
+  ],
+  contextual: [
+    "I spy something people use every day",
+    "I spy something that reminds me of food",
+    "I spy something that looks old",
+    "I spy something brand new",
+    "I spy something that makes people happy",
+    "I spy something an animal might like",
+    "I spy something that helps people",
+    "I spy something from nature",
+    "I spy something made by people",
+    "I spy something that tells a story",
+    "I spy something surprising",
+    "I spy something beautiful",
+  ],
+};
+
+const ALL_GEOSPY_PROMPTS = [
+  ...GEOSPY_PROMPTS.visual,
+  ...GEOSPY_PROMPTS.sensory,
+  ...GEOSPY_PROMPTS.contextual,
 ];
 
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 
-function BackBtn({ label = "← Back to Games", onPress }: { label?: string; onPress: () => void }) {
+function BackBtn({ onPress }: { onPress: () => void }) {
   return (
     <Pressable style={sh.backBtn} onPress={onPress}>
-      <Text style={sh.backBtnText}>{label}</Text>
+      <Text style={sh.backBtnText}>← Back to Games</Text>
     </Pressable>
   );
 }
 
 function IntroScreen({
-  icon, title, subtitle, description, note, btnLabel, btnColor,
-  onStart, onBack,
+  icon, title, subtitle, description, note, btnLabel, btnColor, onStart, onBack,
 }: {
   icon: string; title: string; subtitle: string; description: string;
   note?: string; btnLabel: string; btnColor: string;
@@ -488,7 +688,7 @@ function DoneScreen({
 
 // ─── Think Fast! ─────────────────────────────────────────────────────────────
 
-function ThinkFastGame({ stopName }: { stopName: string }) {
+function ThinkFast({ stopName }: { stopName: string }) {
   const insets = useSafeAreaInsets();
   type Phase = "intro" | "playing" | "reveal" | "complete";
   const [phase, setPhase] = useState<Phase>("intro");
@@ -561,7 +761,6 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
         <Text style={tf.promptLabel}>⚡ Name 10 things…</Text>
         <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
 
-        {/* 10 dots */}
         <View style={tf.dots}>
           {Array.from({ length: 10 }).map((_, i) => (
             <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#22C55E" : "#E5E7EB" }]}>
@@ -570,7 +769,6 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
           ))}
         </View>
 
-        {/* Tap button */}
         <Pressable
           style={[tf.tapBtn, tapCount >= 10 && { backgroundColor: "#22C55E" }]}
           onPress={() => {
@@ -584,16 +782,10 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
         </Pressable>
 
         <View style={tf.rowBtns}>
-          <Pressable
-            style={tf.smBtn}
-            onPress={() => { clearTimer(); setPhase("reveal"); }}
-          >
+          <Pressable style={tf.smBtn} onPress={() => { clearTimer(); setPhase("reveal"); }}>
             <Text style={tf.smBtnText}>Show Answers</Text>
           </Pressable>
-          <Pressable
-            style={tf.smBtn}
-            onPress={() => { clearTimer(); setPhase("intro"); setPrompt(null); }}
-          >
+          <Pressable style={tf.smBtn} onPress={() => { clearTimer(); setPhase("intro"); setPrompt(null); }}>
             <Text style={tf.smBtnText}>Close</Text>
           </Pressable>
         </View>
@@ -601,7 +793,7 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
     );
   }
 
-  if (phase === "reveal") {
+  if (phase === "reveal" && prompt) {
     return (
       <ScrollView
         style={{ flex: 1, backgroundColor: "#FFFBEB" }}
@@ -635,7 +827,6 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
     );
   }
 
-  // complete
   return (
     <DoneScreen
       emoji="🎉"
@@ -651,17 +842,18 @@ function ThinkFastGame({ stopName }: { stopName: string }) {
 
 // ─── Scavenger Hunt ───────────────────────────────────────────────────────────
 
-function ScavengerGame({ stopName, tripId }: { stopName: string; tripId: string }) {
+function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string }) {
   type Phase = "intro" | "hunting" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
   const [items, setItems] = useState<{ text: string; found: boolean }[]>([]);
+  const [usedTexts, setUsedTexts] = useState<string[]>([]);
 
   const startHunt = useCallback(() => {
-    const prompts = generateScavengerPrompts(stopName, tripId);
+    const prompts = generateScavengerPrompts(stopName, tripId, usedTexts);
     setItems(prompts.map((text) => ({ text, found: false })));
     setPhase("hunting");
-  }, [stopName, tripId]);
+  }, [stopName, tripId, usedTexts]);
 
   if (phase === "intro") {
     return (
@@ -685,7 +877,7 @@ function ScavengerGame({ stopName, tripId }: { stopName: string; tripId: string 
       <View style={{ flex: 1, backgroundColor: "#F0FDF4" }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 80, paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 100, paddingHorizontal: 20 }}
         >
           <Text style={[sh.gameTitle, { color: "#16A34A" }]}>🔍 Your Hunt</Text>
           <Text style={sc.hint}>Tap when you find something!</Text>
@@ -708,8 +900,8 @@ function ScavengerGame({ stopName, tripId }: { stopName: string; tripId: string 
               </View>
               <Text style={[sc.itemText, item.found && sc.itemTextDone]}>{item.text}</Text>
               {!item.found && (
-                <View style={sc.foundBtn}>
-                  <Text style={sc.foundBtnText}>Found!</Text>
+                <View style={sc.foundBadge}>
+                  <Text style={sc.foundBadgeText}>Found!</Text>
                 </View>
               )}
             </Pressable>
@@ -726,7 +918,12 @@ function ScavengerGame({ stopName, tripId }: { stopName: string; tripId: string 
           {foundCount > 0 && (
             <Pressable
               style={[sh.btn, { backgroundColor: "#16A34A", flex: 1 }]}
-              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setPhase("complete"); }}
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                const texts = items.map((i) => i.text);
+                setUsedTexts((prev) => [...prev, ...texts]);
+                setPhase("complete");
+              }}
             >
               <Text style={sh.btnText}>Done Exploring ✓</Text>
             </Pressable>
@@ -736,7 +933,6 @@ function ScavengerGame({ stopName, tripId }: { stopName: string; tripId: string 
     );
   }
 
-  // complete
   return (
     <DoneScreen
       emoji="🌿"
@@ -771,7 +967,7 @@ async function fetchGeoGuessAnswer(target: string, question: string): Promise<st
   }
 }
 
-function GeoGuessGame({ stopName }: { stopName: string }) {
+function GeoGuess({ stopName }: { stopName: string }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
@@ -788,7 +984,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
   const [isCorrect, setIsCorrect] = useState(false);
 
   const pickTarget = useCallback((): string => {
-    // Prefer the current stop, then global landmarks
     const candidates = stopName
       ? [stopName, ...GLOBAL_LANDMARKS.filter((l) => l !== stopName)]
       : GLOBAL_LANDMARKS;
@@ -797,13 +992,9 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
     return pool[Math.floor(Math.random() * pool.length)];
   }, [stopName, usedTargets]);
 
-  const pickQuestions = (): string[] => {
-    return [...GEOGUESS_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, VISIBLE_QUESTIONS);
-  };
-
   const startGame = () => {
     const t = pickTarget();
-    const q = pickQuestions();
+    const q = [...GEOGUESS_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, VISIBLE_QUESTIONS);
     setTarget(t);
     setUsedTargets((prev) => [...prev, t]);
     setQuestions(q);
@@ -823,7 +1014,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
     setLastQuestion(q);
     setQuestionsAsked((n) => n + 1);
 
-    // Rotate question out, bring a fresh one in
     const remaining = GEOGUESS_QUESTIONS.filter((x) => !usedQuestions.includes(x));
     const next = remaining.length > 0
       ? remaining[Math.floor(Math.random() * remaining.length)]
@@ -899,7 +1089,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
             {questionsAsked} question{questionsAsked !== 1 ? "s" : ""} asked · {MAX_GEOGUESS_GUESSES - guessesUsed} guess{MAX_GEOGUESS_GUESSES - guessesUsed !== 1 ? "es" : ""} left
           </Text>
 
-          {/* Response bubble */}
           {response ? (
             <View style={gg.bubble}>
               {lastQuestion && <Text style={gg.bubbleQ}>{lastQuestion}</Text>}
@@ -911,7 +1100,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
             </View>
           )}
 
-          {/* Question cards */}
           <Text style={gg.sectionLabel}>ASK A QUESTION</Text>
           {questions.map((q) => (
             <Pressable
@@ -925,7 +1113,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
             </Pressable>
           ))}
 
-          {/* Guess input */}
           <Text style={[gg.sectionLabel, { marginTop: 20 }]}>MAKE A GUESS</Text>
           <View style={gg.guessRow}>
             <TextInput
@@ -953,7 +1140,6 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
     );
   }
 
-  // complete
   return (
     <DoneScreen
       emoji={isCorrect ? "🎉" : "🌍"}
@@ -969,22 +1155,26 @@ function GeoGuessGame({ stopName }: { stopName: string }) {
 
 // ─── What's In My Bag ─────────────────────────────────────────────────────────
 
-function InMyBagGame({ stopName }: { stopName: string }) {
+function WhatsInMyBag({ stopName }: { stopName: string }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
   const [context, setContext] = useState<{ context: string; key: string } | null>(null);
   const [bagItems, setBagItems] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
+  const [usedKeys, setUsedKeys] = useState<string[]>([]);
+  const [playCount, setPlayCount] = useState(0);
 
-  const startGame = () => {
-    const ctx = detectBagContext(stopName);
+  const startGame = useCallback(() => {
+    const ctx = selectBagContext(stopName, usedKeys, playCount);
     const items = getBagItems(ctx.key);
     setContext(ctx);
     setBagItems(items);
     setIndex(0);
+    setUsedKeys((prev) => [...prev, ctx.key]);
+    setPlayCount((n) => n + 1);
     setPhase("playing");
-  };
+  }, [stopName, usedKeys, playCount]);
 
   if (phase === "intro") {
     return (
@@ -1004,7 +1194,6 @@ function InMyBagGame({ stopName }: { stopName: string }) {
 
   if (phase === "playing" && context) {
     const sentence = buildBagSentence(context.context, bagItems, index);
-    const itemNum = index + 1;
     return (
       <View style={{ flex: 1, backgroundColor: "#F5F3FF" }}>
         <ScrollView
@@ -1016,7 +1205,7 @@ function InMyBagGame({ stopName }: { stopName: string }) {
           <View style={bag.readerBadge}>
             <Text style={bag.readerText}>📢 Reader — say this out loud:</Text>
           </View>
-          <Text style={bag.itemNum}>Item {itemNum} of {MAX_BAG_ITEMS}</Text>
+          <Text style={bag.itemNum}>Item {index + 1} of {MAX_BAG_ITEMS}</Text>
 
           <View style={bag.sentenceBox}>
             <Text style={bag.sentence}>"{sentence}"</Text>
@@ -1052,7 +1241,6 @@ function InMyBagGame({ stopName }: { stopName: string }) {
     );
   }
 
-  // complete
   return (
     <DoneScreen
       emoji="🎒"
@@ -1068,22 +1256,25 @@ function InMyBagGame({ stopName }: { stopName: string }) {
 
 // ─── GeoSpy ───────────────────────────────────────────────────────────────────
 
-function GeoSpyGame() {
+function GeoSpy() {
   type Phase = "intro" | "playing";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
   const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
   const [usedPrompts, setUsedPrompts] = useState<string[]>([]);
 
-  const pickPrompt = useCallback((exclude?: string): string => {
-    const available = GEOSPY_PROMPTS.filter((p) => !usedPrompts.includes(p) && p !== exclude);
-    const pool = available.length > 0 ? available : GEOSPY_PROMPTS.filter((p) => p !== exclude);
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    return pick ?? GEOSPY_PROMPTS[0];
+  const selectPrompt = useCallback((exclude?: string): string => {
+    const available = ALL_GEOSPY_PROMPTS.filter((p) => !usedPrompts.includes(p) && p !== exclude);
+    const pool = available.length > 0 ? available : ALL_GEOSPY_PROMPTS.filter((p) => p !== exclude);
+    if (pool.length === 0) {
+      setUsedPrompts([]);
+      return ALL_GEOSPY_PROMPTS[Math.floor(Math.random() * ALL_GEOSPY_PROMPTS.length)];
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
   }, [usedPrompts]);
 
   const startSpy = () => {
-    const p = pickPrompt();
+    const p = selectPrompt();
     setCurrentPrompt(p);
     setUsedPrompts((prev) => [...prev, p]);
     setPhase("playing");
@@ -1091,7 +1282,7 @@ function GeoSpyGame() {
 
   const nextPrompt = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const p = pickPrompt(currentPrompt ?? undefined);
+    const p = selectPrompt(currentPrompt ?? undefined);
     setCurrentPrompt(p);
     setUsedPrompts((prev) => [...prev, p]);
   };
@@ -1102,7 +1293,7 @@ function GeoSpyGame() {
         icon="👁"
         title="GeoSpy"
         subtitle="The travel I Spy game"
-        description="Everyone looks around. Tap 'Next' for a new prompt whenever you're ready for a new challenge!"
+        description="Everyone looks around. Tap 'Next Prompt' whenever you're ready for a new challenge!"
         note="Look carefully — things are everywhere!"
         btnLabel="Start"
         btnColor="#E8692A"
@@ -1164,11 +1355,11 @@ export default function GamePlay() {
       ? (type as GameType)
       : "think-fast";
 
-  if (gameType === "scavenger") return <ScavengerGame stopName={stopName} tripId={tripId} />;
-  if (gameType === "geoguess") return <GeoGuessGame stopName={stopName} />;
-  if (gameType === "geospy") return <GeoSpyGame />;
-  if (gameType === "bag") return <InMyBagGame stopName={stopName} />;
-  return <ThinkFastGame stopName={stopName} />;
+  if (gameType === "scavenger") return <ScavengerHunt stopName={stopName} tripId={tripId} />;
+  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} />;
+  if (gameType === "geospy")    return <GeoSpy />;
+  if (gameType === "bag")       return <WhatsInMyBag stopName={stopName} />;
+  return <ThinkFast stopName={stopName} />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -1178,10 +1369,7 @@ const sh = StyleSheet.create({
     flex: 1, alignItems: "center", justifyContent: "center",
     paddingHorizontal: 32, backgroundColor: "#FFF8F0",
   },
-  btn: {
-    borderRadius: 16, paddingVertical: 16, paddingHorizontal: 24,
-    alignItems: "center",
-  },
+  btn: { borderRadius: 16, paddingVertical: 16, paddingHorizontal: 24, alignItems: "center" },
   btnText: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
   gameTitle: { fontFamily: F.bold, fontSize: 24, marginBottom: 6 },
   backBtn: { alignItems: "center", paddingVertical: 20 },
@@ -1190,10 +1378,7 @@ const sh = StyleSheet.create({
   introTitle: { fontFamily: F.bold, fontSize: 26, color: "#1C1917", textAlign: "center", marginBottom: 6 },
   introSub: { fontFamily: F.semibold, fontSize: 15, color: "#78716C", textAlign: "center", marginBottom: 12 },
   introDesc: { fontFamily: F.medium, fontSize: 15, color: "#374151", textAlign: "center", lineHeight: 22 },
-  introNote: {
-    marginTop: 16, backgroundColor: "#F3F4F6", borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
+  introNote: { marginTop: 16, backgroundColor: "#F3F4F6", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
   introNoteText: { fontFamily: F.medium, fontSize: 13, color: "#6B7280", textAlign: "center" },
   doneEmoji: { fontSize: 72, marginBottom: 12 },
   doneTitle: { fontFamily: F.bold, fontSize: 26, textAlign: "center", marginBottom: 8 },
@@ -1201,47 +1386,25 @@ const sh = StyleSheet.create({
 });
 
 const tf = StyleSheet.create({
-  timerRow: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginBottom: 24,
-  },
-  timerCircle: {
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: 3, alignItems: "center", justifyContent: "center",
-  },
+  timerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 24 },
+  timerCircle: { width: 72, height: 72, borderRadius: 36, borderWidth: 3, alignItems: "center", justifyContent: "center" },
   timerNum: { fontFamily: F.bold, fontSize: 28 },
   tapHint: { fontFamily: F.medium, fontSize: 12, color: "#78716C", marginBottom: 2 },
   tapCount: { fontFamily: F.bold, fontSize: 24, color: "#1C1917" },
   promptLabel: { fontFamily: F.bold, fontSize: 17, color: "#1C1917", marginBottom: 4 },
   promptText: { fontFamily: F.medium, fontSize: 16, color: "#4B5563", marginBottom: 20 },
   dots: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
-  dot: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: "center", justifyContent: "center",
-  },
+  dot: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   dotCheck: { fontFamily: F.bold, fontSize: 16, color: "#fff" },
-  tapBtn: {
-    backgroundColor: "#F59E0B", borderRadius: 20,
-    paddingVertical: 24, alignItems: "center", marginBottom: 16,
-  },
+  tapBtn: { backgroundColor: "#F59E0B", borderRadius: 20, paddingVertical: 24, alignItems: "center", marginBottom: 16 },
   tapBtnText: { fontFamily: F.bold, fontSize: 20, color: "#fff" },
   rowBtns: { flexDirection: "row", gap: 12 },
-  smBtn: {
-    flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14,
-    paddingVertical: 13, alignItems: "center",
-  },
+  smBtn: { flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14, paddingVertical: 13, alignItems: "center" },
   smBtnText: { fontFamily: F.semibold, fontSize: 14, color: "#374151" },
-  revealBox: {
-    backgroundColor: "#FFFBEB", borderRadius: 20, borderWidth: 1.5,
-    borderColor: "#FCD34D", padding: 20, width: "100%", marginTop: 20,
-  },
+  revealBox: { backgroundColor: "#FFFBEB", borderRadius: 20, borderWidth: 1.5, borderColor: "#FCD34D", padding: 20, width: "100%", marginTop: 20 },
   revealLabel: { fontFamily: F.semibold, fontSize: 13, color: "#92400E", marginBottom: 12, textAlign: "center" },
   revealGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  revealItem: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#fff", borderRadius: 10,
-    paddingVertical: 6, paddingHorizontal: 10, width: "47%",
-  },
+  revealItem: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#fff", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, width: "47%" },
   revealItemText: { fontFamily: F.medium, fontSize: 12, color: "#374151", flexShrink: 1 },
   revealNote: { fontFamily: F.medium, fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 12, fontStyle: "italic" },
 });
@@ -1249,98 +1412,45 @@ const tf = StyleSheet.create({
 const sc = StyleSheet.create({
   hint: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 4 },
   count: { fontFamily: F.bold, fontSize: 14, marginBottom: 16 },
-  item: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 10,
-  },
+  item: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 10 },
   itemFound: { backgroundColor: "#F0FDF4", borderColor: "#86EFAC" },
-  circle: {
-    width: 32, height: 32, borderRadius: 16, borderWidth: 2,
-    borderColor: "rgba(0,0,0,0.15)", alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
+  circle: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "rgba(0,0,0,0.15)", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   itemText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1, lineHeight: 20 },
   itemTextDone: { textDecorationLine: "line-through", opacity: 0.5 },
-  foundBtn: {
-    backgroundColor: "#D1FAE5", borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  foundBtnText: { fontFamily: F.bold, fontSize: 11, color: "#065F46" },
-  footer: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 12,
-    backgroundColor: "#F0FDF4", borderTopWidth: 1, borderTopColor: "#D1FAE5",
-  },
+  foundBadge: { backgroundColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  foundBadgeText: { fontFamily: F.bold, fontSize: 11, color: "#065F46" },
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingTop: 12, backgroundColor: "#F0FDF4", borderTopWidth: 1, borderTopColor: "#D1FAE5" },
 });
 
 const gg = StyleSheet.create({
   meta: { fontFamily: F.medium, fontSize: 13, color: "#78716C", marginBottom: 16 },
-  bubble: {
-    backgroundColor: "#DBEAFE", borderRadius: 18, padding: 16, marginBottom: 16,
-    borderWidth: 1.5, borderColor: "#93C5FD",
-  },
+  bubble: { backgroundColor: "#DBEAFE", borderRadius: 18, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: "#93C5FD" },
   bubbleQ: { fontFamily: F.medium, fontSize: 12, color: "#1D4ED8", marginBottom: 4 },
   bubbleA: { fontFamily: F.bold, fontSize: 20, color: "#1E3A8A", textAlign: "center" },
-  placeholder: {
-    backgroundColor: "#EFF6FF", borderRadius: 18, padding: 20,
-    marginBottom: 16, alignItems: "center",
-  },
+  placeholder: { backgroundColor: "#EFF6FF", borderRadius: 18, padding: 20, marginBottom: 16, alignItems: "center" },
   placeholderText: { fontFamily: F.medium, fontSize: 14, color: "#93C5FD" },
-  sectionLabel: {
-    fontFamily: F.bold, fontSize: 10, color: "#9CA3AF",
-    letterSpacing: 0.8, marginBottom: 8,
-  },
-  qCard: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 8,
-  },
+  sectionLabel: { fontFamily: F.bold, fontSize: 10, color: "#9CA3AF", letterSpacing: 0.8, marginBottom: 8 },
+  qCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.08)", padding: 14, marginBottom: 8 },
   qText: { fontFamily: F.medium, fontSize: 14, color: "#1C1917", flex: 1 },
   qArrow: { fontFamily: F.bold, fontSize: 16, color: "#93C5FD" },
   guessRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  guessInput: {
-    flex: 1, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.1)", paddingHorizontal: 16, paddingVertical: 13,
-    fontFamily: F.medium, fontSize: 15, color: "#1C1917",
-  },
-  guessBtn: {
-    backgroundColor: "#2563EB", borderRadius: 14,
-    paddingHorizontal: 18, paddingVertical: 13,
-  },
+  guessInput: { flex: 1, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.1)", paddingHorizontal: 16, paddingVertical: 13, fontFamily: F.medium, fontSize: 15, color: "#1C1917" },
+  guessBtn: { backgroundColor: "#2563EB", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 13 },
   guessBtnText: { fontFamily: F.bold, fontSize: 14, color: "#fff" },
 });
 
 const bag = StyleSheet.create({
-  readerBadge: {
-    backgroundColor: "#EDE9FE", borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 6,
-  },
+  readerBadge: { backgroundColor: "#EDE9FE", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 6 },
   readerText: { fontFamily: F.semibold, fontSize: 13, color: "#5B21B6" },
   itemNum: { fontFamily: F.medium, fontSize: 12, color: "#9CA3AF", marginBottom: 16 },
-  sentenceBox: {
-    backgroundColor: "#fff", borderRadius: 20, borderWidth: 2,
-    borderColor: "#C4B5FD", padding: 24, marginBottom: 20,
-  },
-  sentence: {
-    fontFamily: F.semibold, fontSize: 18, color: "#1C1917",
-    textAlign: "center", lineHeight: 28,
-  },
+  sentenceBox: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 2, borderColor: "#C4B5FD", padding: 24, marginBottom: 20 },
+  sentence: { fontFamily: F.semibold, fontSize: 18, color: "#1C1917", textAlign: "center", lineHeight: 28 },
   repeatHint: { fontFamily: F.medium, fontSize: 14, color: "#78716C", textAlign: "center" },
 });
 
 const spy = StyleSheet.create({
   look: { fontFamily: F.medium, fontSize: 15, color: "#78716C", marginBottom: 24 },
-  promptCard: {
-    backgroundColor: "#fff", borderRadius: 24, borderWidth: 2,
-    borderColor: "#FBD0B8", padding: 32, alignItems: "center",
-    width: "100%", marginBottom: 16,
-  },
-  promptText: {
-    fontFamily: F.bold, fontSize: 22, color: "#1C1917",
-    textAlign: "center", lineHeight: 32,
-  },
-  hint: {
-    fontFamily: F.medium, fontSize: 13, color: "#9CA3AF",
-    textAlign: "center",
-  },
+  promptCard: { backgroundColor: "#fff", borderRadius: 24, borderWidth: 2, borderColor: "#FBD0B8", padding: 32, alignItems: "center", width: "100%", marginBottom: 16 },
+  promptText: { fontFamily: F.bold, fontSize: 22, color: "#1C1917", textAlign: "center", lineHeight: 32 },
+  hint: { fontFamily: F.medium, fontSize: 13, color: "#9CA3AF", textAlign: "center" },
 });
