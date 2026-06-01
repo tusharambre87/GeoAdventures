@@ -1077,14 +1077,13 @@ function DayDetail({
   const status   = getDayStatus(selectedDay);
   const isEditable = status !== 'past';
 
-  // Run Day button — always tracks active (real-world today) day
-  const activeDayIndex = activeTripDay - 1;
-  const activeDay      = activeTripDay;
-  const activeDayStops = getStopsForDay(activeDay);
-  const isDayComplete  = activeDayStops.length > 0 &&
-    activeDayStops.every(s => s.isVisited || s.visited);
-  const isViewingPast  = selectedDay - 1 < activeDayIndex;
-  const runBtnDisabled = isViewingPast || isDayComplete;
+  // Run Day button — tracks the currently selected day pill
+  const activeDayIndex   = activeTripDay - 1;
+  const selectedDayStops = getStopsForDay(selectedDay);
+  const isDayComplete    = selectedDayStops.length > 0 &&
+    selectedDayStops.every(s => s.isVisited || s.visited);
+  const isViewingPast    = selectedDay - 1 < activeDayIndex;
+  const runBtnDisabled   = isViewingPast || isDayComplete;
   const dayStops = getStopsForDay(selectedDay);
   const anchor   = getAnchorStopForDay(selectedDay);
   const theme    = dayTheme(dayStops);
@@ -1237,16 +1236,16 @@ function DayDetail({
         )}
       </ScrollView>
 
-      {/* Footer — always show when active day has stops */}
-      {activeDayStops.length > 0 && (
+      {/* Footer — show for the selected day */}
+      {selectedDayStops.length > 0 && (
         <View style={[dd.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
           <Pressable
             style={[dd.runBtn, runBtnDisabled && dd.runBtnDone]}
             onPress={runBtnDisabled ? undefined : onRunDay}
             disabled={runBtnDisabled}>
             {isDayComplete
-              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'✓'} Day {activeDay} Complete</Text>
-              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run Day {activeDay}</Text></>}
+              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'✓'} Day {selectedDay} Complete</Text>
+              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run Day {selectedDay}</Text></>}
           </Pressable>
           {!isDayComplete && (
             <Text style={dd.runSub}>Switches to Today tab — live mode</Text>
