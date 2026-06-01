@@ -44,7 +44,7 @@ function ShimmerRow() {
 
 export default function ExplorerHome() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string }>();
+  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string }>();
   const kids = useKids();
 
   useEffect(() => {
@@ -88,7 +88,10 @@ export default function ExplorerHome() {
   }, [stopId]);
 
   const stopName = kids.stopName || (params.stopName ? decodeURIComponent(params.stopName) : "Explorer");
-  const kidName = kids.kidName || "Explorer";
+  const kidName =
+    (kids.kidName && kids.kidName !== "Explorer")
+      ? kids.kidName
+      : (params.explorerName ? decodeURIComponent(params.explorerName) : "Explorer");
   const xpToday = kids.xpToday;
 
   function fmtSec(s: number) {

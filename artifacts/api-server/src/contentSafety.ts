@@ -89,7 +89,15 @@ export function isProhibitedContent(text: string): boolean {
  */
 export function isProhibitedStoryContent(text: string): boolean {
   const normalized = normalizeForCheck(text);
-  return PROHIBITED_STORY_TERMS.some(term => normalized.includes(term));
+  // Pad with spaces so word-boundary matching works:
+  // "cockpit" won't match term "cock", but standalone "cock" will.
+  const padded = ` ${normalized} `;
+  const hit = PROHIBITED_STORY_TERMS.find(term => padded.includes(` ${term} `));
+  if (hit) {
+    console.error(`[ContentSafety] Story blocked — matched term: "${hit}"`);
+    return true;
+  }
+  return false;
 }
 
 export function isProhibitedLocation(text: string): boolean {
