@@ -41,17 +41,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const inTabPreview = __DEV__ && (segments[1] === 'today' || segments[1] === 'atstop');
     if (!token && !inOnboarding && !inLegacyLogin && !inTabPreview) {
-      // No auth — send to onboarding splash
       router.replace("/onboarding/splash");
     } else if (token && !inOnboarding) {
-      // Has token and not in onboarding — ensure tabs are shown
-      // (only redirect away from the legacy login page)
       if (inLegacyLogin) router.replace("/(tabs)");
     } else if (token && inOnboarding && !data.onboardingInProgress) {
-      // Returning user with token who is not mid-onboarding → send to app
       router.replace("/(tabs)");
     }
-    // token + inOnboarding + onboardingInProgress = true → stay put (post-register flow)
   }, [token, isLoading, segments, data.onboardingInProgress]);
 
   return <>{children}</>;
@@ -71,6 +66,7 @@ function RootLayoutNav() {
         name="kids"
         options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
       />
+      <Stack.Screen name="atstop" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -32,27 +32,28 @@ export default function ExpectScreen() {
         .filter((s: string) => s.length > 8)
     : [];
 
-  const keepGoingTips: string[] = enrichment.keepGoing
-    ? enrichment.keepGoing
-        .split(/\.\s+/)
-        .map((s: string) => s.replace(/\.$/, '').trim())
-        .filter((s: string) => s.length > 8)
-    : [];
-
   const timingRows = [
-    ['Recommended duration', `${duration} min`],
-    meta.sessionFit               ? ['Best for',        meta.sessionFit]                                    : null,
-    enrichment.bestTimeOfDay      ? ['Best time to visit', enrichment.bestTimeOfDay]                        : null,
+    duration            ? ['Recommended time', `~${duration} min`]                                    : null,
+    meta.sessionFit     ? ['Best for',         meta.sessionFit]                                       : null,
+    enrichment.bestTimeOfDay
+                        ? ['Best time',        enrichment.bestTimeOfDay]                              : null,
     enrichment.strollerFriendly != null
-      ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes ✓' : 'No ✗']                             : null,
+                        ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes' : 'No']          : null,
+    meta.hoursToday     ? ['Hours today',      meta.hoursToday]                                       : null,
   ].filter((x): x is [string, string] => Array.isArray(x));
 
   const accessRows = [
-    enrichment.parkingNotes       ? ['Parking',      enrichment.parkingNotes]                               : null,
-    meta.restroomConfidence       ? ['Restrooms',    meta.restroomConfidence]                               : null,
-    meta.ticketSignal === true    ? ['Admission',    'Ticket required']                                     : null,
-    meta.ticketSignal === false   ? ['Admission',    'Free entry']                                          : null,
-    address                       ? ['Address',      address]                                               : null,
+    enrichment.parkingNotes  ? ['Parking',          enrichment.parkingNotes]                : null,
+    enrichment.strollerFriendly != null
+                             ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes' : 'No'] : null,
+    meta.restroomConfidence  ? ['Restrooms',         meta.restroomConfidence]                : null,
+    enrichment.admissionCost ? ['Admission',         enrichment.admissionCost]               : null,
+    meta.ticketSignal === true && !enrichment.admissionCost
+                             ? ['Admission',         'Ticket required']                      : null,
+    meta.ticketSignal === false && !enrichment.admissionCost
+                             ? ['Admission',         'Free entry']                           : null,
+    enrichment.bookingNotes  ? ['Booking required',  enrichment.bookingNotes]                : null,
+    address                  ? ['Address',            address]                               : null,
   ].filter((x): x is [string, string] => Array.isArray(x));
 
   const nearbyItems: string[] = enrichment.foodOptions
@@ -65,58 +66,50 @@ export default function ExpectScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.nav}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>← At Stop</Text>
+            <Text style={styles.backText}>{'\u2190'} At Stop</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.stopLabel} numberOfLines={1}>{stopName}</Text>
-        <Text style={styles.title}>What to expect</Text>
+        <Text style={styles.title}>What you'll experience</Text>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
+      <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
 
         {/* Directions + Tickets row */}
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionBtn} onPress={openDirections}>
-            <Text style={styles.actionBtnText}>↗  Directions</Text>
+            <Text style={styles.actionBtnText}>{'\u2197'}  Directions</Text>
           </TouchableOpacity>
-          {meta.ticketSignal === true && (
-            <TouchableOpacity style={[styles.actionBtn, styles.ticketBtn]}
-              onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stopName + ' tickets')}`)}>
-              <Text style={[styles.actionBtnText, { color: '#D97706' }]}>🎫  Book tickets</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.ticketBtn]}
+            onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stopName + ' tickets')}`)}>
+            <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{'\U0001f3ab'}  Book tickets</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 1. What you'll experience */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>WHAT YOU{'\u2019'}LL EXPERIENCE</Text>
+          {enrichment.whyNow ? (
+            <Text style={styles.highlight}>{enrichment.whyNow}</Text>
+          ) : (
+            <Text style={styles.highlight}>
+              {stopName} is a great stop for families — explore at your own pace and look out for the highlights listed below.
+            </Text>
           )}
         </View>
 
-        {/* 1. What to expect */}
-        {(!!enrichment.whyNow || practicalTips.length > 0) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>WHAT TO EXPECT</Text>
-            {!!enrichment.whyNow && (
-              <Text style={styles.highlight}>{enrichment.whyNow}</Text>
-            )}
-            {practicalTips.length > 0 && (
-              <View style={styles.tipsWrap}>
-                {practicalTips.map((tip, i) => (
-                  <View key={i} style={styles.tipRow}>
-                    <View style={styles.tipDot} />
-                    <Text style={styles.tipText}>{tip}.</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
         {/* 2. Best way to do this stop */}
-        {keepGoingTips.length > 0 && (
+        {practicalTips.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>BEST WAY TO DO THIS STOP</Text>
-            {keepGoingTips.map((tip, i) => (
-              <View key={i} style={styles.tipRow}>
-                <View style={[styles.tipDot, { backgroundColor: G.green }]} />
-                <Text style={styles.tipText}>{tip}.</Text>
-              </View>
-            ))}
+            <View style={styles.tipsWrap}>
+              {practicalTips.map((tip, i) => (
+                <View key={i} style={styles.tipRow}>
+                  <View style={styles.tipDot} />
+                  <Text style={styles.tipText}>{tip}.</Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
@@ -127,10 +120,7 @@ export default function ExpectScreen() {
             {timingRows.map(([k, v], i) => (
               <View key={k} style={[styles.infoRow, i === 0 && { borderTopWidth: 0 }]}>
                 <Text style={styles.infoKey}>{k}</Text>
-                <Text style={[styles.infoVal,
-                  (k === 'Crowd level now' || k === 'Best time to visit') && { color: G.green }]}>
-                  {v}
-                </Text>
+                <Text style={styles.infoVal}>{v}</Text>
               </View>
             ))}
           </View>
@@ -143,7 +133,7 @@ export default function ExpectScreen() {
             {accessRows.map(([k, v], i) => (
               <View key={k} style={[styles.infoRow, i === 0 && { borderTopWidth: 0 }]}>
                 <Text style={styles.infoKey}>{k}</Text>
-                <Text style={[styles.infoVal, { maxWidth: '55%', textAlign: 'right' }]}>{v}</Text>
+                <Text style={[styles.infoVal, { color: k === 'Parking' || k === 'Stroller friendly' ? G.green : G.deep }]}>{v}</Text>
               </View>
             ))}
           </View>
@@ -187,9 +177,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10,
   },
   sectionLabel: { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-  highlight:    { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 22, marginBottom: 12 },
+  highlight:    { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 22 },
   tipsWrap:     { gap: 8 },
-  tipRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
+  tipRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 2 },
   tipDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: G.orange, marginTop: 7, flexShrink: 0 },
   tipText:      { fontFamily: F.medium, fontSize: 13, color: G.muted, lineHeight: 20, flex: 1 },
   infoRow:      {

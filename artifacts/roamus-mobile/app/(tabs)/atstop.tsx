@@ -702,14 +702,12 @@ export default function AtStopScreen() {
             <Text style={dt.actIcon}>↗</Text>
             <Text style={[dt.actLabel, { fontSize: 13, color: C.deep }]}>Directions</Text>
           </TouchableOpacity>
-          {hasTicket && (
-            <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
-              borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
-              onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
-              <Text style={dt.actIcon}>🎟</Text>
-              <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
+            borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
+            onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
+            <Text style={dt.actIcon}>🎟</Text>
+            <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
+          </TouchableOpacity>
         </View>
 
         {/* ── 2×2 action grid ────────────────────────────────────────────────────────────────────────────── */}
@@ -772,7 +770,10 @@ export default function AtStopScreen() {
 
           {/* Need something? */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
-            onPress={() => openRescue('behind')}>
+            onPress={() => router.push({ pathname: '/atstop/need' as never, params: {
+              stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
+              address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
+            } })}>
             <Text style={dt.gridIcon}>🔀</Text>
             <Text style={dt.gridTitle}>Need something?</Text>
             <Text style={dt.gridSub}>Adjust, skip, or swap</Text>
