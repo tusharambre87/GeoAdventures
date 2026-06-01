@@ -93,7 +93,7 @@ export default function ExpectScreen() {
           <TouchableOpacity
             style={[styles.actionBtn, styles.ticketBtn]}
             onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stopName + ' tickets')}`)}>
-            <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{'\U0001f3ab'}  Book tickets</Text>
+            <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{'🎫'}  Book tickets</Text>
           </TouchableOpacity>
         </View>
 

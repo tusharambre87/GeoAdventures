@@ -44,7 +44,7 @@ export default function NeedScreen() {
         ]),
     },
     {
-      icon: '\U0001f625',
+      icon: '😥',
       title: 'Kids are tired',
       sub: 'Find a break spot or easier next stop',
       onPress: () =>
@@ -55,13 +55,13 @@ export default function NeedScreen() {
         ]),
     },
     {
-      icon: '\U0001f389',
+      icon: '🎉',
       title: 'Need more fun',
       sub: 'Swap for something more exciting nearby',
       onPress: () => Linking.openURL(activityUrl),
     },
     {
-      icon: '\U0001f355',
+      icon: '🍕',
       title: 'Find food nearby',
       sub: '4 family options within 0.3 mi',
       onPress: () => Linking.openURL(foodUrl),
