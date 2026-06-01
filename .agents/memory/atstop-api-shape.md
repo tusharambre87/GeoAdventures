@@ -1,46 +1,48 @@
 ---
-name: atstop API data shape
-description: Real field names returned by /api/travel/trips/:id for stops, and the fallback chain used in atstop.tsx.
+name: At Stop data shape and placeProfileData architecture
+description: How placeProfileData reaches (or doesn't) the execution layer — critical for Nearby Essentials sheets
 ---
 
-# Stop data shape from /api/travel/trips/:tripId
+## The architecture gap
 
-The API returns stops with these top-level fields:
-- `id`, `name`, `stopType`, `dayIndex`, `displayOrder`, `durationMinutes`
-- `isVisited`, `visited` (both may appear)
-- `address`, `cityGroup`, `openingHours`
-- `latitude`, `longitude` (strings, e.g. `"41.8668"`)
-- `minAge` (number or null)
-- `enrichment` — flat JSON blob from `stop_library.enrichment`
-- `metadata` — flat JSON blob with `ticketSignal`, `sessionFit`, `restroomConfidence`
-- `placeProfileData` — may be set as a JSON column directly on the stop
-- `placeReferenceData` — may be set as a JSON column (`bookingRequired`, `bookingUrl`, `priceRange`, `openingHours`)
-- `parentSupportData` — may be set as a JSON column (`keepGoingSuggestion`, etc.)
+`travelStops` DB table has NO `placeProfileData` column — only `metadata: jsonb` (StopExecutionSnapshot).
 
-## enrichment flat fields
-`whyNow`, `whyItWorks`, `parkingNotes`, `bathroomNotes`, `bestTimeOfDay`, `strollerFriendly`, `practicalTips` (string OR string[]), `foodOptions`, `priceRange`, `bookingRequired`, `bookingUrl`, `keepGoingSuggestion`
+`placeProfileData` (including `nearbyStops`) lives on:
+- `plannerTripPlanStops.placeProfileData` — planner world
+- `plannerPlaceProfiles.nearbyStops` — separate enrichment table
 
-## Fallback chains used in atstop.tsx
+`StopExecutionSnapshot` (stored in `travelStops.metadata`) does NOT include `nearbyStops` or the full profile. It only copies: `practicalHighlights`, `strollerFriendly`, `foodNearby`, `parkingSignal`, etc.
 
-```typescript
-// "Do this first" card
-const doThisFirst = enrichment.whyItWorks ?? pProf.whyItWorks
-  ?? currentStop.parentSupportData?.keepGoingSuggestion ?? enrichment.whyNow;
+**Why:** Snapshot bridge (snapshotBridge.ts) was never updated to copy nearbyStops.
 
-// Open status pill
-const openStatus = formatOpenStatus(pRef.openingHours ?? currentStop.openingHours);
+## The fix (as of 2026-06-01)
 
-// Ticket visibility
-const hasTicket = pRef.bookingRequired === true || meta.ticketSignal === true;
+In `GET /api/travel/trips/:tripId` (routes.ts ~line 6454): batch-join `plannerTripPlanStops` via `metadata.plannerStopId` and inject `placeProfileData` onto each stop response.
 
-// Booking URL
-const bookingHref = pRef.bookingUrl ?? enrichment.bookingUrl;
+**Limitation**: Most existing trips were created BEFORE the snapshot bridge, so `metadata.plannerStopId` is null. The join only works for planner-linked trips (trips where `plannerTripPlans.experienceTripId` is set). The Barcelona trip is the only current example.
 
-// Directions (Platform.select)
-// iOS:  maps://app?daddr={lat},{lon}&dirflg=d
-// Android: google.navigation:q={lat},{lon}
-// Fallback: mapsUrl(address)
-```
+## Data quality of existing nearbyStops
 
-## TripData fields
-`id`, `name`, `status`, `destination`, `city`, `country`, `startDate`, `plannerTripDays`, `tripDays`, `currentDayIndex`, `accommodationAddress`, `stops[]`, `travelers[]` (with `name`, `type`, `id`)
+Old planner trips: `nearbyStops` is `string[]` — plain names like `["Barcelona Zoo", "El Born District"]`. No type/distance/description.
+
+New planner trips (post 2026-06-01 prompt update): `nearbyStops` is structured objects `{name, distance, description, agesNote?, type}`.
+
+The `type` field drives category filtering in expect.tsx (Food/Break/Kids sheets).
+
+## expect.tsx fallback chain
+
+1. nearbyStops filtered by category type → best
+2. All nearbyStops when filter finds nothing (avoids blank)
+3. parseFoodOptions: "Name - distance - cuisine - price" strings → food sheet only; detected by presence of ' - '
+4. Prose foodOptions (no ' - '): shown as a bordered note card above Maps CTA
+5. Empty state: prominent orange Maps CTA "Find X near [stopName]" using lat/lon + sll param
+
+## pProf reading in atstop.tsx
+
+`const pProf = currentStop.placeProfileData ?? {}` — reads from API response. Since TravelStop has no placeProfileData column, this is only populated when the API join succeeds (planner-linked trips with plannerStopId in metadata).
+
+## Existing DB state (2026-06-01)
+
+- plannerTripPlanStops: 165 rows
+- Only 1 trip (Barcelona) has plannerTripPlans.experienceTripId set → only Barcelona gets placeProfileData via join
+- All other trips: pProf = {} → falls back to Maps CTA

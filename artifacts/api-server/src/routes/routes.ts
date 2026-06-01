@@ -6448,6 +6448,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('[Trip v2] stop_library enrichment join failed:', (enrichErr as Error).message);
       }
 
+      // Inject placeProfileData from plannerTripPlanStops for each stop that has a plannerStopId
+      // in its metadata. This bridges the planner intelligence (nearbyStops, foodOptions, etc.)
+      // into the execution layer without requiring a travelStops schema change.
+      try {
+        const plannerStopIds = stopsWithPackStatus
+          .map(s => (s.metadata as any)?.plannerStopId as string | undefined)
+          .filter((id): id is string => Boolean(id));
+
+        if (plannerStopIds.length > 0) {
+          const plannerRows = await db
+            .select({ id: plannerTripPlanStops.id, placeProfileData: plannerTripPlanStops.placeProfileData })
+            .from(plannerTripPlanStops)
+            .where(inArray(plannerTripPlanStops.id, plannerStopIds));
+
+          const plannerMap = new Map(plannerRows.map(r => [r.id, r.placeProfileData]));
+
+          for (const stop of stopsWithPackStatus) {
+            const psId = (stop.metadata as any)?.plannerStopId as string | undefined;
+            if (psId) {
+              const ppd = plannerMap.get(psId);
+              if (ppd) (stop as any).placeProfileData = ppd;
+            }
+          }
+        }
+      } catch (ppdErr) {
+        // Non-fatal — stops still served without placeProfileData
+        console.warn('[Trip v2] placeProfileData join failed:', (ppdErr as Error).message);
+      }
+
       // Enrich with planner plan trip_days (used when trip has no explicit dates)
       let plannerTripDays: number | null = null;
       try {

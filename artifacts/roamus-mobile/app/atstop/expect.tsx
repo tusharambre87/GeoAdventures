@@ -168,10 +168,12 @@ export default function ExpectScreen() {
 
   // Food: try typed nearbyStops first, then all nearbyStops, then parse foodOptions string
   const foodRawStr: string = enrichment.foodOptions ?? pProf.foodOptions ?? '';
+  // Detect prose vs structured "Name - distance" format
+  const foodIsProse = foodRawStr.length > 0 && !foodRawStr.includes(' - ');
   const foodPlaces: NearbyItem[] = (() => {
     const fromNearby = filterByType(FOOD_TYPES);
     if (fromNearby.length > 0) return fromNearby;
-    if (foodRawStr) return parseFoodOptions(foodRawStr);
+    if (foodRawStr && !foodIsProse) return parseFoodOptions(foodRawStr);
     return [];
   })();
 
@@ -185,9 +187,11 @@ export default function ExpectScreen() {
       Linking.openURL('https://maps.apple.com/?q=' + q).catch(() => {}));
   };
   const openMapsQuery = (q: string, z = 14) => {
+    const nearLabel = address || stopName;
+    const query = nearLabel ? q + ' near ' + nearLabel : q;
     const url = lat && lon
       ? 'https://maps.apple.com/?q=' + encodeURIComponent(q) + '&sll=' + lat + ',' + lon + '&z=' + z
-      : 'https://maps.apple.com/?q=' + encodeURIComponent(q + (address ? ' near ' + address : ''));
+      : 'https://maps.apple.com/?q=' + encodeURIComponent(query);
     Linking.openURL(url).catch(() => {});
   };
 
@@ -352,11 +356,21 @@ export default function ExpectScreen() {
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {foodPlaces.length === 0 ? (
-                <View style={styles.emptyWrap}>
-                  <Text style={styles.emptyMsg}>No food data for this stop yet</Text>
-                  <TouchableOpacity onPress={() => openMapsQuery('family restaurant')}>
-                    <Text style={styles.emptyMaps}>Search on Apple Maps →</Text>
-                  </TouchableOpacity>
+                <View>
+                  {foodIsProse && foodRawStr ? (
+                    <View style={styles.proseCard}>
+                      <Text style={styles.proseLabel}>FOOD AT THIS STOP</Text>
+                      <Text style={styles.proseText}>{foodRawStr}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.emptyWrap}>
+                    {!foodIsProse && (
+                      <Text style={styles.emptyMsg}>No food data for this stop yet</Text>
+                    )}
+                    <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('restaurant')}>
+                      <Text style={styles.mapsCtaText}>Find restaurants near {stopName} →</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 foodPlaces.map((place, i) => (
@@ -406,8 +420,8 @@ export default function ExpectScreen() {
               {breakPlaces.length === 0 ? (
                 <View style={styles.emptyWrap}>
                   <Text style={styles.emptyMsg}>No break spot data for this stop yet</Text>
-                  <TouchableOpacity onPress={() => openMapsQuery('park cafe')}>
-                    <Text style={styles.emptyMaps}>Search on Apple Maps →</Text>
+                  <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('park cafe')}>
+                    <Text style={styles.mapsCtaText}>Find parks & cafes near {stopName} →</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -452,8 +466,8 @@ export default function ExpectScreen() {
               {kidPlaces.length === 0 ? (
                 <View style={styles.emptyWrap}>
                   <Text style={styles.emptyMsg}>No kid activity data for this stop yet</Text>
-                  <TouchableOpacity onPress={() => openMapsQuery('kids activities')}>
-                    <Text style={styles.emptyMaps}>Search on Apple Maps →</Text>
+                  <TouchableOpacity style={styles.mapsCta} onPress={() => openMapsQuery('kid activities')}>
+                    <Text style={styles.mapsCtaText}>Find kid activities near {stopName} →</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -551,4 +565,15 @@ const styles = StyleSheet.create({
   addBtn:        { backgroundColor: G.orange, borderRadius: 24, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   addBtnText:    { fontFamily: F.bold, fontSize: 14, color: 'white' },
   seeMore:       { fontFamily: F.medium, fontSize: 13, color: G.muted },
+  proseCard:     {
+    backgroundColor: '#FFF8F4', borderRadius: 12, padding: 14, marginBottom: 12,
+    borderLeftWidth: 3, borderLeftColor: G.orange,
+  },
+  proseLabel:    { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 1, marginBottom: 6 },
+  proseText:     { fontFamily: F.medium, fontSize: 13, color: G.deep, lineHeight: 20 },
+  mapsCta:       {
+    backgroundColor: G.orange, borderRadius: 24, paddingHorizontal: 20, paddingVertical: 14,
+    alignItems: 'center', marginTop: 8,
+  },
+  mapsCtaText:   { fontFamily: F.bold, fontSize: 14, color: 'white' },
 });
