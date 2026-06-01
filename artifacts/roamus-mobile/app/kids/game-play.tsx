@@ -1376,34 +1376,49 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
     setPhase("playing");
   }, [stopName, usedKeys, playCount]);
 
+  // ── INTRO ──
   if (phase === "intro") {
     return (
-      <IntroScreen
-        icon="👜"
-        title="What's In My Bag?"
-        subtitle="Family memory chain game"
-        description="One person reads the sentence aloud while everyone else listens. Then everyone repeats it together from memory!"
-        note="There are no wrong answers — help each other and have fun."
-        btnLabel="Start"
-        btnColor="#7C3AED"
-        onStart={startGame}
-        onBack={() => router.back()}
-      />
+      <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
+        <Text style={{ fontSize: 64, marginBottom: 12 }}>👜</Text>
+        <Text style={bag.introTitle}>What's In My Bag?</Text>
+        <Text style={bag.introSub}>One person reads, everyone repeats!</Text>
+        <View style={bag.themeBadge}>
+          <Text style={bag.themeText}>
+            Going to <Text style={{ color: "#7C3AED", fontFamily: F.bold }}>{stopName}</Text>, my bag has...
+          </Text>
+        </View>
+        <Pressable
+          style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 32, paddingHorizontal: 40 }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
+        >
+          <Text style={sh.btnText}>Start Game</Text>
+        </Pressable>
+        <Pressable style={{ marginTop: 16 }} onPress={() => router.back()}>
+          <Text style={sh.backBtnText}>← Back to Games</Text>
+        </Pressable>
+      </View>
     );
   }
 
+  // ── PLAYING ──
   if (phase === "playing" && context) {
     const sentence = buildBagSentence(context.context, bagItems, index);
+    const isLast = index >= MAX_BAG_ITEMS - 1;
     return (
-      <View style={{ flex: 1, backgroundColor: "#F5F3FF" }}>
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
+          contentContainerStyle={{
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 32,
+            paddingHorizontal: 24,
+          }}
         >
-          <Text style={[sh.gameTitle, { color: "#7C3AED" }]}>👜 What's In My Bag?</Text>
+          <Text style={bag.title}>👜 What's In My Bag?</Text>
 
           <View style={bag.readerBadge}>
-            <Text style={bag.readerText}>📢 Reader — say this out loud:</Text>
+            <Text style={bag.readerText}>🔊 Reader, say this out loud:</Text>
           </View>
           <Text style={bag.itemNum}>Item {index + 1} of {MAX_BAG_ITEMS}</Text>
 
@@ -1413,44 +1428,52 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
 
           <Text style={bag.repeatHint}>Now everyone repeat together!</Text>
 
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 24 }}>
+          <View style={bag.btnRow}>
             <Pressable
-              style={[sh.btn, { backgroundColor: "#E5E7EB", flex: 1 }]}
-              onPress={() => setPhase("intro")}
+              style={bag.endBtn}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
             >
-              <Text style={[sh.btnText, { color: "#374151" }]}>End Game</Text>
+              <Text style={bag.endBtnText}>End Game</Text>
             </Pressable>
             <Pressable
               style={[sh.btn, { backgroundColor: "#7C3AED", flex: 1 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                if (index < MAX_BAG_ITEMS - 1) {
-                  setIndex((n) => n + 1);
-                } else {
-                  setPhase("complete");
-                }
+                if (isLast) { setPhase("complete"); } else { setIndex((n) => n + 1); }
               }}
             >
-              <Text style={sh.btnText}>{index < MAX_BAG_ITEMS - 1 ? "Next Item →" : "Finish!"}</Text>
+              <Text style={sh.btnText}>{isLast ? "Finish! 🎒" : "Next Item →"}</Text>
             </Pressable>
           </View>
-
-          <BackBtn onPress={() => router.back()} />
         </ScrollView>
       </View>
     );
   }
 
+  // ── COMPLETE ──
+  const fullSentence = context
+    ? buildBagSentence(context.context, bagItems, MAX_BAG_ITEMS - 1)
+    : "";
   return (
-    <DoneScreen
-      emoji="🎒"
-      title="Nice remembering together!"
-      subtitle="Want to play again with a new bag?"
-      accent="#7C3AED"
-      onPlayAgain={startGame}
-      onBack={() => router.back()}
-      playAgainLabel="👜 Play Again"
-    />
+    <View style={[sh.centered, { backgroundColor: "#FFF8F0", paddingHorizontal: 24 }]}>
+      <Text style={{ fontSize: 72, marginBottom: 12 }}>🎒</Text>
+      <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>Amazing memory!</Text>
+      <View style={bag.sentenceBox}>
+        <Text style={bag.sentence}>"{fullSentence}"</Text>
+      </View>
+      <Pressable
+        style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 24 }]}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
+      >
+        <Text style={sh.btnText}>👜 Play Again</Text>
+      </Pressable>
+      <Pressable
+        style={[sh.btn, { backgroundColor: "#F3F4F6", marginTop: 12 }]}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+      >
+        <Text style={[sh.btnText, { color: "#374151" }]}>← Back to Games</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -1710,12 +1733,35 @@ const gg = StyleSheet.create({
 });
 
 const bag = StyleSheet.create({
-  readerBadge: { backgroundColor: "#EDE9FE", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 6 },
+  // Intro
+  introTitle: { fontFamily: F.bold, fontSize: 22, color: "#7C3AED", textAlign: "center", marginBottom: 8 },
+  introSub: { fontFamily: F.medium, fontSize: 15, color: "#78716C", textAlign: "center", marginBottom: 20 },
+  themeBadge: {
+    backgroundColor: "#F3F0FF", borderRadius: 16, borderWidth: 1.5,
+    borderColor: "#C4B5FD", paddingHorizontal: 20, paddingVertical: 14,
+    alignItems: "center", maxWidth: 300,
+  },
+  themeText: { fontFamily: F.medium, fontSize: 15, color: "#4B5563", textAlign: "center" },
+  // Playing
+  title: { fontFamily: F.bold, fontSize: 20, color: "#7C3AED", marginBottom: 16 },
+  readerBadge: {
+    backgroundColor: "#EDE9FE", borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 8, alignSelf: "flex-start", marginBottom: 8,
+  },
   readerText: { fontFamily: F.semibold, fontSize: 13, color: "#5B21B6" },
   itemNum: { fontFamily: F.medium, fontSize: 12, color: "#9CA3AF", marginBottom: 16 },
-  sentenceBox: { backgroundColor: "#fff", borderRadius: 20, borderWidth: 2, borderColor: "#C4B5FD", padding: 24, marginBottom: 20 },
+  sentenceBox: {
+    backgroundColor: "#fff", borderRadius: 20, borderWidth: 2,
+    borderColor: "#C4B5FD", padding: 24, marginBottom: 20,
+  },
   sentence: { fontFamily: F.semibold, fontSize: 18, color: "#1C1917", textAlign: "center", lineHeight: 28 },
-  repeatHint: { fontFamily: F.medium, fontSize: 14, color: "#78716C", textAlign: "center" },
+  repeatHint: { fontFamily: F.medium, fontSize: 14, color: "#78716C", textAlign: "center", marginBottom: 8 },
+  btnRow: { flexDirection: "row", gap: 12, marginTop: 24 },
+  endBtn: {
+    flex: 1, borderRadius: 16, borderWidth: 2, borderColor: "#7C3AED",
+    alignItems: "center", justifyContent: "center", paddingVertical: 14,
+  },
+  endBtnText: { fontFamily: F.bold, fontSize: 15, color: "#7C3AED" },
 });
 
 const spy = StyleSheet.create({
