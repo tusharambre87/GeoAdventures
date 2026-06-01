@@ -720,6 +720,7 @@ export default function AtStopScreen() {
               enrichment: encodeURIComponent(JSON.stringify(enrichment)),
               meta: encodeURIComponent(JSON.stringify(meta)),
               duration: String(duration),
+              openingHours: encodeURIComponent(currentStop.openingHours ?? ''),
             }})}>
             <Text style={dt.gridIcon}>✨</Text>
             <Text style={dt.gridTitle}>What to expect</Text>
