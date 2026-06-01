@@ -8762,6 +8762,107 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // ── GET /api/travel/stops/:stopId/nearby ─────────────────────────────────────
+  // Generate nearby food, break spots, and kid activities for a stop using GPT-4o.
+  // Results are cached in travelStops.metadata.nearbyEssentials so subsequent calls
+  // are instant. Cache is invalidated by passing ?refresh=true.
+  const nearbyEssentialsCache = new Map<string, { food: unknown[]; breaks: unknown[]; kids: unknown[] }>();
+
+  app.get('/api/travel/stops/:stopId/nearby', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { stopId } = req.params;
+      const refresh = req.query.refresh === 'true';
+
+      // 1. In-memory cache (fast path)
+      if (!refresh && nearbyEssentialsCache.has(stopId)) {
+        return res.json(nearbyEssentialsCache.get(stopId));
+      }
+
+      // 2. Load stop
+      const stop = await storage.getStopById(stopId);
+      if (!stop) return res.status(404).json({ message: 'Stop not found' });
+
+      // 3. Persistent cache in metadata (survives restarts)
+      const meta = (stop.metadata ?? {}) as Record<string, unknown>;
+      if (!refresh && meta.nearbyEssentials) {
+        const cached = meta.nearbyEssentials as { food: unknown[]; breaks: unknown[]; kids: unknown[] };
+        nearbyEssentialsCache.set(stopId, cached);
+        return res.json(cached);
+      }
+
+      const lat  = stop.latitude  ? parseFloat(stop.latitude)  : null;
+      const lon  = stop.longitude ? parseFloat(stop.longitude) : null;
+      const name = stop.name ?? 'this stop';
+      const addr = stop.address ?? '';
+
+      const locationStr = lat && lon
+        ? `${lat}, ${lon}${addr ? ' (address: ' + addr + ')' : ''}`
+        : addr || name;
+
+      // 4. Generate with GPT-4o
+      const openai = getOpenAI();
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a family travel assistant. Return ONLY valid JSON, no markdown, no explanation.',
+          },
+          {
+            role: 'user',
+            content:
+              `Generate nearby places for families visiting "${name}" at ${locationStr}.\n\n` +
+              'Return exactly this JSON shape (use real place names that exist near these coordinates):\n' +
+              '{\n' +
+              '  "food": [\n' +
+              '    { "name": "...", "distance": "X min walk", "cuisine": "...", "priceRange": "$$", "description": "..." }\n' +
+              '  ],\n' +
+              '  "breaks": [\n' +
+              '    { "name": "...", "distance": "X min walk", "description": "..." }\n' +
+              '  ],\n' +
+              '  "kids": [\n' +
+              '    { "name": "...", "distance": "X min walk/drive", "agesNote": "Ages X\u2013Y", "description": "..." }\n' +
+              '  ]\n' +
+              '}\n\n' +
+              'food: 3\u20134 restaurants or cafes within 10 min walk/drive.\n' +
+              'breaks: 2\u20133 parks, plazas, or quiet cafes within 10 min.\n' +
+              'kids: 2\u20133 playgrounds, museums, or family attractions within 15 min.\n' +
+              'Be specific \u2014 real names only, no generic placeholders.',
+          },
+        ],
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? '{}';
+      let result: { food: unknown[]; breaks: unknown[]; kids: unknown[] };
+      try {
+        const parsed = JSON.parse(raw);
+        result = {
+          food:   Array.isArray(parsed.food)   ? parsed.food   : [],
+          breaks: Array.isArray(parsed.breaks) ? parsed.breaks : [],
+          kids:   Array.isArray(parsed.kids)   ? parsed.kids   : [],
+        };
+      } catch {
+        result = { food: [], breaks: [], kids: [] };
+      }
+
+      // 5. Cache in memory + persist to metadata
+      nearbyEssentialsCache.set(stopId, result);
+      try {
+        await storage.updateStop(stopId, {
+          metadata: { ...meta, nearbyEssentials: result } as any,
+        });
+      } catch (cacheErr) {
+        console.warn('[Nearby] Failed to persist nearbyEssentials to metadata:', (cacheErr as Error).message);
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[Nearby] Error generating nearby essentials:', error.message || error);
+      res.status(500).json({ message: 'Failed to generate nearby places', error: error.message });
+    }
+  });
+
   app.post('/api/travel/lookup-address', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { placeName, tripContext } = req.body;
