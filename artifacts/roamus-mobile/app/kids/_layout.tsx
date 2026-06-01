@@ -29,7 +29,7 @@ function KidsLayoutInner() {
     } else if (params.stopName) {
       setKidName("Explorer");
     }
-  }, [params.stopId, params.explorerId]);
+  }, [params.stopId, params.explorerId, params.explorerName]);
 
   return (
     <Stack

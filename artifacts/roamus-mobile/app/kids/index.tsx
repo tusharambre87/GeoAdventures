@@ -68,7 +68,7 @@ export default function ExplorerHome() {
     kids.setExploreError(false);
 
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 4000)
+      setTimeout(() => reject(new Error("timeout")), 28000)
     );
 
     Promise.race([kidsAPI.getExplore(stopId), timeout])
@@ -122,7 +122,7 @@ export default function ExplorerHome() {
           {/* top row */}
           <View style={s.heroTop}>
             <View>
-              <Text style={s.greeting}>{"Hey Explorer! \uD83E\uDDED"}</Text>
+              <Text style={s.greeting}>{`Hey ${kidName}! \uD83E\uDDED`}</Text>
               <Text style={s.kidName}>{kidName}</Text>
             </View>
             <View style={s.xpBadge}>

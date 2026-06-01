@@ -128,7 +128,9 @@ export default function WhoScreen() {
                 style={{ fontFamily: F.regular, fontSize: 15, color: G.deep, flex: 1 }}
                 value={newName}
                 onChangeText={setNewName}
-                placeholder={addingType === "child" ? "e.g. Aarav" : "e.g. Partner"}
+                placeholder={addingType === "child"
+                  ? (data.cities.some(c => c.toLowerCase().includes("india")) ? "e.g. Aarav" : "e.g. Aaron")
+                  : "e.g. Partner"}
                 placeholderTextColor={G.muted}
                 autoFocus
               />
