@@ -189,55 +189,75 @@ export default function ExpectScreen() {
           </View>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>NEARBY ESSENTIALS</Text>
+        {/* NEARBY ESSENTIALS — 3 rows, each opens Maps */}
+        <View style={{
+          backgroundColor: 'white', borderRadius: 14, padding: 16,
+          marginBottom: 12,
+          shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 }, elevation: 2,
+        }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#E8692A',
+            letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>
+            NEARBY ESSENTIALS
+          </Text>
 
+          {/* Row 1: Food */}
           <TouchableOpacity
-            style={styles.essentialRow}
             onPress={() => Linking.openURL(
               lat && lon
                 ? `https://maps.apple.com/?q=family+restaurant&sll=${lat},${lon}&z=14`
                 : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("family restaurants near " + (address || stopName))}`
             ).catch(() => {})}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' }}
           >
-            <Text style={styles.essentialIcon}>{"\U0001F355"}</Text>
+            <Text style={{ fontSize: 20, width: 36 }}>🍕</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.essentialTitle}>Food nearby</Text>
-              <Text style={styles.essentialSub}>{foodOptions ? String(foodOptions).split(/[;,\n]/)[0].trim() : "Family-friendly options near you"}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E' }}>Food nearby</Text>
+              <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>
+                Family-friendly options near you
+              </Text>
             </View>
-            <Text style={styles.essentialLink}>Maps {"\u2192"}</Text>
+            <Text style={{ color: '#E8692A', fontSize: 13, fontWeight: '700' }}>Maps →</Text>
           </TouchableOpacity>
 
+          {/* Row 2: Parking */}
           <TouchableOpacity
-            style={styles.essentialRow}
             onPress={() => Linking.openURL(
               lat && lon
                 ? `https://maps.apple.com/?q=parking&sll=${lat},${lon}&z=15`
                 : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("parking near " + (address || stopName))}`
             ).catch(() => {})}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' }}
           >
-            <Text style={styles.essentialIcon}>{"\U0001F17F\uFE0F"}</Text>
+            <Text style={{ fontSize: 20, width: 36 }}>🅿️</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.essentialTitle}>Parking</Text>
-              <Text style={styles.essentialSub}>{parking ?? "Find parking nearby"}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E' }}>Parking</Text>
+              <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>
+                Find parking nearby
+              </Text>
             </View>
-            <Text style={styles.essentialLink}>Maps {"\u2192"}</Text>
+            <Text style={{ color: '#E8692A', fontSize: 13, fontWeight: '700' }}>Maps →</Text>
           </TouchableOpacity>
 
+          {/* Row 3: Coffee */}
           <TouchableOpacity
-            style={[styles.essentialRow, { borderBottomWidth: 0 }]}
             onPress={() => Linking.openURL(
               lat && lon
                 ? `https://maps.apple.com/?q=coffee+cafe&sll=${lat},${lon}&z=14`
                 : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("coffee cafe near " + (address || stopName))}`
             ).catch(() => {})}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
           >
-            <Text style={styles.essentialIcon}>{"\u2615"}</Text>
+            <Text style={{ fontSize: 20, width: 36 }}>☕</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.essentialTitle}>Coffee {"\u0026"} cafes</Text>
-              <Text style={styles.essentialSub}>Find a quick break nearby</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E' }}>Coffee &amp; cafes</Text>
+              <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>
+                Find a quick break nearby
+              </Text>
             </View>
-            <Text style={styles.essentialLink}>Maps {"\u2192"}</Text>
+            <Text style={{ color: '#E8692A', fontSize: 13, fontWeight: '700' }}>Maps →</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
