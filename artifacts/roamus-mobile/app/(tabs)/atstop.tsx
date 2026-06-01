@@ -343,6 +343,9 @@ export default function AtStopScreen() {
   const [addingStop, setAddingStop]     = useState<string | null>(null);
   const [stopMoments, setStopMoments]   = useState<Moment[]>([]);
 
+  // Prevents useFocusEffect from resetting mode when returning from a sub-screen
+  const keepDetailOnFocus = useRef(false);
+
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
     if (!currentStop) return;
@@ -366,6 +369,7 @@ export default function AtStopScreen() {
   // ── Load on focus ──
   useFocusEffect(
     useCallback(() => {
+      if (keepDetailOnFocus.current) { keepDetailOnFocus.current = false; return; }
       if (__DEV__ && devMode && devMode !== 'loading') {
         const ts = MOCK_TRIP.stops.filter(s => (s.dayIndex ?? 0) === 0);
         setTrip(MOCK_TRIP); setDayStops(ts);
@@ -670,8 +674,8 @@ export default function AtStopScreen() {
                 borderColor: 'rgba(239,68,68,0.4)', borderRadius: 20,
                 paddingHorizontal: 12, paddingVertical: 6,
               }}
-              onPress={() => router.push({ pathname: '/atstop/sos' as never,
-                params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } })}>
+              onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/sos' as never,
+                params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } }); }}>
               <Text style={{ fontSize: 12 }}>🆘</Text>
               <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
             </TouchableOpacity>
@@ -714,14 +718,14 @@ export default function AtStopScreen() {
         <View style={dt.gridRow}>
           {/* What to expect */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
-            onPress={() => router.push({ pathname: '/atstop/expect' as never, params: {
+            onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/expect' as never, params: {
               stopName: encodeURIComponent(currentStop.name),
               address: encodeURIComponent(address),
               enrichment: encodeURIComponent(JSON.stringify(enrichment)),
               meta: encodeURIComponent(JSON.stringify(meta)),
               duration: String(duration),
               openingHours: encodeURIComponent(currentStop.openingHours ?? ''),
-            }})}>
+            }}); }}>
             <Text style={dt.gridIcon}>✨</Text>
             <Text style={dt.gridTitle}>What to expect</Text>
             <Text style={dt.gridSub}>Experience {'&'} best tips</Text>
@@ -734,7 +738,7 @@ export default function AtStopScreen() {
               const kidExplorer = travelers.find(t => t.name && t.name !== 'You') ?? travelers[0];
               const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
                 ? kidExplorer.name : travelers[0]?.name ?? 'Explorer';
-              router.push({ pathname: '/kids' as never, params: {
+              keepDetailOnFocus.current = true; router.push({ pathname: '/kids' as never, params: {
                 stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
                 tripId: trip?.id ?? '', explorerId: explorerName,
                 explorerName: encodeURIComponent(explorerName),
@@ -771,10 +775,10 @@ export default function AtStopScreen() {
 
           {/* Need something? */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
-            onPress={() => router.push({ pathname: '/atstop/need' as never, params: {
+            onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/need' as never, params: {
               stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
               address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
-            } })}>
+            } }); }}>
             <Text style={dt.gridIcon}>🔀</Text>
             <Text style={dt.gridTitle}>Need something?</Text>
             <Text style={dt.gridSub}>Adjust, skip, or swap</Text>
