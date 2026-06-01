@@ -1560,7 +1560,7 @@ function ReplaceSheet({
     if (c === 'Outdoors')   return 'outdoors';
     if (c === 'Shorter')    return 'shorter';
     if (c === 'More fun')   return 'fun';
-    if (c === 'Indoor')     return null;  // API has no indoor filter — omit
+    if (c === 'Indoor')     return 'indoor';
     return null;
   }
 
@@ -1582,7 +1582,9 @@ function ReplaceSheet({
         }
       );
       const combined = [...(res.better ?? []), ...(res.similar ?? []), ...(res.suggestions ?? [])];
-      setAlts(combined.slice(0, 8));
+      const existingNames = new Set(allStops.map(s => s.name?.toLowerCase().trim()));
+      const filtered = combined.filter(a => !existingNames.has(a.name?.toLowerCase().trim()));
+      setAlts(filtered.slice(0, 8));
     } catch {
       setAlts([]);
     } finally {
@@ -1612,18 +1614,14 @@ function ReplaceSheet({
     if (!stop) return;
     const replacedStop = stop;
     try {
-      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+      await apiFetch(`/api/travel/trips/${tripId}/stops/${replacedStop.id}/replace`, {
         method: 'POST',
         body: JSON.stringify({
           name: alt.name,
           stopType: alt.stopType ?? 'landmark',
           durationMinutes: alt.durationMinutes ?? 60,
-          dayIndex: replacedStop.dayIndex ?? 0,
-          displayOrder: replacedStop.displayOrder ?? 0,
-          cityGroup: replacedStop.cityGroup ?? null,
         }),
       });
-      await apiFetch(`/api/travel/stops/${replacedStop.id}`, { method: 'DELETE' });
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
       onReplaceConfirm();
@@ -1791,10 +1789,11 @@ function RunDaySheet({
   const dropMin   = dropSt ? getStopDuration(dropSt) : 0;
   const totalMin  = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
 
+  const singleStop = dayStops.length <= 1;
   const MODES: Array<{ key: RunMode; name: string; badge: string; desc: string }> = [
     { key: 'balanced', name: 'Balanced', badge: 'Recommended', desc: 'All stops as planned. Works best when everyone is rested and ready.' },
-    { key: 'faster',   name: 'Faster',   badge: 'Tighter',     desc: "Cuts travel buffer between stops. Good when you're starting late." },
-    { key: 'easier',   name: 'Easier',   badge: 'Lighter',     desc: 'Removes the lowest-priority stop. Best when kids need more breathing room.' },
+    ...(!singleStop ? [{ key: 'faster' as RunMode,  name: 'Faster',  badge: 'Tighter',  desc: "Cuts travel buffer between stops. Good when you're starting late." }] : []),
+    ...(!singleStop ? [{ key: 'easier' as RunMode,  name: 'Easier',  badge: 'Lighter',  desc: 'Removes the lowest-priority stop. Best when kids need more breathing room.' }] : []),
   ];
 
   async function applyEasier() {

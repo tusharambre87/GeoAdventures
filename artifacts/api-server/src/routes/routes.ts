@@ -6840,10 +6840,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const openai = getOpenAI();
 
       let chipHint = "";
-      if (chipFilter === "outdoors") chipHint = "Focus on outdoor, nature, or park stops.";
+      if (chipFilter === "outdoors") chipHint = "Focus on outdoor, nature, or park stops. All suggestions must be outdoors.";
       else if (chipFilter === "shorter") chipHint = "Prefer stops with a short visit duration (30 min or less).";
       else if (chipFilter === "fun") chipHint = "Prioritize highly entertaining, interactive stops that kids love.";
       else if (chipFilter === "free") chipHint = "Only suggest free or no-cost stops (public parks, free museums, plazas, markets, viewpoints, etc.).";
+      else if (chipFilter === "indoor") chipHint = "Only suggest indoor stops (museums, aquariums, science centers, indoor playgrounds, theaters, galleries). No parks, outdoor landmarks, or outdoor activities.";
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
