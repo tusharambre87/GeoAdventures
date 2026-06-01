@@ -6,6 +6,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE } from '@/lib/apiClient';
 import { G, F } from '@/lib/tokens';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -14,8 +15,6 @@ type BreakItem = { name: string; distance: string; description?: string };
 type KidItem   = { name: string; distance: string; agesNote?: string; description?: string };
 type NearbyData = { food: FoodItem[]; breaks: BreakItem[]; kids: KidItem[] } | null;
 type NearbySheet = 'food' | 'breaks' | 'kids' | null;
-
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
 
 async function apiFetch<T>(path: string): Promise<T> {
   const token = await AsyncStorage.getItem('auth_token');

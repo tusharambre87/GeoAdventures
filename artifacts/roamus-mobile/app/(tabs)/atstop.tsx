@@ -811,6 +811,8 @@ export default function AtStopScreen() {
           {/* What to expect */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
             onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/expect' as never, params: {
+              stopId: currentStop.id,
+              tripId: trip?.id ?? '',
               stopName: encodeURIComponent(currentStop.name),
               address: encodeURIComponent(address),
               enrichment: encodeURIComponent(JSON.stringify(enrichment)),
