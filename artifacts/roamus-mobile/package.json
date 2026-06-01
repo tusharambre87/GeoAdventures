@@ -59,6 +59,7 @@
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "expo-av": "^16.0.8",
     "expo-file-system": "^56.0.7",
+    "expo-speech": "^56.0.3",
     "react-native-webview": "13.15.0"
   }
 }

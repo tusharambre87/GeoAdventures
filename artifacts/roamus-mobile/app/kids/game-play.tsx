@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { API_BASE } from "@/lib/apiClient";
+import * as Speech from "expo-speech";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -1565,6 +1566,18 @@ function GeoSpy() {
     setUsedPrompts((prev) => [...prev, p]);
     setPhase("playing");
   };
+
+  // Auto-speak each prompt as soon as it appears
+  useEffect(() => {
+    if (!currentPrompt) return;
+    Speech.stop();
+    Speech.speak(currentPrompt, {
+      language: "en-US",
+      pitch: 1.0,
+      rate: 0.9,
+    });
+    return () => { Speech.stop(); };
+  }, [currentPrompt]);
 
   const nextPrompt = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
