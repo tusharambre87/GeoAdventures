@@ -96,6 +96,7 @@ type PlaceProfileData = {
   bestTimeOfDay?: string;
   strollerFriendly?: boolean;
   practicalTips?: string | string[];
+  nearbyStops?: Array<{ name: string; distance: string; description: string; agesNote?: string; type: string } | string>;
 };
 
 type PlaceReferenceData = {

@@ -301,7 +301,10 @@ export interface GeneratedStop {
     bathroomNotes: string;
     foodOptions: string;
     parkingNotes: string;
-    nearbyStops: string[];
+    bestTimeOfDay: string;
+    weatherSensitive: boolean;
+    strollerFriendly: boolean;
+    nearbyStops: Array<{ name: string; distance: string; description: string; agesNote?: string; type: string } | string>;
     practicalTips: string[];
   };
   /** True when sourceConfidence < MIN_SOURCE_CONFIDENCE — shown as an amber badge in the UI. */
@@ -360,6 +363,9 @@ function createNapStop(dayNumber: number, displayOrder: number): GeneratedStop {
       bathroomNotes: "",
       foodOptions: "",
       parkingNotes: "",
+      bestTimeOfDay: "afternoon",
+      weatherSensitive: false,
+      strollerFriendly: true,
       nearbyStops: [],
       practicalTips: [
         "Find a quiet spot at your accommodation or a nearby café",
@@ -935,7 +941,11 @@ Return a JSON object:
         "bestTimeOfDay": "morning|afternoon|evening|anytime",
         "weatherSensitive": false,
         "strollerFriendly": true,
-        "nearbyStops": ["Nearby place 1", "Nearby place 2"],
+        "nearbyStops": [
+          {"name": "Real nearby restaurant or cafe name", "distance": "5 min walk", "description": "Why this food spot works for families", "agesNote": "All ages", "type": "restaurant"},
+          {"name": "Real nearby park or garden name", "distance": "8 min walk", "description": "Good spot to let kids run or take a break", "agesNote": "All ages", "type": "park"},
+          {"name": "Real nearby museum or kid attraction name", "distance": "10 min walk", "description": "Hands-on or interactive — great for kids", "agesNote": "Ages 4+", "type": "kid_attraction"}
+        ],
         "practicalTips": ["Tip 1", "Tip 2"]
       }
     }
@@ -1982,7 +1992,11 @@ Return a JSON object:
         "bestTimeOfDay": "morning|afternoon|evening|anytime",
         "weatherSensitive": false,
         "strollerFriendly": true,
-        "nearbyStops": ["Nearby place 1", "Nearby place 2"],
+        "nearbyStops": [
+          {"name": "Real nearby restaurant or cafe name", "distance": "5 min walk", "description": "Why this food spot works for families", "agesNote": "All ages", "type": "restaurant"},
+          {"name": "Real nearby park or garden name", "distance": "8 min walk", "description": "Good spot to let kids run or take a break", "agesNote": "All ages", "type": "park"},
+          {"name": "Real nearby museum or kid attraction name", "distance": "10 min walk", "description": "Hands-on or interactive — great for kids", "agesNote": "Ages 4+", "type": "kid_attraction"}
+        ],
         "practicalTips": ["Tip 1", "Tip 2"]
       }
     }
