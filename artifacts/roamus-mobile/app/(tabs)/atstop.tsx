@@ -651,12 +651,8 @@ export default function AtStopScreen() {
             style={StyleSheet.absoluteFill}
           />
 
-          {/* Back pill */}
+          {/* Hero top row: Change Stop + Didn’t Visit (left) · SOS (right) */}
           <View style={[dt.heroPills, { top: paddingTop }]}>
-            <TouchableOpacity style={dt.heroPill} activeOpacity={0.85}
-              onPress={() => { setMode('picker'); setCurrentStop(null); }}>
-              <Text style={dt.heroPillText}>← Back</Text>
-            </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity style={dt.heroPill} activeOpacity={0.85}
                 onPress={() => openSheet('change')}>
@@ -667,38 +663,19 @@ export default function AtStopScreen() {
                 <Text style={[dt.heroPillText, { color: C.red }]}>🚫 Didn’t visit</Text>
               </TouchableOpacity>
             </View>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 5,
+                backgroundColor: 'rgba(239,68,68,0.18)', borderWidth: 1,
+                borderColor: 'rgba(239,68,68,0.4)', borderRadius: 20,
+                paddingHorizontal: 12, paddingVertical: 6,
+              }}
+              onPress={() => router.push({ pathname: '/atstop/sos' as never,
+                params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } })}>
+              <Text style={{ fontSize: 12 }}>🆘</Text>
+              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Hours pill — conditional, bottom-left of nav row */}
-          {currentStop.openingHours ? (
-            <View style={{
-              position: 'absolute', top: paddingTop + 48, left: 16, zIndex: 10,
-              flexDirection: 'row', alignItems: 'center', gap: 5,
-              backgroundColor: 'rgba(61,170,110,0.2)', borderWidth: 1,
-              borderColor: 'rgba(61,170,110,0.4)', borderRadius: 20,
-              paddingHorizontal: 12, paddingVertical: 6,
-            }}>
-              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#3DAA6E' }} />
-              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#6EE7B7' }}>
-                {'Open · '}{currentStop.openingHours}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* SOS pill — always visible, top-right below nav row */}
-          <TouchableOpacity
-            style={{
-              position: 'absolute', top: paddingTop + 48, right: 16, zIndex: 10,
-              flexDirection: 'row', alignItems: 'center', gap: 5,
-              backgroundColor: 'rgba(239,68,68,0.18)', borderWidth: 1,
-              borderColor: 'rgba(239,68,68,0.4)', borderRadius: 20,
-              paddingHorizontal: 12, paddingVertical: 6,
-            }}
-            onPress={() => router.push({ pathname: '/atstop/sos' as never,
-              params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } })}>
-            <Text style={{ fontSize: 12 }}>🆘</Text>
-            <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
-          </TouchableOpacity>
 
           {/* Stop info at hero bottom */}
           <View style={dt.heroBottom}>
@@ -708,22 +685,6 @@ export default function AtStopScreen() {
           </View>
         </View>
 
-        {/* ── Status pills ─────────────────────────────────────────────────── */}
-        <View style={dt.statusRow}>
-          <View style={[dt.statusPill, dt.statusPillGreen]}>
-            <Text style={[dt.statusPillText, { color: C.green }]}>🟢 Open now · 9AM–5PM</Text>
-          </View>
-          {hasTicket ? (
-            <TouchableOpacity style={[dt.statusPill, dt.statusPillRed]} activeOpacity={0.8}
-              onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
-              <Text style={[dt.statusPillText, { color: C.red }]}>🎫 Ticket needed ↗</Text>
-            </TouchableOpacity>
-          ) : isFree ? (
-            <View style={[dt.statusPill, dt.statusPillGreen]}>
-              <Text style={[dt.statusPillText, { color: C.green }]}>Free entry</Text>
-            </View>
-          ) : null}
-        </View>
 
         {/* ── Why This Stop card ───────────────────────────────────────────── */}
         {!!enrichment.whyNow && (
@@ -733,41 +694,88 @@ export default function AtStopScreen() {
           </View>
         )}
 
-        {/* ── Best Time card ───────────────────────────────────────────────── */}
-        {!!enrichment.bestTimeOfDay && (
-          <View style={[dt.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-            <View style={dt.greenDot} />
-            <View style={{ flex: 1 }}>
-              <Text style={dt.cardLabelGreen}>BEST TIME RIGHT NOW</Text>
-              <Text style={dt.bestTimeText}>{enrichment.bestTimeOfDay}</Text>
-            </View>
-          </View>
-        )}
 
-        {/* ── Quick action buttons ─────────────────────────────────────────── */}
+        {/* ── Flat action buttons: Directions + Tickets ────────────────────────────── */}
         <View style={dt.actionsRow}>
-          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
+          <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6 }]} activeOpacity={0.8}
             onPress={() => address ? Linking.openURL(mapsUrl(address)) : null}>
             <Text style={dt.actIcon}>↗</Text>
-            <Text style={dt.actLabel}>Directions</Text>
+            <Text style={[dt.actLabel, { fontSize: 13, color: C.deep }]}>Directions</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
-            onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
-            <Text style={dt.actIcon}>🎫</Text>
-            <Text style={dt.actLabel}>Tickets</Text>
+          {hasTicket && (
+            <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
+              borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
+              onPress={() => Linking.openURL(ticketUrl(currentStop.name))}>
+              <Text style={dt.actIcon}>🎟</Text>
+              <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── 2×2 action grid ────────────────────────────────────────────────────────────────────────────── */}
+        <View style={dt.gridRow}>
+          {/* What to expect */}
+          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
+            onPress={() => router.push({ pathname: '/atstop/expect' as never, params: {
+              stopName: encodeURIComponent(currentStop.name),
+              address: encodeURIComponent(address),
+              enrichment: encodeURIComponent(JSON.stringify(enrichment)),
+              meta: encodeURIComponent(JSON.stringify(meta)),
+              duration: String(duration),
+            }})}>
+            <Text style={dt.gridIcon}>✨</Text>
+            <Text style={dt.gridTitle}>What to expect</Text>
+            <Text style={dt.gridSub}>Experience {'&'} best tips</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={dt.actBtn} activeOpacity={0.8}
+
+          {/* Kids explorer */}
+          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
             onPress={() => {
-              openSheet('food');
-              if (!foodLoaded && address) {
-                setFoodLoading(true);
-                loadFoodNearby(address).then(places => {
-                  setFoodPlaces(places); setFoodLoading(false); setFoodLoaded(true);
-                });
-              }
+              const travelers = trip?.travelers ?? [];
+              const kidExplorer = travelers.find(t => t.name && t.name !== 'You') ?? travelers[0];
+              const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
+                ? kidExplorer.name : travelers[0]?.name ?? 'Explorer';
+              router.push({ pathname: '/kids' as never, params: {
+                stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
+                tripId: trip?.id ?? '', explorerId: explorerName,
+                explorerName: encodeURIComponent(explorerName),
+              }});
             }}>
-            <Text style={dt.actIcon}>🍕</Text>
-            <Text style={dt.actLabel}>Food nearby</Text>
+            <Text style={dt.gridIcon}>🧭</Text>
+            <Text style={dt.gridTitle}>Kids explorer</Text>
+            <Text style={dt.gridSub}>Missions and stories</Text>
+          </TouchableOpacity>
+
+          {/* Capture moment */}
+          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
+            onPress={() => {
+              Alert.alert('Add a photo', 'Choose a source', [
+                { text: '📷  Camera', onPress: async () => {
+                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow camera access in Settings.'); return; }
+                    await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                  },
+                },
+                { text: '🖼  Photo Library', onPress: async () => {
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo library access in Settings.'); return; }
+                    await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85 });
+                  },
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}>
+            <Text style={dt.gridIcon}>📸</Text>
+            <Text style={dt.gridTitle}>Capture moment</Text>
+            <Text style={dt.gridSub}>Photo, note, kid quote</Text>
+          </TouchableOpacity>
+
+          {/* Need something? */}
+          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
+            onPress={() => openRescue('behind')}>
+            <Text style={dt.gridIcon}>🔀</Text>
+            <Text style={dt.gridTitle}>Need something?</Text>
+            <Text style={dt.gridSub}>Adjust, skip, or swap</Text>
           </TouchableOpacity>
         </View>
 
@@ -793,23 +801,6 @@ export default function AtStopScreen() {
           </ScrollView>
         </View>
 
-        {/* ── Need Help? rescue rows ───────────────────────────────────────── */}
-        <View style={dt.rescueSection}>
-          <Text style={dt.sectionLabel}>NEED SOMETHING?</Text>
-          {([
-            { icon: '⏩', label: 'Running behind',   type: 'behind' as RescueType },
-            { icon: '😴', label: 'Kids are tired',   type: 'tired'  as RescueType },
-            { icon: '⏭', label: 'Skip this stop',    type: 'skip'   as RescueType },
-            { icon: '🎉', label: 'Need more fun',     type: 'fun'    as RescueType },
-          ] as const).map(row => (
-            <TouchableOpacity key={row.type} style={dt.rescueRow} activeOpacity={0.8}
-              onPress={() => openRescue(row.type)}>
-              <Text style={dt.rescueIcon}>{row.icon}</Text>
-              <Text style={dt.rescueLabel}>{row.label}</Text>
-              <Text style={dt.rescueChev}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* ── Explore More (expandable) ────────────────────────────────────── */}
         <View style={dt.exploreCard}>
@@ -818,7 +809,7 @@ export default function AtStopScreen() {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setExploreOpen(o => !o);
             }}>
-            <Text style={dt.exploreTitle}>Explore more about this stop</Text>
+            <Text style={dt.exploreTitle}>💡 Timing, access {'&'} logistics</Text>
             <Text style={[dt.exploreChev, exploreOpen && { transform: [{ rotate: '180deg' }] }]}>▾</Text>
           </TouchableOpacity>
 
@@ -893,87 +884,19 @@ export default function AtStopScreen() {
           )}
         </View>
 
-        {/* ── What to Expect tile ─────────────────────────────────────────── */}
-        <TouchableOpacity style={[dt.card, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
-          activeOpacity={0.8}
-          onPress={() => router.push({ pathname: '/atstop/expect' as never, params: {
-            stopName: encodeURIComponent(currentStop.name),
-            address: encodeURIComponent(address),
-            enrichment: encodeURIComponent(JSON.stringify(enrichment)),
-            meta: encodeURIComponent(JSON.stringify(meta)),
-            duration: String(duration),
-          }})}>
-          <View style={{ flex: 1 }}>
-            <Text style={dt.cardLabelOrange}>WHAT TO EXPECT</Text>
-            <Text style={dt.bestTimeText}>Full timing, tips {'&'} logistics</Text>
-          </View>
-          <Text style={{ fontSize: 18, color: C.muted }}>›</Text>
-        </TouchableOpacity>
 
-        {/* ── CTA buttons (scroll with content) ───────────────────────────── */}
+        {/* ── CTA: We visited + Didn’t make it ───────────────────────────────────────────────── */}
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
-          {/* 1. Primary — Capture a moment */}
           <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-            onPress={() => {
-              Alert.alert('Add a photo', 'Choose a source', [
-                {
-                  text: '📷  Camera',
-                  onPress: async () => {
-                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                    if (status !== 'granted') {
-                      Alert.alert('Permission needed', 'Allow camera access in Settings to take photos.');
-                      return;
-                    }
-                    await ImagePicker.launchCameraAsync({ mediaTypes: ['images'],
-                      allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                  },
-                },
-                {
-                  text: '🖼  Photo Library',
-                  onPress: async () => {
-                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    if (status !== 'granted') {
-                      Alert.alert('Permission needed', 'Allow photo library access in Settings.');
-                      return;
-                    }
-                    await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'],
-                      allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                  },
-                },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}>
-            <Text style={dt.ctaPrimaryText}>📸 Capture a moment</Text>
-          </TouchableOpacity>
-
-          {/* 2. Secondary — Let kids explore */}
-          <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.88}
-            onPress={() => {
-              const travelers = trip?.travelers ?? [];
-              // Prefer a traveler who isn't named "You" (likely a child or named family member)
-              const kidExplorer =
-                travelers.find(t => t.name && t.name !== 'You') ??
-                travelers[0];
-              const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
-                ? kidExplorer.name
-                : travelers[0]?.name ?? 'Explorer';
-              router.push({ pathname: '/kids' as never,
-                params: {
-                  stopId: currentStop.id,
-                  stopName: encodeURIComponent(currentStop.name),
-                  tripId: trip?.id ?? '',
-                  explorerId: explorerName,
-                  explorerName: encodeURIComponent(explorerName),
-                },
-              });
-            }}>
-            <Text style={dt.ctaSecondaryText}>🧭 Let kids explore</Text>
-          </TouchableOpacity>
-
-          {/* 3. Tertiary — Mark stop complete */}
-          <TouchableOpacity style={dt.ctaTertiary} activeOpacity={0.88}
             onPress={() => openSheet('feedback')}>
-            <Text style={dt.ctaTertiaryText}>✓ Mark stop complete</Text>
+            <Text style={dt.ctaPrimaryText}>✓ We visited — mark complete</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}
+            onPress={() => openSheet('didnt')}
+            style={{ alignItems: 'center', paddingVertical: 10 }}>
+            <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
+              Didn’t make it → didn’t visit
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -1522,7 +1445,7 @@ const dt = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 3 },
   photoAddIcon: { fontSize: 20 },
   photoAddLabel: { fontFamily: F.semibold, fontSize: 10, color: C.muted },
-  // Rescue
+  // Rescue (kept for sheet content)
   rescueSection: { marginHorizontal: 20, marginTop: 14 },
   sectionLabel: { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 8 },
   rescueRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16,
@@ -1531,6 +1454,14 @@ const dt = StyleSheet.create({
   rescueIcon: { fontSize: 18, width: 24, textAlign: 'center' },
   rescueLabel: { fontFamily: F.semibold, fontSize: 13, color: C.deep, flex: 1 },
   rescueChev: { fontSize: 14, color: C.muted },
+  // 2x2 Action grid
+  gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginHorizontal: 20, marginTop: 12 },
+  gridCard: { width: '47%', backgroundColor: C.card, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  gridIcon: { fontSize: 24, marginBottom: 8 },
+  gridTitle: { fontFamily: F.bold, fontSize: 14, color: C.deep, marginBottom: 2 },
+  gridSub: { fontFamily: F.medium, fontSize: 11, color: C.muted, lineHeight: 16 },
   // Explore More
   exploreCard: { marginHorizontal: 20, marginTop: 14, backgroundColor: C.card,
     borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
