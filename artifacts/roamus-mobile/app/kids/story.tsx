@@ -320,10 +320,10 @@ export default function StoryPlayer() {
 
   // ── Status text ───────────────────────────────────────────────────────────
 
-  let statusText = "Tap ▶ to listen";
+  let statusText = "Tap to listen";
   if (audioLoading) statusText = "Loading audio…";
   else if (audioError) statusText = "Tap ▶ to retry";
-  else if (isPlaying) statusText = "Now playing…";
+  else if (isPlaying) statusText = "Listening…";
   else if (positionMs > 0) statusText = "Paused";
 
   // ── Duration display ──────────────────────────────────────────────────────
@@ -384,26 +384,64 @@ export default function StoryPlayer() {
         <View style={s.glass}>
           {/* Controls */}
           <View style={s.controls}>
-            <Pressable style={s.skipBtn} onPress={handleRestart}>
-              <Text style={{ color: K.purple, fontSize: 22 }}>{"⏮"}</Text>
-            </Pressable>
-
+            {/* Skip-back button */}
             <Pressable
-              style={s.playBtn}
-              onPress={audioError ? () => loadAudio(storyIdx) : handlePlay}
-              disabled={audioLoading}
+              style={[s.skipBtn, { backgroundColor: isPlaying ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.18)" }]}
+              onPress={handleRestart}
             >
-              {audioLoading ? (
-                <ActivityIndicator color={K.purple} size="large" />
-              ) : (
-                <Text style={{ color: K.purple, fontSize: 32, paddingLeft: isPlaying ? 0 : 4 }}>
-                  {audioError ? "↺" : isPlaying ? "⏸" : "▶"}
-                </Text>
-              )}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                <View style={{ width: 3, height: 16, borderRadius: 1.5, backgroundColor: K.purple }} />
+                <View style={{ width: 0, height: 0,
+                  borderTopWidth: 7, borderBottomWidth: 7, borderRightWidth: 12,
+                  borderTopColor: "transparent", borderBottomColor: "transparent",
+                  borderRightColor: K.purple,
+                }} />
+              </View>
             </Pressable>
 
-            <Pressable style={s.skipBtn} onPress={handleSkipEnd}>
-              <Text style={{ color: K.purple, fontSize: 22 }}>{"⏭"}</Text>
+            {/* Play / Pause button with orange glow ring when playing */}
+            <View style={[s.playBtnGlow, isPlaying && s.playBtnGlowActive]}>
+              <Pressable
+                style={s.playBtn}
+                onPress={audioError ? () => loadAudio(storyIdx) : handlePlay}
+                disabled={audioLoading}
+              >
+                {audioLoading ? (
+                  <ActivityIndicator color={K.purple} size="large" />
+                ) : audioError ? (
+                  <View style={{ flexDirection: "row", gap: 5 }}>
+                    <View style={{ width: 5, height: 22, borderRadius: 2.5, backgroundColor: K.purple }} />
+                    <View style={{ width: 5, height: 22, borderRadius: 2.5, backgroundColor: K.purple }} />
+                  </View>
+                ) : isPlaying ? (
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <View style={{ width: 6, height: 26, borderRadius: 3, backgroundColor: K.purple }} />
+                    <View style={{ width: 6, height: 26, borderRadius: 3, backgroundColor: K.purple }} />
+                  </View>
+                ) : (
+                  <View style={{ width: 0, height: 0,
+                    borderTopWidth: 14, borderBottomWidth: 14, borderLeftWidth: 24,
+                    borderTopColor: "transparent", borderBottomColor: "transparent",
+                    borderLeftColor: K.purple,
+                    marginLeft: 5,
+                  }} />
+                )}
+              </Pressable>
+            </View>
+
+            {/* Skip-forward button */}
+            <Pressable
+              style={[s.skipBtn, { backgroundColor: isPlaying ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.18)" }]}
+              onPress={handleSkipEnd}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                <View style={{ width: 0, height: 0,
+                  borderTopWidth: 7, borderBottomWidth: 7, borderLeftWidth: 12,
+                  borderTopColor: "transparent", borderBottomColor: "transparent",
+                  borderLeftColor: K.purple,
+                }} />
+                <View style={{ width: 3, height: 16, borderRadius: 1.5, backgroundColor: K.purple }} />
+              </View>
             </Pressable>
           </View>
 
@@ -568,11 +606,7 @@ const s = StyleSheet.create({
   },
   skipBtn: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: "#fff",
     alignItems: "center", justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15, shadowRadius: 8, elevation: 4,
   },
   playBtn: {
     width: 88, height: 88, borderRadius: 44,
@@ -581,6 +615,20 @@ const s = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+  },
+  playBtnGlow: {
+    borderRadius: 50,
+    borderWidth: 3.5,
+    borderColor: "transparent",
+    padding: 3,
+  },
+  playBtnGlowActive: {
+    borderColor: "#F97316",
+    shadowColor: "#F97316",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
   },
   status: {
     fontFamily: F.bold, fontSize: 15,
