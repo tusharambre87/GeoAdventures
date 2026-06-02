@@ -452,7 +452,7 @@ export default function TodayScreen() {
   // ── Pulse animation for En Route dot ──
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (todayState !== 'en_route') { pulseAnim.setValue(1); return; }
+    if (todayState !== 'en_route' && todayState !== 'at_stop_frozen') { pulseAnim.setValue(1); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
@@ -492,7 +492,7 @@ export default function TodayScreen() {
 
   // ── Signal layout to show blue At Stop icon ──
   useEffect(() => {
-    DeviceEventEmitter.emit('todayAtStopFrozen', todayState === 'at_stop_frozen');
+    DeviceEventEmitter.emit('todayAtStopFrozen', { active: todayState === 'at_stop_frozen' });
   }, [todayState]);
   // ── Close menu when state changes ──
   useEffect(() => { setShowMenu(false); }, [todayState]);
@@ -507,7 +507,7 @@ export default function TodayScreen() {
       if (override) {
         await AsyncStorage.removeItem('today_state_override');
         if (override === 'stop_complete') {
-          setCurrentStopIndex(i => i + 1);
+          // Index will be reconciled from visited state after trip fetch
           if (!devState) setTodayState('stop_complete');
         }
       }
@@ -551,6 +551,12 @@ export default function TodayScreen() {
         .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
+
+      // Reconcile stop index from visited state (for stop_complete handoff)
+      if (override === 'stop_complete') {
+        const nextIdx = stops.findIndex(s => !(s.isVisited || s.visited));
+        setCurrentStopIndex(nextIdx >= 0 ? nextIdx : stops.length);
+      }
 
       if (!devState && override !== 'stop_complete') {
         const days = daysUntilDate(t.startDate);
@@ -1394,7 +1400,6 @@ export default function TodayScreen() {
               activeOpacity={0.85}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                DeviceEventEmitter.emit('todayAtStopFrozen', { active: true });
                 setTodayState('at_stop_frozen');
                 router.push('/(tabs)/atstop' as never);
               }}
