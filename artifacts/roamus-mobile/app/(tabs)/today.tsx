@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  DeviceEventEmitter,
   Image,
   Linking,
   Platform,
@@ -442,6 +443,8 @@ export default function TodayScreen() {
   const [visitedPhotos, setVisitedPhotos]       = useState<(string | null)[]>([null, null, null]);
   const [wrapPhotos, setWrapPhotos]             = useState<(string | null)[]>([null, null, null, null, null, null]);
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
+  const [previousState, setPreviousState]       = useState<TodayState | null>(null);
+  const [showMenu, setShowMenu]                 = useState(false);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -486,6 +489,13 @@ export default function TodayScreen() {
     if (todayState === 'at_stop_frozen') setAtStopStartTime(prev => prev ?? Date.now());
     else if (todayState === 'en_route' || todayState === 'morning') setAtStopStartTime(null);
   }, [todayState]);
+
+  // ── Signal layout to show blue At Stop icon ──
+  useEffect(() => {
+    DeviceEventEmitter.emit('todayAtStopFrozen', todayState === 'at_stop_frozen');
+  }, [todayState]);
+  // ── Close menu when state changes ──
+  useEffect(() => { setShowMenu(false); }, [todayState]);
 
   // ── Load trip ──
   const loadTrip = useCallback(async () => {
@@ -757,6 +767,40 @@ export default function TodayScreen() {
     </ScrollView>
   ) : null;
 
+  // ── ⋯ Menu overlay (shared by all states except no_trip) ──
+  const menuOverlay = todayState === 'no_trip' ? null : (
+    <>
+      <TouchableOpacity
+        style={[mx.btn, { position: 'absolute', top: insets.top + 14, right: 20, zIndex: 100 }]}
+        onPress={() => setShowMenu(v => !v)}
+      >
+        <Text style={mx.btnText}>···</Text>
+      </TouchableOpacity>
+      {showMenu && (
+        <Pressable
+          style={[StyleSheet.absoluteFill, { zIndex: 200 }]}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={[mx.drop, { position: 'absolute', top: insets.top + 58, right: 20 }]}>
+            <Pressable style={mx.dropRow} onPress={() => {
+              setShowMenu(false);
+              setPreviousState(todayState);
+              setTodayState(resolvedDayIndex > 0 ? 'day_history' : 'day_history_empty');
+            }}>
+              <Text style={mx.dropIcon}>📅</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={mx.dropTitle}>Day history</Text>
+                <Text style={mx.dropSub}>
+                  {resolvedDayIndex > 0 ? 'View completed days' : 'Nothing completed yet'}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      )}
+    </>
+  );
+
   // ── Loading ──
   if (loading) {
     return (
@@ -863,6 +907,7 @@ export default function TodayScreen() {
             </Text>
           </View>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -941,6 +986,7 @@ export default function TodayScreen() {
             <Text style={ptt.ctaText}>Review tomorrow's plan →</Text>
           </TouchableOpacity>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -1039,6 +1085,7 @@ export default function TodayScreen() {
               <Text style={alt.backBtnText}>{'←'} Back to Day {currentDayIndex + 1} (Today)</Text>
             </Pressable>
           </ScrollView>
+          {menuOverlay}
         </View>
       );
     }
@@ -1165,6 +1212,7 @@ export default function TodayScreen() {
               : <Text style={mo.startBtnText}>{'▶'}  Start Day {resolvedDayIndex + 1}</Text>}
           </Pressable>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -1313,12 +1361,13 @@ export default function TodayScreen() {
             </View>
           )}
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STATE: AT_STOP_FROZEN
+  // STATE: AT_STOP_FROZEN — dimmed EN_ROUTE hero + green banner only
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'at_stop_frozen') {
     const stop = currentStop;
@@ -1327,181 +1376,68 @@ export default function TodayScreen() {
         <View style={[misc.center, { paddingTop: insets.top }]}>
           <Text style={misc.errorText}>No current stop.</Text>
           <Pressable style={misc.stubBtn} onPress={() => setTodayState('morning')}>
-            <Text style={misc.stubBtnText}>{'←'} Back</Text>
+            <Text style={misc.stubBtnText}>← Back</Text>
           </Pressable>
         </View>
       );
     }
-    const meta    = parseMetadata(stop.metadata);
-    const doFirst = stop.enrichment?.whyNow ?? meta.doThisFirst;
-    const address = stop.address ?? '';
-    const planned = getStopDuration(stop);
-
-    const rescueContent: Record<'behind' | 'tired' | 'skip' | 'fun', {
-      title: string; sub: string;
-      options: { icon: string; label: string; sub?: string; onPress: () => void }[];
-    }> = {
-      behind: {
-        title: 'Running behind?',
-        sub: "Here's how we can catch up",
-        options: [
-          { icon: '⚡', label: 'Tighten travel gaps', sub: 'Cut buffer between stops', onPress: () => setActiveSheet('none') },
-          { icon: '✂️', label: 'Shorten this stop', sub: 'Do the highlights in 45 min', onPress: () => setActiveSheet('none') },
-          { icon: '⏭', label: 'Skip this stop', sub: 'Move to the next one', onPress: handleSkipStop },
-        ],
-      },
-      tired: {
-        title: 'Kids running low?',
-        sub: "Let's give everyone a break",
-        options: [
-          { icon: '☕', label: 'Find a nearby cafe', onPress: () => {
-            Linking.openURL('https://www.google.com/maps/search/' + encodeURIComponent('cafe near ' + address));
-            setActiveSheet('none');
-          }},
-          { icon: '🌳', label: 'Quick outdoor break', onPress: () => {
-            Linking.openURL('https://www.google.com/maps/search/' + encodeURIComponent('park near ' + address));
-            setActiveSheet('none');
-          }},
-          { icon: '🏠', label: 'Head back early', onPress: () => { setActiveSheet('none'); setTodayState('day_complete'); } },
-        ],
-      },
-      skip: {
-        title: 'Skip this stop?',
-        sub: "We'll keep the rest of your day",
-        options: [
-          { icon: '⏭', label: 'Skip, go to next', onPress: handleSkipStop },
-          { icon: '🔄', label: 'Replace with something', sub: 'Coming soon', onPress: () => {
-            Alert.alert('Coming soon', 'Replace stop is coming in the next update.');
-          }},
-          { icon: '🏠', label: 'Wrap up for the day', onPress: () => { setActiveSheet('none'); setTodayState('day_complete'); } },
-        ],
-      },
-      fun: {
-        title: 'Need more excitement?',
-        sub: "Let's turn it up",
-        options: [
-          { icon: '🎡', label: 'Add a bonus stop', sub: 'Coming soon', onPress: () => {
-            Alert.alert('Coming soon', 'Adding stops is coming in the next update.');
-          }},
-          { icon: '🍕', label: 'Upgrade lunch', onPress: () => {
-            Linking.openURL('https://www.google.com/maps/search/' + encodeURIComponent('restaurant near ' + address));
-            setActiveSheet('none');
-          }},
-          { icon: '🎭', label: 'Find something active', onPress: () => {
-            Linking.openURL('https://www.google.com/maps/search/' + encodeURIComponent('activities near ' + address));
-            setActiveSheet('none');
-          }},
-        ],
-      },
-    };
-    const sheet = rescueContent[rescueType];
-    const sheetTranslate = sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [560, 0] });
-    const backdropOpacity = sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
+    const meta      = parseMetadata(stop.metadata);
+    const travelMins = stop.travelMinsFromPrevious ?? meta.travelMinutes;
+    const stopLabel  = stop.stopType
+      ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
+      : 'Stop';
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          <LinearGradient
-            colors={[C.teal, C.tealMid, '#3a7a6e']}
-            start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-            style={[asf.hero, { paddingTop: insets.top + 20 }]}
-          >
-            <View style={asf.heroBadge}>
-              <View style={asf.heroDot} />
-              <Text style={asf.heroBadgeText}>YOU'RE HERE</Text>
-            </View>
-            <Text style={asf.stopName} numberOfLines={2}>{stop.name}</Text>
-            <Text style={asf.stopSub}>
-              Stop {currentStopIndex + 1} of {dayStops.length} · {planned} min planned
-            </Text>
-            <View style={asf.timerPill}>
-              <Text style={asf.timerText}>{'⏱'}  {planned} min</Text>
-            </View>
-          </LinearGradient>
-
-          {doFirst && (
-            <View style={asf.doFirstCard}>
-              <View style={asf.doFirstIcon}><Text style={{ fontSize: 18 }}>{'⭐'}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={asf.doFirstLabel}>DO THIS FIRST</Text>
-                <Text style={asf.doFirstText}>{doFirst}</Text>
+          {/* Dimmed EN_ROUTE hero - opacity 0.55 */}
+          <View style={{ opacity: 0.55 }}>
+            <LinearGradient
+              colors={['#0f2a4a', '#1a4a7a', '#2563a8']}
+              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+              style={[er.hero, { paddingTop: insets.top + 20 }]}
+            >
+              <View style={er.headingBadge}>
+                <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
+                <Text style={er.headingText}>HEADING THERE</Text>
               </View>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[asf.visitedBtn, markingVisited && { opacity: 0.7 }]}
-            activeOpacity={0.85}
-            onPress={handleMarkVisited}
-            disabled={markingVisited}
-          >
-            {markingVisited
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={asf.visitedBtnText}>{'✓'}  We visited — mark complete</Text>}
-          </TouchableOpacity>
-
-          <View style={asf.rescueSection}>
-            <Text style={asf.rescueLabel}>NEED HELP?</Text>
-            {([
-              { type: 'behind' as const, icon: '⏩', label: 'Running behind' },
-              { type: 'tired'  as const, icon: '😴', label: 'Kids are tired' },
-              { type: 'skip'   as const, icon: '⏭', label: 'Skip this stop' },
-              { type: 'fun'    as const, icon: '🎉', label: 'Need more fun' },
-            ]).map(item => (
-              <TouchableOpacity
-                key={item.type} style={asf.rescueRow} activeOpacity={0.75}
-                onPress={() => { setRescueType(item.type); setActiveSheet('rescue'); }}
-              >
-                <Text style={asf.rescueIcon}>{item.icon}</Text>
-                <Text style={asf.rescueRowText}>{item.label}</Text>
-                <Text style={asf.rescueChevron}>{'›'}</Text>
-              </TouchableOpacity>
-            ))}
+              <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
+              <Text style={er.stopSub}>
+                Stop {currentStopIndex + 1} of {dayStops.length} · {stopLabel}
+              </Text>
+              <View style={er.etaRow}>
+                <View style={er.etaPill}>
+                  <Text style={er.etaIcon}>🚗</Text>
+                  <View>
+                    <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
+                    <Text style={er.etaLbl}>ETA</Text>
+                  </View>
+                </View>
+                <View style={er.etaPill}>
+                  <Text style={er.etaIcon}>📍</Text>
+                  <View>
+                    <Text style={er.etaVal}>~3 mi</Text>
+                    <Text style={er.etaLbl}>Away</Text>
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
           </View>
 
+          {/* Green banner — tap to return to At Stop tab */}
           <TouchableOpacity
-            style={asf.kidsBtn} activeOpacity={0.85}
-            onPress={() => {
-              const travelers = trip?.travelers ?? [];
-              const kidExplorer = travelers.find(t => t.name && t.name !== 'You') ?? travelers[0];
-              const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
-                ? kidExplorer.name : travelers[0]?.name ?? 'Explorer';
-              router.push({ pathname: '/kids' as never, params: {
-                stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''),
-                tripId: trip?.id ?? '', explorerId: explorerName,
-                explorerName: encodeURIComponent(explorerName),
-              }});
-            }}
+            style={asf.greenBanner}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(tabs)/atstop' as never)}
           >
-            <Text style={asf.kidsBtnText}>{'🧭'}  Let kids explore</Text>
+            <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={asf.greenBannerTitle}>You're at {stop.name}</Text>
+              <Text style={asf.greenBannerSub}>Tap to go back to your stop</Text>
+            </View>
+            <Text style={asf.greenBannerArrow}>›</Text>
           </TouchableOpacity>
         </ScrollView>
-
-        <Animated.View
-          pointerEvents={activeSheet !== 'none' ? 'auto' : 'none'}
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.46)', opacity: backdropOpacity }]}
-        >
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setActiveSheet('none')} />
-        </Animated.View>
-
-        <Animated.View style={[asf.sheet, { transform: [{ translateY: sheetTranslate }] }]}>
-          <View style={asf.sheetHandle} />
-          <Text style={asf.sheetTitle}>{sheet.title}</Text>
-          <Text style={asf.sheetSub}>{sheet.sub}</Text>
-          {sheet.options.map((opt, i) => (
-            <TouchableOpacity key={i} style={asf.sheetRow} activeOpacity={0.75} onPress={opt.onPress}>
-              <View style={asf.sheetRowIcon}><Text style={{ fontSize: 18 }}>{opt.icon}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={asf.sheetRowLabel}>{opt.label}</Text>
-                {opt.sub && <Text style={asf.sheetRowSub}>{opt.sub}</Text>}
-              </View>
-              <Text style={asf.sheetChevron}>{'›'}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={asf.sheetDismiss} onPress={() => setActiveSheet('none')}>
-            <Text style={asf.sheetDismissText}>Never mind</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {menuOverlay}
       </View>
     );
   }
@@ -1592,6 +1528,7 @@ export default function TodayScreen() {
             </View>
           )}
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -1708,6 +1645,7 @@ export default function TodayScreen() {
             <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
           </TouchableOpacity>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -1767,6 +1705,7 @@ export default function TodayScreen() {
             <Text style={tc.newTripBtnText}>Plan your next adventure →</Text>
           </TouchableOpacity>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -1853,10 +1792,11 @@ export default function TodayScreen() {
             </View>
           )}
 
-          <Pressable style={dh.backBtn} onPress={() => setTodayState('morning')}>
-            <Text style={dh.backBtnText}>{'←'} Back to Today</Text>
+          <Pressable style={dh.backBtn} onPress={() => setTodayState(previousState ?? 'morning')}>
+            <Text style={dh.backBtnText}>← Back to Today</Text>
           </Pressable>
         </ScrollView>
+        {menuOverlay}
       </View>
     );
   }
@@ -2161,6 +2101,17 @@ const asf = StyleSheet.create({
   sheetChevron:  { fontSize: 22, color: C.muted },
   sheetDismiss:  { alignItems: 'center', paddingVertical: 14, marginTop: 2 },
   sheetDismissText: { fontFamily: F.semibold, fontSize: 14, color: C.muted },
+  greenBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#DCFCE7', borderWidth: 1, borderColor: 'rgba(61,170,110,0.25)',
+    borderRadius: 14, padding: 15, marginHorizontal: 14, marginTop: 10,
+  },
+  greenDot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: C.green,
+  },
+  greenBannerTitle: { fontFamily: F.bold, fontSize: 13, color: C.deep },
+  greenBannerSub:   { fontFamily: F.medium, fontSize: 12, color: C.muted, marginTop: 1 },
+  greenBannerArrow: { fontFamily: F.bold, fontSize: 18, color: C.green },
 });
 
 // STOP_COMPLETE
@@ -2277,4 +2228,28 @@ const dh = StyleSheet.create({
   emptySub:     { fontFamily: F.medium, fontSize: 14, color: C.muted, textAlign: 'center' },
   backBtn:      { alignItems: 'center', paddingVertical: 14 },
   backBtnText:  { fontFamily: F.semibold, fontSize: 14, color: C.muted },
+});
+
+// ⋯ Menu styles
+const mx = StyleSheet.create({
+  btn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  btnText: { fontSize: 16, color: '#fff', letterSpacing: 2, lineHeight: 20 },
+  drop: {
+    width: 200, backgroundColor: '#fff',
+    borderRadius: 14, overflow: 'hidden',
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, elevation: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  dropRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    padding: 14,
+  },
+  dropIcon: { fontSize: 18, lineHeight: 22 },
+  dropTitle: { fontFamily: F.bold, fontSize: 13, color: '#1A1F2E' },
+  dropSub:   { fontFamily: F.medium, fontSize: 11, color: '#8A8FA8', marginTop: 1 },
 });

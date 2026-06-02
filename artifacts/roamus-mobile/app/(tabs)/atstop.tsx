@@ -504,14 +504,9 @@ export default function AtStopScreen() {
     } catch { /* best effort */ }
     setSubmittingFeedback(false);
     setActiveSheet('none');
-    // If more unvisited stops, go back to picker; else signal today tab + navigate
-    const remaining = dayStops.filter(s => s.id !== currentStop.id && !isStopVisited(s));
-    if (remaining.length > 0) {
-      setMode('picker'); setCurrentStop(null);
-    } else {
-      await AsyncStorage.setItem('today_state_override', 'stop_complete');
-      router.push('/(tabs)/today');
-    }
+    // Always signal today tab STOP_COMPLETE and navigate back
+    await AsyncStorage.setItem('today_state_override', 'stop_complete');
+    router.push('/(tabs)/today');
   }
 
   // ── Skip stop ──
