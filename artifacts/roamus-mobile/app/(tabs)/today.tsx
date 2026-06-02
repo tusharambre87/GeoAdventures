@@ -1377,6 +1377,31 @@ export default function TodayScreen() {
               })}
             </View>
           )}
+          {/* Dual action buttons: outline Directions + dark I'm here */}
+          <View style={er.dualBtnRow}>
+            <TouchableOpacity
+              style={er.dirBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const addr = (stop as { address?: string }).address ?? stop.name;
+                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+              }}
+            >
+              <Text style={er.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={er.hereBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                DeviceEventEmitter.emit('todayAtStopFrozen', { active: true });
+                setTodayState('at_stop_frozen');
+                router.push('/(tabs)/atstop' as never);
+              }}
+            >
+              <Text style={er.hereBtnText}>I’m here ✓</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
         {menuOverlay}
       </View>
@@ -1440,31 +1465,19 @@ export default function TodayScreen() {
             </LinearGradient>
           </View>
 
-          {/* Dual action button row: Directions (outline) + I'm here (dark) */}
-          <View style={er.dualBtnRow}>
-            <TouchableOpacity
-              style={er.dirBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                const addr = (stop as { address?: string }).address ?? stop.name;
-                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-              }}
-            >
-              <Text style={er.dirBtnText}>Directions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={er.hereBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                DeviceEventEmitter.emit('todayAtStopFrozen', { active: true });
-                setTodayState('at_stop_frozen');
-                router.push('/(tabs)/atstop' as never);
-              }}
-            >
-              <Text style={er.hereBtnText}>I’m here ✓</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Green arrival banner — no action buttons in AT_STOP_FROZEN */}
+          <TouchableOpacity
+            style={asf.greenBanner}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(tabs)/atstop' as never)}
+          >
+            <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={asf.greenBannerTitle}>You’re at {stop.name}</Text>
+              <Text style={asf.greenBannerSub}>Tap to go back to your stop</Text>
+            </View>
+            <Text style={asf.greenBannerArrow}>›</Text>
+          </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
       </View>
