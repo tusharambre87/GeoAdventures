@@ -9,7 +9,7 @@
  *   5. Feedback sheet + Rescue sheets (4 variants)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,10 +29,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Tabs, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -410,6 +411,25 @@ export default function AtStopScreen() {
     );
     return () => sub.remove();
   }, []);
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) =>
+        Platform.OS === 'ios' ? (
+          <SymbolView
+            name={focused ? 'location.fill' : 'location'}
+            tintColor={atStopFrozen ? '#3B82F6' : color}
+            size={24}
+          />
+        ) : (
+          <Ionicons
+            name='location-outline'
+            size={22}
+            color={atStopFrozen ? '#3B82F6' : color}
+          />
+        ),
+    });
+  }, [navigation, atStopFrozen]);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackInputFocused, setFeedbackInputFocused] = useState(false);
   const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
@@ -730,24 +750,6 @@ export default function AtStopScreen() {
 
   return (
     <View style={sc.screen}>
-      <Tabs.Screen
-        options={{
-          tabBarIcon: ({ color, focused }) =>
-            Platform.OS === 'ios' ? (
-              <SymbolView
-                name={focused ? 'location.fill' : 'location'}
-                tintColor={atStopFrozen ? '#3B82F6' : color}
-                size={24}
-              />
-            ) : (
-              <Ionicons
-                name='location-outline'
-                size={22}
-                color={atStopFrozen ? '#3B82F6' : color}
-              />
-            ),
-        }}
-      />
       <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
 
