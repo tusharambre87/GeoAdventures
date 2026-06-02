@@ -18,6 +18,7 @@ export const F = {
   medium: 'PlusJakartaSans_500Medium',
   semibold: 'PlusJakartaSans_600SemiBold',
   bold: 'PlusJakartaSans_700Bold',
+  serif: 'Fraunces_900Black',
 } as const;
 
 export const CHIP_COLORS = [G.orange, G.sage, G.amber, '#E86A9A', '#7B6FE8'] as const;

@@ -516,7 +516,6 @@ export default function TodayScreen() {
             setVisitedElapsed(elapsed > 0 ? elapsed : null);
             await AsyncStorage.removeItem('atStopStartTime');
           }
-          setCurrentStopIndex(i => i + 1);
           if (!devState) setTodayState('stop_complete');
         }
       }
@@ -560,6 +559,14 @@ export default function TodayScreen() {
         .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
+
+      // Derive current stop index deterministically from visited state
+      if (override === 'stop_complete') {
+        const lastVisited = stops.reduce(
+          (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
+        );
+        setCurrentStopIndex(Math.min(lastVisited + 1, stops.length - 1));
+      }
 
       if (!devState && override !== 'stop_complete') {
         const days = daysUntilDate(t.startDate);
@@ -2130,7 +2137,7 @@ const ptf = StyleSheet.create({
   hero:           { paddingHorizontal: 24, paddingBottom: 32, alignItems: 'center' },
   badge:          { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 20 },
   badgeText:      { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.8 },
-  countdown:      { fontFamily: F.bold, fontSize: 72, color: '#fff', lineHeight: 76 },
+  countdown:      { fontFamily: F.serif, fontSize: 72, color: '#fff', lineHeight: 76 },
   countdownLabel: { fontFamily: F.semibold, fontSize: 18, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
   startDate:      { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.55)' },
   card:           { margin: 16, backgroundColor: '#fff', borderRadius: 16, padding: 20,
@@ -2212,7 +2219,7 @@ const mo = StyleSheet.create({
   weatherText:    { fontFamily: F.bold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   heroBottom:     { position: 'absolute', bottom: 22, left: 22, right: 22 },
   greeting:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 5 },
-  heroHeadline:   { fontFamily: F.bold, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
+  heroHeadline:   { fontFamily: F.serif, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
   heroMeta:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   metaRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   metaPill:       { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
@@ -2273,7 +2280,7 @@ const er = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 14 },
   headingDot:  { width: 7, height: 7, backgroundColor: '#60d8a4', borderRadius: 4 },
   headingText: { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.6 },
-  stopName:    { fontFamily: F.bold, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
+  stopName:    { fontFamily: F.serif, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
   stopSub:     { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20 },
   etaRow:      { flexDirection: 'row', gap: 10 },
   etaPill:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -2338,7 +2345,7 @@ const asf = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 14 },
   heroDot:       { width: 7, height: 7, backgroundColor: '#60d8a4', borderRadius: 4 },
   heroBadgeText: { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.6 },
-  stopName:      { fontFamily: F.bold, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
+  stopName:      { fontFamily: F.serif, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
   stopSub:       { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 18 },
   timerPill:     { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.16)',
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
@@ -2395,7 +2402,7 @@ const asf = StyleSheet.create({
 const sc = StyleSheet.create({
   hero: { backgroundColor: C.orange, paddingHorizontal: 24, paddingBottom: 32, alignItems: 'center' },
   heroEmoji:   { fontSize: 56, marginBottom: 10 },
-  heroTitle:   { fontFamily: F.bold, fontSize: 28, color: '#fff', marginBottom: 6 },
+  heroTitle:   { fontFamily: F.serif, fontSize: 28, color: '#fff', marginBottom: 6 },
   heroSub:     { fontFamily: F.medium, fontSize: 14, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginBottom: 14 },
   elapsedPill: { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   elapsedText: { fontFamily: F.semibold, fontSize: 13, color: '#fff' },
@@ -2422,7 +2429,7 @@ const sc = StyleSheet.create({
 const dc = StyleSheet.create({
   hero:         { paddingHorizontal: 22, paddingBottom: 22 },
   heroLabel:    { fontFamily: F.bold, fontSize: 11, color: C.orange, letterSpacing: 1.2, marginBottom: 10 },
-  heroTheme:    { fontFamily: F.bold, fontSize: 26, color: '#fff', lineHeight: 30, marginBottom: 6 },
+  heroTheme:    { fontFamily: F.serif, fontSize: 26, color: '#fff', lineHeight: 30, marginBottom: 6 },
   heroMeta:     { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 18 },
   heroChips:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   heroChip:     { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
