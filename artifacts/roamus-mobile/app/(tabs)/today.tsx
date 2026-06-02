@@ -1126,20 +1126,26 @@ export default function TodayScreen() {
         <ScrollView showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
           <LinearGradient
-            colors={['#1a3a2a', '#2d6648', '#3a8a60']}
+            colors={['#1D4A42', '#163830']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
             style={[mo.hero, { paddingTop: insets.top + 20 }]}
           >
-            <View style={mo.activePill}>
-              <View style={mo.activeDot} />
-              <Text style={mo.activePillText}>ACTIVE TRIP</Text>
+            {/* Weather pill */}
+            <View style={mo.weatherPill}>
+              <Text style={{ fontSize: 15 }}>{'🌤'}</Text>
+              <Text style={mo.weatherText}>72°F</Text>
             </View>
-            <Text style={mo.tripName} numberOfLines={2}>{trip?.name ?? 'Your Trip'}</Text>
-            <Text style={mo.tripSub}>
-              Day {resolvedDayIndex + 1} of {totalDays}
-              {city ? ` · ${city}` : ''}
-              {dayLabel ? ` · ${dayLabel}` : ''}
-            </Text>
+            {/* Bottom copy */}
+            <View style={mo.heroBottom}>
+              <Text style={mo.greeting}>Good morning 👋</Text>
+              <Text style={mo.heroHeadline}>
+                Day {resolvedDayIndex + 1}{city ? ` in ${city}` : ''}
+              </Text>
+              <Text style={mo.heroMeta}>
+                {dayLabel || ''}
+                {dayStops.length > 0 ? ` · ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}` : ''}
+              </Text>
+            </View>
             <View style={mo.metaRow}>
               <View style={mo.metaPill}><Text style={mo.metaText}>{'📍'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
               <View style={mo.metaPill}><Text style={mo.metaText}>{'⏱'} {estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
@@ -1277,19 +1283,28 @@ export default function TodayScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          <LinearGradient
-            colors={['#0f2a4a', '#1a4a7a', '#2563a8']}
-            start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-            style={[er.hero, { paddingTop: insets.top + 20 }]}
-          >
+          {/* Teal hero with stop emoji background */}
+          <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
+            <LinearGradient
+              colors={['#1D4A42', '#163830', '#0E2820']}
+              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Large stop emoji centred as background */}
+            <Text style={er.heroBgEmoji}>{stop.stopType ?? '📍'}</Text>
+            {/* HEADING THERE badge — top left */}
             <View style={er.headingBadge}>
               <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
               <Text style={er.headingText}>HEADING THERE</Text>
             </View>
-            <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
-            <Text style={er.stopSub}>
-              Stop {currentStopIndex + 1} of {dayStops.length} · {stopLabel}
-            </Text>
+            {/* Stop info — bottom left */}
+            {/* Stop info — bottom left */}
+            <View style={er.stopInfoBlock}>
+              <Text style={er.stopNum}>Stop {currentStopIndex + 1} of {dayStops.length}</Text>
+              <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
+              <Text style={er.stopSub}>{stopLabel}</Text>
+            </View>
+            {/* ETA row — pinned to bottom */}
             <View style={er.etaRow}>
               <View style={er.etaPill}>
                 <Text style={er.etaIcon}>{'🚗'}</Text>
@@ -1306,7 +1321,7 @@ export default function TodayScreen() {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+          </View> {/* heroWrap */}
 
           <TouchableOpacity
             style={er.kidsStrip} activeOpacity={0.85}
@@ -1443,7 +1458,7 @@ export default function TodayScreen() {
           {/* Dimmed EN_ROUTE hero - opacity 0.55 */}
           <View style={{ opacity: 0.55 }}>
             <LinearGradient
-              colors={['#0f2a4a', '#1a4a7a', '#2563a8']}
+              colors={['#1D4A42', '#163830', '#0E2820']}
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
               style={[er.hero, { paddingTop: insets.top + 20 }]}
             >
@@ -1603,20 +1618,30 @@ export default function TodayScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={[dc.hero, { paddingTop: insets.top + 28 }]}>
-            <Text style={dc.heroLabel}>DAY {resolvedDayIndex + 1} COMPLETE</Text>
-            <Text style={dc.heroTheme}>{city} Adventure</Text>
-            <Text style={dc.heroMeta}>
-              {dayLabel}  ·  {completedStops.length} stops  ·  {totalStr}
-            </Text>
-            <View style={dc.heroChips}>
-              {completedStops.map(s => (
-                <View key={s.id} style={dc.heroChip}>
-                  <Text style={dc.heroChipText}>{'✓'}  {s.name}</Text>
-                </View>
-              ))}
+          <LinearGradient
+            colors={['#1D4A42', '#163830']}
+            start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+            style={[dc.hero, { paddingTop: insets.top + 52 }]}
+          >
+            <Text style={dc.heroStars}>{'⭐⭐⭐'}</Text>
+            <Text style={dc.heroLabel}>DAY {resolvedDayIndex + 1} DONE!</Text>
+            <Text style={dc.heroTheme}>{city || 'Your trip'} Adventure</Text>
+            <Text style={dc.heroMeta}>{dayLabel || ''}</Text>
+            <View style={dc.statsGrid}>
+              <View style={dc.statCell}>
+                <Text style={dc.statVal}>{completedStops.length}</Text>
+                <Text style={dc.statLbl}>STOPS</Text>
+              </View>
+              <View style={dc.statCell}>
+                <Text style={dc.statVal}>{totalStr}</Text>
+                <Text style={dc.statLbl}>EXPLORED</Text>
+              </View>
+              <View style={dc.statCell}>
+                <Text style={dc.statVal}>{(trip?.travelers ?? []).length}</Text>
+                <Text style={dc.statLbl}>PEOPLE</Text>
+              </View>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={dc.card}>
             <Text style={dc.cardLabel}>BEST PHOTOS FROM TODAY</Text>
@@ -2114,6 +2139,14 @@ const mo = StyleSheet.create({
   activePillText: { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.6 },
   tripName:       { fontFamily: F.bold, fontSize: 26, color: '#fff', lineHeight: 30, marginBottom: 4 },
   tripSub:        { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18 },
+  weatherPill:    { position: 'absolute', top: 8, right: 16, flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5 },
+  weatherText:    { fontFamily: F.bold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  heroBottom:     { position: 'absolute', bottom: 22, left: 22, right: 22 },
+  greeting:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 5 },
+  heroHeadline:   { fontFamily: F.bold, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
+  heroMeta:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   metaRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   metaPill:       { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   metaText:       { fontFamily: F.semibold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
@@ -2164,7 +2197,11 @@ const mo = StyleSheet.create({
 // EN_ROUTE
 const er = StyleSheet.create({
   hero:         { paddingHorizontal: 24, paddingBottom: 28 },
-  headingBadge: { flexDirection: 'row', alignItems: 'center', gap: 8,
+  heroWrap:     { position: 'relative', overflow: 'hidden', justifyContent: 'flex-end', paddingHorizontal: 20, paddingBottom: 16 },
+  heroBgEmoji:  { position: 'absolute', fontSize: 110, opacity: 0.18, alignSelf: 'center', top: 60 },
+  stopInfoBlock:{ position: 'absolute', bottom: 90, left: 20, right: 70 },
+  stopNum:      { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1.0, marginBottom: 3 },
+  headingBadge: { position: 'absolute', top: 8, left: 0, flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 14 },
   headingDot:  { width: 7, height: 7, backgroundColor: '#60d8a4', borderRadius: 4 },
@@ -2316,13 +2353,18 @@ const sc = StyleSheet.create({
 
 // DAY_COMPLETE
 const dc = StyleSheet.create({
-  hero:         { backgroundColor: C.deep, paddingHorizontal: 24, paddingBottom: 28 },
+  hero:         { paddingHorizontal: 22, paddingBottom: 22 },
   heroLabel:    { fontFamily: F.bold, fontSize: 11, color: C.orange, letterSpacing: 1.2, marginBottom: 10 },
   heroTheme:    { fontFamily: F.bold, fontSize: 26, color: '#fff', lineHeight: 30, marginBottom: 6 },
   heroMeta:     { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 18 },
   heroChips:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   heroChip:     { backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   heroChipText: { fontFamily: F.semibold, fontSize: 12, color: 'rgba(255,255,255,0.8)' },
+  heroStars:    { fontSize: 22, marginBottom: 8 },
+  statsGrid:    { flexDirection: 'row', gap: 8, marginTop: 14 },
+  statCell:     { flex: 1, backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 12, padding: 11, alignItems: 'center' },
+  statVal:      { fontFamily: F.bold, fontSize: 20, color: '#fff' },
+  statLbl:      { fontFamily: F.bold, fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 2 },
   card:         { marginHorizontal: 20, marginTop: 14, backgroundColor: C.card, borderRadius: 16, padding: 18,
     borderWidth: 1, borderColor: C.border },
   cardLabel:    { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 12 },

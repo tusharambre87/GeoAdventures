@@ -15,7 +15,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
+function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -27,12 +27,7 @@ function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
         <Label>Today</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="atstop">
-        <Icon
-          sf={{
-            default: atStopFrozen ? "location.fill" : "location",
-            selected: "location.fill",
-          }}
-        />
+        <Icon sf={{ default: "location", selected: "location.fill" }} />
         <Label>At Stop</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
@@ -47,14 +42,23 @@ function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
   );
 }
 
-function ClassicTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
+function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
-  const atStopColor = atStopFrozen ? "#3B82F6" : undefined;
+  const [atStopFrozen, setAtStopFrozen] = useState(false);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "todayAtStopFrozen",
+      ({ active }: { active: boolean }) => setAtStopFrozen(active),
+    );
+    return () => sub.remove();
+  }, []);
+
+  const atStopIconColor = atStopFrozen ? "#3B82F6" : undefined;
 
   return (
     <Tabs
@@ -119,14 +123,14 @@ function ClassicTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
             isIOS ? (
               <SymbolView
                 name="location"
-                tintColor={atStopColor ?? color}
+                tintColor={atStopIconColor ?? color}
                 size={24}
               />
             ) : (
               <Ionicons
                 name="location-outline"
                 size={22}
-                color={atStopColor ?? color}
+                color={atStopIconColor ?? color}
               />
             ),
         }}
@@ -164,17 +168,8 @@ function ClassicTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
 }
 
 export default function TabLayout() {
-  const [atStopFrozen, setAtStopFrozen] = useState(false);
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      "todayAtStopFrozen",
-      ({ active }: { active: boolean }) => setAtStopFrozen(active),
-    );
-    return () => sub.remove();
-  }, []);
-
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout atStopFrozen={atStopFrozen} />;
+    return <NativeTabLayout />;
   }
-  return <ClassicTabLayout atStopFrozen={atStopFrozen} />;
+  return <ClassicTabLayout />;
 }
