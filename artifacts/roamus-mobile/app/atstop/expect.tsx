@@ -21,7 +21,7 @@ type StopType = 'food' | 'break' | 'kid_attraction';
 type CheckResult = {
   canInsert: boolean;
   position?: 'middle' | 'end_of_day';
-  warning?: 'tight_timing' | null;
+  warning?: 'tight_timing' | 'time_sensitive' | null;
   affectedStop?: { name: string; isTimeSensitive: boolean };
   reason?: 'day_full';
   options?: string[];
@@ -31,7 +31,8 @@ type CheckResult = {
 
 type CardPhase =
   | 'idle' | 'checking' | 'confirming' | 'added'
-  | 'warn_tight' | 'warn_end_of_day' | 'warn_day_full_soft' | 'warn_day_full_hard';
+  | 'warn_tight' | 'warn_end_of_day' | 'warn_day_full_soft' | 'warn_day_full_hard'
+  | 'warn_kid_attraction';
 
 type CardState = { phase: CardPhase; check?: CheckResult };
 
@@ -176,8 +177,12 @@ export default function ExpectScreen() {
         }),
       });
 
-      // Clean insert — auto-confirm
+      // Clean insert — kid attractions get a pre-warning; food/break auto-confirm
       if (check.canInsert && !check.warning) {
+        if (type === 'kid_attraction') {
+          setCard(key, { phase: 'warn_kid_attraction', check });
+          return;
+        }
         await doInsert(key, placeName, placeAddress, type);
         return;
       }
@@ -340,6 +345,31 @@ export default function ExpectScreen() {
           <TouchableOpacity onPress={() => setCard(key, { phase: 'idle' })}>
             <Text style={styles.dayFullCancel}>Cancel</Text>
           </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (cs.phase === 'warn_kid_attraction') {
+      const estMin = DEFAULT_DURATIONS[type] ?? 90;
+      return (
+        <View style={styles.warnBox}>
+          <Text style={styles.warnText}>
+            {"⏱"} This adds ~{estMin} min to your day. Your plan will shift around it.
+          </Text>
+          <View style={styles.confirmRow}>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => doInsert(key, placeName, placeAddress, type)}
+            >
+              <Text style={styles.confirmBtnText}>Add to plan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => openMaps(placeName)}
+            >
+              <Text style={styles.cancelBtnText}>Just open in Maps</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }

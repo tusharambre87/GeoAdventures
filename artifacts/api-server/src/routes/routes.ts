@@ -8077,6 +8077,27 @@ Return ONLY valid JSON in this exact format:
         }
       }
 
+      // ── Real clock math (runs alongside count check; fires when startTime is available) ──
+      if (nextStop && (refStop as any).startTime) {
+        const refMetaDur: number =
+          typeof ((refStop as any).metadata as any)?.durationMinutes === 'number'
+            ? ((refStop as any).metadata as any).durationMinutes
+            : 60;
+        const refEnd = new Date((refStop as any).startTime).getTime() + refMetaDur * 60000;
+        const bufferMs = 50 * 60000; // 50 min family buffer
+        const latestInsertEnd = refEnd + bufferMs + estDuration * 60000;
+        const nextStart = new Date((nextStop as any).startTime).getTime();
+
+        if (latestInsertEnd > nextStart) {
+          const sensitive = !!(nextStop as any).metadata?.timeSensitive;
+          (checkResult as any).warning = sensitive ? 'time_sensitive' : 'tight_timing';
+          (checkResult as any).affectedStop = {
+            name: (nextStop as any).name,
+            isTimeSensitive: sensitive,
+          };
+        }
+      }
+
       // ── Dry-run: return check result only ───────────────────────────────────
       if (!confirmed) return res.json(checkResult);
 
