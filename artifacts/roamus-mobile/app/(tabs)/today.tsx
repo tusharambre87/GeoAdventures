@@ -1291,7 +1291,7 @@ export default function TodayScreen() {
               style={StyleSheet.absoluteFill}
             />
             {/* Large stop emoji centred as background */}
-            <Text style={er.heroBgEmoji}>{stop.stopType ?? '📍'}</Text>
+            <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '📍'}</Text>
             {/* HEADING THERE badge — top left */}
             <View style={er.headingBadge}>
               <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
@@ -1357,17 +1357,6 @@ export default function TodayScreen() {
               </View>
             </View>
           )}
-
-          <TouchableOpacity
-            style={er.imHereBtn} activeOpacity={0.85}
-            onPress={() => {
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setTodayState('at_stop_frozen');
-              router.push('/(tabs)/atstop' as never);
-            }}
-          >
-            <Text style={er.imHereText}>{'📍'}  I'm here — we arrived</Text>
-          </TouchableOpacity>
 
           {afterStops.length > 0 && (
             <View style={er.afterSection}>
@@ -1455,38 +1444,41 @@ export default function TodayScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Dimmed EN_ROUTE hero - opacity 0.55 */}
+          {/* Dimmed EN_ROUTE hero — exact same structure at opacity 0.55 */}
           <View style={{ opacity: 0.55 }}>
-            <LinearGradient
-              colors={['#1D4A42', '#163830', '#0E2820']}
-              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-              style={[er.hero, { paddingTop: insets.top + 20 }]}
-            >
+            <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
+              <LinearGradient
+                colors={['#1D4A42', '#163830', '#0E2820']}
+                start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '📍'}</Text>
               <View style={er.headingBadge}>
                 <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
                 <Text style={er.headingText}>HEADING THERE</Text>
               </View>
-              <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
-              <Text style={er.stopSub}>
-                Stop {currentStopIndex + 1} of {dayStops.length} · {stopLabel}
-              </Text>
+              <View style={er.stopInfoBlock}>
+                <Text style={er.stopNum}>Stop {currentStopIndex + 1} of {dayStops.length}</Text>
+                <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
+                <Text style={er.stopSub}>{stopLabel}</Text>
+              </View>
               <View style={er.etaRow}>
                 <View style={er.etaPill}>
-                  <Text style={er.etaIcon}>🚗</Text>
+                  <Text style={er.etaIcon}>{'🚗'}</Text>
                   <View>
                     <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
                     <Text style={er.etaLbl}>ETA</Text>
                   </View>
                 </View>
                 <View style={er.etaPill}>
-                  <Text style={er.etaIcon}>📍</Text>
+                  <Text style={er.etaIcon}>{'📍'}</Text>
                   <View>
                     <Text style={er.etaVal}>~3 mi</Text>
                     <Text style={er.etaLbl}>Away</Text>
                   </View>
                 </View>
               </View>
-            </LinearGradient>
+            </View>
           </View>
 
           {/* Green arrival banner — no action buttons in AT_STOP_FROZEN */}
