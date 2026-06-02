@@ -38,6 +38,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+import StopPickerSheet from '@/components/StopPickerSheet';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -439,6 +440,7 @@ export default function AtStopScreen() {
   const [kidLoading, setKidLoading]     = useState(false);
   const [addingStop, setAddingStop]     = useState<string | null>(null);
   const [stopMoments, setStopMoments]   = useState<Moment[]>([]);
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
 
   // Prevents useFocusEffect from resetting mode when returning from a sub-screen
   const keepDetailOnFocus = useRef(false);
@@ -568,6 +570,19 @@ export default function AtStopScreen() {
   function openSheet(s: ActiveSheet) {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveSheet(s);
+  }
+
+  function handleAddPhoto() { setShowPhotoSheet(true); }
+
+  function handleStopSelectFromAtStop(stopId: string | null, stopName: string, stopIcon: string) {
+    setShowPhotoSheet(false);
+    if (trip) {
+      keepDetailOnFocus.current = true;
+      router.push({
+        pathname: `/memories/${trip.id}/add-photo` as never,
+        params: { stopId: stopId ?? '', stopName, stopIcon },
+      });
+    }
   }
 
   async function addStopToPlan(name: string, stopType: string, durationMinutes: number) {
@@ -894,23 +909,7 @@ export default function AtStopScreen() {
 
           {/* Capture moment */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
-            onPress={() => {
-              Alert.alert('Add a photo', 'Choose a source', [
-                { text: '📷  Camera', onPress: async () => {
-                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow camera access in Settings.'); return; }
-                    await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                  },
-                },
-                { text: '🖼  Photo Library', onPress: async () => {
-                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    if (status !== 'granted') { Alert.alert('Permission needed', 'Allow photo library access in Settings.'); return; }
-                    await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85 });
-                  },
-                },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}>
+            onPress={handleAddPhoto}>
             <Text style={dt.gridIcon}>📸</Text>
             <Text style={dt.gridTitle}>Capture moment</Text>
             <Text style={dt.gridSub}>Photo, note, kid quote</Text>
@@ -943,7 +942,7 @@ export default function AtStopScreen() {
               </View>
             ))}
             <TouchableOpacity style={dt.photoAdd} activeOpacity={0.8}
-              onPress={() => Alert.alert('Photo capture coming soon')}>
+              onPress={handleAddPhoto}>
               <Text style={dt.photoAddIcon}>📷</Text>
               <Text style={dt.photoAddLabel}>Add yours</Text>
             </TouchableOpacity>
@@ -1504,6 +1503,14 @@ export default function AtStopScreen() {
           <Text style={sh.cancelText}>Cancel</Text>
         </TouchableOpacity>
       </SheetModal>
+
+      {showPhotoSheet && mode === 'detail' && (
+        <StopPickerSheet
+          trip={trip as any}
+          onDismiss={() => setShowPhotoSheet(false)}
+          onSelect={handleStopSelectFromAtStop}
+        />
+      )}
     </View>
   );
 }
