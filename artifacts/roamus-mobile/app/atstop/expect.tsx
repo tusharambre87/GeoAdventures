@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking,
-  ActivityIndicator, Platform,
+  ActivityIndicator, Platform, PanResponder,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -76,6 +76,12 @@ export default function ExpectScreen() {
   const stopId       = params.stopId  ?? '';
 
   const [nearbySheet,   setNearbySheet]   = useState<NearbySheet>(null);
+  const swipeDismiss = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 5,
+      onPanResponderRelease: (_, g) => { if (g.dy > 60) setNearbySheet(null); },
+    })
+  ).current;
   const [nearbyData,    setNearbyData]    = useState<NearbyData>(null);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError,   setNearbyError]   = useState(false);
@@ -713,7 +719,7 @@ export default function ExpectScreen() {
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
           <View style={styles.sheet}>
-            <View style={styles.handle} />
+            <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
               <Text style={{ fontSize: 20 }}>{"🍔"}</Text>
               <Text style={styles.sheetTitle}>Food nearby</Text>
@@ -738,7 +744,7 @@ export default function ExpectScreen() {
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
           <View style={styles.sheet}>
-            <View style={styles.handle} />
+            <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
               <Text style={{ fontSize: 20 }}>{"🌿"}</Text>
               <Text style={styles.sheetTitle}>Quick break spots</Text>
@@ -763,7 +769,7 @@ export default function ExpectScreen() {
         <View style={styles.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setNearbySheet(null)} />
           <View style={styles.sheet}>
-            <View style={styles.handle} />
+            <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
               <Text style={{ fontSize: 20 }}>{"🧒"}</Text>
               <Text style={styles.sheetTitle}>Kid-friendly extras</Text>

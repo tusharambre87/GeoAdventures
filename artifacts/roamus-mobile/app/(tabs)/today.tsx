@@ -1348,6 +1348,8 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: 'rgba(232,67,58,0.2)', borderRadius: 13, padding: 11, paddingHorizontal: 14, marginHorizontal: 16, marginBottom: 14 }}
             activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/atstop/sos' as never,
+              params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } })}
           >
             <View style={{ backgroundColor: '#E8433A', borderRadius: 6, paddingVertical: 3, paddingHorizontal: 7, flexShrink: 0 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>SOS</Text>

@@ -18,6 +18,7 @@ import {
   Keyboard,
   LayoutAnimation,
   Linking,
+  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -360,6 +361,14 @@ function SheetModal({ visible, onClose, children }: {
 }) {
   const anim    = useRef(new Animated.Value(0)).current;
   const mounted = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 5,
+      onPanResponderRelease:       (_, g) => { if (g.dy > 60) onCloseRef.current(); },
+    })
+  ).current;
   if (visible && !mounted.current) mounted.current = true;
   useEffect(() => {
     Animated.spring(anim, { toValue: visible ? 1 : 0, useNativeDriver: true,
@@ -373,7 +382,7 @@ function SheetModal({ visible, onClose, children }: {
       <Animated.View style={[sh.sheet, {
         transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }],
       }]}>
-        <View style={sh.handle} />
+        <View {...pan.panHandlers} style={sh.handle} />
         {children}
       </Animated.View>
     </Animated.View>
@@ -574,7 +583,15 @@ export default function AtStopScreen() {
     setActiveSheet(s);
   }
 
-  function handleAddPhoto() { setShowPhotoSheet(true); }
+  function handleAddPhoto() {
+    if (!trip?.id || !currentStop) return;
+    keepDetailOnFocus.current = true;
+    const stopIcon = STOP_HERO_EMOJI[currentStop.stopType ?? ''] ?? STOP_HERO_EMOJI.default ?? '📍';
+    router.push({
+      pathname: `/memories/${trip.id}/add-photo` as never,
+      params: { stopId: currentStop.id, stopName: currentStop.name, stopIcon },
+    });
+  }
 
   function handleStopSelectFromAtStop(stopId: string | null, stopName: string, stopIcon: string) {
     setShowPhotoSheet(false);
