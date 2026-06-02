@@ -1460,7 +1460,7 @@ export default function TodayScreen() {
             </View>
           )}
 
-          {(parking || restrooms) && (
+          {!!(parking || restrooms) && (
             <View style={er.twoCol}>
               <View style={er.halfCard}>
                 <Text style={er.halfLabel}>PARKING</Text>
@@ -1526,7 +1526,7 @@ export default function TodayScreen() {
                 setTodayState('at_stop_frozen');
                 AsyncStorage.setItem('atStopFrozen', 'true');
                 AsyncStorage.setItem('atStopStartTime', String(Date.now()));
-                router.push('/(tabs)/atstop' as never);
+                router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
               }}
             >
               <Text style={er.hereBtnText}>I’m here ✓</Text>
@@ -1602,7 +1602,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={asf.greenBanner}
             activeOpacity={0.85}
-            onPress={() => router.push('/(tabs)/atstop' as never)}
+            onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
           >
             <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
             <View style={{ flex: 1 }}>

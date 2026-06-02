@@ -75,7 +75,7 @@ export default function NeedScreen() {
   }
 
   async function handleSkipStop() {
-    closeRunning();
+    if (showRunning) closeRunning();
     if (stopId) {
       try {
         await apiFetch(`/api/travel/stops/${stopId}/quality-signal`, {
@@ -105,19 +105,40 @@ export default function NeedScreen() {
       icon: '😥',
       title: 'Kids are tired',
       sub: 'Find a break spot or easier next stop',
-      onPress: () => Linking.openURL(parkUrl).catch(() => {}),
+      onPress: () => Alert.alert(
+        'Kids are tired',
+        'Break spot finder is coming soon. Want to search for parks and cafes near ' + stopName + ' on Google Maps?',
+        [
+          { text: 'Open Maps', onPress: () => Linking.openURL(parkUrl) },
+          { text: 'Not now', style: 'cancel' },
+        ]
+      ),
     },
     {
       icon: '🎉',
       title: 'Need more fun',
       sub: 'Swap for something more exciting nearby',
-      onPress: () => Linking.openURL(activityUrl).catch(() => {}),
+      onPress: () => Alert.alert(
+        'Need more fun',
+        'Activity swap is coming soon. Want to search for fun things near ' + stopName + ' on Google Maps?',
+        [
+          { text: 'Open Maps', onPress: () => Linking.openURL(activityUrl) },
+          { text: 'Not now', style: 'cancel' },
+        ]
+      ),
     },
     {
       icon: '🍕',
       title: 'Find food nearby',
-      sub: '4 family options within 0.3 mi',
-      onPress: () => Linking.openURL(foodUrl).catch(() => {}),
+      sub: 'Family-friendly restaurants near your stop',
+      onPress: () => Alert.alert(
+        'Find food nearby',
+        'In-app food finder is coming soon. Want to open Google Maps for family restaurants near ' + stopName + '?',
+        [
+          { text: 'Open Maps', onPress: () => Linking.openURL(foodUrl) },
+          { text: 'Not now', style: 'cancel' },
+        ]
+      ),
     },
     {
       icon: '\u23ED',
