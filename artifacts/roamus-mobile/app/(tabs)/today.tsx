@@ -451,7 +451,7 @@ export default function TodayScreen() {
   // ── Pulse animation for En Route dot ──
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (todayState !== 'en_route') { pulseAnim.setValue(1); return; }
+    if (todayState !== 'en_route' && todayState !== 'at_stop_frozen') { pulseAnim.setValue(1); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
