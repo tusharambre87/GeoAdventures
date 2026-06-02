@@ -976,6 +976,31 @@ export default function TodayScreen() {
             </View>
           )}
 
+          {/* Rain alert */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
+            <Text style={{ fontSize: 20 }}>{'\U0001f327'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected tomorrow 2–4pm</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Plan ahead for outdoor stops</Text>
+              <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>See indoor alternatives →</Text>
+            </View>
+          </View>
+
+          {/* Hotel / start point card */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+            activeOpacity={0.85}
+          >
+            <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Text style={{ fontSize: 20 }}>{'\U0001f3e8'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with directions and timing</Text>
+            </View>
+            <Text style={{ color: C.orange, fontSize: 20, fontWeight: '700' }}>+</Text>
+          </TouchableOpacity>
+
           <View style={ptt.card}>
             <Text style={ptt.cardLabel}>TOMORROW'S STOPS</Text>
             {tomorrowStops.map((s, i) => (
@@ -1243,6 +1268,36 @@ export default function TodayScreen() {
             </View>
           )}
 
+          {/* Hotel / start point card */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+            activeOpacity={0.85}
+          >
+            <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Text style={{ fontSize: 20 }}>{'\U0001f3e8'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with travel times</Text>
+            </View>
+            <Text style={{ color: C.orange, fontSize: 20, fontWeight: '700' }}>+</Text>
+          </TouchableOpacity>
+
+          {/* SOS / Emergency button */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: 'rgba(232,67,58,0.2)', borderRadius: 13, padding: 11, paddingHorizontal: 14, marginHorizontal: 16, marginBottom: 14 }}
+            activeOpacity={0.85}
+          >
+            <View style={{ backgroundColor: '#E8433A', borderRadius: 6, paddingVertical: 3, paddingHorizontal: 7, flexShrink: 0 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>SOS</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#E8433A' }}>Emergency help</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>Medical, lost, need help fast</Text>
+            </View>
+            <Text style={{ color: '#E8433A', fontSize: 18 }}>{'›'}</Text>
+          </TouchableOpacity>
+
           <Pressable style={[mo.startBtn, starting && { opacity: 0.7 }]} onPress={handleStartDay} disabled={starting}>
             {starting
               ? <ActivityIndicator color="#fff" />
@@ -1322,6 +1377,29 @@ export default function TodayScreen() {
               </View>
             </View>
           </View> {/* heroWrap */}
+
+          {/* Rain alert */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
+            <Text style={{ fontSize: 20 }}>{'\U0001f327'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected at 2pm</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
+              <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>See indoor alternatives →</Text>
+            </View>
+          </View>
+
+          {/* Did you know teaser */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+            <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+              <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
+              <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>
+                Fun facts await — explore with your kids as you head over.
+              </Text>
+            </View>
+          </View>
 
           <TouchableOpacity
             style={er.kidsStrip} activeOpacity={0.85}

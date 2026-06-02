@@ -15,7 +15,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
+function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -27,7 +27,7 @@ function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
         <Label>Today</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="atstop">
-        <Icon sf={{ default: atStopFrozen ? "location.fill" : "location", selected: "location.fill" }} />
+        <Icon sf={{ default: "location", selected: "location.fill" }} />
         <Label>At Stop</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
@@ -168,16 +168,8 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  const [atStopFrozen, setAtStopFrozen] = React.useState(false);
-  React.useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      "todayAtStopFrozen",
-      ({ active }: { active: boolean }) => setAtStopFrozen(active),
-    );
-    return () => sub.remove();
-  }, []);
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout atStopFrozen={atStopFrozen} />;
+    return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
 }
