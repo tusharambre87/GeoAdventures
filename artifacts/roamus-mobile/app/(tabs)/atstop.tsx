@@ -504,10 +504,14 @@ export default function AtStopScreen() {
     } catch { /* best effort */ }
     setSubmittingFeedback(false);
     setActiveSheet('none');
-    // If more unvisited stops, go back to picker; else go to today for day wrap
+    // If more unvisited stops, go back to picker; else signal today tab + navigate
     const remaining = dayStops.filter(s => s.id !== currentStop.id && !isStopVisited(s));
-    if (remaining.length > 0) { setMode('picker'); setCurrentStop(null); }
-    else { router.push('/(tabs)/today'); }
+    if (remaining.length > 0) {
+      setMode('picker'); setCurrentStop(null);
+    } else {
+      await AsyncStorage.setItem('today_state_override', 'stop_complete');
+      router.push('/(tabs)/today');
+    }
   }
 
   // ── Skip stop ──
