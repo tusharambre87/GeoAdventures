@@ -978,7 +978,7 @@ export default function TodayScreen() {
 
           {/* Rain alert */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
-            <Text style={{ fontSize: 20 }}>{'\U0001f327'}</Text>
+            <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected tomorrow 2–4pm</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Plan ahead for outdoor stops</Text>
@@ -992,7 +992,7 @@ export default function TodayScreen() {
             activeOpacity={0.85}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'\U0001f3e8'}</Text>
+              <Text style={{ fontSize: 20 }}>{'🏨'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
@@ -1274,7 +1274,7 @@ export default function TodayScreen() {
             activeOpacity={0.85}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'\U0001f3e8'}</Text>
+              <Text style={{ fontSize: 20 }}>{'🏨'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
@@ -1380,7 +1380,7 @@ export default function TodayScreen() {
 
           {/* Rain alert */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
-            <Text style={{ fontSize: 20 }}>{'\U0001f327'}</Text>
+            <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected at 2pm</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
@@ -1391,7 +1391,7 @@ export default function TodayScreen() {
           {/* Did you know teaser */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
             <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-              <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
+              <Text style={{ fontSize: 16 }}>{'✨'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
