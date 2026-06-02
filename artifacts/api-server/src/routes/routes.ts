@@ -6,7 +6,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification } from "../email";
@@ -5205,7 +5205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })();
 
         // ── Stop count — arrival/departure-aware ──────────────────────────────
-        const stopsPerDayByPace = effectivePace === "chill" ? 2 : effectivePace === "packed" ? 4 : 3;
+        const stopsPerDayByPace = effectivePace === "chill" ? 2 : effectivePace === "packed" ? 3 : 3;
 
         // Read arrival signals from tailoring JSONB
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
@@ -5337,7 +5337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 stopMissions: null,
                 cityGroup: cityName,
                 metadata: {
-                  durationMinutes: stop.durationMinutes || null,
+                  durationMinutes: familyDurationFloor(stop.type ?? stop.stopType ?? 'landmark', stop.durationMinutes),
                   sessionFit: null,
                   durationClass: null,
                   anchorScore: null,
@@ -5466,13 +5466,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               cityGroup: cityName,
               metadata: (stop.durationMinutes || stop.sessionFit || stop.durationClass || stop.anchorScore || stop.dropPriority)
                 ? {
-                    durationMinutes: stop.durationMinutes ?? null,
+                    durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', stop.durationMinutes ?? null),
                     sessionFit: stop.sessionFit ?? null,
                     durationClass: stop.durationClass ?? null,
                     anchorScore: stop.anchorScore ?? null,
                     dropPriority: stop.dropPriority ?? null,
                   }
-                : null,
+                : { durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', null) },
             });
           }
           const missionCount = generatedStops.filter(s => s.missionType).length;
@@ -8131,6 +8131,42 @@ Return ONLY valid JSON in this exact format:
     } catch (error) {
       req.log?.error({ error }, 'insert-stop failed');
       res.status(500).json({ message: 'Failed to insert stop' });
+    }
+  });
+
+  // POST /api/travel/trips/:tripId/recalculate-schedule
+  // Re-applies family duration floors to all stops in a trip.
+  // Safe to call repeatedly; only updates stops that are below the family minimum.
+  app.post('/api/travel/trips/:tripId/recalculate-schedule', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if (trip.userId !== req.user?.id) return res.status(403).json({ message: 'Forbidden' });
+
+      const stops = await storage.getStopsByTripId(tripId);
+      let updated = 0;
+
+      for (const stop of stops) {
+        const floor = familyDurationFloor(stop.stopType ?? 'landmark', stop.durationMinutes ?? null);
+        const currentDur = stop.durationMinutes ?? null;
+
+        // Update if current duration is missing or below the family floor
+        if (!currentDur || currentDur < floor) {
+          await storage.updateStop(stop.id, { durationMinutes: floor } as any);
+          // Also sync metadata.durationMinutes
+          const meta = (stop.metadata ?? {}) as Record<string, unknown>;
+          await storage.updateStop(stop.id, {
+            metadata: { ...meta, durationMinutes: floor },
+          } as any);
+          updated++;
+        }
+      }
+
+      res.json({ message: `Recalculated schedule for ${stops.length} stops`, updated });
+    } catch (err) {
+      req.log?.error({ err }, 'recalculate-schedule failed');
+      res.status(500).json({ message: 'Failed to recalculate schedule' });
     }
   });
 

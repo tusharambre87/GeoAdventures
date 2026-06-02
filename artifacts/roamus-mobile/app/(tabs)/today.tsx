@@ -249,16 +249,40 @@ async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): P
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const DURATION_BY_TYPE: Record<string, number> = {
-  museum: 90, aquarium: 90, zoo: 90, theater: 90, science_center: 90,
-  restaurant: 45, meal: 45, lunch: 45, dinner: 45, breakfast: 45, cafe: 45,
-  park: 45, nature: 45, garden: 45, beach: 45,
-  landmark: 60, viewpoint: 60, observation: 60, bridge: 60,
+  // Major attractions
+  planetarium: 150, aquarium: 150, zoo: 180, theme_park: 240, water_park: 240,
+  // Museums
+  museum: 105, childrens_museum: 120, science_museum: 120, science_center: 120,
+  art_museum: 90, history_museum: 90,
+  // Outdoors
+  national_park: 120, beach: 90, park: 60, garden: 60, nature: 60,
+  // Landmarks
+  observation_deck: 60, viewpoint: 45, landmark: 45, monument: 30, bridge: 30,
+  // Food
+  restaurant: 60, meal: 60, lunch: 60, dinner: 60, breakfast: 45, cafe: 30,
+  // Entertainment
+  theater: 120, show: 120, sports: 180, adventure: 90,
+  // Shopping
+  market: 60, shopping: 45, street: 45,
 };
 
 function getStopDuration(stop: Stop): number {
   if (stop.durationMinutes) return stop.durationMinutes;
   const t = stop.stopType ?? '';
-  return DURATION_BY_TYPE[t] ?? 60;
+  return DURATION_BY_TYPE[t] ?? 75;
+}
+
+/**
+ * Minimum gap between end of one stop and start of the next — includes travel,
+ * regrouping, restrooms, and a snack break.
+ * Toddler tax: +15 min if any child under 5.
+ * Large family: +10 min if 3+ kids.
+ */
+function familyInterStopGap(childrenAges: number[]): number {
+  let gap = 50;
+  if (childrenAges.some(a => a < 5)) gap += 15;
+  if (childrenAges.length >= 3) gap += 10;
+  return gap;
 }
 
 /** Faster pace trims 15 min off each stop (min 30). Balanced/Easier use planned duration. */
@@ -288,7 +312,8 @@ function isMealStop(type?: string | null): boolean {
   return ['meal', 'restaurant', 'lunch', 'dinner', 'breakfast', 'cafe'].includes(type ?? '');
 }
 
-function buildStopTimes(stops: Stop[], pace: Pace = 'balanced'): string[] {
+function buildStopTimes(stops: Stop[], pace: Pace = 'balanced', childrenAges: number[] = []): string[] {
+  const gap = familyInterStopGap(childrenAges);
   let cursor = 9 * 60; // 9:00 AM
   return stops.map((s, i) => {
     const h = Math.floor(cursor / 60);
@@ -296,15 +321,21 @@ function buildStopTimes(stops: Stop[], pace: Pace = 'balanced'): string[] {
     const ampm = h >= 12 ? 'PM' : 'AM';
     const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
     const label = `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
-    cursor += effectiveDuration(s, pace) + getTravelToNext(stops, i);
+    // Inter-stop gap = max(raw travel time, family gap). Meal stops get 10 min transition only.
+    const travel = getTravelToNext(stops, i);
+    const nextIsMeal = i < stops.length - 1 && isMealStop(stops[i + 1].stopType);
+    const interGap = nextIsMeal ? Math.max(travel, 15) : Math.max(travel, gap);
+    cursor += effectiveDuration(s, pace) + interGap;
     return label;
   });
 }
 
-function estimateTotalTime(stops: Stop[], pace: Pace = 'balanced'): string {
+function estimateTotalTime(stops: Stop[], pace: Pace = 'balanced', childrenAges: number[] = []): string {
+  const gap = familyInterStopGap(childrenAges);
   const content = stops.filter(s => !isMealStop(s.stopType));
   const total = content.reduce((sum, s, i) => {
-    return sum + effectiveDuration(s, pace) + getTravelToNext(content, i);
+    const travel = getTravelToNext(content, i);
+    return sum + effectiveDuration(s, pace) + Math.max(travel, i < content.length - 1 ? gap : 0);
   }, 0);
   if (total < 60) return `~${total} min`;
   const h = Math.floor(total / 60);
@@ -652,7 +683,11 @@ export default function TodayScreen() {
   const city = trip?.city ?? trip?.destination ?? '';
   const dayLabel = formatDayDate(trip?.startDate, resolvedDayIndex);
   const ticketStops = dayStops.filter(s => hasTicketSignal(s.metadata));
-  const stopTimes = buildStopTimes(dayStops, selectedPace);
+  const childrenAges = (trip?.travelers ?? [])
+    .filter(t => !t.isParent && t.age)
+    .map(t => parseInt(t.age!, 10))
+    .filter(n => n > 0 && n < 18);
+  const stopTimes = buildStopTimes(dayStops, selectedPace, childrenAges);
 
   // ── Loading ──
   if (loading) {
@@ -1496,7 +1531,7 @@ export default function TodayScreen() {
               </Text>
             </View>
             <View style={pd.metaPill}>
-              <Text style={pd.metaText}>⏱ {estimateTotalTime(dayStops, selectedPace)}</Text>
+              <Text style={pd.metaText}>⏱ {estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text>
             </View>
           </View>
         </LinearGradient>

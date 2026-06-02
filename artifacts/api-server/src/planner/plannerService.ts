@@ -2008,20 +2008,77 @@ Generate exactly 10 stops. Make each genuinely useful to real families visiting 
 
 // ── Pool-building helpers ──────────────────────────────────────────────────
 
-/** Sensible default visit duration by stop type (minutes). */
+/**
+ * Minimum family-realistic visit durations by stop type.
+ * These are floors — actual stops with a longer explicit duration keep theirs.
+ * Values calibrated for families with kids (not solo travelers).
+ */
+const FAMILY_STOP_DURATIONS: Record<string, number> = {
+  // Major attractions — 2.5–4 hrs with kids
+  planetarium:         150,
+  aquarium:            150,
+  zoo:                 180,
+  theme_park:          240,
+  water_park:          240,
+
+  // Museums — 1.5–2 hrs
+  museum:              105,
+  childrens_museum:    120,
+  science_museum:      120,
+  science_center:      120,
+  art_museum:           90,
+  history_museum:       90,
+
+  // Outdoors
+  national_park:       120,
+  beach:                90,
+  park:                 60,
+  garden:               60,
+  nature:               60,
+
+  // Landmarks / observations
+  observation_deck:     60,
+  viewpoint:            45,
+  landmark:             45,
+  monument:             30,
+  bridge:               30,
+
+  // Food
+  restaurant:           60,
+  meal:                 60,
+  lunch:                60,
+  dinner:               60,
+  breakfast:            45,
+  cafe:                 30,
+
+  // Entertainment
+  theater:             120,
+  show:                120,
+  sports:              180,
+  adventure:            90,
+
+  // Shopping / markets
+  market:               60,
+  shopping:             45,
+  street:               45,
+
+  // Fallback
+  default:              75,
+};
+
+/** Sensible default visit duration by stop type (minutes) — family floors. */
 function durationByStopType(stopType: string): number {
-  switch (stopType.toLowerCase()) {
-    case "museum": return 120;
-    case "zoo": return 150;
-    case "aquarium": return 120;
-    case "park": case "garden": return 60;
-    case "nature": return 75;
-    case "landmark": return 45;
-    case "adventure": return 90;
-    case "food": case "restaurant": case "cafe": return 60;
-    case "street": return 45;
-    default: return 75;
-  }
+  return FAMILY_STOP_DURATIONS[stopType.toLowerCase()] ?? FAMILY_STOP_DURATIONS.default;
+}
+
+/**
+ * Apply family duration floor: returns the larger of the stored value and the
+ * family minimum for this stop type. Use when writing stops to the DB.
+ */
+export function familyDurationFloor(stopType: string, storedMinutes: number | null | undefined): number {
+  const floor = durationByStopType(stopType);
+  if (storedMinutes && storedMinutes > floor) return storedMinutes;
+  return floor;
 }
 
 /** Indoor/outdoor classification by stop type. */
