@@ -174,6 +174,7 @@ type StopOption = {
   address?: string;
   type?: string;
   stopType?: string;
+  duration?: string;
   durationMinutes?: number;
   estimatedDurationMinutes?: number;
   distance?: string;
@@ -2284,6 +2285,16 @@ function stopIconForCategory(cat: 'food' | 'kids' | 'landmarks'): string {
   return '📍';
 }
 
+function parseDurationMins(opt: StopOption, cat: 'food' | 'kids' | 'landmarks'): number {
+  if (opt.durationMinutes != null) return opt.durationMinutes;
+  if (opt.estimatedDurationMinutes != null) return opt.estimatedDurationMinutes;
+  if (opt.duration) {
+    const m = opt.duration.match(/(\d+)/);
+    if (m) return parseInt(m[1], 10);
+  }
+  return DEFAULT_DURATIONS[cat];
+}
+
 // ─── StopOptionCard ───────────────────────────────────────────────────────────
 
 function StopOptionCard({
@@ -2295,7 +2306,7 @@ function StopOptionCard({
   onAdd: () => void;
   adding: boolean;
 }) {
-  const dur = opt.durationMinutes ?? opt.estimatedDurationMinutes ?? DEFAULT_DURATIONS[category];
+  const dur = parseDurationMins(opt, category);
   return (
     <View style={[as.soCard, isSelected && as.soCardSelected]}>
       <View style={as.soTop}>
@@ -2351,59 +2362,63 @@ function AddStopSheet({
   const [selectedOpt, setSelectedOpt] = useState<StopOption | null>(null);
   const [adding,      setAdding]      = useState(false);
 
-  const fetchOptions = useCallback(async (cat: 'food' | 'kids' | 'landmarks', stop: Stop | null) => {
-    if (!stop) return;
+  const fetchOptions = useCallback(async (cat: 'food' | 'kids' | 'landmarks') => {
     setLoading(true);
     setOptions([]);
     try {
-      const result = await apiFetch<{ suggestions?: StopOption[]; better?: StopOption[]; similar?: StopOption[] }>(
-        `/api/travel/stops/${stop.id}/replace-suggestions`,
-        { method: 'POST', body: JSON.stringify({ filters: { category: cat } }) }
+      const body: Record<string, unknown> = { destination: city };
+      const todayNames = getStopsForDay(selectedDay).map(s => s.name).filter(Boolean);
+      if (todayNames.length > 0) body.todayStopNames = todayNames;
+      if (cat === 'food') {
+        body.stopTypes = ['restaurant', 'food'];
+      } else if (cat === 'kids') {
+        body.context = 'fun';
+      } else {
+        body.stopTypes = ['landmark', 'museum', 'park'];
+      }
+      const result = await apiFetch<{ nearby?: StopOption[]; popular?: StopOption[] }>(
+        '/api/travel/stops/smart-suggestions',
+        { method: 'POST', body: JSON.stringify(body) }
       );
-      const combined = [
-        ...(result.suggestions ?? []),
-        ...(result.better ?? []),
-        ...(result.similar ?? []),
-      ];
-      setOptions(combined);
+      setOptions([...(result.nearby ?? []), ...(result.popular ?? [])]);
     } catch {
       setOptions([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [city, selectedDay, getStopsForDay]);
 
-  useEffect(() => { fetchOptions('food', lastStop); }, []);
+  useEffect(() => { fetchOptions('food'); }, []);
 
   function changeCategory(cat: 'food' | 'kids' | 'landmarks') {
     setCategory(cat);
     setSelectedOpt(null);
     setSearch('');
-    fetchOptions(cat, lastStop);
+    fetchOptions(cat);
   }
 
   async function handleAddStop(opt: StopOption) {
+    if (!lastStop) return;
     setSelectedOpt(opt);
     setAdding(true);
     try {
-      const result = await apiFetch<{ success?: boolean; stop?: Stop }>(
+      await apiFetch<{ canInsert?: boolean; success?: boolean; stop?: Stop }>(
         `/api/travel/trips/${tripId}/insert-stop`,
         {
           method: 'POST',
           body: JSON.stringify({
+            insertAfterStopId: lastStop.id,
             confirmed: true,
             place: {
               name: opt.name,
               address: opt.address ?? `${opt.name}, ${city}`,
-              type: categoryToType(category),
-              estimatedDurationMinutes: opt.durationMinutes ?? opt.estimatedDurationMinutes ?? DEFAULT_DURATIONS[category],
+              type: opt.stopType ?? categoryToType(category),
+              estimatedDurationMinutes: parseDurationMins(opt, category),
             },
           }),
         }
       );
-      if (result.success || result.stop) {
-        queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
     } catch {
       setSelectedOpt(null);
     } finally {
