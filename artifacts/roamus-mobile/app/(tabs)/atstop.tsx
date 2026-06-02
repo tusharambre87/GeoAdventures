@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  DeviceEventEmitter,
   Image,
   Keyboard,
   LayoutAnimation,
@@ -404,13 +403,12 @@ export default function AtStopScreen() {
   const [feedbackText, setFeedbackText]     = useState('');
   const [exploreOpen, setExploreOpen]       = useState(false);
   const [atStopFrozen, setAtStopFrozen]      = useState(false);
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      'todayAtStopFrozen',
-      ({ active }: { active: boolean }) => setAtStopFrozen(active),
-    );
-    return () => sub.remove();
-  }, []);
+  // Read durable frozen state from AsyncStorage on every focus (handles lazy mount)
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('atStopFrozen').then(v => setAtStopFrozen(v === 'true'));
+    }, []),
+  );
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({

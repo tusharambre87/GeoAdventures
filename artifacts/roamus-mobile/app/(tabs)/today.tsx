@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  DeviceEventEmitter,
   Image,
   Linking,
   Platform,
@@ -452,7 +451,7 @@ export default function TodayScreen() {
   // ── Pulse animation for En Route dot ──
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    if (todayState !== 'en_route' && todayState !== 'at_stop_frozen') { pulseAnim.setValue(1); return; }
+    if (todayState !== 'en_route') { pulseAnim.setValue(1); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
@@ -490,7 +489,6 @@ export default function TodayScreen() {
     else if (todayState === 'en_route' || todayState === 'morning') setAtStopStartTime(null);
   }, [todayState]);
 
-  // ── Transition EN_ROUTE → DAY_COMPLETE when all stops visited ──
   useEffect(() => {
     if (todayState !== 'en_route') return;
     if (dayStops.length > 0 && dayStops.every(s => s.isVisited || s.visited)) {
@@ -498,10 +496,6 @@ export default function TodayScreen() {
     }
   }, [todayState, dayStops]);
 
-  // ── Signal layout to show blue At Stop icon ──
-  useEffect(() => {
-    DeviceEventEmitter.emit('todayAtStopFrozen', { active: todayState === 'at_stop_frozen' });
-  }, [todayState]);
   // ── Close menu when state changes ──
   useEffect(() => { setShowMenu(false); }, [todayState]);
 
@@ -1481,6 +1475,7 @@ export default function TodayScreen() {
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setTodayState('at_stop_frozen');
+                AsyncStorage.setItem('atStopFrozen', 'true');
                 router.push('/(tabs)/atstop' as never);
               }}
             >
