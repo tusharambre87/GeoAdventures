@@ -15,7 +15,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout() {
+function NativeTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -27,7 +27,12 @@ function NativeTabLayout() {
         <Label>Today</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="atstop">
-        <Icon sf={{ default: "location", selected: "location.fill" }} />
+        <Icon
+          sf={{
+            default: atStopFrozen ? "location.fill" : "location",
+            selected: "location.fill",
+          }}
+        />
         <Label>At Stop</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
@@ -42,21 +47,12 @@ function NativeTabLayout() {
   );
 }
 
-function ClassicTabLayout() {
+function ClassicTabLayout({ atStopFrozen }: { atStopFrozen: boolean }) {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-
-  const [atStopFrozen, setAtStopFrozen] = useState(false);
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      "todayAtStopFrozen",
-      ({ active }: { active: boolean }) => setAtStopFrozen(active),
-    );
-    return () => sub.remove();
-  }, []);
 
   const atStopColor = atStopFrozen ? "#3B82F6" : undefined;
 
@@ -168,8 +164,17 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
+  const [atStopFrozen, setAtStopFrozen] = useState(false);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "todayAtStopFrozen",
+      ({ active }: { active: boolean }) => setAtStopFrozen(active),
+    );
+    return () => sub.remove();
+  }, []);
+
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
+    return <NativeTabLayout atStopFrozen={atStopFrozen} />;
   }
-  return <ClassicTabLayout />;
+  return <ClassicTabLayout atStopFrozen={atStopFrozen} />;
 }

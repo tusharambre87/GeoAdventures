@@ -490,6 +490,14 @@ export default function TodayScreen() {
     else if (todayState === 'en_route' || todayState === 'morning') setAtStopStartTime(null);
   }, [todayState]);
 
+  // ── Transition EN_ROUTE → DAY_COMPLETE when all stops visited ──
+  useEffect(() => {
+    if (todayState !== 'en_route') return;
+    if (dayStops.length > 0 && dayStops.every(s => s.isVisited || s.visited)) {
+      setTodayState('day_complete');
+    }
+  }, [todayState, dayStops]);
+
   // ── Signal layout to show blue At Stop icon ──
   useEffect(() => {
     DeviceEventEmitter.emit('todayAtStopFrozen', { active: todayState === 'at_stop_frozen' });
@@ -1246,11 +1254,7 @@ export default function TodayScreen() {
   if (todayState === 'en_route') {
     const stop = currentStop;
     if (!stop) {
-      const allDone = dayStops.length > 0 && dayStops.every(s => s.isVisited || s.visited);
-      if (allDone || dayStops.length === 0) {
-        setTodayState('day_complete');
-        return null;
-      }
+      // State transition to day_complete is handled by the useEffect below; avoid render-time mutation
       return (
         <View style={[misc.center, { paddingTop: insets.top }]}>
           <Text style={misc.errorText}>No stop to navigate to.</Text>
@@ -1691,6 +1695,39 @@ export default function TodayScreen() {
           >
             <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
           </TouchableOpacity>
+
+          {/* Tomorrow prep card with stops + ticket alerts */}
+          {resolvedDayIndex + 1 < totalDays && (() => {
+            const tomorrowStops = (trip?.stops ?? [])
+              .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex + 1)
+              .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+              .slice(0, 3);
+            const ticketCount = tomorrowStops.filter(s => hasTicketSignal(s.metadata)).length;
+            return (
+              <View style={dc.tomorrowCard}>
+                <Text style={dc.tomorrowLabel}>TOMORROW</Text>
+                {ticketCount > 0 && (
+                  <View style={dc.ticketAlert}>
+                    <Text style={dc.ticketAlertText}>🎫 {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} needed</Text>
+                  </View>
+                )}
+                {tomorrowStops.map((s, i) => (
+                  <View key={s.id} style={dc.tomorrowRow}>
+                    <View style={dc.tomorrowNum}><Text style={dc.tomorrowNumText}>{i + 1}</Text></View>
+                    <Text style={dc.tomorrowName} numberOfLines={1}>{s.name}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
+
+          {/* Kids zone CTA */}
+          <TouchableOpacity
+            style={dc.kidsZoneBtn} activeOpacity={0.85}
+            onPress={() => {}}
+          >
+            <Text style={dc.kidsZoneBtnText}>🧸 Kids zone →</Text>
+          </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
       </View>
@@ -1745,11 +1782,32 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* WHAT THE KIDS SAID */}
+          <View style={tc.kidSection}>
+            <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
+            {[
+              { quote: 'That was the BEST day ever!', name: 'Emma, 8' },
+              { quote: 'Can we do it again tomorrow?', name: 'Liam, 6' },
+            ].map((q, i) => (
+              <View key={i} style={tc.kidCard}>
+                <Text style={tc.kidQuote}>“{q.quote}”</Text>
+                <Text style={tc.kidAttrib}>— {q.name}</Text>
+              </View>
+            ))}
+          </View>
+
           <TouchableOpacity
             style={tc.newTripBtn} activeOpacity={0.85}
             onPress={() => router.push('/onboarding/splash' as never)}
           >
             <Text style={tc.newTripBtnText}>Plan your next adventure →</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={tc.gamesBtn} activeOpacity={0.85}
+            onPress={() => {}}
+          >
+            <Text style={tc.gamesBtnText}>🎮 Travel games for the way home</Text>
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
@@ -1860,6 +1918,12 @@ export default function TodayScreen() {
                       </View>
                     ))}
                   </View>
+                  {/* Kid quote strip (if available) */}
+                  {(stop as { kidQuote?: string }).kidQuote ? (
+                    <View style={dh.kidQuoteRow}>
+                      <Text style={dh.kidQuoteText}>“{(stop as { kidQuote?: string }).kidQuote}”</Text>
+                    </View>
+                  ) : null}
                   {/* Story playback button — read-only tap target */}
                   <TouchableOpacity style={dh.playRow} activeOpacity={0.7} onPress={() => {}}>
                     <View style={dh.playBtn}>
@@ -2285,6 +2349,27 @@ const dc = StyleSheet.create({
   wrapBtn:      { marginHorizontal: 20, marginTop: 16, backgroundColor: C.deep, borderRadius: 16,
     paddingVertical: 18, alignItems: 'center' },
   wrapBtnText:  { fontFamily: F.bold, fontSize: 16, color: '#fff' },
+  tomorrowCard: {
+    marginHorizontal: 16, marginBottom: 12, backgroundColor: C.card,
+    borderRadius: 14, padding: 14,
+  },
+  tomorrowLabel: { fontFamily: F.bold, fontSize: 11, color: C.muted, letterSpacing: 1.1, marginBottom: 8 },
+  ticketAlert: {
+    backgroundColor: C.amberLt, borderRadius: 8, padding: 8, marginBottom: 8,
+  },
+  ticketAlertText: { fontFamily: F.bold, fontSize: 12, color: C.amberDark },
+  tomorrowRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  tomorrowNum: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: C.orangeLt, alignItems: 'center', justifyContent: 'center',
+  },
+  tomorrowNumText: { fontFamily: F.bold, fontSize: 11, color: C.orange },
+  tomorrowName: { fontFamily: F.medium, fontSize: 14, color: C.deep, flex: 1 },
+  kidsZoneBtn: {
+    marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
+    backgroundColor: C.purplePrimary, alignItems: 'center',
+  },
+  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
 });
 
 // TRIP_COMPLETE
@@ -2307,6 +2392,19 @@ const tc = StyleSheet.create({
   newTripBtn: { marginHorizontal: 16, backgroundColor: C.bg, borderRadius: 14, paddingVertical: 16,
     alignItems: 'center', borderWidth: 1.5, borderColor: C.border },
   newTripBtnText: { fontFamily: F.semibold, fontSize: 15, color: C.deep },
+  kidSection: { marginHorizontal: 16, marginBottom: 12 },
+  kidSectionLabel: { fontFamily: F.bold, fontSize: 11, color: C.muted, letterSpacing: 1.1, marginBottom: 8 },
+  kidCard: {
+    backgroundColor: C.purplePrimaryLt, borderRadius: 12,
+    padding: 14, marginBottom: 8,
+  },
+  kidQuote: { fontFamily: F.medium, fontSize: 14, color: C.purplePrimary, fontStyle: 'italic', marginBottom: 4 },
+  kidAttrib: { fontFamily: F.bold, fontSize: 12, color: C.muted },
+  gamesBtn: {
+    marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
+    backgroundColor: C.purplePrimaryLt, alignItems: 'center',
+  },
+  gamesBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
 });
 
 // DAY_HISTORY
@@ -2369,6 +2467,11 @@ const dh = StyleSheet.create({
   },
   playBtnIcon: { fontSize: 12 },
   playLabel: { fontFamily: F.medium, fontSize: 13, color: '#6B4FA8' },
+  kidQuoteRow: {
+    backgroundColor: C.purplePrimaryLt, borderRadius: 8,
+    padding: 8, marginTop: 4, marginBottom: 4,
+  },
+  kidQuoteText: { fontFamily: F.medium, fontSize: 12, color: C.purplePrimary, fontStyle: 'italic' },
 });
 
 // ⋯ Menu styles
