@@ -21,6 +21,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from "react-native";
+import { useFonts as useFrauncesFonts, Fraunces_900Black } from "@expo-google-fonts/fraunces";
 import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -164,8 +165,23 @@ type TripData = {
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
-type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare';
+type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop';
 type DayStatus = 'past' | 'today' | 'future';
+
+type StopOption = {
+  id?: string;
+  name: string;
+  address?: string;
+  type?: string;
+  stopType?: string;
+  durationMinutes?: number;
+  estimatedDurationMinutes?: number;
+  distance?: string;
+  icon?: string;
+  description?: string;
+  priceRange?: string;
+  tags?: string[];
+};
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
@@ -1054,6 +1070,7 @@ function DayDetail({
   onOpenOptions,
   onDelete,
   onMoveStop,
+  onAddStop,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1072,6 +1089,7 @@ function DayDetail({
   onOpenOptions: () => void;
   onDelete: (stopId: string) => Promise<void>;
   onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
+  onAddStop: () => void;
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
@@ -1229,7 +1247,7 @@ function DayDetail({
 
         {/* Add a stop — editable only */}
         {isEditable && (
-          <Pressable style={dd.addStopBtn} onPress={() => showToast('Add a stop — coming soon')}>
+          <Pressable style={dd.addStopBtn} onPress={onAddStop}>
             <IconPlus />
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
@@ -2225,11 +2243,380 @@ function SheetModal({
   );
 }
 
+// ─── AddStopSheet helpers ─────────────────────────────────────────────────────
+
+const DEFAULT_DURATIONS = { food: 45, kids: 90, landmarks: 60 } as const;
+
+function categoryToType(cat: 'food' | 'kids' | 'landmarks'): string {
+  if (cat === 'food') return 'food';
+  if (cat === 'kids') return 'kid_attraction';
+  return 'landmark';
+}
+
+function featuredGradient(cat: 'food' | 'kids' | 'landmarks'): [string, string] {
+  if (cat === 'food') return ['#1D4A42', '#163830'];
+  if (cat === 'kids') return ['#5B21B6', '#3B1A8A'];
+  return ['#1D3A5C', '#0F2236'];
+}
+
+function iconBgForCategory(cat: 'food' | 'kids' | 'landmarks'): string {
+  if (cat === 'food') return '#FDF0E9';
+  if (cat === 'kids') return '#F0EBFF';
+  return '#EEF5F2';
+}
+
+function stopIconForCategory(cat: 'food' | 'kids' | 'landmarks'): string {
+  if (cat === 'food') return '🍽️';
+  if (cat === 'kids') return '🎪';
+  return '📍';
+}
+
+// ─── StopOptionCard ───────────────────────────────────────────────────────────
+
+function StopOptionCard({
+  opt, category, isSelected, onAdd, adding,
+}: {
+  opt: StopOption;
+  category: 'food' | 'kids' | 'landmarks';
+  isSelected: boolean;
+  onAdd: () => void;
+  adding: boolean;
+}) {
+  const dur = opt.durationMinutes ?? opt.estimatedDurationMinutes ?? DEFAULT_DURATIONS[category];
+  return (
+    <View style={[as.soCard, isSelected && as.soCardSelected]}>
+      <View style={as.soTop}>
+        <View style={[as.soIcon, { backgroundColor: iconBgForCategory(category) }]}>
+          <Text style={{ fontSize: 20 }}>{opt.icon ?? stopIconForCategory(category)}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={as.soName} numberOfLines={1}>{opt.name}</Text>
+          <Text style={as.soMeta} numberOfLines={1}>
+            {[opt.distance, opt.type ?? opt.stopType].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+        <Text style={as.soDuration}>{dur} min</Text>
+      </View>
+      <Pressable
+        style={[as.soAddBtn, isSelected && as.soAddBtnSelected]}
+        onPress={onAdd}
+        disabled={adding || isSelected}
+      >
+        <Text style={[as.soAddBtnText, isSelected && as.soAddBtnTextSelected]}>
+          {isSelected ? '✓ Added to plan' : '+ Add to plan'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── AddStopSheet ─────────────────────────────────────────────────────────────
+
+function AddStopSheet({
+  trip,
+  tripId,
+  selectedDay,
+  getStopsForDay,
+  queryClient,
+  onClose,
+}: {
+  trip: TripData;
+  tripId: string;
+  selectedDay: number;
+  getStopsForDay: (d: number) => Stop[];
+  queryClient: ReturnType<typeof useQueryClient>;
+  onClose: () => void;
+}) {
+  const insets    = useSafeAreaInsets();
+  const city      = trip.city ?? trip.destination ?? 'your destination';
+  const lastStop  = getStopsForDay(selectedDay).at(-1) ?? null;
+
+  const [category,    setCategory]    = useState<'food' | 'kids' | 'landmarks'>('food');
+  const [options,     setOptions]     = useState<StopOption[]>([]);
+  const [loading,     setLoading]     = useState(false);
+  const [search,      setSearch]      = useState('');
+  const [selectedOpt, setSelectedOpt] = useState<StopOption | null>(null);
+  const [adding,      setAdding]      = useState(false);
+
+  const fetchOptions = useCallback(async (cat: 'food' | 'kids' | 'landmarks', stop: Stop | null) => {
+    if (!stop) return;
+    setLoading(true);
+    setOptions([]);
+    try {
+      const result = await apiFetch<{ suggestions?: StopOption[]; better?: StopOption[]; similar?: StopOption[] }>(
+        `/api/travel/stops/${stop.id}/replace-suggestions`,
+        { method: 'POST', body: JSON.stringify({ filters: { category: cat } }) }
+      );
+      const combined = [
+        ...(result.suggestions ?? []),
+        ...(result.better ?? []),
+        ...(result.similar ?? []),
+      ];
+      setOptions(combined);
+    } catch {
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchOptions('food', lastStop); }, []);
+
+  function changeCategory(cat: 'food' | 'kids' | 'landmarks') {
+    setCategory(cat);
+    setSelectedOpt(null);
+    setSearch('');
+    fetchOptions(cat, lastStop);
+  }
+
+  async function handleAddStop(opt: StopOption) {
+    setSelectedOpt(opt);
+    setAdding(true);
+    try {
+      const result = await apiFetch<{ success?: boolean; stop?: Stop }>(
+        `/api/travel/trips/${tripId}/insert-stop`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            confirmed: true,
+            place: {
+              name: opt.name,
+              address: opt.address ?? `${opt.name}, ${city}`,
+              type: categoryToType(category),
+              estimatedDurationMinutes: opt.durationMinutes ?? opt.estimatedDurationMinutes ?? DEFAULT_DURATIONS[category],
+            },
+          }),
+        }
+      );
+      if (result.success || result.stop) {
+        queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      }
+    } catch {
+      setSelectedOpt(null);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  const filteredOptions = search.trim()
+    ? options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  const featured   = filteredOptions[0] ?? null;
+  const restOpts   = filteredOptions.slice(1);
+  const nearbyOpts = restOpts.slice(0, 3);
+  const popularOpts = restOpts.slice(3);
+  const isAdded    = !!selectedOpt;
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Drag handle */}
+      <View style={as.handle} />
+
+      {/* Header */}
+      <View style={as.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={as.title}>Add a stop</Text>
+          <Text style={as.sub}>{city} · system picks best time</Text>
+        </View>
+        <Pressable
+          style={as.closeBtn}
+          onPress={() => { onClose(); setSelectedOpt(null); }}
+          hitSlop={8}
+        >
+          <Text style={as.closeX}>{'✕'}</Text>
+        </Pressable>
+      </View>
+
+      {/* Category pills */}
+      <View style={as.pillsRow}>
+        {(['food', 'kids', 'landmarks'] as const).map(cat => (
+          <Pressable
+            key={cat}
+            style={[as.pill, category === cat && as.pillOn]}
+            onPress={() => changeCategory(cat)}
+          >
+            <Text style={as.pillIcon}>{cat === 'food' ? '🍔' : cat === 'kids' ? '🧒' : '📍'}</Text>
+            <Text style={[as.pillText, category === cat && as.pillTextOn]}>
+              {cat === 'food' ? 'Food' : cat === 'kids' ? 'Kids extras' : 'Landmarks'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Search bar */}
+      <View style={as.searchWrap}>
+        <View style={as.searchBar}>
+          <Text style={as.searchIcon}>{'🔍'}</Text>
+          <TextInput
+            style={as.searchInput}
+            placeholder={`Search ${city}...`}
+            placeholderTextColor="#D1D5E0"
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+      </View>
+
+      {/* Scrollable content */}
+      {loading ? (
+        <View style={as.loadingWrap}>
+          <ActivityIndicator color="#E8692A" size="large" />
+        </View>
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={as.body} showsVerticalScrollIndicator={false}>
+          {featured && (
+            <LinearGradient
+              colors={featuredGradient(category)}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={as.featured}
+            >
+              <Text style={as.featLabel}>
+                {'TOP PICK'}
+                {lastStop ? ` NEAR ${lastStop.name.toUpperCase()}` : ''}
+              </Text>
+              <Text style={as.featName}>{featured.name}</Text>
+              <Text style={as.featMeta}>
+                {[featured.distance, featured.type ?? featured.stopType, featured.priceRange]
+                  .filter(Boolean).join(' · ')}
+              </Text>
+              {featured.tags && featured.tags.length > 0 && (
+                <View style={as.featTags}>
+                  {featured.tags.slice(0, 3).map((t, i) => (
+                    <View key={i} style={as.featTag}>
+                      <Text style={as.featTagText}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              <Pressable
+                style={as.featAddBtn}
+                onPress={() => handleAddStop(featured)}
+                disabled={adding}
+              >
+                <Text style={as.featAddText}>+ Add to plan</Text>
+              </Pressable>
+            </LinearGradient>
+          )}
+
+          {nearbyOpts.length > 0 && (
+            <>
+              <Text style={as.sectionLabel}>GREAT NEARBY OPTIONS</Text>
+              {nearbyOpts.map((opt, i) => (
+                <StopOptionCard
+                  key={opt.id ?? `nearby-${i}`}
+                  opt={opt}
+                  category={category}
+                  isSelected={selectedOpt?.name === opt.name}
+                  onAdd={() => handleAddStop(opt)}
+                  adding={adding}
+                />
+              ))}
+            </>
+          )}
+
+          {popularOpts.length > 0 && (
+            <>
+              <Text style={[as.sectionLabel, { marginTop: 6 }]}>POPULAR WITH FAMILIES</Text>
+              {popularOpts.map((opt, i) => (
+                <StopOptionCard
+                  key={opt.id ?? `popular-${i}`}
+                  opt={opt}
+                  category={category}
+                  isSelected={selectedOpt?.name === opt.name}
+                  onAdd={() => handleAddStop(opt)}
+                  adding={adding}
+                />
+              ))}
+            </>
+          )}
+
+          {options.length === 0 && (
+            <View style={as.emptyWrap}>
+              <Text style={as.emptyText}>No stops found — try a different category.</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Footer */}
+      <View style={[as.footer, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
+        {isAdded && selectedOpt && (
+          <View style={as.confirmStrip}>
+            <Text style={as.confirmText}>
+              {'✓ '}{selectedOpt.name} added · system will schedule it
+            </Text>
+          </View>
+        )}
+        <Pressable
+          style={[as.footerBtn, !isAdded && as.footerBtnDisabled]}
+          onPress={isAdded ? () => { onClose(); setSelectedOpt(null); } : undefined}
+          disabled={!isAdded}
+        >
+          <Text style={as.footerBtnText}>{isAdded ? 'Done' : 'Select a stop to add'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const as = StyleSheet.create({
+  handle:      { width: 36, height: 4, backgroundColor: '#D1D5E0', borderRadius: 2, alignSelf: 'center', marginTop: 14 },
+  header:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 14 },
+  title:       { fontFamily: 'Fraunces_900Black', fontSize: 22, color: '#1A1F2E', lineHeight: 26 },
+  sub:         { fontSize: 13, color: '#8A8FA8', marginTop: 3, fontFamily: F.regular },
+  closeBtn:    { width: 32, height: 32, backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  closeX:      { fontSize: 15, color: '#8A8FA8' },
+  pillsRow:    { flexDirection: 'row', gap: 7, paddingHorizontal: 20, paddingTop: 12 },
+  pill:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 13, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)', backgroundColor: '#fff' },
+  pillOn:      { backgroundColor: '#1A1F2E', borderColor: '#1A1F2E' },
+  pillIcon:    { fontSize: 14 },
+  pillText:    { fontSize: 12, fontFamily: F.bold, color: '#1A1F2E' },
+  pillTextOn:  { color: '#fff' },
+  searchWrap:  { paddingHorizontal: 20, paddingTop: 10 },
+  searchBar:   { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: '#F5F2EE', borderRadius: 13, paddingVertical: 10, paddingHorizontal: 13, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)' },
+  searchIcon:  { fontSize: 15, color: '#8A8FA8' },
+  searchInput: { flex: 1, fontSize: 14, color: '#1A1F2E', fontFamily: F.regular },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  body:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  featured:    { borderRadius: 16, padding: 16, marginBottom: 14 },
+  featLabel:   { fontSize: 10, fontFamily: F.bold, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 7 },
+  featName:    { fontFamily: 'Fraunces_900Black', fontSize: 19, color: '#fff', lineHeight: 23, marginBottom: 3 },
+  featMeta:    { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontFamily: F.semibold, marginBottom: 10 },
+  featTags:    { flexDirection: 'row', gap: 5, flexWrap: 'wrap', marginBottom: 12 },
+  featTag:     { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 9 },
+  featTagText: { fontSize: 11, color: 'rgba(255,255,255,0.8)', fontFamily: F.bold },
+  featAddBtn:  { backgroundColor: '#fff', borderRadius: 11, paddingVertical: 9, paddingHorizontal: 14, alignSelf: 'flex-start' },
+  featAddText: { fontSize: 12, fontFamily: F.bold, color: '#1A1F2E' },
+  sectionLabel:{ fontSize: 11, fontFamily: F.bold, color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  soCard:      { backgroundColor: '#fff', borderRadius: 14, padding: 13, shadowColor: '#1A1F2E', shadowRadius: 12, shadowOpacity: 0.08, elevation: 2, marginBottom: 8, borderWidth: 1.5, borderColor: 'transparent' },
+  soCardSelected: { borderColor: '#E8692A', backgroundColor: '#FDF0E9' },
+  soTop:       { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
+  soIcon:      { width: 44, height: 44, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  soName:      { fontSize: 14, fontFamily: F.bold, color: '#1A1F2E' },
+  soMeta:      { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular },
+  soDuration:  { fontSize: 12, fontFamily: F.bold, color: '#E8692A', flexShrink: 0 },
+  soAddBtn:    { backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  soAddBtnSelected: { backgroundColor: '#3DAA6E' },
+  soAddBtnText: { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
+  soAddBtnTextSelected: { color: '#fff' },
+  emptyWrap:   { paddingVertical: 40, alignItems: 'center' },
+  emptyText:   { fontSize: 14, color: '#8A8FA8', fontFamily: F.regular, textAlign: 'center' },
+  footer:      { paddingHorizontal: 20, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)', flexShrink: 0 },
+  confirmStrip:{ backgroundColor: '#E8F7EF', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
+  confirmText: { fontSize: 12, fontFamily: F.bold, color: '#1A6640', flex: 1 },
+  footerBtn:   { backgroundColor: '#E8692A', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  footerBtnDisabled: { backgroundColor: '#D1D5E0' },
+  footerBtnText: { fontSize: 15, fontFamily: F.bold, color: '#fff' },
+});
+
 // ─── Root screen ──────────────────────────────────────────────────────────────
 
 export default function TripPlanScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const queryClient = useQueryClient();
+  useFrauncesFonts({ Fraunces_900Black });
 
   // ── Screen state ──
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
@@ -2431,6 +2818,7 @@ export default function TripPlanScreen() {
           onOpenOptions={() => setActiveSheet('options')}
           onDelete={deleteStop}
           onMoveStop={moveStop}
+          onAddStop={() => setActiveSheet('addStop')}
         />
       )}
 
@@ -2501,6 +2889,19 @@ export default function TripPlanScreen() {
             getStopsForDay={getStopsForDay}
             onClose={closeSheet}
             onSelectDay={(d) => { closeSheet(); goToDay(d); }}
+          />
+        </SheetModal>
+      )}
+
+      {activeSheet === 'addStop' && (
+        <SheetModal visible onClose={closeSheet}>
+          <AddStopSheet
+            trip={trip}
+            tripId={tripId ?? ''}
+            selectedDay={selectedDay}
+            getStopsForDay={getStopsForDay}
+            queryClient={queryClient}
+            onClose={closeSheet}
           />
         </SheetModal>
       )}
