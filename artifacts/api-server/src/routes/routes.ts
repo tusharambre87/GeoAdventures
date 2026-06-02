@@ -7008,6 +7008,49 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
     }
   });
 
+  // POST /api/travel/stops/:stopId/replace-suggestions (stopId-only variant)
+  // Client sends only a stopId in the URL; server looks up the stop and trip to derive destination.
+  app.post('/api/travel/stops/:stopId/replace-suggestions', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { stopId } = req.params;
+
+      const stop = await storage.getStopById(stopId);
+      if (!stop) return res.status(404).json({ message: 'Stop not found' });
+
+      const trip = await storage.getTripById(stop.tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+      const { generateReplacementSuggestions } = await import('../planner/plannerService.js');
+      const destination = (trip as any).city ?? trip.destination ?? '';
+
+      const grouped = await generateReplacementSuggestions(
+        stopId,
+        destination,
+        {
+          id: stop.id,
+          name: stop.name ?? '',
+          type: stop.stopType ?? 'landmark',
+          durationMinutes: stop.durationMinutes ?? 60,
+          effortLevel: 'moderate',
+          indoorOutdoor: 'outdoor',
+        } as any
+      );
+
+      const suggestions = [
+        ...grouped.shorter.map(s => ({ ...s, filterGroup: 'shorter' })),
+        ...grouped.easier.map(s => ({ ...s, filterGroup: 'easier' })),
+        ...grouped.indoor.map(s => ({ ...s, filterGroup: 'indoor' })),
+        ...grouped.moreActive.map(s => ({ ...s, filterGroup: 'moreActive' })),
+        ...grouped.sameVibe.map(s => ({ ...s, filterGroup: 'sameVibe' })),
+      ];
+
+      res.json({ suggestions });
+    } catch (err) {
+      req.log.error({ err }, '[Travel] replace-suggestions by stopId error');
+      res.status(500).json({ message: 'Failed to generate replacement suggestions' });
+    }
+  });
+
   // POST /api/travel/trips/:tripId/stops/:stopId/replace
   // Commits a stop swap: creates the replacement in the same slot then deletes the original.
   app.post('/api/travel/trips/:tripId/stops/:stopId/replace', isAuthenticated, travelModeGuard, async (req: any, res) => {
