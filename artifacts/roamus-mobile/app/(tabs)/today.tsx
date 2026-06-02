@@ -29,7 +29,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fonts/fraunces";
 import * as Haptics from "expo-haptics";
 
-import { API_BASE } from "@/lib/apiClient";
+import { API_BASE, kidsAPI } from "@/lib/apiClient";
 import { F } from "@/lib/tokens";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -446,6 +446,7 @@ export default function TodayScreen() {
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
   const [showMenu, setShowMenu]                 = useState(false);
+  const [kidsXp, setKidsXp]                     = useState<number | null>(null);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -500,6 +501,17 @@ export default function TodayScreen() {
 
   // ── Close menu when state changes ──
   useEffect(() => { setShowMenu(false); }, [todayState]);
+
+  // ── Fetch kids XP when day is complete ──
+  useEffect(() => {
+    if (todayState !== 'day_complete') return;
+    if (!resolvedTripId) return;
+    const children = (trip?.travelers ?? []).filter(t => !t.isParent);
+    const explorerId = children[0]?.name ?? 'explorer';
+    kidsAPI.getProgress(resolvedTripId, explorerId)
+      .then(prog => setKidsXp(prog.xp ?? null))
+      .catch(() => {});
+  }, [todayState, resolvedTripId, trip]);
 
   // ── Load trip ──
   const loadTrip = useCallback(async () => {
@@ -1832,6 +1844,14 @@ export default function TodayScreen() {
           })()}
 
           {/* Kids zone CTA */}
+          {kidsXp !== null && (
+            <View style={dc.kidsXpRow}>
+              <Text style={dc.kidsXpText}>
+                {(trip?.travelers ?? []).filter(t => !t.isParent)[0]?.name ?? 'Explorer'} earned{' '}
+                <Text style={dc.kidsXpNum}>{kidsXp} XP</Text> today
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             style={dc.kidsZoneBtn} activeOpacity={0.85}
             onPress={() => router.push('/kids' as never)}
@@ -2497,6 +2517,9 @@ const dc = StyleSheet.create({
   },
   tomorrowNumText: { fontFamily: F.bold, fontSize: 11, color: C.orange },
   tomorrowName: { fontFamily: F.medium, fontSize: 14, color: C.deep, flex: 1 },
+  kidsXpRow:  { marginHorizontal: 20, marginBottom: 10, alignItems: 'center' },
+  kidsXpText: { fontFamily: F.medium, fontSize: 14, color: '#3DAA6E' },
+  kidsXpNum:  { fontFamily: F.bold, fontSize: 14, color: '#3DAA6E' },
   kidsZoneBtn: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimary, alignItems: 'center',
