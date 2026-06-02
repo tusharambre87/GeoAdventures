@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -14,6 +16,7 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { travelAPI, Trip } from '@/lib/apiClient';
+import StopPickerSheet from '@/components/StopPickerSheet';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -86,7 +89,7 @@ function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets>
 
 // ─── Hero card — for the one active/current trip ──────────────────────────────
 
-function HeroCard({ trip, isExplicitlyActive }: { trip: Trip; isExplicitlyActive: boolean }) {
+function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExplicitlyActive: boolean; onAddPhoto: () => void }) {
   const { current, total } = getDayOf(trip);
   const visited = visitedCount(trip);
   const total_ = stopCount(trip);
@@ -142,7 +145,7 @@ function HeroCard({ trip, isExplicitlyActive }: { trip: Trip; isExplicitlyActive
             </View>
           )}
         </View>
-        <Pressable style={s.addBtn} onPress={() => router.push(`/memories/${trip.id}` as any)}>
+        <Pressable style={s.addBtn} onPress={onAddPhoto}>
           <Text style={s.addBtnText}>📷 Add</Text>
         </Pressable>
       </View>
@@ -209,6 +212,7 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
 
 export default function MemoriesScreen() {
   const insets = useSafeAreaInsets();
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: () => travelAPI.getTrips(),
@@ -246,12 +250,23 @@ export default function MemoriesScreen() {
     return <NoTripsState insets={insets} />;
   }
 
+  const handleStopSelect = (stopId: string | null, stopName: string, stopIcon: string) => {
+    setShowPhotoSheet(false);
+    if (heroTrip) {
+      router.push({
+        pathname: `/memories/${heroTrip.id}/add-photo` as never,
+        params: { stopId: stopId ?? '', stopName, stopIcon },
+      });
+    }
+  };
+
   return (
-    <ScrollView
-      style={[s.root, { backgroundColor: C.bg }]}
-      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 120 }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[s.root, { backgroundColor: C.bg }]}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={s.pageHeader}>
         <Text style={s.pageTitle}>Memories</Text>
         <Text style={s.pageSub}>Your family travel journal</Text>
@@ -263,7 +278,7 @@ export default function MemoriesScreen() {
           <Text style={[s.sectionLabel, { paddingTop: 0, paddingLeft: 0 }]}>
             {isExplicitlyActive ? 'In Progress' : 'Current Trip'}
           </Text>
-          <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} />
+          <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} onAddPhoto={() => setShowPhotoSheet(true)} />
         </View>
       )}
 
@@ -293,7 +308,15 @@ export default function MemoriesScreen() {
       {completedTrips.length === 0 && otherCurrentTrips.length === 0 && heroTrip && (
         <Text style={s.hintText}>Complete your trip to see it here as a story</Text>
       )}
-    </ScrollView>
+      </ScrollView>
+      {showPhotoSheet && heroTrip && (
+        <StopPickerSheet
+          trip={heroTrip}
+          onDismiss={() => setShowPhotoSheet(false)}
+          onSelect={handleStopSelect}
+        />
+      )}
+    </View>
   );
 }
 
