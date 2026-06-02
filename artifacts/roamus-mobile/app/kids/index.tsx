@@ -68,16 +68,18 @@ export default function ExplorerHome() {
     kids.setExploreError(false);
 
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 28000)
+      setTimeout(() => reject(new Error("timeout")), 55000)
     );
 
     Promise.race([kidsAPI.getExplore(stopId), timeout])
       .then((content) => {
         kids.setExploreContent(content);
         kids.setLoadingExplore(false);
+        kids.setExploreError(false);
       })
       .catch(() => {
         kids.setLoadingExplore(false);
+        kids.setExploreError(true);
       });
 
     if (tripId) {

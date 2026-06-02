@@ -5058,7 +5058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Skip if already has a full-length story (≥ 5 min = 300 s)
         const pack = await storage.getJourneyPackByStopId(stop.id);
         const cached = (pack?.exploreData) as any;
-        const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 300;
+        const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 420;
         if (hasRichStories) {
           console.log(`📚 [StoryPreload] "${stop.name}" already cached — skipping`);
           continue;
@@ -8878,14 +8878,14 @@ Return ONLY valid JSON in this exact format:
         return res.status(404).json({ message: "Stop not found" });
       }
       
-      // Check if journey pack already has explore data cached (with new fields)
+      // Check if journey pack already has explore data cached.
+      // Require a properly generated main story of at least 7 minutes (420s).
+      // This busts any cached fallback/short entries.
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
       const cached = journeyPack?.exploreData as any;
-      // Require stories with a proper main track of at least 5 minutes (300s).
-      // This busts cached entries from before the two-step fact-grounded generation.
-      const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 300;
+      const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 420;
       if (cached && cached.reviews !== undefined && hasRichStories) {
-        return res.json(cached);
+        return res.json({ ...cached, stopId });
       }
       
       // Get trip for destination context
@@ -8896,12 +8896,19 @@ Return ONLY valid JSON in this exact format:
       const { getExploreContent } = await import('../exploreContentService');
       const exploreData = await getExploreContent(stop.name, stop.stopType || 'landmark', destination);
       
-      // Cache the explore data in journey pack
-      if (journeyPack) {
-        await storage.updateJourneyPack(journeyPack.id, { exploreData });
+      // Only cache if the story is properly long (>= 7 min). Don't persist fallback content.
+      const generatedDuration = (exploreData as any)?.stories?.main?.durationSeconds ?? 0;
+      const exploreDataWithStop = { ...exploreData, stopId };
+      if (journeyPack && generatedDuration >= 420) {
+        await storage.updateJourneyPack(journeyPack.id, { exploreData: exploreDataWithStop });
+      } else if (!journeyPack && generatedDuration >= 420) {
+        const newPack = await storage.createJourneyPack({ stopId });
+        if (newPack) {
+          await storage.updateJourneyPack(newPack.id, { exploreData: exploreDataWithStop });
+        }
       }
-      
-      res.json(exploreData);
+
+      res.json(exploreDataWithStop);
     } catch (error) {
       console.error("Error fetching explore content:", error);
       res.status(500).json({ message: "Failed to fetch explore content" });

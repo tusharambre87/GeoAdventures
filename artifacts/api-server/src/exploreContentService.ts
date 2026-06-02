@@ -79,6 +79,7 @@ export function stripForTTS(text: string): string {
     .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^[•·▪▸►▶–—]\s*/gm, "")
+    .replace(/\[[a-zA-Z][^\]]{0,40}\]/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -269,32 +270,26 @@ Return JSON:
       messages: [
         {
           role: "system",
-          content: `You are a brilliant storyteller creating narrated audio tracks for kids aged 5 to 14 who are about to visit a real place on a family trip.
+          content: `You are a brilliant storyteller creating audio tracks for families visiting a real place on a trip.
 
-Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller.
+Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller who earns every sentence.
 
-WHAT MAKES GREAT TRAVEL AUDIO FOR KIDS:
-- It is completely specific to THIS place. A listener should immediately know which place is being described.
-- It builds genuine curiosity about real things they will see.
-- It treats the listener as intelligent, whatever their age.
-- It tells human stories — real people, real decisions, real struggles.
+WHAT MAKES GREAT TRAVEL AUDIO:
+- Every sentence is specific to THIS place. A listener immediately knows which place is being described.
+- It builds genuine curiosity about real things they will see with their own eyes.
+- It treats every listener as intelligent.
+- It tells human stories — real people, real decisions, real struggles, real stakes.
 - It has rhythm and pace. Some sentences are short. Some breathe longer.
-- It earns every sentence. Nothing is filler.
+- Nothing is filler.
 
-NARRATOR CUES — use these throughout for natural TTS pacing:
-[pause] — a beat of silence, used after a striking idea
-[warm voice] — gentle and reassuring opening tone
-[mysterious tone] — drop the energy, get conspiratorial
-[excited voice] — genuine enthusiasm, not forced
-[slowly] — slow down for emphasis
-
-ABSOLUTE RULES — violating these ruins the audio:
-- NO emojis. Not one. They are spoken aloud by the TTS engine and sound absurd.
-- NO markdown. No asterisks, hashes, or bullet symbols of any kind.
-- NO lists introduced with numbers or dashes.
-- NO phrases like "imagine you are" or "close your eyes" — they are overused clichés.
+ABSOLUTE RULES — violating these ruins the experience:
+- NO emojis. Not one.
+- NO markdown. No asterisks, hashes, bullet symbols, or dashes introducing items.
+- NO narrator stage directions or bracket cues of any kind — no [pause], [warm voice], [mysterious tone], [slowly], or anything in square brackets. These appear in the written transcript and look terrible.
+- NO phrases like "imagine you are" or "close your eyes" — overused clichés.
 - NO generic content that could describe ANY place. Every sentence must be specific.
-- Plain, natural spoken prose only.
+- NO "Welcome to..." or "Today we are visiting..." openings. Drop the listener straight into the story.
+- Plain, natural spoken prose only — write as if speaking naturally, not reading a script.
 
 ${GEOQUEST_SAFETY_PROMPT}`,
         },
@@ -304,15 +299,15 @@ ${GEOQUEST_SAFETY_PROMPT}`,
 ${factsContext}
 
 ──────────────────────────────────────────────────────
-TRACK 1: MAIN STORY — target 650 to 900 words (about 5 to 7 minutes spoken)
+TRACK 1: MAIN STORY — target 900 to 1200 words (about 7 to 8 minutes spoken at 130 words per minute)
 ──────────────────────────────────────────────────────
-This is the primary experience. Write it as one flowing narrative, not chapters.
+This is the primary experience. Write it as one flowing narrative.
 
-Opening (about 120 words): Start with something specific and vivid about THIS place — a sensory detail, a striking fact, or a moment in history. Do not open with "Welcome to" or "Today we are visiting". Drop the listener straight into the story.
+Opening (about 150 words): Start with something specific and vivid about THIS place — a striking fact, a human detail, or a moment in history. Drop the listener straight into the story. Do not open with generic phrases.
 
-Middle (about 600 words): Weave the real facts into a narrative that builds. Include at least one moment of genuine surprise — something that makes a child say "wait, really?". Include the human story: who made this, why, what was hard about it. Connect what happened in the past to what the child will see with their own eyes.
+Middle (about 900 words): Weave every real fact into a narrative that builds. Include at least two moments of genuine surprise. Include the full human story: who made this, why, what challenges they faced, what was hard about it, who the key people were. Connect the past to what the child will see with their own eyes today. Let the story breathe — not every sentence needs to carry new information. Some sentences should pause on an idea.
 
-Close (about 150 words): End with one specific, compelling question they can think about while exploring. Make it connected to something real they will actually see.
+Close (about 150 words): End with one specific, compelling observation they can test while exploring. Make it connected to something real they will actually see.
 
 ──────────────────────────────────────────────────────
 TRACK 2: QUICK HITS — target 260 to 390 words (about 2 to 3 minutes spoken)
@@ -335,13 +330,13 @@ End by connecting that history to the child standing there today — why does it
 
 Return JSON with exactly these three fields. Every field is a single string of plain prose:
 {
-  "main": "The main story text. Plain prose. Narrator cues allowed. No emojis. No markdown. 650 to 900 words.",
+  "main": "The main story text. Plain prose only. No narrator cues, no emojis, no markdown. 900 to 1200 words.",
   "quickHits": "The quick hits text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words.",
   "history": "The history text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words."
 }`,
         },
       ],
-      max_tokens: 7000,
+      max_tokens: 9000,
       temperature: 0.72,
       response_format: { type: "json_object" },
     });
@@ -426,15 +421,15 @@ export async function generateStopHeroImage(
 function getFallbackData(stopName: string, stopType: string, destination: string): ExploreData {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stopName + " " + (destination || ""))}`;
 
-  const mainText = `[Warm voice] There is a reason people travel from all over the world to stand where you are about to stand. [pause] ${stopName} is one of those places that looks one way in photographs and feels completely different in person. The scale of it, the details up close, the sounds and the light — none of that comes through in a picture.
+  const mainText = `There is a reason people travel from all over the world to stand where you are about to stand. ${stopName} is one of those places that looks one way in photographs and feels completely different in person. The scale of it, the details up close, the sounds and the light — none of that comes through in a picture.
 
 Before you get there, here is something worth knowing. Places like this one were not built overnight, and they were not built easily. Someone had a vision, fought to make it happen, and convinced others it was worth the effort. That human story is written into every part of the place, even if most visitors never stop to think about it.
 
-As you explore, resist the urge to rush through. The things that most people miss are usually right in front of them — in the materials, the proportions, the small decisions that add up to something remarkable. [pause] Look at how things are put together. Look at what is worn smooth from a century of hands touching it. Look up when everyone else is looking straight ahead.
+As you explore, resist the urge to rush through. The things that most people miss are usually right in front of them — in the materials, the proportions, the small decisions that add up to something remarkable. Look at how things are put together. Look at what is worn smooth from a century of hands touching it. Look up when everyone else is looking straight ahead.
 
-[Mysterious tone] And if you get the chance, find someone who works there and ask them what their favourite detail is. The people who spend their days in a place like this always know something that is not in any guidebook.
+And if you get the chance, find someone who works there and ask them what their favourite detail is. The people who spend their days in a place like this always know something that is not in any guidebook.
 
-[Warm voice] Here is your question to carry with you: what is the one thing about ${stopName} that you would want to tell someone who had never heard of it?`;
+Here is your question to carry with you: what is the one thing about ${stopName} that you would want to tell someone who had never heard of it?`;
 
   const quickHitsText = `${stopName} draws visitors from dozens of countries every year, but most of them only see a fraction of what is actually there. The parts that take a little extra attention are often the most interesting.
 
@@ -446,13 +441,13 @@ Every place like this has been photographed millions of times, but photographs a
 
 The people who maintain a place like this work mostly invisibly. The cleaning, the repairs, the climate control, the security — it is a continuous effort that most visitors never think about. What you are seeing today exists because of work that happened last night.`;
 
-  const historyText = `[Warm voice] The story of ${stopName} begins with a decision — someone looked at a piece of land, or a problem that needed solving, and said: this is where it should go, and this is what it should be.
+  const historyText = `The story of ${stopName} begins with a decision — someone looked at a piece of land, or a problem that needed solving, and said: this is where it should go, and this is what it should be.
 
 That decision was almost certainly harder to make than it looks in hindsight. Resources had to be gathered. People had to be convinced. Plans that seemed sound on paper ran into realities that nobody had anticipated. There were probably moments when the whole thing might have been abandoned.
 
 The version of ${stopName} that exists today is not the first version that was imagined. It is the version that survived compromise, setback, and the long test of time. Every generation since has had to decide whether to maintain it, restore it, or let it decline. The fact that you are visiting it means enough people kept saying yes.
 
-[Pause] When you stand inside or in front of it, you are standing in a place that outlasted the people who built it, the arguments that surrounded its creation, and several different eras of what people thought was worth caring about. [Warm voice] That is not nothing. That is actually remarkable.`;
+When you stand inside or in front of it, you are standing in a place that outlasted the people who built it, the arguments that surrounded its creation, and several different eras of what people thought was worth caring about. That is not nothing. That is actually remarkable.`;
 
   return {
     aboutArea: `${stopName} is a popular destination in ${destination || "the area"}. This ${stopType} offers wonderful experiences for the whole family.`,
