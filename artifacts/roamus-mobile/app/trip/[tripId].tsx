@@ -2298,29 +2298,30 @@ function parseDurationMins(opt: StopOption, cat: 'food' | 'kids' | 'landmarks'):
 // ─── StopOptionCard ───────────────────────────────────────────────────────────
 
 function StopOptionCard({
-  opt, category, isSelected, onAdd, adding,
+  opt, category, isSelected, onCardPress, onAdd, adding,
 }: {
   opt: StopOption;
   category: 'food' | 'kids' | 'landmarks';
   isSelected: boolean;
+  onCardPress: () => void;
   onAdd: () => void;
   adding: boolean;
 }) {
   const dur = parseDurationMins(opt, category);
   return (
     <View style={[as.soCard, isSelected && as.soCardSelected]}>
-      <View style={as.soTop}>
+      <Pressable style={as.soTop} onPress={onCardPress}>
         <View style={[as.soIcon, { backgroundColor: iconBgForCategory(category) }]}>
           <Text style={{ fontSize: 20 }}>{opt.icon ?? stopIconForCategory(category)}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={as.soName} numberOfLines={1}>{opt.name}</Text>
           <Text style={as.soMeta} numberOfLines={1}>
-            {[opt.distance, opt.type ?? opt.stopType].filter(Boolean).join(' · ')}
+            {[opt.distance, opt.type ?? opt.stopType, opt.description].filter(Boolean).join(' · ')}
           </Text>
         </View>
         <Text style={as.soDuration}>{dur} min</Text>
-      </View>
+      </Pressable>
       <Pressable
         style={[as.soAddBtn, isSelected && as.soAddBtnSelected]}
         onPress={onAdd}
@@ -2361,6 +2362,8 @@ function AddStopSheet({
   const [search,      setSearch]      = useState('');
   const [selectedOpt, setSelectedOpt] = useState<StopOption | null>(null);
   const [adding,      setAdding]      = useState(false);
+  const [detailOpt,   setDetailOpt]   = useState<StopOption | null>(null);
+  const [positionOpt, setPositionOpt] = useState<StopOption | null>(null);
 
   const fetchOptions = useCallback(async (cat: 'food' | 'kids' | 'landmarks') => {
     setLoading(true);
@@ -2397,9 +2400,12 @@ function AddStopSheet({
     fetchOptions(cat);
   }
 
-  async function handleAddStop(opt: StopOption) {
-    if (!lastStop) return;
-    setSelectedOpt(opt);
+  function openPositionPicker(opt: StopOption) {
+    setPositionOpt(opt);
+    setDetailOpt(null);
+  }
+
+  async function handleInsertAt(opt: StopOption, afterStopId: string) {
     setAdding(true);
     try {
       await apiFetch<{ canInsert?: boolean; success?: boolean; stop?: Stop }>(
@@ -2407,7 +2413,7 @@ function AddStopSheet({
         {
           method: 'POST',
           body: JSON.stringify({
-            insertAfterStopId: lastStop.id,
+            insertAfterStopId: afterStopId,
             confirmed: true,
             place: {
               name: opt.name,
@@ -2419,8 +2425,11 @@ function AddStopSheet({
         }
       );
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      setPositionOpt(null);
+      setDetailOpt(null);
+      setSelectedOpt(opt);
     } catch {
-      setSelectedOpt(null);
+      // stay on picker on error
     } finally {
       setAdding(false);
     }
@@ -2520,7 +2529,7 @@ function AddStopSheet({
               )}
               <Pressable
                 style={as.featAddBtn}
-                onPress={() => handleAddStop(featured)}
+                onPress={() => openPositionPicker(featured)}
                 disabled={adding}
               >
                 <Text style={as.featAddText}>+ Add to plan</Text>
@@ -2537,7 +2546,8 @@ function AddStopSheet({
                   opt={opt}
                   category={category}
                   isSelected={selectedOpt?.name === opt.name}
-                  onAdd={() => handleAddStop(opt)}
+                  onCardPress={() => setDetailOpt(opt)}
+                  onAdd={() => openPositionPicker(opt)}
                   adding={adding}
                 />
               ))}
@@ -2553,7 +2563,8 @@ function AddStopSheet({
                   opt={opt}
                   category={category}
                   isSelected={selectedOpt?.name === opt.name}
-                  onAdd={() => handleAddStop(opt)}
+                  onCardPress={() => setDetailOpt(opt)}
+                  onAdd={() => openPositionPicker(opt)}
                   adding={adding}
                 />
               ))}
@@ -2569,7 +2580,7 @@ function AddStopSheet({
       )}
 
       {/* Footer */}
-      <View style={[as.footer, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
+      <View style={[as.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]}>
         {isAdded && selectedOpt && (
           <View style={as.confirmStrip}>
             <Text style={as.confirmText}>
@@ -2585,6 +2596,33 @@ function AddStopSheet({
           <Text style={as.footerBtnText}>{isAdded ? 'Done' : 'Select a stop to add'}</Text>
         </Pressable>
       </View>
+
+      {/* Stop detail overlay */}
+      {detailOpt != null && positionOpt == null && (
+        <AddStopDetailSheet
+          opt={detailOpt}
+          category={category}
+          city={city}
+          insets={insets}
+          onBack={() => setDetailOpt(null)}
+          onClose={() => { setDetailOpt(null); onClose(); }}
+          onAddToDay={() => { setPositionOpt(detailOpt); }}
+        />
+      )}
+
+      {/* Position picker overlay */}
+      {positionOpt != null && (
+        <PositionPickerSheet
+          opt={positionOpt}
+          dayStops={getStopsForDay(selectedDay)}
+          category={category}
+          adding={adding}
+          insets={insets}
+          onBack={() => setPositionOpt(null)}
+          onClose={() => { setPositionOpt(null); setDetailOpt(null); onClose(); }}
+          onInsertAt={(afterStopId) => handleInsertAt(positionOpt, afterStopId)}
+        />
+      )}
     </View>
   );
 }
@@ -2637,6 +2675,261 @@ const as = StyleSheet.create({
   footerBtn:   { backgroundColor: '#E8692A', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   footerBtnDisabled: { backgroundColor: '#D1D5E0' },
   footerBtnText: { fontSize: 15, fontFamily: F.bold, color: '#fff' },
+});
+
+// ─── AddStopDetailSheet ───────────────────────────────────────────────────────
+
+function AddStopDetailSheet({
+  opt, category, city, insets, onBack, onClose, onAddToDay,
+}: {
+  opt: StopOption;
+  category: 'food' | 'kids' | 'landmarks';
+  city: string;
+  insets: { bottom: number; top: number };
+  onBack: () => void;
+  onClose: () => void;
+  onAddToDay: () => void;
+}) {
+  const dur = parseDurationMins(opt, category);
+  const typeLabel = (opt.stopType ?? opt.type ?? category).replace(/_/g, ' ');
+  const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(`${opt.name} ${city}`)}`;
+
+  return (
+    <View style={asd.wrap}>
+      <View style={as.handle} />
+      <View style={asd.header}>
+        <Pressable style={asd.backBtn} onPress={onBack} hitSlop={8}>
+          <Text style={asd.backArrow}>{'←'}</Text>
+        </Pressable>
+        <Pressable style={as.closeBtn} onPress={onClose} hitSlop={8}>
+          <Text style={as.closeX}>{'✕'}</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={asd.body} showsVerticalScrollIndicator={false}>
+        <Text style={asd.name}>{opt.name}</Text>
+        <Text style={asd.subtitle}>{typeLabel}</Text>
+
+        <View style={asd.tagsRow}>
+          <View style={[asd.tag, asd.tagOrange]}>
+            <Text style={asd.tagOrangeTxt}>
+              {category === 'food' ? 'Food' : category === 'kids' ? 'Kids' : 'Landmark'}
+            </Text>
+          </View>
+          <View style={[asd.tag, asd.tagAmber]}>
+            <Text style={asd.tagAmberTxt}>{opt.duration ?? `${dur} min`}</Text>
+          </View>
+          {opt.description && (
+            <View style={[asd.tag, asd.tagGreen]}>
+              <Text style={asd.tagGreenTxt}>Family pick</Text>
+            </View>
+          )}
+        </View>
+
+        {opt.description ? (
+          <View style={asd.section}>
+            <Text style={asd.sectionLabel}>{'WHY FAMILIES LOVE IT'}</Text>
+            <Text style={asd.sectionText}>{opt.description}</Text>
+          </View>
+        ) : null}
+
+        <View style={asd.infoGrid}>
+          <View style={asd.infoRow}>
+            <Text style={asd.infoLabel}>Duration</Text>
+            <Text style={asd.infoVal}>{opt.duration ?? `${dur} min`}</Text>
+          </View>
+          <View style={asd.infoRow}>
+            <Text style={asd.infoLabel}>Type</Text>
+            <Text style={asd.infoVal}>{typeLabel}</Text>
+          </View>
+          <View style={[asd.infoRow, { borderBottomWidth: 0 }]}>
+            <Text style={asd.infoLabel}>City</Text>
+            <Text style={asd.infoVal}>{city}</Text>
+          </View>
+        </View>
+
+        <Pressable style={asd.mapsRow} onPress={() => Linking.openURL(mapsUrl)}>
+          <Text style={asd.mapsAddr} numberOfLines={1}>
+            {'📍 '}{opt.address ?? `${opt.name}, ${city}`}
+          </Text>
+          <Text style={asd.mapsLink}>Open in Maps</Text>
+        </Pressable>
+      </ScrollView>
+
+      <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]}>
+        <Pressable style={asd.addBtn} onPress={onAddToDay}>
+          <Text style={asd.addBtnText}>Add to my day →</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const asd = StyleSheet.create({
+  wrap:         { position: 'absolute', inset: 0, backgroundColor: '#fff', zIndex: 10 },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14 },
+  backBtn:      { width: 32, height: 32, backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  backArrow:    { fontSize: 17, color: '#8A8FA8', marginTop: -1 },
+  body:         { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
+  name:         { fontFamily: 'Fraunces_900Black', fontSize: 22, color: '#1A1F2E', lineHeight: 27, marginBottom: 4 },
+  subtitle:     { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, textTransform: 'capitalize', marginBottom: 12 },
+  tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 16 },
+  tag:          { borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  tagOrange:    { backgroundColor: '#FDF0E9' },
+  tagOrangeTxt: { fontSize: 12, fontFamily: F.bold, color: '#E8692A' },
+  tagAmber:     { backgroundColor: '#FEF3DC' },
+  tagAmberTxt:  { fontSize: 12, fontFamily: F.bold, color: '#7A5A00' },
+  tagGreen:     { backgroundColor: '#E8F7EF' },
+  tagGreenTxt:  { fontSize: 12, fontFamily: F.bold, color: '#1A6640' },
+  section:      { backgroundColor: '#F5F2EE', borderRadius: 14, padding: 14, marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontFamily: F.bold, color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 7 },
+  sectionText:  { fontSize: 13, fontFamily: F.regular, color: '#1A1F2E', lineHeight: 20 },
+  infoGrid:     { backgroundColor: '#F5F2EE', borderRadius: 14, paddingHorizontal: 14, marginBottom: 12 },
+  infoRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(26,31,46,0.09)' },
+  infoLabel:    { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular },
+  infoVal:      { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E', textTransform: 'capitalize' },
+  mapsRow:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)', gap: 8 },
+  mapsAddr:     { flex: 1, fontSize: 13, fontFamily: F.regular, color: '#1A1F2E' },
+  mapsLink:     { fontSize: 13, fontFamily: F.bold, color: '#E8692A', flexShrink: 0 },
+  footer:       { paddingHorizontal: 20, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)', flexShrink: 0 },
+  addBtn:       { backgroundColor: '#E8692A', borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
+  addBtnText:   { fontSize: 15, fontFamily: F.bold, color: '#fff' },
+});
+
+// ─── PositionPickerSheet ──────────────────────────────────────────────────────
+
+function PositionPickerSheet({
+  opt, dayStops, category, adding, insets, onBack, onClose, onInsertAt,
+}: {
+  opt: StopOption;
+  dayStops: Stop[];
+  category: 'food' | 'kids' | 'landmarks';
+  adding: boolean;
+  insets: { bottom: number; top: number };
+  onBack: () => void;
+  onClose: () => void;
+  onInsertAt: (afterStopId: string) => void;
+}) {
+  const optDur = parseDurationMins(opt, category);
+
+  const BASE_MINS = 9 * 60; // 9:00 AM
+  const TRAVEL_MINS = 15;
+  const DAY_CAP_MINS = 18 * 60; // 6:00 PM
+
+  function toTimeStr(mins: number): string {
+    const h = Math.floor(mins / 60) % 24;
+    const m = mins % 60;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
+  }
+
+  type PosRow = { stopId: string; label: string; timeSub: string; warning?: string };
+  const rows: PosRow[] = [];
+  let acc = BASE_MINS;
+
+  dayStops.forEach((s, i) => {
+    const dur = s.durationMinutes ?? 60;
+    const newStopStart = acc + dur + TRAVEL_MINS;
+    const newStopEnd = newStopStart + optDur;
+    const isEnd = i === dayStops.length - 1;
+    const warning = newStopEnd > DAY_CAP_MINS
+      ? `Pushes day end to ${toTimeStr(newStopEnd)}`
+      : undefined;
+
+    rows.push({
+      stopId: s.id,
+      label: isEnd ? 'End of day' : `After ${s.name}`,
+      timeSub: `New stop around ${toTimeStr(newStopStart)}`,
+      warning,
+    });
+    acc += dur + TRAVEL_MINS;
+  });
+
+  return (
+    <View style={pps.wrap}>
+      <View style={as.handle} />
+
+      <View style={pps.header}>
+        <Pressable style={asd.backBtn} onPress={onBack} hitSlop={8}>
+          <Text style={asd.backArrow}>{'←'}</Text>
+        </Pressable>
+        <Pressable style={as.closeBtn} onPress={onClose} hitSlop={8}>
+          <Text style={as.closeX}>{'✕'}</Text>
+        </Pressable>
+      </View>
+
+      <View style={pps.titleWrap}>
+        <Text style={pps.title}>Where should we fit this?</Text>
+        <Text style={pps.sub}>{opt.name}</Text>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={pps.list} showsVerticalScrollIndicator={false}>
+        {rows.map((row, i) => (
+          <View key={row.stopId}>
+            {i > 0 && (
+              <View style={pps.divider}>
+                <View style={pps.divLine} />
+                <View style={pps.divPill}>
+                  <Text style={pps.divPillText} numberOfLines={1}>{dayStops[i].name}</Text>
+                </View>
+                <View style={pps.divLine} />
+              </View>
+            )}
+            <Pressable
+              style={pps.row}
+              onPress={() => !adding && onInsertAt(row.stopId)}
+              disabled={adding}
+            >
+              <View style={pps.rowPlus}>
+                <Text style={pps.rowPlusTxt}>+</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={pps.rowLabel}>{row.label}</Text>
+                <Text style={pps.rowSub}>{row.timeSub}</Text>
+                {row.warning ? (
+                  <Text style={pps.rowWarn}>{'⚠️ '}{row.warning}</Text>
+                ) : null}
+              </View>
+              {adding ? (
+                <ActivityIndicator color={C.orange} size="small" />
+              ) : (
+                <Text style={pps.rowChev}>{'›'}</Text>
+              )}
+            </Pressable>
+          </View>
+        ))}
+
+        {rows.length === 0 && (
+          <View style={as.emptyWrap}>
+            <Text style={as.emptyText}>No stops on this day yet.</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={[pps.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]} />
+    </View>
+  );
+}
+
+const pps = StyleSheet.create({
+  wrap:        { position: 'absolute', inset: 0, backgroundColor: '#fff', zIndex: 20 },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14 },
+  titleWrap:   { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
+  title:       { fontFamily: 'Fraunces_900Black', fontSize: 22, color: '#1A1F2E', lineHeight: 27 },
+  sub:         { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, marginTop: 3 },
+  list:        { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20 },
+  divider:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
+  divLine:     { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(26,31,46,0.09)' },
+  divPill:     { backgroundColor: '#F5F2EE', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10 },
+  divPillText: { fontSize: 11, color: '#8A8FA8', fontFamily: F.bold },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)', marginBottom: 2, shadowColor: '#1A1F2E', shadowRadius: 6, shadowOpacity: 0.06, elevation: 1 },
+  rowPlus:     { width: 32, height: 32, backgroundColor: '#FDF0E9', borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  rowPlusTxt:  { fontSize: 18, fontFamily: F.bold, color: '#E8692A', lineHeight: 22 },
+  rowLabel:    { fontSize: 14, fontFamily: F.bold, color: '#1A1F2E' },
+  rowSub:      { fontSize: 12, color: '#8A8FA8', fontFamily: F.regular, marginTop: 2 },
+  rowWarn:     { fontSize: 11, fontFamily: F.bold, color: '#F5A623', marginTop: 3 },
+  rowChev:     { fontSize: 20, color: '#D1D5E0', flexShrink: 0 },
+  footer:      { borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)' },
 });
 
 // ─── Root screen ──────────────────────────────────────────────────────────────
