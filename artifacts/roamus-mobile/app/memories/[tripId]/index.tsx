@@ -2,10 +2,9 @@
  * Active Trip Memory Index — per-stop photo grids + capture
  * Brief: memories-replit-brief.md — Screen 2
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,10 +16,9 @@ import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import * as ImagePicker from 'expo-image-picker';
-
 import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+import StopPickerSheet from '@/components/StopPickerSheet';
 
 const { width: SW } = Dimensions.get('window');
 const PHOTO_SIZE = (SW - 40 - 12) / 3;
@@ -50,6 +48,7 @@ export default function TripMemoryIndex() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
 
   const { data: trip, isLoading: tripLoading } = useQuery({
     queryKey: ['trip', tripId],
@@ -82,43 +81,14 @@ export default function TripMemoryIndex() {
     return { visitedStops, momentsByStop, allPhotos };
   }, [trip, moments]);
 
-  async function captureTripPhoto() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera access is required to take photos.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      await memoriesAPI.createMoment({ tripId, stopId: undefined, photoUrls: [uri] });
-      await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-      Alert.alert('Moment saved!', 'Your photo has been added to this trip.');
-    }
-  }
+  function openPhotoSheet() { setShowPhotoSheet(true); }
 
-  async function addPhotoToStop(stopId: string) {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Photo library access is required.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+  function handleStopSelect(stopId: string | null, stopName: string, stopIcon: string) {
+    setShowPhotoSheet(false);
+    router.push({
+      pathname: `/memories/${tripId}/add-photo` as never,
+      params: { stopId: stopId ?? '', stopName, stopIcon },
     });
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      await memoriesAPI.createMoment({ tripId, stopId, photoUrls: [uri] });
-      await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-    }
   }
 
   if (tripLoading || momentsLoading) {
@@ -139,8 +109,8 @@ export default function TripMemoryIndex() {
           <Text style={styles.backBtnText}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{tripName}</Text>
-        <Pressable style={styles.cameraBtn} onPress={captureTripPhoto} hitSlop={8}>
-          <Text style={styles.cameraBtnIcon}>📷</Text>
+        <Pressable style={styles.addBtn} onPress={openPhotoSheet} hitSlop={8}>
+          <Text style={styles.addBtnText}>📷 Add</Text>
         </Pressable>
       </View>
 
@@ -191,7 +161,7 @@ export default function TripMemoryIndex() {
                   </View>
                 ))}
                 {/* Dashed add slot */}
-                <Pressable style={styles.addSlot} onPress={() => addPhotoToStop(stop.id)}>
+                <Pressable style={styles.addSlot} onPress={openPhotoSheet}>
                   <Text style={styles.addSlotPlus}>+</Text>
                 </Pressable>
               </View>
@@ -220,6 +190,13 @@ export default function TripMemoryIndex() {
           </View>
         )}
       </ScrollView>
+      {showPhotoSheet && (
+        <StopPickerSheet
+          trip={trip ?? null}
+          onDismiss={() => setShowPhotoSheet(false)}
+          onSelect={handleStopSelect}
+        />
+      )}
     </View>
   );
 }
@@ -249,13 +226,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: 8,
   },
-  cameraBtn: {
-    width: 38,
-    height: 38,
+  addBtn: {
+    backgroundColor: '#E8692A',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
-  cameraBtnIcon: { fontSize: 22 },
+  addBtnText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
 
   emptyBox: { margin: 24, alignItems: 'center', paddingVertical: 40 },
   emptyTitle: { fontSize: 16, fontFamily: F.bold, color: C.deep, marginBottom: 6 },
