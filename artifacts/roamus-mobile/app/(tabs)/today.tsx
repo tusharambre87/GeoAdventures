@@ -509,6 +509,13 @@ export default function TodayScreen() {
       if (override) {
         await AsyncStorage.removeItem('today_state_override');
         if (override === 'stop_complete') {
+          await AsyncStorage.removeItem('atStopFrozen');
+          const startStr = await AsyncStorage.getItem('atStopStartTime');
+          if (startStr) {
+            const elapsed = Math.round((Date.now() - parseInt(startStr, 10)) / 60000);
+            setVisitedElapsed(elapsed > 0 ? elapsed : null);
+            await AsyncStorage.removeItem('atStopStartTime');
+          }
           setCurrentStopIndex(i => i + 1);
           if (!devState) setTodayState('stop_complete');
         }
@@ -1476,6 +1483,7 @@ export default function TodayScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setTodayState('at_stop_frozen');
                 AsyncStorage.setItem('atStopFrozen', 'true');
+                AsyncStorage.setItem('atStopStartTime', String(Date.now()));
                 router.push('/(tabs)/atstop' as never);
               }}
             >

@@ -519,6 +519,7 @@ export default function AtStopScreen() {
   async function handleMarkComplete(skipFeedback = false) {
     if (!currentStop) return;
     Keyboard.dismiss();
+    await AsyncStorage.removeItem('atStopFrozen');
     setSubmittingFeedback(true);
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
