@@ -1831,7 +1831,7 @@ export default function TodayScreen() {
           {/* Kids zone CTA */}
           <TouchableOpacity
             style={dc.kidsZoneBtn} activeOpacity={0.85}
-            onPress={() => {}}
+            onPress={() => router.push('/kids' as never)}
           >
             <Text style={dc.kidsZoneBtnText}>🧸 Kids zone →</Text>
           </TouchableOpacity>
@@ -1912,7 +1912,7 @@ export default function TodayScreen() {
 
           <TouchableOpacity
             style={tc.gamesBtn} activeOpacity={0.85}
-            onPress={() => {}}
+            onPress={() => router.push('/kids/games' as never)}
           >
             <Text style={tc.gamesBtnText}>🎮 Travel games for the way home</Text>
           </TouchableOpacity>
@@ -2032,7 +2032,8 @@ export default function TodayScreen() {
                     </View>
                   ) : null}
                   {/* Story playback button — read-only tap target */}
-                  <TouchableOpacity style={dh.playRow} activeOpacity={0.7} onPress={() => {}}>
+                  <TouchableOpacity style={dh.playRow} activeOpacity={0.7}
+                    onPress={() => trip ? router.push({ pathname: '/memories/[tripId]/recap' as never, params: { tripId: trip.id } } as never) : undefined}>
                     <View style={dh.playBtn}>
                       <Text style={dh.playBtnIcon}>▶️</Text>
                     </View>
