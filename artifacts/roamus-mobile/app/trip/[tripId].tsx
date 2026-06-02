@@ -4,7 +4,7 @@
  * Brief: ROAMUS_TRIP_PLAN_REPLIT_BRIEF_v2.md
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -1545,8 +1545,28 @@ function StopDetailSheet({
 
 // ─── ReplaceSheet ─────────────────────────────────────────────────────────────
 
-const REPLACE_CHIPS = ['Best match', 'Outdoors', 'Shorter', 'More fun', 'Indoor'] as const;
+const REPLACE_CHIPS = ['All', 'Same Vibe', 'Shorter', 'Easier', 'Indoor', 'More Active'] as const;
 type ReplaceChip = typeof REPLACE_CHIPS[number];
+
+type SuggestionItem = {
+  id: string;
+  name: string;
+  stopType?: string;
+  description?: string;
+  duration?: string;
+  durationMinutes?: number;
+  filterGroup?: string;
+};
+
+function chipToFilterGroup(c: ReplaceChip): string | null {
+  if (c === 'All')         return null;
+  if (c === 'Same Vibe')   return 'sameVibe';
+  if (c === 'Shorter')     return 'shorter';
+  if (c === 'Easier')      return 'easier';
+  if (c === 'Indoor')      return 'indoor';
+  if (c === 'More Active') return 'moreActive';
+  return null;
+}
 
 function ReplaceSheet({
   stop,
@@ -1565,52 +1585,28 @@ function ReplaceSheet({
   onClose: () => void;
   onReplaceConfirm: () => void;
 }) {
-  const [chip, setChip]       = useState<ReplaceChip>('Best match');
-  const [search, setSearch]   = useState('');
-  const [loading, setLoading] = useState(false);
-  const [alts, setAlts]       = useState<Array<{ id: string; name: string; stopType?: string; description?: string; duration?: string; durationMinutes?: number }>>([]);
-  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const altsCacheRef = useRef<Map<string, typeof alts>>(new Map());
+  const [chip, setChip]             = useState<ReplaceChip>('All');
+  const [search, setSearch]         = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [allSugs, setAllSugs]       = useState<SuggestionItem[]>([]);
+  const sugsCache = useRef<Map<string, SuggestionItem[]>>(new Map());
 
   const queryClient = useQueryClient();
 
-  function chipFilter(c: ReplaceChip): string | null {
-    if (c === 'Best match') return 'best_match';
-    if (c === 'Outdoors')   return 'outdoors';
-    if (c === 'Shorter')    return 'shorter';
-    if (c === 'More fun')   return 'fun';
-    if (c === 'Indoor')     return 'indoor';
-    return null;
-  }
-
-  async function loadAlts(chipVal: ReplaceChip, searchVal: string) {
-    if (!stop) return;
-    const cacheKey = `${stop.id}:${chipVal}:${searchVal}`;
-    const cached = altsCacheRef.current.get(cacheKey);
-    if (cached) { setAlts(cached); return; }
+  async function loadSuggestions(stopId: string) {
+    const cached = sugsCache.current.get(stopId);
+    if (cached) { setAllSugs(cached); return; }
     setLoading(true);
     try {
-      const res = await apiFetch<{ better?: typeof alts; similar?: typeof alts; suggestions?: typeof alts }>(
-        '/api/travel/stops/replace-suggestions',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            stopName: stop.name,
-            stopType: stop.stopType,
-            destination: trip.city ?? trip.destination ?? '',
-            chipFilter: chipFilter(chipVal),
-            search: searchVal || undefined,
-          }),
-        }
+      const res = await apiFetch<{ suggestions: SuggestionItem[] }>(
+        `/api/travel/stops/${stopId}/replace-suggestions`,
+        { method: 'POST' }
       );
-      const combined = [...(res.better ?? []), ...(res.similar ?? []), ...(res.suggestions ?? [])];
-      const existingNames = new Set(allStops.map(s => s.name?.toLowerCase().trim()));
-      const filtered = combined.filter(a => !existingNames.has(a.name?.toLowerCase().trim()));
-      const result = filtered.slice(0, 8);
-      altsCacheRef.current.set(cacheKey, result);
-      setAlts(result);
+      const result = res.suggestions ?? [];
+      sugsCache.current.set(stopId, result);
+      setAllSugs(result);
     } catch {
-      setAlts([]);
+      setAllSugs([]);
     } finally {
       setLoading(false);
     }
@@ -1618,13 +1614,30 @@ function ReplaceSheet({
 
   useEffect(() => {
     if (!stop) return;
-    loadAlts(chip, '');
-  }, [stop?.id, chip]);
+    setChip('All');
+    setSearch('');
+    loadSuggestions(stop.id);
+  }, [stop?.id]);
+
+  const existingNames = useMemo(
+    () => new Set(allStops.map(s => s.name?.toLowerCase().trim())),
+    [allStops]
+  );
+
+  const alts = useMemo(() => {
+    const filterGroup = chipToFilterGroup(chip);
+    let result = filterGroup
+      ? allSugs.filter(s => s.filterGroup === filterGroup)
+      : allSugs;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(s => s.name.toLowerCase().includes(q));
+    }
+    return result.filter(a => !existingNames.has(a.name?.toLowerCase().trim())).slice(0, 8);
+  }, [allSugs, chip, search, existingNames]);
 
   function onSearchChange(text: string) {
     setSearch(text);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => loadAlts(chip, text), 400);
   }
 
   if (!stop) return null;
