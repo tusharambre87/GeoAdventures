@@ -511,13 +511,13 @@ export default function TodayScreen() {
       if (override) {
         await AsyncStorage.removeItem('today_state_override');
         if (override === 'stop_complete') {
-          await AsyncStorage.removeItem('atStopFrozen');
-          const startStr = await AsyncStorage.getItem('atStopStartTime');
-          if (startStr) {
-            const elapsed = Math.round((Date.now() - parseInt(startStr, 10)) / 60000);
-            setVisitedElapsed(elapsed > 0 ? elapsed : null);
-            await AsyncStorage.removeItem('atStopStartTime');
+          setCurrentStopIndex(i => i + 1);
+          const elapsed = await AsyncStorage.getItem('atStopElapsed');
+          if (elapsed) {
+            setVisitedElapsed(parseInt(elapsed, 10) || null);
+            await AsyncStorage.removeItem('atStopElapsed');
           }
+          await AsyncStorage.removeItem('atStopFrozen');
           if (!devState) setTodayState('stop_complete');
         }
       }
@@ -562,13 +562,6 @@ export default function TodayScreen() {
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
 
-      // Derive current stop index deterministically from visited state
-      if (override === 'stop_complete') {
-        const lastVisited = stops.reduce(
-          (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
-        );
-        setCurrentStopIndex(Math.min(lastVisited + 1, stops.length - 1));
-      }
 
       if (!devState && override !== 'stop_complete') {
         const days = daysUntilDate(t.startDate);

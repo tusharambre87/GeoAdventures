@@ -519,6 +519,13 @@ export default function AtStopScreen() {
   async function handleMarkComplete(skipFeedback = false) {
     if (!currentStop) return;
     Keyboard.dismiss();
+    // Compute elapsed time before clearing start timestamp
+    const startStr = await AsyncStorage.getItem('atStopStartTime');
+    if (startStr) {
+      const elapsed = Math.round((Date.now() - parseInt(startStr, 10)) / 60000);
+      await AsyncStorage.setItem('atStopElapsed', String(elapsed > 0 ? elapsed : 0));
+      await AsyncStorage.removeItem('atStopStartTime');
+    }
     await AsyncStorage.removeItem('atStopFrozen');
     setSubmittingFeedback(true);
     try {
