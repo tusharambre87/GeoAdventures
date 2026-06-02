@@ -122,6 +122,8 @@ type StopMetadata = {
   anchorScore?: number;
   dropPriority?: number;
   sessionFit?: string;
+  durationMinutes?: number | null;
+  durationClass?: string | null;
   foodNearby?: Array<{ name: string; distance: string; type: string }>;
 };
 
@@ -267,9 +269,15 @@ const DURATION_BY_TYPE: Record<string, number> = {
 };
 
 function getStopDuration(stop: Stop): number {
+  // 1. Top-level field (future-proofing if DB column is ever added)
   if (stop.durationMinutes) return stop.durationMinutes;
-  const t = stop.stopType ?? '';
-  return DURATION_BY_TYPE[t] ?? 75;
+  // 2. metadata.durationMinutes — where the real stored value lives in the API response
+  const metaDur = parseMetadata(stop.metadata).durationMinutes;
+  // 3. Family floor for this stop type — applies as minimum even if metadata has a value
+  const typeFloor = DURATION_BY_TYPE[stop.stopType ?? ''] ?? 75;
+  // Use whichever is larger: the stored metadata value or the family floor
+  if (metaDur) return Math.max(metaDur, typeFloor);
+  return typeFloor;
 }
 
 /**

@@ -8148,16 +8148,16 @@ Return ONLY valid JSON in this exact format:
       let updated = 0;
 
       for (const stop of stops) {
-        const floor = familyDurationFloor(stop.stopType ?? 'landmark', stop.durationMinutes ?? null);
-        const currentDur = stop.durationMinutes ?? null;
+        const floor = familyDurationFloor(stop.stopType ?? 'landmark', null);
+        // durationMinutes lives in metadata JSONB, not a top-level column
+        const meta = (stop.metadata ?? {}) as Record<string, unknown>;
+        const currentDur = typeof meta.durationMinutes === 'number' ? meta.durationMinutes : null;
+        const targetDur = currentDur ? Math.max(currentDur, floor) : floor;
 
-        // Update if current duration is missing or below the family floor
+        // Only write if we need to change something
         if (!currentDur || currentDur < floor) {
-          await storage.updateStop(stop.id, { durationMinutes: floor } as any);
-          // Also sync metadata.durationMinutes
-          const meta = (stop.metadata ?? {}) as Record<string, unknown>;
           await storage.updateStop(stop.id, {
-            metadata: { ...meta, durationMinutes: floor },
+            metadata: { ...meta, durationMinutes: targetDur },
           } as any);
           updated++;
         }
