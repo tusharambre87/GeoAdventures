@@ -892,6 +892,7 @@ export default function TodayScreen() {
             <View style={ptf.badge}>
               <Text style={ptf.badgeText}>UPCOMING TRIP</Text>
             </View>
+            <Text style={ptf.heroName} numberOfLines={2}>{trip?.name ?? (city ? `${city} Trip` : 'Your Trip')}</Text>
             <Text style={ptf.countdown}>{daysLeft}</Text>
             <Text style={ptf.countdownLabel}>days until {city || 'your trip'}</Text>
             <Text style={ptf.startDate}>{startLabel}</Text>
@@ -969,7 +970,10 @@ export default function TodayScreen() {
             end={{ x: 0.9, y: 1 }}
             style={[ptt.hero, { paddingTop: insets.top + 28 }]}
           >
-            <Text style={ptt.heroEyebrow}>TOMORROW'S THE DAY</Text>
+            <View style={ptt.pillWrap}>
+              <Text style={ptt.pillIcon}>{'⏰'}</Text>
+              <Text style={ptt.pillText}>You leave tomorrow</Text>
+            </View>
             <Text style={ptt.heroTitle}>{trip?.name ?? city}</Text>
             <Text style={ptt.heroSub}>
               {tomorrowStops.length} stop{tomorrowStops.length !== 1 ? 's' : ''} planned{city ? ` in ${city}` : ''}
@@ -2132,7 +2136,7 @@ const nt = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
   iconEmoji: { fontSize: 46 },
-  heading: { fontFamily: F.bold, fontSize: 24, color: C.deep, textAlign: 'center', marginBottom: 10 },
+  heading: { fontFamily: F.serif, fontSize: 24, color: C.deep, textAlign: 'center', marginBottom: 10 },
   sub:     { fontFamily: F.medium, fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22, marginBottom: 28, paddingHorizontal: 12 },
   cta:     { backgroundColor: C.orange, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32,
     shadowColor: C.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
@@ -2143,6 +2147,7 @@ const nt = StyleSheet.create({
 // PRE_TRIP_FAR
 const ptf = StyleSheet.create({
   hero:           { paddingHorizontal: 24, paddingBottom: 32, alignItems: 'center' },
+  heroName:       { fontFamily: F.serif, fontSize: 32, color: '#fff', lineHeight: 38, marginBottom: 12, textAlign: 'center' },
   badge:          { backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 20 },
   badgeText:      { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.8 },
   countdown:      { fontFamily: F.serif, fontSize: 72, color: '#fff', lineHeight: 76 },
@@ -2181,8 +2186,11 @@ const ptf = StyleSheet.create({
 // PRE_TRIP_TOMORROW
 const ptt = StyleSheet.create({
   hero:         { paddingHorizontal: 24, paddingBottom: 32 },
+  pillWrap:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(251,191,36,0.22)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, alignSelf: 'flex-start', marginBottom: 14 },
+  pillIcon:     { fontSize: 14 },
+  pillText:     { fontFamily: F.bold, fontSize: 11, color: '#FEF3C7', letterSpacing: 0.7, textTransform: 'uppercase' },
   heroEyebrow:  { fontFamily: F.bold, fontSize: 11, color: 'rgba(255,255,255,0.65)', letterSpacing: 1, marginBottom: 10 },
-  heroTitle:    { fontFamily: F.bold, fontSize: 26, color: '#fff', marginBottom: 6, lineHeight: 30 },
+  heroTitle:    { fontFamily: F.serif, fontSize: 28, color: '#fff', marginBottom: 6, lineHeight: 34 },
   heroSub:      { fontFamily: F.medium, fontSize: 14, color: 'rgba(255,255,255,0.7)' },
   alertBanner:  { marginHorizontal: 16, marginTop: 14, backgroundColor: C.redLt, borderRadius: 12, padding: 14,
     flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: 'rgba(232,67,58,0.2)' },
