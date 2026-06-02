@@ -872,6 +872,26 @@ export default function TodayScreen() {
             <Text style={ptf.countdown}>{daysLeft}</Text>
             <Text style={ptf.countdownLabel}>days until {city || 'your trip'}</Text>
             <Text style={ptf.startDate}>{startLabel}</Text>
+            {/* Scrolling quote-chip strip */}
+            <ScrollView
+              horizontal showsHorizontalScrollIndicator={false}
+              style={ptf.quoteStrip} contentContainerStyle={ptf.quoteStripContent}
+              scrollEnabled
+            >
+              {[
+                'The journey is the destination',
+                'Family memories last forever',
+                'Adventure awaits around every corner',
+                'Collect moments, not things',
+                'Every mile is worth it',
+                'Life is short — travel often',
+                'Go where you feel most alive',
+              ].map((q, i) => (
+                <View key={i} style={ptf.quoteChip}>
+                  <Text style={ptf.quoteChipText}>{q}</Text>
+                </View>
+              ))}
+            </ScrollView>
           </LinearGradient>
 
           <View style={ptf.card}>
@@ -1420,19 +1440,31 @@ export default function TodayScreen() {
             </LinearGradient>
           </View>
 
-          {/* Green banner — tap to return to At Stop tab */}
-          <TouchableOpacity
-            style={asf.greenBanner}
-            activeOpacity={0.85}
-            onPress={() => router.push('/(tabs)/atstop' as never)}
-          >
-            <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={asf.greenBannerTitle}>You're at {stop.name}</Text>
-              <Text style={asf.greenBannerSub}>Tap to go back to your stop</Text>
-            </View>
-            <Text style={asf.greenBannerArrow}>›</Text>
-          </TouchableOpacity>
+          {/* Dual action button row: Directions (outline) + I'm here (dark) */}
+          <View style={er.dualBtnRow}>
+            <TouchableOpacity
+              style={er.dirBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const addr = (stop as { address?: string }).address ?? stop.name;
+                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+              }}
+            >
+              <Text style={er.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={er.hereBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                DeviceEventEmitter.emit('todayAtStopFrozen', { active: true });
+                setTodayState('at_stop_frozen');
+                router.push('/(tabs)/atstop' as never);
+              }}
+            >
+              <Text style={er.hereBtnText}>I’m here ✓</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
         {menuOverlay}
       </View>
@@ -1762,7 +1794,7 @@ export default function TodayScreen() {
             </ScrollView>
           </View>
 
-          {hStops.length === 0 ? (
+          {(todayState === 'day_history_empty' || hStops.length === 0) ? (
             <View style={dh.emptyCard}>
               <Text style={dh.emptyEmoji}>{'🗓️'}</Text>
               <Text style={dh.emptyTitle}>No stops recorded for Day {historyDayIndex + 1}</Text>
@@ -1791,14 +1823,32 @@ export default function TodayScreen() {
                 </View>
               </View>
               {hStops.map((stop, i) => (
-                <View key={stop.id} style={dh.stopRow}>
-                  <View style={[dh.stopCheck, (stop.isVisited || stop.visited) && dh.stopCheckDone]}>
-                    <Text style={dh.stopCheckText}>
-                      {(stop.isVisited || stop.visited) ? '✓' : String(i + 1)}
-                    </Text>
+                <View key={stop.id} style={dh.stopCard}>
+                  {/* Header row: check + name + duration */}
+                  <View style={dh.stopRow}>
+                    <View style={[dh.stopCheck, (stop.isVisited || stop.visited) && dh.stopCheckDone]}>
+                      <Text style={dh.stopCheckText}>
+                        {(stop.isVisited || stop.visited) ? '✓' : String(i + 1)}
+                      </Text>
+                    </View>
+                    <Text style={dh.stopName} numberOfLines={1}>{stop.name}</Text>
+                    <Text style={dh.stopDur}>{getStopDuration(stop)} min</Text>
                   </View>
-                  <Text style={dh.stopName} numberOfLines={1}>{stop.name}</Text>
-                  <Text style={dh.stopDur}>{getStopDuration(stop)} min</Text>
+                  {/* Photo row — placeholder slots (read-only) */}
+                  <View style={dh.photoRow}>
+                    {[0, 1, 2].map(slot => (
+                      <View key={slot} style={dh.photoSlot}>
+                        <Text style={dh.photoSlotIcon}>📷</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {/* Story playback button — read-only tap target */}
+                  <TouchableOpacity style={dh.playRow} activeOpacity={0.7} onPress={() => {}}>
+                    <View style={dh.playBtn}>
+                      <Text style={dh.playBtnIcon}>▶️</Text>
+                    </View>
+                    <Text style={dh.playLabel}>Play story</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
               <Pressable style={dh.linkBtn} onPress={() => trip && router.push(`/trip/${trip.id}` as never)}>
@@ -1927,6 +1977,16 @@ const ptf = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(245,166,35,0.25)' },
   tipLabel:       { fontFamily: F.bold, fontSize: 10, color: C.amberDark, letterSpacing: 1, marginBottom: 6 },
   tipText:        { fontFamily: F.medium, fontSize: 13, color: C.amberDark, lineHeight: 20 },
+  quoteStrip: { marginTop: 16 },
+  quoteStripContent: { paddingHorizontal: 20, gap: 8 },
+  quoteChip: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+  },
+  quoteChipText: {
+    fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.85)',
+    fontStyle: 'italic',
+  },
 });
 
 // PRE_TRIP_TOMORROW
@@ -2068,6 +2128,20 @@ const er = StyleSheet.create({
   afterTicket:     { backgroundColor: C.redLt, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
   afterTicketText: { fontSize: 10 },
   afterDur:        { fontFamily: F.medium, fontSize: 12, color: C.muted },
+  dualBtnRow: {
+    flexDirection: 'row', gap: 10, marginHorizontal: 16,
+    marginTop: 10, marginBottom: 8,
+  },
+  dirBtn: {
+    flex: 1, borderWidth: 1.5, borderColor: '#1A1F2E',
+    borderRadius: 12, paddingVertical: 14, alignItems: 'center',
+  },
+  dirBtnText: { fontFamily: F.bold, fontSize: 15, color: '#1A1F2E' },
+  hereBtn: {
+    flex: 1, backgroundColor: '#1A1F2E',
+    borderRadius: 12, paddingVertical: 14, alignItems: 'center',
+  },
+  hereBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
 });
 
 // AT_STOP_FROZEN
@@ -2256,6 +2330,27 @@ const dh = StyleSheet.create({
   emptySub:     { fontFamily: F.medium, fontSize: 14, color: C.muted, textAlign: 'center' },
   backBtn:      { alignItems: 'center', paddingVertical: 14 },
   backBtnText:  { fontFamily: F.semibold, fontSize: 14, color: C.muted },
+  stopCard: {
+    marginBottom: 12, backgroundColor: '#fff',
+    borderRadius: 14, padding: 14,
+  },
+  photoRow: {
+    flexDirection: 'row', gap: 8, marginTop: 10, marginBottom: 10,
+  },
+  photoSlot: {
+    flex: 1, aspectRatio: 1, borderRadius: 10,
+    backgroundColor: '#F0F0F5', alignItems: 'center', justifyContent: 'center',
+  },
+  photoSlotIcon: { fontSize: 22, opacity: 0.4 },
+  playRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4,
+  },
+  playBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
+  },
+  playBtnIcon: { fontSize: 12 },
+  playLabel: { fontFamily: F.medium, fontSize: 13, color: '#6B4FA8' },
 });
 
 // ⋯ Menu styles
