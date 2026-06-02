@@ -418,7 +418,7 @@ export default function TodayScreen() {
       ? (rawDevState as TodayState)
       : undefined;
 
-  const [todayState, setTodayState]             = useState<TodayState>(devState ?? 'morning');
+  const [todayState, setTodayState]             = useState<TodayState>(devState ?? 'no_trip');
   const [trip, setTrip]                         = useState<TripData | null>(null);
   const [dayStops, setDayStops]                 = useState<Stop[]>([]);
   const [currentStopIndex, setCurrentStopIndex] = useState(0);

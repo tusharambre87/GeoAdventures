@@ -72,29 +72,59 @@ function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null
 }
 
 function Slide2Map({ trip }: { trip: any }) {
-  const stops = trip?.stops ?? [];
+  const allStops = trip?.stops ?? [];
+  const visited = allStops
+    .filter((s: any) => s.isVisited || s.visited)
+    .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  const city = trip?.destination ?? '';
+  const numDays = trip?.tripDays ?? trip?.days ?? 0;
+  const visitedCount = visited.length;
+
   return (
     <View style={styles.slide}>
-      <LinearGradient colors={['#b8d4c8', '#a8c4b8']} style={StyleSheet.absoluteFill} />
-      <LinearGradient
-        colors={['rgba(0,0,0,0.5)', 'transparent']}
-        style={[StyleSheet.absoluteFill, { height: 140 }]}
-      />
-      <View style={styles.mapLabel}>
-        <Text style={styles.eyebrow}>Your Journey</Text>
-        <Text style={styles.mapTitle}>{stops.length} places explored</Text>
+      <LinearGradient colors={['#1A1F2E', '#0d1520']} style={StyleSheet.absoluteFill} />
+
+      {/* Top text block */}
+      <View style={styles.mapTopBlock}>
+        <Text style={styles.mapEyebrow}>YOUR JOURNEY</Text>
+        <Text style={styles.mapTripName}>{trip?.name ?? 'Our Trip'}</Text>
+        <Text style={styles.mapSubline}>
+          {[city, visitedCount > 0 ? `${visitedCount} stops` : null, numDays > 0 ? `${numDays} days` : null]
+            .filter(Boolean).join(' · ')}
+        </Text>
       </View>
-      {/* Placeholder pins */}
-      {stops.slice(0, 5).map((s: any, i: number) => {
-        const top = 200 + i * 70 + (i % 2 === 0 ? 0 : 40);
-        const left = 60 + (i % 2 === 0 ? 0 : 180);
-        return (
-          <View key={s.id} style={[styles.mapPin, { top, left }]}>
-            <Text style={styles.mapPinText}>{i + 1}</Text>
-          </View>
-        );
-      })}
-      <Wordmark opacity={0.5} />
+
+      {/* Stop list */}
+      <View style={styles.mapStopList}>
+        {visited.slice(0, 8).map((s: any, i: number) => {
+          const visitedAt = s.visitedAt ?? s.updatedAt ?? null;
+          const timeLabel = visitedAt
+            ? new Date(visitedAt).toLocaleTimeString('default', { hour: 'numeric', minute: '2-digit' })
+            : '';
+          const isLast = i === Math.min(visited.length, 8) - 1;
+          return (
+            <View key={s.id} style={styles.mapStopRow}>
+              {/* Dot + connector */}
+              <View style={styles.mapDotCol}>
+                <View style={[styles.mapDot, s.isVisited || s.visited ? styles.mapDotFilled : styles.mapDotOutline]} />
+                {!isLast && <View style={styles.mapConnector} />}
+              </View>
+              {/* Name + time */}
+              <View style={styles.mapStopInfo}>
+                <Text style={styles.mapStopName} numberOfLines={1}>{s.name}</Text>
+                {timeLabel ? <Text style={styles.mapStopTime}>{timeLabel}</Text> : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Attribution pill */}
+      <View style={styles.mapPill}>
+        <Text style={styles.mapPillText}>📍 {visitedCount} places explored</Text>
+      </View>
+
+      <Wordmark opacity={0.3} />
     </View>
   );
 }
@@ -324,10 +354,22 @@ const styles = StyleSheet.create({
   slide1Meta: { fontSize: 14, fontFamily: F.regular, color: 'rgba(255,255,255,0.6)' },
 
   // Slide 2 Map
-  mapLabel: { position: 'absolute', top: 70, left: 24, zIndex: 3 },
-  mapTitle: { fontSize: 22, fontFamily: F.bold, color: '#fff', marginTop: 4 },
-  mapPin: { position: 'absolute', width: 36, height: 36, backgroundColor: '#E8692A', borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff', zIndex: 2 },
-  mapPinText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
+  mapTopBlock: { position: 'absolute', top: 100, left: 28, right: 28 },
+  mapEyebrow: { fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.45)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 },
+  mapTripName: { fontFamily: 'Georgia', fontSize: 28, fontWeight: '800', color: '#fff', lineHeight: 34, marginBottom: 6 },
+  mapSubline: { fontSize: 13, fontFamily: F.regular, color: 'rgba(255,255,255,0.5)' },
+  mapStopList: { position: 'absolute', top: 260, left: 28, right: 28 },
+  mapStopRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 0 },
+  mapDotCol: { alignItems: 'center', width: 20, paddingTop: 4 },
+  mapDot: { width: 10, height: 10, borderRadius: 5 },
+  mapDotFilled: { backgroundColor: '#fff' },
+  mapDotOutline: { borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'transparent' },
+  mapConnector: { width: 1, flex: 1, minHeight: 24, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4 },
+  mapStopInfo: { flex: 1, paddingLeft: 10, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  mapStopName: { flex: 1, fontSize: 14, fontFamily: F.bold, color: '#fff' },
+  mapStopTime: { fontSize: 12, fontFamily: F.regular, color: 'rgba(255,255,255,0.45)', marginLeft: 8 },
+  mapPill: { position: 'absolute', bottom: 140, left: 28, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
+  mapPillText: { fontSize: 13, fontFamily: F.medium, color: 'rgba(255,255,255,0.75)' },
 
   // Slide 3 Collage
   collageHeader: { paddingTop: 100, paddingHorizontal: 24, paddingBottom: 20, position: 'relative', zIndex: 2 },
