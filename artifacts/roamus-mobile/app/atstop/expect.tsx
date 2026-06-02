@@ -570,9 +570,13 @@ export default function ExpectScreen() {
     (meta.ticketSignal === false || (!priceRange && meta.ticketSignal !== true))
       ? G.green : G.deep;
   const accessRows: AccessRow[] = [
-    parking != null ? { key: 'Parking', val: parking || 'Nearby', color: '#D97706' } : null,
-    { key: 'Stroller friendly', val: stroller ? 'Yes' : 'Check ahead', color: stroller ? G.green : G.muted },
-    { key: 'Restrooms', val: restrooms || 'On site' },
+    parking ? { key: 'Parking', val: parking, color: '#D97706' } : null,
+    stroller != null
+      ? { key: 'Stroller friendly', val: stroller ? 'Yes' : 'No', color: stroller ? G.green : G.muted }
+      : { key: 'Stroller friendly', val: 'Info not available', color: G.muted },
+    typeof restrooms === 'string' && restrooms
+      ? { key: 'Restrooms', val: restrooms }
+      : { key: 'Restrooms', val: 'Info not available', color: G.muted },
     { key: 'Admission', val: admissionVal, color: admissionColor },
     address ? { key: 'Address', val: address } : null,
   ].filter((x): x is AccessRow => x !== null);

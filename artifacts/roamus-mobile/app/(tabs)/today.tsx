@@ -123,6 +123,8 @@ type Stop = {
   enrichment?: StopEnrichment | null;
   metadata?: StopMetadata | null;
   cityGroup?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
 };
 
 type TripData = {
@@ -447,6 +449,7 @@ export default function TodayScreen() {
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
   const [showMenu, setShowMenu]                 = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
+  const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -464,6 +467,27 @@ export default function TodayScreen() {
     loop.start();
     return () => loop.stop();
   }, [todayState]);
+
+  // ── Open-Meteo weather fetch for EN_ROUTE rain alert ──
+  useEffect(() => {
+    const s = dayStops[currentStopIndex];
+    if (!s?.latitude || !s?.longitude) { setRainAlert(null); return; }
+    const lat = parseFloat(s.latitude);
+    const lon = parseFloat(s.longitude);
+    if (isNaN(lat) || isNaN(lon)) { setRainAlert(null); return; }
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability&timezone=auto&forecast_days=1`
+    )
+      .then(r => r.json())
+      .then((d: Record<string, unknown>) => {
+        const now = new Date();
+        const probs = ((d.hourly as Record<string,unknown>)?.precipitation_probability ?? []) as number[];
+        const nextThree = probs.slice(now.getHours(), now.getHours() + 3);
+        const maxChance = Math.max(...nextThree, 0);
+        setRainAlert(maxChance > 40 ? { chance: maxChance } : null);
+      })
+      .catch(() => setRainAlert(null));
+  }, [dayStops, currentStopIndex]);
 
   // ── Bounce animation for stop_complete hero emoji ──
   const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -1375,15 +1399,19 @@ export default function TodayScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Teal hero with stop emoji background */}
+          {/* Photo hero with gradient overlay */}
           <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
+            <Image
+              source={{ uri: (stop.metadata as Record<string, unknown> | null)?.imageUrl as string ||
+                `https://source.unsplash.com/800x600/?${encodeURIComponent(stop.name + ' landmark')}` }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
             <LinearGradient
-              colors={['#1D4A42', '#163830', '#0E2820']}
+              colors={['rgba(10,28,22,0.30)', 'rgba(10,28,22,0.62)', 'rgba(10,28,22,0.90)']}
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            {/* Large stop emoji centred as background */}
-            <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '📍'}</Text>
             {/* HEADING THERE badge — top left */}
             <View style={er.headingBadge}>
               <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
@@ -1415,15 +1443,16 @@ export default function TodayScreen() {
             </View>
           </View> {/* heroWrap */}
 
-          {/* Rain alert */}
+          {/* Rain alert — powered by Open-Meteo (real data) */}
+          {!!rainAlert && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
             <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected at 2pm</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain likely in the next 3 hours ({rainAlert.chance}%)</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
-              <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>See indoor alternatives →</Text>
             </View>
           </View>
+          )}
 
           {/* Did you know teaser */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>

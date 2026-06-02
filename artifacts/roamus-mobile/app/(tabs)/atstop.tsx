@@ -451,8 +451,10 @@ export default function AtStopScreen() {
     setHeroImageUrl(null);
     setStopImages([null, null, null]);
     fetchWikiImages(currentStop.name).then(urls => {
-      if (urls[0]) setHeroImageUrl(urls[0]);
-      setStopImages([urls[0] ?? null, urls[1] ?? null, urls[2] ?? null]);
+      const fallback = `https://source.unsplash.com/800x600/?${encodeURIComponent(currentStop.name + ' landmark')}`;
+      const hero = urls[0] ?? fallback;
+      setHeroImageUrl(hero);
+      setStopImages([hero, urls[1] ?? null, urls[2] ?? null]);
     });
     // Reset food + extras + moments state for new stop
     setFoodPlaces([]); setFoodLoaded(false);
