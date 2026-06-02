@@ -12,6 +12,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { memoriesAPI } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
@@ -42,6 +43,7 @@ export default function ConfirmPhotoScreen() {
   const uris: string[] = JSON.parse((urisParam as string) ?? '[]');
   const isMulti = uris.length > 1;
 
+  const queryClient = useQueryClient();
   const [captions, setCaptions] = useState<string[]>(() => uris.map(() => ''));
   const [saving, setSaving] = useState(false);
 
@@ -67,7 +69,8 @@ export default function ConfirmPhotoScreen() {
           })
         )
       );
-      router.push('/(tabs)/memories' as never);
+      await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
+      router.replace(`/memories/${tripId}` as never);
     } catch (err) {
       console.error('Save photos failed:', err);
     } finally {
