@@ -26,6 +26,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fonts/fraunces";
 import * as Haptics from "expo-haptics";
 
 import { API_BASE } from "@/lib/apiClient";
@@ -406,6 +407,7 @@ const sm = StyleSheet.create({
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
+  useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
   const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
 
   const rawDevState = __DEV__
@@ -593,6 +595,12 @@ export default function TodayScreen() {
             setTodayState('morning');
           }
         }
+      }
+
+      // Restore AT_STOP_FROZEN when user returns to Today before completing
+      if (!devState && override !== 'stop_complete') {
+        const frozenFlag = await AsyncStorage.getItem('atStopFrozen');
+        if (frozenFlag === 'true') setTodayState('at_stop_frozen');
       }
     } finally {
       setLoading(false);

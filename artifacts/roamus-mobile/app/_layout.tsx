@@ -1,4 +1,3 @@
-import { Fraunces_900Black } from "@expo-google-fonts/fraunces";
 import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
@@ -74,7 +73,6 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Fraunces_900Black,
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
