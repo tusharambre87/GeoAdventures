@@ -4,14 +4,8 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
-import {
-  DeviceEventEmitter,
-  Platform,
-  StyleSheet,
-  View,
-  useColorScheme,
-} from "react-native";
+import React from "react";
+import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -48,17 +42,6 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const [atStopFrozen, setAtStopFrozen] = useState(false);
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener(
-      "todayAtStopFrozen",
-      (frozen: boolean) => setAtStopFrozen(frozen)
-    );
-    return () => sub.remove();
-  }, []);
-
-  const atStopBlue = "#3B82F6";
 
   return (
     <Tabs
@@ -119,14 +102,12 @@ function ClassicTabLayout() {
         name="atstop"
         options={{
           title: "At Stop",
-          tabBarIcon: ({ color }) => {
-            const iconColor = atStopFrozen ? atStopBlue : color;
-            return isIOS ? (
-              <SymbolView name="location" tintColor={iconColor} size={24} />
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="location" tintColor={color} size={24} />
             ) : (
-              <Ionicons name="location-outline" size={22} color={iconColor} />
-            );
-          },
+              <Ionicons name="location-outline" size={22} color={color} />
+            ),
         }}
       />
       <Tabs.Screen

@@ -829,12 +829,12 @@ export default function TodayScreen() {
   if (todayState === 'no_trip') {
     return (
       <View style={[misc.center, { paddingTop: insets.top, backgroundColor: C.bg }]}>
-        <View style={nt.compassWrap}>
-          <Text style={nt.compassEmoji}>{'🧭'}</Text>
+        <View style={nt.iconWrap}>
+          <Text style={nt.iconEmoji}>🗺️</Text>
         </View>
-        <Text style={nt.heading}>Where will you roam?</Text>
+        <Text style={nt.heading}>Where will your family go next?</Text>
         <Text style={nt.sub}>
-          Add your first trip and RoamUs builds your perfect family day — stops, timing, and all.
+          Plan your first adventure and we’ll run the day when you get there.
         </Text>
         <TouchableOpacity
           style={nt.cta}
@@ -842,9 +842,6 @@ export default function TodayScreen() {
           onPress={() => router.push('/onboarding/splash' as never)}
         >
           <Text style={nt.ctaText}>Plan a trip →</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/(tabs)' as never)} style={{ marginTop: 16 }}>
-          <Text style={nt.link}>Browse my trips</Text>
         </TouchableOpacity>
       </View>
     );
@@ -924,7 +921,7 @@ export default function TodayScreen() {
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
           <LinearGradient
-            colors={['#7c3aed', '#9d5bf5', '#b47dff']}
+            colors={['#1D3A5C', '#152C47', '#0E1E30']}
             start={{ x: 0.1, y: 0 }}
             end={{ x: 0.9, y: 1 }}
             style={[ptt.hero, { paddingTop: insets.top + 28 }]}
@@ -1661,18 +1658,18 @@ export default function TodayScreen() {
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
           <LinearGradient
-            colors={[C.teal, C.tealMid, '#4a9e8e']}
+            colors={['#2D1B69', '#1E1145', '#150D33']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
             style={[tc.hero, { paddingTop: insets.top + 32 }]}
           >
-            <Text style={tc.heroEmoji}>{'🏕️'}</Text>
-            <Text style={tc.heroEyebrow}>ADVENTURE COMPLETE</Text>
+            <Text style={tc.heroEmoji}>{'🏆'}</Text>
+            <Text style={tc.heroEyebrow}>TRIP COMPLETE!</Text>
             <Text style={tc.heroTitle}>{trip?.name ?? city}</Text>
             <Text style={tc.heroSub}>{tripDays} day{tripDays !== 1 ? 's' : ''} of family memories</Text>
             <View style={tc.statRow}>
               <View style={tc.stat}>
                 <Text style={tc.statVal}>{totalVisited}</Text>
-                <Text style={tc.statLbl}>places visited</Text>
+                <Text style={tc.statLbl}>stops visited</Text>
               </View>
               <View style={tc.stat}>
                 <Text style={tc.statVal}>{tripDays}</Text>
@@ -1727,7 +1724,25 @@ export default function TodayScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-          <View style={[ds.stripWrap, { paddingTop: insets.top + 8, backgroundColor: '#fff' }]}>
+          {/* Dark gradient hero with back pill */}
+          <LinearGradient
+            colors={['#3A3A4A', '#26262E', '#1A1A22']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={[dh.hero, { paddingTop: insets.top + 20 }]}
+          >
+            <TouchableOpacity
+              style={dh.backPill}
+              activeOpacity={0.75}
+              onPress={() => setTodayState(previousState ?? 'morning')}
+            >
+              <Text style={dh.backPillText}>← Back to today</Text>
+            </TouchableOpacity>
+            <Text style={dh.heroTitle}>Day history</Text>
+            <Text style={dh.heroSub}>{trip?.name ?? 'Your Trip'}</Text>
+          </LinearGradient>
+
+          {/* Horizontal day pills strip */}
+          <View style={[ds.stripWrap, { backgroundColor: '#fff' }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               style={ds.strip} contentContainerStyle={ds.stripContent}>
               {Array.from({ length: totalDays }, (_, i) => {
@@ -1873,9 +1888,11 @@ const misc = StyleSheet.create({
 
 // NO_TRIP
 const nt = StyleSheet.create({
-  compassWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: C.teal,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  compassEmoji: { fontSize: 44 },
+  iconWrap: {
+    width: 100, height: 100, borderRadius: 28, backgroundColor: C.orangeLt,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+  },
+  iconEmoji: { fontSize: 46 },
   heading: { fontFamily: F.bold, fontSize: 24, color: C.deep, textAlign: 'center', marginBottom: 10 },
   sub:     { fontFamily: F.medium, fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22, marginBottom: 28, paddingHorizontal: 12 },
   cta:     { backgroundColor: C.orange, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32,
@@ -2202,6 +2219,17 @@ const tc = StyleSheet.create({
 
 // DAY_HISTORY
 const dh = StyleSheet.create({
+  hero: {
+    paddingHorizontal: 20, paddingBottom: 20,
+  },
+  backPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 14,
+  },
+  backPillText: { fontFamily: F.bold, fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  heroTitle: { fontFamily: F.bold, fontSize: 24, color: '#fff', marginBottom: 4 },
+  heroSub: { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.45)' },
   card:         { margin: 16, backgroundColor: '#fff', borderRadius: 16, padding: 20,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   summaryRow:   { marginBottom: 16 },
