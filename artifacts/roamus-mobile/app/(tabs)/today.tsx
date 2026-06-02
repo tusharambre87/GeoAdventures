@@ -515,7 +515,7 @@ export default function TodayScreen() {
       if (override) {
         await AsyncStorage.removeItem('today_state_override');
         if (override === 'stop_complete') {
-          // Index will be reconciled from visited state after trip fetch
+          setCurrentStopIndex(i => i + 1);
           if (!devState) setTodayState('stop_complete');
         }
       }
@@ -559,12 +559,6 @@ export default function TodayScreen() {
         .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
-
-      // Reconcile stop index from visited state (for stop_complete handoff)
-      if (override === 'stop_complete') {
-        const nextIdx = stops.findIndex(s => !(s.isVisited || s.visited));
-        setCurrentStopIndex(nextIdx >= 0 ? nextIdx : stops.length);
-      }
 
       if (!devState && override !== 'stop_complete') {
         const days = daysUntilDate(t.startDate);

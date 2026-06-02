@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  DeviceEventEmitter,
   Image,
   Keyboard,
   LayoutAnimation,
@@ -28,7 +29,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Tabs, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -399,6 +402,14 @@ export default function AtStopScreen() {
   const [feedbackRating, setFeedbackRating] = useState<FeedbackRating>('amazing');
   const [feedbackText, setFeedbackText]     = useState('');
   const [exploreOpen, setExploreOpen]       = useState(false);
+  const [atStopFrozen, setAtStopFrozen]      = useState(false);
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      'todayAtStopFrozen',
+      ({ active }: { active: boolean }) => setAtStopFrozen(active),
+    );
+    return () => sub.remove();
+  }, []);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackInputFocused, setFeedbackInputFocused] = useState(false);
   const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
@@ -719,6 +730,24 @@ export default function AtStopScreen() {
 
   return (
     <View style={sc.screen}>
+      <Tabs.Screen
+        options={{
+          tabBarIcon: ({ color, focused }) =>
+            Platform.OS === 'ios' ? (
+              <SymbolView
+                name={focused ? 'location.fill' : 'location'}
+                tintColor={atStopFrozen ? '#3B82F6' : color}
+                size={24}
+              />
+            ) : (
+              <Ionicons
+                name='location-outline'
+                size={22}
+                color={atStopFrozen ? '#3B82F6' : color}
+              />
+            ),
+        }}
+      />
       <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}>
 
