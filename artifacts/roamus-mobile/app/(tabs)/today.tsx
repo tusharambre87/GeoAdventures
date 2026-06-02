@@ -568,7 +568,7 @@ export default function TodayScreen() {
 
       if (!devState && override !== 'stop_complete') {
         const days = daysUntilDate(t.startDate);
-        if (days > 1) {
+        if (days > 7) {
           setTodayState('pre_trip_far');
         } else if (days === 1) {
           setTodayState('pre_trip_tomorrow');
@@ -862,7 +862,7 @@ export default function TodayScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STATE: PRE_TRIP_FAR  (trip starts >1 day from now)
+  // STATE: PRE_TRIP_FAR  (trip starts >7 days from now)
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'pre_trip_far') {
     const daysLeft = daysUntilDate(trip?.startDate);
