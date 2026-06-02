@@ -8142,7 +8142,8 @@ Return ONLY valid JSON in this exact format:
       const { tripId } = req.params;
       const trip = await storage.getTripById(tripId);
       if (!trip) return res.status(404).json({ message: 'Trip not found' });
-      if (trip.userId !== req.user?.id) return res.status(403).json({ message: 'Forbidden' });
+      const recalcUserId = req.user?.claims?.sub || req.user?.id;
+      if (trip.userId !== recalcUserId) return res.status(403).json({ message: 'Forbidden' });
 
       const stops = await storage.getStopsByTripId(tripId);
       let updated = 0;
