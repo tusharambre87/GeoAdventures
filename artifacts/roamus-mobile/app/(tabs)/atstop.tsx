@@ -833,13 +833,19 @@ export default function AtStopScreen() {
             <Text style={dt.actIcon}>↗</Text>
             <Text style={[dt.actLabel, { fontSize: 13, color: C.deep }]}>Directions</Text>
           </TouchableOpacity>
-          {hasTicket && (
+          {hasTicket ? (
             <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
               borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
               onPress={() => Linking.openURL(ticketUrl(currentStop.name, bookingHref))}>
               <Text style={dt.actIcon}>🎟</Text>
               <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
             </TouchableOpacity>
+          ) : (
+            <View style={[dt.actBtn, { flexDirection: 'row', gap: 6,
+              borderColor: 'rgba(74,222,128,0.3)' }]}>
+              <Text style={dt.actIcon}>✓</Text>
+              <Text style={[dt.actLabel, { fontSize: 13, color: '#16A34A' }]}>No ticket needed</Text>
+            </View>
           )}
         </View>
 

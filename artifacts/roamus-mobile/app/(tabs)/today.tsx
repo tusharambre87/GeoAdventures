@@ -953,12 +953,24 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={ptf.tipCard}>
-            <Text style={ptf.tipLabel}>PRO TIP</Text>
-            <Text style={ptf.tipText}>
-              Book tickets for {city ? `${city} ` : ''}attractions early — popular family stops sell out fast.
-            </Text>
-          </View>
+          {ticketStops.length > 0 && (
+            <View style={ptf.tipCard}>
+              <Text style={ptf.tipLabel}>TICKETS NEEDED</Text>
+              {ticketStops.map(s => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={ptf.ticketStopRow}
+                  activeOpacity={0.75}
+                  onPress={() => openTicketSearch(s.name)}
+                >
+                  <Text style={ptf.ticketStopIcon}>{'🎫'}</Text>
+                  <Text style={ptf.ticketStopName} numberOfLines={2}>{s.name}</Text>
+                  <Text style={ptf.ticketStopArrow}>{'→'}</Text>
+                </TouchableOpacity>
+              ))}
+              <Text style={ptf.ticketHint}>Tap a stop to search for tickets</Text>
+            </View>
+          )}
         </ScrollView>
         {menuOverlay}
       </View>
@@ -2189,8 +2201,14 @@ const ptf = StyleSheet.create({
   viewPlanText:   { fontFamily: F.semibold, fontSize: 14, color: C.orange },
   tipCard:        { marginHorizontal: 16, backgroundColor: C.amberLt, borderRadius: 14, padding: 16,
     borderWidth: 1, borderColor: 'rgba(245,166,35,0.25)' },
-  tipLabel:       { fontFamily: F.bold, fontSize: 10, color: C.amberDark, letterSpacing: 1, marginBottom: 6 },
+  tipLabel:       { fontFamily: F.bold, fontSize: 10, color: C.amberDark, letterSpacing: 1, marginBottom: 10 },
   tipText:        { fontFamily: F.medium, fontSize: 13, color: C.amberDark, lineHeight: 20 },
+  ticketStopRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8,
+    borderTopWidth: 1, borderTopColor: 'rgba(245,166,35,0.2)' },
+  ticketStopIcon: { fontSize: 16 },
+  ticketStopName: { fontFamily: F.semibold, fontSize: 13, color: C.amberDark, flex: 1 },
+  ticketStopArrow:{ fontFamily: F.bold, fontSize: 13, color: C.amberDark },
+  ticketHint:     { fontFamily: F.medium, fontSize: 11, color: 'rgba(180,120,10,0.6)', marginTop: 8 },
   quoteStrip: { marginTop: 16 },
   quoteStripContent: { paddingHorizontal: 20, gap: 8 },
   quoteChip: {
