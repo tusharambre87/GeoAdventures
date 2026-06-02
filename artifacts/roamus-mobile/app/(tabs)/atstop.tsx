@@ -527,6 +527,7 @@ export default function AtStopScreen() {
       await AsyncStorage.removeItem('atStopStartTime');
     }
     await AsyncStorage.removeItem('atStopFrozen');
+    setAtStopFrozen(false);
     setSubmittingFeedback(true);
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
