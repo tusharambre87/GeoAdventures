@@ -1135,6 +1135,7 @@ function DayDetail({
   const hrs      = (totalMin / 60).toFixed(1).replace('.0', '');
   const dateStr  = trip.startDate ? formatDate(trip.startDate, selectedDay - 1) : null;
   const stopCount = dayStops.length;
+  const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
@@ -3391,6 +3392,11 @@ const ov = StyleSheet.create({
   },
   runTodayText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   runSub: { fontFamily: F.regular, fontSize: 10, color: C.muted, textAlign: 'center', marginTop: 6 },
+  disclaimerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 16, marginBottom: 4, padding: 12, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)' },
+  disclaimerIcon: { fontSize: 14 },
+  disclaimerTitle: { flex: 1, fontSize: 12, fontWeight: '700', color: '#8A8FA8' },
+  disclaimerChevron: { fontSize: 10, color: '#C4C7D4' },
+  disclaimerBody: { marginHorizontal: 16, marginBottom: 16, padding: 12, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(26,31,46,0.08)' },
   disclaimer: { margin: 16, marginTop: 8, padding: 14, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)' },
   disclaimerText: { fontSize: 12, color: '#8A8FA8', lineHeight: 18, fontWeight: '500' },
 });

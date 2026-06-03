@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
 import { useQuery } from "@tanstack/react-query";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
 import { travelAPI, type Trip } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
@@ -182,6 +183,15 @@ export default function TripsScreen() {
   const trips = data?.trips ?? [];
   // Treat active + planned + in_progress trips as "current"
   const activeTrip = trips.find(t => t.status === "active" || t.status === "in_progress");
+
+  // On mount — restore cacheStatus from AsyncStorage if any trip was previously cached
+  useEffect(() => {
+    if (user?.subscriptionTier === "free") return;
+    AsyncStorage.getAllKeys().then(keys => {
+      const hasCached = keys.some(k => k.startsWith("roamus_cache_status_"));
+      if (hasCached) setCacheStatus("ready");
+    }).catch(() => {});
+  }, [user?.subscriptionTier]);
 
   // Pre-cache upcoming trips for paid users
   useEffect(() => {

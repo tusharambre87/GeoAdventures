@@ -947,20 +947,24 @@ export default function TodayScreen() {
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .slice(0, 4);
     console.log('trip firstPhotoUrl:', trip?.firstPhotoUrl);
-    const heroUri = trip?.coverImageUrl
-      ?? trip?.firstPhotoUrl
-      ?? CITY_IMGS[trip?.destination ?? city ?? '']
-      ?? `https://source.unsplash.com/800x600/?${encodeURIComponent((trip?.destination ?? city ?? 'city') + ' city')}`;
+    const day0Stops = trip?.stops?.filter(s => (s.dayIndex ?? 0) === 0) ?? previewStops;
+    const stopCount = day0Stops.length || (trip?.stops?.length ?? 0);
+    const totalMins = stopCount * 75;
+    const totalHoursLabel = totalMins >= 60
+      ? `${Math.floor(totalMins / 60)}h${totalMins % 60 > 0 ? ' ' + (totalMins % 60) + 'm' : ''}`
+      : `${totalMins}m`;
+    const heroImageUrl = trip?.firstPhotoUrl
+      ?? `https://source.unsplash.com/800x600/?${encodeURIComponent((trip?.destination ?? 'travel') + ' city landmark')}`;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
           <ImageBackground
-            source={{ uri: heroUri }}
+            source={{ uri: heroImageUrl }}
             style={[ptf.hero, { paddingTop: insets.top + 24 }]}
             resizeMode="cover"
           >
             <LinearGradient
-              colors={['rgba(10,20,15,0.35)', 'rgba(10,20,15,0.75)', 'rgba(10,20,15,0.95)']}
+              colors={['rgba(0,0,0,0.20)', 'rgba(0,0,0,0.50)', 'rgba(0,0,0,0.80)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
@@ -972,6 +976,19 @@ export default function TodayScreen() {
             <Text style={ptf.countdown}>{daysLeft}</Text>
             <Text style={ptf.countdownLabel}>days until {city || 'your trip'}</Text>
             <Text style={ptf.startDate}>{startLabel}</Text>
+            {/* Stop count + time pills */}
+            {stopCount > 0 && (
+              <View style={ptf.pillsRow}>
+                <View style={ptf.pill}>
+                  <Text style={ptf.pillText}>{'📍 '}{stopCount}{' stops'}</Text>
+                </View>
+                {totalMins > 0 && (
+                  <View style={ptf.pill}>
+                    <Text style={ptf.pillText}>{'🕐 ~'}{totalHoursLabel}</Text>
+                  </View>
+                )}
+              </View>
+            )}
             {/* Scrolling quote-chip strip */}
             <ScrollView
               horizontal showsHorizontalScrollIndicator={false}
@@ -2303,6 +2320,9 @@ const ptf = StyleSheet.create({
     fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.85)',
     fontStyle: 'italic',
   },
+  pillsRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 8 },
+  pill: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  pillText: { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.90)' },
 });
 
 // PRE_TRIP_TOMORROW
