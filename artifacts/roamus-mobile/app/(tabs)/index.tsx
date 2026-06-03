@@ -158,7 +158,7 @@ export default function TripsScreen() {
 
   async function handleLogout() {
     await logout();
-    router.replace("/onboarding/splash" as any);
+    router.replace("/auth/splash");
   }
   const topPad = Platform.OS === "web" ? insets.top + 67 : insets.top + 24;
   const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 84;
