@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Image,
+  ImageBackground,
   Linking,
   Platform,
   Pressable,
@@ -31,7 +32,7 @@ import * as Haptics from "expo-haptics";
 
 import { API_BASE, kidsAPI } from "@/lib/apiClient";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
-import { F } from "@/lib/tokens";
+import { F, CITY_IMGS } from "@/lib/tokens";
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
@@ -143,6 +144,8 @@ type TripData = {
   plannerTripDays?: number | null;
   tripDays?: number | null;
   travelers?: Array<{ name: string; isParent?: boolean; age?: string }> | null;
+  coverImageUrl?: string | null;
+  firstPhotoUrl?: string | null;
   stops: Stop[];
 };
 
@@ -943,15 +946,25 @@ export default function TodayScreen() {
       .filter(s => (s.dayIndex ?? 0) === 0)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .slice(0, 4);
+    console.log('trip firstPhotoUrl:', trip?.firstPhotoUrl);
+    const heroUri = trip?.coverImageUrl
+      ?? trip?.firstPhotoUrl
+      ?? CITY_IMGS[trip?.destination ?? city ?? '']
+      ?? `https://source.unsplash.com/800x600/?${encodeURIComponent((trip?.destination ?? city ?? 'city') + ' city')}`;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-          <LinearGradient
-            colors={[C.teal, C.tealMid, '#3a7a6e']}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
+          <ImageBackground
+            source={{ uri: heroUri }}
             style={[ptf.hero, { paddingTop: insets.top + 24 }]}
+            resizeMode="cover"
           >
+            <LinearGradient
+              colors={['rgba(10,20,15,0.35)', 'rgba(10,20,15,0.75)', 'rgba(10,20,15,0.95)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={ptf.badge}>
               <Text style={ptf.badgeText}>UPCOMING TRIP</Text>
             </View>
@@ -979,7 +992,7 @@ export default function TodayScreen() {
                 </View>
               ))}
             </ScrollView>
-          </LinearGradient>
+          </ImageBackground>
 
           <View style={ptf.card}>
             <Text style={ptf.cardLabel}>YOUR FIRST DAY STARTS WITH</Text>

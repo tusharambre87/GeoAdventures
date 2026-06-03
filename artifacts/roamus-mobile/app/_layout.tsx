@@ -96,6 +96,7 @@ function RootLayoutNav() {
         options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
       />
       <Stack.Screen name="atstop" options={{ headerShown: false }} />
+      <Stack.Screen name="me" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -304,13 +305,14 @@ export default function TripsScreen() {
         )}
       </ScrollView>
 
-      {/* Floating + button */}
-      <Pressable
-        style={[s.fab, { bottom: insets.bottom + 90 }]}
+      {/* Plan a trip FAB */}
+      <TouchableOpacity
+        style={[s.planTripFab, { bottom: insets.bottom + 90 }]}
         onPress={startNewTrip}
+        activeOpacity={0.85}
       >
-        <Ionicons name="add" size={28} color="#fff" />
-      </Pressable>
+        <Text style={s.planTripFabText}>＋ Plan a trip</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -381,12 +383,16 @@ const s = StyleSheet.create({
   retryBtn: { backgroundColor: G.orange, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 4 },
   retryBtnText: { fontFamily: F.bold, fontSize: 14, fontWeight: "700", color: "#fff" },
 
-  fab: {
+  planTripFab: {
     position: "absolute", right: 20,
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: G.orange,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: G.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8,
+    backgroundColor: "#E8692A",
+    borderRadius: 20,
+    paddingHorizontal: 20, paddingVertical: 14,
+    flexDirection: "row", alignItems: "center", gap: 6,
+    shadowColor: "#E8692A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
+  },
+  planTripFabText: {
+    color: "#fff", fontSize: 14, fontWeight: "800", fontFamily: F.bold,
   },
 
   offlinePill: {

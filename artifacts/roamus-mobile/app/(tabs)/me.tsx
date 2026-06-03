@@ -510,7 +510,6 @@ export default function MeScreen() {
             icon="🛡️"
             iconBg="#F5F2EE"
             title="Privacy Policy"
-            subtitle="roamus.app/privacy"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}
             onPress={() => Linking.openURL("https://roamus.app/privacy").catch(() => {})}
           />
@@ -518,7 +517,6 @@ export default function MeScreen() {
             icon="⚖️"
             iconBg="#EEF5F2"
             title="Terms of Service"
-            subtitle="roamus.app/terms"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}
             onPress={() => Linking.openURL("https://roamus.app/terms").catch(() => {})}
             noDivider
