@@ -184,14 +184,21 @@ export default function TripsScreen() {
   // Treat active + planned + in_progress trips as "current"
   const activeTrip = trips.find(t => t.status === "active" || t.status === "in_progress");
 
-  // On mount — restore cacheStatus from AsyncStorage if any trip was previously cached
+  // On mount — restore cacheStatus only if an active/upcoming trip is actually cached
   useEffect(() => {
-    if (user?.subscriptionTier === "free") return;
-    AsyncStorage.getAllKeys().then(keys => {
-      const hasCached = keys.some(k => k.startsWith("roamus_cache_status_"));
-      if (hasCached) setCacheStatus("ready");
-    }).catch(() => {});
-  }, [user?.subscriptionTier]);
+    if (user?.subscriptionTier === "free" || !trips.length) return;
+    const checkCache = async () => {
+      const activeOrUpcoming = trips.filter(
+        t => t.status !== "completed" && t.status !== "archived"
+      );
+      const keys = await AsyncStorage.getAllKeys();
+      const anyTripCached = activeOrUpcoming.some(t =>
+        keys.includes(`roamus_cache_status_${t.id}`)
+      );
+      if (anyTripCached) setCacheStatus("ready");
+    };
+    checkCache().catch(() => {});
+  }, [user?.subscriptionTier, trips]);
 
   // Pre-cache upcoming trips for paid users
   useEffect(() => {
