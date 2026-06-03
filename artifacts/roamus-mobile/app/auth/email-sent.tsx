@@ -37,12 +37,9 @@ export default function EmailSent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-    } catch {
-      // silent — always show success
-    } finally {
-      setResending(false);
-      setResent(true);
-    }
+    } catch { /* silent */ }
+    setResending(false);
+    setResent(true);
   }
 
   return (
@@ -60,9 +57,9 @@ export default function EmailSent() {
 
         <Text style={styles.heading}>Check your inbox</Text>
         <Text style={styles.subheading}>
-          {"We sent a reset link to "}
+          {"We sent a 6-digit reset code to "}
           <Text style={styles.emailBold}>{displayEmail}</Text>
-          {". It expires in 30 minutes."}
+          {". It expires in 10 minutes."}
         </Text>
 
         {/* Resend card */}
@@ -70,14 +67,14 @@ export default function EmailSent() {
           <Text style={styles.cardLabel}>DIDN{"\u2019"}T GET IT?</Text>
           {resent ? (
             <Text style={styles.cardBody}>
-              {"Link resent! Check your spam folder if you still don\u2019t see it."}
+              {"New code sent! Check spam if you still don\u2019t see it."}
             </Text>
           ) : (
-            <TouchableOpacity onPress={handleResend} activeOpacity={0.75}>
+            <TouchableOpacity onPress={handleResend} activeOpacity={0.75} disabled={resending}>
               <Text style={styles.cardBody}>
                 {"Check spam, or "}
                 <Text style={styles.cardLink}>
-                  {resending ? "resending…" : "resend the link \u2192"}
+                  {resending ? "resending\u2026" : "resend the code \u2192"}
                 </Text>
               </Text>
             </TouchableOpacity>
@@ -85,8 +82,20 @@ export default function EmailSent() {
         </View>
       </ScrollView>
 
-      {/* Back to sign in */}
+      {/* Footer */}
       <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 12 }]}>
+        {/* Primary: enter code */}
+        <TouchableOpacity
+          style={styles.enterCodeBtn}
+          activeOpacity={0.88}
+          onPress={() =>
+            router.push({ pathname: "/auth/verify-code" as any, params: { email } })
+          }
+        >
+          <Text style={styles.enterCodeBtnText}>Enter code {"\u2192"}</Text>
+        </TouchableOpacity>
+
+        {/* Ghost: back to sign in */}
         <TouchableOpacity
           style={styles.ghostBtn}
           onPress={() => router.replace("/auth/signin")}
@@ -100,18 +109,20 @@ export default function EmailSent() {
 }
 
 const styles = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: C.bg },
-  body:       { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingVertical: 48, textAlign: "center" },
-  iconBox:    { width: 88, height: 88, borderRadius: 26, backgroundColor: C.orLt, alignItems: "center", justifyContent: "center", marginBottom: 24 },
-  iconEmoji:  { fontSize: 40 },
-  heading:    { fontSize: 26, fontWeight: "800", color: C.deep, letterSpacing: -0.4, marginBottom: 10, textAlign: "center" },
-  subheading: { fontSize: 15, color: C.muted, lineHeight: 26, marginBottom: 28, textAlign: "center" },
-  emailBold:  { fontWeight: "800", color: C.deep },
-  infoCard:   { backgroundColor: C.orLt, borderRadius: 16, padding: 16, width: "100%", marginBottom: 8 },
-  cardLabel:  { fontSize: 11, fontWeight: "800", color: C.orange, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 },
-  cardBody:   { fontSize: 13, color: C.deep, lineHeight: 22 },
-  cardLink:   { color: C.orange, fontWeight: "700" },
-  footer:     { paddingHorizontal: 24, paddingTop: 8, backgroundColor: C.bg },
-  ghostBtn:   { paddingVertical: 14, alignItems: "center" },
+  root:         { flex: 1, backgroundColor: C.bg },
+  body:         { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, paddingVertical: 48 },
+  iconBox:      { width: 88, height: 88, borderRadius: 26, backgroundColor: C.orLt, alignItems: "center", justifyContent: "center", marginBottom: 24 },
+  iconEmoji:    { fontSize: 40 },
+  heading:      { fontSize: 26, fontWeight: "800", color: C.deep, letterSpacing: -0.4, marginBottom: 10, textAlign: "center" },
+  subheading:   { fontSize: 15, color: C.muted, lineHeight: 26, marginBottom: 28, textAlign: "center" },
+  emailBold:    { fontWeight: "800", color: C.deep },
+  infoCard:     { backgroundColor: C.orLt, borderRadius: 16, padding: 16, width: "100%" },
+  cardLabel:    { fontSize: 11, fontWeight: "800", color: C.orange, letterSpacing: 1, marginBottom: 5 },
+  cardBody:     { fontSize: 13, color: C.deep, lineHeight: 22 },
+  cardLink:     { color: C.orange, fontWeight: "700" },
+  footer:       { paddingHorizontal: 24, paddingTop: 8, backgroundColor: C.bg, gap: 4 },
+  enterCodeBtn: { backgroundColor: C.orange, borderRadius: 14, paddingVertical: 17, alignItems: "center", shadowColor: C.orange, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.32, shadowRadius: 14, elevation: 8 },
+  enterCodeBtnText: { fontSize: 15, fontWeight: "800", color: "#fff", letterSpacing: -0.1 },
+  ghostBtn:     { paddingVertical: 14, alignItems: "center" },
   ghostBtnText: { fontSize: 14, fontWeight: "700", color: C.muted },
 });

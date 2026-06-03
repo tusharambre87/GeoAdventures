@@ -256,41 +256,41 @@ export async function sendPasswordResetEmail(email: string, code: string): Promi
   <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 20px 20px 0 0; padding: 30px; text-align: center;">
       <h1 style="color: white; margin: 0; font-size: 28px;">Reset Your Password</h1>
-      <p style="color: #FEF3C7; margin: 10px 0 0 0; font-size: 16px;">Let's get you back to exploring!</p>
+      <p style="color: #FEF3C7; margin: 10px 0 0 0; font-size: 16px;">Let's get you back on the road!</p>
     </div>
     
     <div style="background: white; padding: 30px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
       <p style="font-size: 18px; color: #374151; margin-top: 0;">Hi there!</p>
       
       <p style="color: #4B5563; line-height: 1.6;">
-        We received a request to reset your password for your GeoQuest Games account. 
-        Use the code below to set a new password:
+        We received a request to reset your RoamUs password.
+        Use the code below to set a new password — it expires in 10 minutes.
       </p>
       
-      <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-radius: 15px; padding: 25px; margin: 25px 0; text-align: center;">
-        <p style="margin: 0 0 10px 0; color: #92400E; font-size: 14px;">Your password reset code is:</p>
-        <p style="margin: 0; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #D97706;">${code}</p>
+      <div style="background: linear-gradient(135deg, #FDF0E9 0%, #FDDCC4 100%); border-radius: 15px; padding: 25px; margin: 25px 0; text-align: center;">
+        <p style="margin: 0 0 10px 0; color: #7C3100; font-size: 14px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">Your reset code</p>
+        <p style="margin: 0; font-size: 40px; font-weight: 900; letter-spacing: 10px; color: #E8692A;">${code}</p>
       </div>
       
       <p style="color: #9CA3AF; font-size: 14px; line-height: 1.6;">
-        This code will expire in 10 minutes. If you didn't request a password reset, you can safely ignore this email - your password will remain unchanged.
+        If you didn't request this, you can safely ignore this email — your password won't change.
       </p>
       
       <div style="background: #FEE2E2; border-left: 4px solid #EF4444; padding: 15px; margin: 20px 0; border-radius: 0 10px 10px 0;">
         <p style="margin: 0; color: #991B1B; font-size: 13px;">
-          <strong>Security tip:</strong> Never share this code with anyone. GeoQuest team members will never ask for your password or reset code.
+          <strong>Security tip:</strong> Never share this code with anyone. The RoamUs team will never ask for your password or reset code.
         </p>
       </div>
       
       <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 0;">
-        Happy exploring!<br>
-        <strong style="color: #D97706;">The GeoQuest Team</strong>
+        Safe travels,<br>
+        <strong style="color: #E8692A;">The RoamUs Team</strong>
       </p>
     </div>
     
     <div style="text-align: center; padding: 20px; color: #9CA3AF; font-size: 12px;">
       <p style="margin: 0;">
-        GeoQuest Games - Educational Geography for Kids Ages 5+<br>
+        RoamUs — Family Travel Journals<br>
         <a href="${baseUrl}/privacy" style="color: #6B7280;">Privacy Policy</a> | 
         <a href="${baseUrl}/terms" style="color: #6B7280;">Terms of Service</a>
       </p>
@@ -302,7 +302,7 @@ export async function sendPasswordResetEmail(email: string, code: string): Promi
   
   return sendEmail({
     to: email,
-    subject: 'Reset Your GeoQuest Password - Code: ' + code,
+    subject: 'Your RoamUs password reset code: ' + code,
     html,
   });
 }
