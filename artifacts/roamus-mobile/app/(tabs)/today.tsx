@@ -30,6 +30,7 @@ import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fo
 import * as Haptics from "expo-haptics";
 
 import { API_BASE, kidsAPI } from "@/lib/apiClient";
+import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import { F } from "@/lib/tokens";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -450,6 +451,7 @@ export default function TodayScreen() {
   const [showMenu, setShowMenu]                 = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
+  const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -1447,13 +1449,18 @@ export default function TodayScreen() {
 
           {/* Rain alert — powered by Open-Meteo (real data) */}
           {!!rainAlert && (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}
+            activeOpacity={0.85}
+            onPress={() => setIndoorSheetVisible(true)}
+          >
             <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain likely in the next 3 hours ({rainAlert.chance}%)</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
+              <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>{'See indoor alternatives →'}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           )}
 
           {/* Did you know teaser */}
@@ -1564,6 +1571,12 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        <IndoorAlternativesSheet
+          visible={indoorSheetVisible}
+          onClose={() => setIndoorSheetVisible(false)}
+          stopId={stop.id}
+          stopName={stop.name ?? ''}
+        />
         {menuOverlay}
       </View>
     );
