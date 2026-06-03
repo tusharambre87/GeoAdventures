@@ -8870,6 +8870,16 @@ Return ONLY valid JSON in this exact format:
   });
   
   // Get explore content for a stop (nearby attractions, restaurants, etc.)
+  // Stale-cache detector: invalidate if story text looks like old narrator-cue or generic content.
+  function isStaleExploreContent(cached: any): boolean {
+    const text = ((cached?.stories?.main?.text) ?? "").trim();
+    return (
+      text.startsWith("[") ||
+      text.includes("Fun facts await") ||
+      text.includes("explore with your kids as you head over")
+    );
+  }
+
   app.get('/api/travel/stops/:stopId/explore', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
@@ -8880,13 +8890,15 @@ Return ONLY valid JSON in this exact format:
       
       // Check if journey pack already has explore data cached.
       // Require a properly generated main story of at least 7 minutes (420s).
-      // This busts any cached fallback/short entries.
+      // Invalidate stale entries that contain narrator cues or generic fallback text.
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
       const cached = journeyPack?.exploreData as any;
       const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 420;
-      if (cached && cached.reviews !== undefined && hasRichStories) {
+      const isStale = isStaleExploreContent(cached);
+      if (cached && cached.reviews !== undefined && hasRichStories && !isStale) {
         return res.json({ ...cached, stopId });
       }
+      // If stale, fall through to regeneration — the updated data will overwrite the old entry.
       
       // Get trip for destination context
       const trip = await storage.getTripById(stop.tripId);

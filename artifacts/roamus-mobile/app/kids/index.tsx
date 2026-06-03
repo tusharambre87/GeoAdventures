@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
+import { isStaleContent } from "@/lib/staleContent";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -62,7 +63,7 @@ export default function ExplorerHome() {
 
   useEffect(() => {
     if (!stopId) return;
-    if (kids.exploreContent && kids.exploreContent.stopId === stopId) return;
+    if (kids.exploreContent && kids.exploreContent.stopId === stopId && !isStaleContent(kids.exploreContent)) return;
 
     kids.setLoadingExplore(true);
     kids.setExploreError(false);
