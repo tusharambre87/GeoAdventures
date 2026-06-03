@@ -31,6 +31,7 @@ type AuthContextType = {
     players: RegisterPlayer[]
   ) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -142,8 +143,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
+  async function refreshUser() {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const u: AuthUser = data.user ?? data;
+        setUser(u);
+        await AsyncStorage.setItem("auth_user", JSON.stringify(u));
+      }
+    } catch {
+      // non-fatal — context remains as-is
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

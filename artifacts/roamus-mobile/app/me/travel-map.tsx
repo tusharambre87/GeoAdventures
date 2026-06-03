@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,9 +7,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE } from "@/lib/authContext";
+import { router, useLocalSearchParams } from "expo-router";
 import { CITY_COORDS, F, G } from "@/lib/tokens";
 
 type Stop = {
@@ -64,32 +61,11 @@ export default function TravelMapScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const cardOffsets = useRef<Record<string, number>>({});
 
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { tripsJson } = useLocalSearchParams<{ tripsJson: string }>();
+  // NOTE: trips[n].stops may be empty on list response; fetch individual
+  // trip on city card tap if stop names are missing.
+  const trips: Trip[] = tripsJson ? (JSON.parse(tripsJson as string) as Trip[]) : [];
   const [expandedCity, setExpandedCity] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await AsyncStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE}/api/travel/trips`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to load trips");
-      const data = await res.json();
-      setTrips(data.trips ?? []);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const cities: CityEntry[] = trips
     .filter((t) => t.visitedStops > 0 && t.destination)
@@ -141,23 +117,11 @@ export default function TravelMapScreen() {
         </Pressable>
       </View>
 
-      {loading ? (
-        <View style={s.center}>
-          <ActivityIndicator color={G.orange} size="large" />
-        </View>
-      ) : error ? (
-        <View style={s.center}>
-          <Text style={s.errorText}>{error}</Text>
-          <Pressable style={s.retryBtn} onPress={load}>
-            <Text style={s.retryText}>Try again</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView
-          ref={scrollRef}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        >
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+      >
           <View style={s.subHeader}>
             <Text style={s.subH}>Travel Map</Text>
             <Text style={s.subS}>Everywhere your family has explored</Text>
@@ -278,8 +242,8 @@ export default function TravelMapScreen() {
               );
             })
           )}
-        </ScrollView>
-      )}
+      </ScrollView>
+    
     </View>
   );
 }

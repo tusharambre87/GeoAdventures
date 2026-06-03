@@ -124,7 +124,7 @@ export default function MeScreen() {
         fetch(`${API_BASE}/api/auth/user`, { headers: authHeaders }),
         fetch(`${API_BASE}/api/travel/trips`, { headers: authHeaders }),
         userId
-          ? fetch(`${API_BASE}/api/explorers/user/${userId}`)
+          ? fetch(`${API_BASE}/api/explorers/user/${userId}`, { headers: authHeaders })
           : Promise.resolve(null),
       ]);
 
@@ -360,7 +360,12 @@ export default function MeScreen() {
             iconBg="#EEF5F2"
             title="Travel Map"
             subtitle="Everywhere your family has explored"
-            onPress={() => router.push("/me/travel-map" as never)}
+            onPress={() =>
+              router.push({
+                pathname: '/me/travel-map',
+                params: { tripsJson: JSON.stringify(trips.slice(0, 20)) },
+              } as never)
+            }
           />
           <MenuRow
             icon="✨"

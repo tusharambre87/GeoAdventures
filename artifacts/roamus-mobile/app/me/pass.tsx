@@ -75,10 +75,26 @@ export default function PassScreen() {
     }
   }
 
-  const isSubscribed = user?.subscriptionTier && user.subscriptionTier !== "free";
-  const isMonthly = user?.subscriptionTier === "monthly";
-  const planName = isMonthly ? "RoamUs Pass Monthly" : "RoamUs Pass Annual";
-  const priceStr = isMonthly ? "$2.99/month · Up to 4 kids" : "$24.99/year · Up to 4 kids";
+  // TODO: remove after verifying subscriptionTier value from API
+  console.log('subscriptionTier raw value:', user?.subscriptionTier);
+
+  const tier = user?.subscriptionTier?.toLowerCase() ?? 'free';
+
+  const isFree = !user?.subscriptionTier ||
+    tier === 'free' ||
+    tier === 'explorer';
+
+  const isAnnual =
+    tier === 'annual' ||
+    tier === 'geopass_annual' ||
+    tier.includes('annual');
+
+  const isMonthly = !isFree && !isAnnual;
+
+  const planName = isAnnual ? 'RoamUs Pass Annual' : 'RoamUs Pass Monthly';
+  const planPrice = isAnnual ? '$24.99/year · Up to 4 kids' : '$2.99/month · Up to 4 kids';
+  const isSubscribed = !isFree;
+  const planPriceShort = planPrice.split(' · ')[0];
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -125,7 +141,7 @@ export default function PassScreen() {
                   <Text style={s.passActiveText}>{"ACTIVE"}</Text>
                 </View>
                 <Text style={s.planName}>{planName}</Text>
-                <Text style={s.priceRow}>{priceStr}</Text>
+                <Text style={s.priceRow}>{planPrice}</Text>
                 <View style={s.renewCard}>
                   <Text style={s.renewText}>
                     {"Next renewal: "}
@@ -183,6 +199,7 @@ export default function PassScreen() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.upgradeTitle}>{"Switch to Annual"}</Text>
+                        {/* TODO: pull from pricing API */}
                         <Text style={s.upgradeSub}>{"$24.99/yr — save 30%"}</Text>
                       </View>
                       <View style={s.saveTag}>
@@ -232,7 +249,7 @@ export default function PassScreen() {
                 style={({ pressed }) => [s.upgradeCTA, pressed && { opacity: 0.88 }]}
                 onPress={() => router.push("/onboarding/upgrade" as never)}
               >
-                <Text style={s.upgradeCTAText}>{"Upgrade to RoamUs Pass — $2.99/mo"}</Text>
+                <Text style={s.upgradeCTAText}>{"Upgrade to RoamUs Pass — " + planPriceShort}</Text>
               </Pressable>
             </>
           )}

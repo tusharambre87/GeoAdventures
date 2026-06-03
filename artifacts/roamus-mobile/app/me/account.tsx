@@ -71,7 +71,7 @@ const t = StyleSheet.create({
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
-  const { logout } = useAuth();
+  const { logout, refreshUser } = useAuth();
 
   const [user, setUser] = useState<UserData | null>(null);
   const [explorers, setExplorers] = useState<Explorer[]>([]);
@@ -173,6 +173,7 @@ export default function AccountScreen() {
       setUser((prev) => (prev ? { ...prev, firstName, lastName } : prev));
       setEditingProfile(false);
       showToast("Profile updated");
+      await refreshUser();
     } catch {
       showToast("Failed to save — try again");
     } finally {
