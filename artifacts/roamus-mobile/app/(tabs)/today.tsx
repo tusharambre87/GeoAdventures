@@ -32,6 +32,9 @@ import * as Haptics from "expo-haptics";
 import { API_BASE, kidsAPI } from "@/lib/apiClient";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import { F } from "@/lib/tokens";
+import { useAuth } from "@/lib/authContext";
+import NetInfo from "@react-native-community/netinfo";
+import { getCachedTrip } from "@/lib/tripCache";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -410,6 +413,7 @@ const sm = StyleSheet.create({
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
   const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
 
@@ -452,6 +456,7 @@ export default function TodayScreen() {
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
+  const [isOffline, setIsOffline]               = useState(false);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -528,6 +533,14 @@ export default function TodayScreen() {
   // ── Close menu when state changes ──
   useEffect(() => { setShowMenu(false); }, [todayState]);
 
+  // ── Offline detector ──
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener(state => {
+      setIsOffline(!(state.isConnected ?? true));
+    });
+    return () => { unsub(); };
+  }, []);
+
   // ── Fetch kids XP when day is complete ──
   useEffect(() => {
     if (todayState !== 'day_complete') return;
@@ -585,7 +598,10 @@ export default function TodayScreen() {
       try {
         t = await apiFetch<TripData>(`/api/travel/trips/${tid}`);
       } catch {
-        if (__DEV__) {
+        const cached = await getCachedTrip(tid);
+        if (cached) {
+          t = cached as TripData;
+        } else if (__DEV__) {
           t = MOCK_TRIP;
         } else {
           setError('Failed to load trip details.');
@@ -826,6 +842,15 @@ export default function TodayScreen() {
         );
       })}
     </ScrollView>
+  ) : null;
+
+  const isPaidUser = user?.subscriptionTier !== 'free';
+  const offlineBannerEl = (isOffline && isPaidUser) ? (
+    <View style={{ backgroundColor: '#1F2937', paddingVertical: 7, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Text style={{ color: '#D1FAE5', fontSize: 12, fontFamily: F.medium, letterSpacing: 0.2 }}>
+        {'No connection — showing cached data'}
+      </Text>
+    </View>
   ) : null;
 
   // ── ⋯ Menu overlay (shared by all states except no_trip) ──
@@ -1137,6 +1162,7 @@ export default function TodayScreen() {
         <View style={{ flex: 1, backgroundColor: C.bg }}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
             <View style={[ds.stripWrap, { paddingTop: insets.top + 8, backgroundColor: '#fff' }]}>
+              {offlineBannerEl}
               {dayStripEl}
             </View>
             {isPast ? (
@@ -1240,6 +1266,7 @@ export default function TodayScreen() {
             </View>
           </LinearGradient>
 
+          {offlineBannerEl}
           {totalDays > 1 && <View style={ds.stripWrap}>{dayStripEl}</View>}
 
           <View style={mo.paceSection}>

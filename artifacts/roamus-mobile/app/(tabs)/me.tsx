@@ -803,45 +803,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-<<<<<<< HEAD
-  pickerInitial: {
-    fontFamily: F.bold,
-    fontSize: 18,
-    color: "#fff",
-  },
-  pickerName: {
-    fontFamily: F.bold,
-    fontSize: 16,
-    color: "#1C1917",
-    marginBottom: 2,
-  },
-  pickerXp: {
-    fontFamily: F.semibold,
-    fontSize: 12,
-    color: "#D97706",
-  },
-  pickerArrow: {
-    fontFamily: F.regular,
-    fontSize: 22,
-    color: "#C4C9D4",
-  },
-  pickerDismiss: {
-    alignItems: "center",
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  pickerDismissText: {
-    fontFamily: F.semibold,
-    fontSize: 15,
-    color: G.muted,
-  },
-  versionText: { fontFamily: F.regular, fontSize: 12, color: G.muted, textAlign: "center", paddingVertical: 20 },
-=======
   pickerInitial: { fontFamily: F.bold, fontSize: 18, color: "#fff" },
   pickerName: { fontFamily: F.bold, fontSize: 16, color: "#1C1917", marginBottom: 2 },
   pickerXp: { fontFamily: F.semibold, fontSize: 12, color: "#D97706" },
   pickerArrow: { fontFamily: F.regular, fontSize: 22, color: "#C4C9D4" },
   pickerDismiss: { alignItems: "center", paddingVertical: 16, marginTop: 8 },
   pickerDismissText: { fontFamily: F.semibold, fontSize: 15, color: G.muted },
->>>>>>> d313a52 (Build Me tab — main screen + 4 sub-screens (Task #223))
 });

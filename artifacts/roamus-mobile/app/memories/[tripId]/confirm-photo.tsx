@@ -16,6 +16,9 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { memoriesAPI } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+import { useAuth } from '@/lib/authContext';
+import NetInfo from '@react-native-community/netinfo';
+import { queuePhoto } from '@/lib/photoQueue';
 
 const { width: SW } = Dimensions.get('window');
 const THUMB_SIZE = (SW - 32 - 8) / 2;
@@ -44,6 +47,7 @@ export default function ConfirmPhotoScreen() {
   const isMulti = uris.length > 1;
 
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [captions, setCaptions] = useState<string[]>(() => uris.map(() => ''));
   const [saving, setSaving] = useState(false);
 
@@ -59,16 +63,33 @@ export default function ConfirmPhotoScreen() {
     if (!tripId || uris.length === 0) return;
     setSaving(true);
     try {
-      await Promise.all(
-        uris.map((uri, i) =>
-          memoriesAPI.createMoment({
-            tripId,
-            stopId: (stopId as string) || null,
-            photoUrls: [uri],
-            parentPromptResponse: captions[i] || null,
-          })
-        )
-      );
+      const net = await NetInfo.fetch();
+      const isOffline = !(net.isConnected ?? true);
+      const isPaid = user?.subscriptionTier !== 'free';
+
+      if (isOffline && isPaid) {
+        await Promise.all(
+          uris.map((uri, i) =>
+            queuePhoto({
+              localUri: uri,
+              stopId: (stopId as string) || '',
+              tripId: tripId as string,
+              caption: captions[i] || '',
+            })
+          )
+        );
+      } else {
+        await Promise.all(
+          uris.map((uri, i) =>
+            memoriesAPI.createMoment({
+              tripId,
+              stopId: (stopId as string) || null,
+              photoUrls: [uri],
+              parentPromptResponse: captions[i] || null,
+            })
+          )
+        );
+      }
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
       router.replace(`/memories/${tripId}` as never);
     } catch (err) {

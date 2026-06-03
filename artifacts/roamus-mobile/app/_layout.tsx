@@ -5,10 +5,14 @@ import {
   PlusJakartaSans_700Bold,
   useFonts,
 } from "@expo-google-fonts/plus-jakarta-sans";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { QueryClient } from "@tanstack/react-query";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -16,22 +20,45 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/lib/authContext";
 import { OnboardingProvider, useOnboarding } from "@/lib/onboardingContext";
+import { drainAllPhotoQueues } from "@/lib/photoQueue";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
+      gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days
+      staleTime: 1000 * 60 * 30,         // 30 min
       retry: 1,
     },
   },
 });
 
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: "ROAMUS_QUERY_CACHE",
+});
+
+const persistOptions = {
+  persister: asyncStoragePersister,
+  maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+};
+
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { token, isLoading } = useAuth();
+  const { token, isLoading, user } = useAuth();
   const { data } = useOnboarding();
   const segments = useSegments();
+
+  // Drain photo queue when app returns to foreground (paid users only)
+  useEffect(() => {
+    if (!token || user?.subscriptionTier === "free") return;
+    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        drainAllPhotoQueues(token).catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [token, user?.subscriptionTier]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -92,7 +119,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
           <AuthProvider>
             <OnboardingProvider>
               <GestureHandlerRootView>
@@ -104,7 +131,7 @@ export default function RootLayout() {
               </GestureHandlerRootView>
             </OnboardingProvider>
           </AuthProvider>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

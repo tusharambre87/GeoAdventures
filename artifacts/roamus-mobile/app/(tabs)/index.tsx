@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -15,12 +15,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import NetInfo from "@react-native-community/netinfo";
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/lib/authContext";
 import { travelAPI, type Trip } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { preCacheTrip } from "@/lib/tripCache";
 
 function greeting() {
   const h = new Date().getHours();
@@ -29,7 +31,7 @@ function greeting() {
   return "Good evening";
 }
 
-function ActiveHeroCard({ trip }: { trip: Trip }) {
+function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boolean }) {
   const city = trip.destination ?? trip.name ?? "";
   const bg   = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
 
@@ -90,6 +92,12 @@ function ActiveHeroCard({ trip }: { trip: Trip }) {
         {nextStop ? ` · Next: ${nextStop.name}` : ''}
       </Text>
 
+      {offlineReady && (
+        <View style={s.offlinePill}>
+          <Text style={s.offlinePillText}>{"✓ Available offline"}</Text>
+        </View>
+      )}
+
       {/* Primary CTA */}
       <Pressable
         style={({ pressed }) => [s.continueBtn, { opacity: pressed ? 0.88 : 1 }]}
@@ -148,7 +156,8 @@ function TripCard({ trip }: { trip: Trip }) {
 
 export default function TripsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const [cacheStatus, setCacheStatus] = useState<"idle" | "ready">("idle");
   const { reset: resetOnboarding } = useOnboarding();
 
   function startNewTrip() {
@@ -172,6 +181,26 @@ export default function TripsScreen() {
   const trips = data?.trips ?? [];
   // Treat active + planned + in_progress trips as "current"
   const activeTrip = trips.find(t => t.status === "active" || t.status === "in_progress");
+
+  // Pre-cache upcoming trips for paid users
+  useEffect(() => {
+    if (!token || user?.subscriptionTier === "free") return;
+    const upcoming = trips.filter(t => {
+      if (t.status === "completed" || t.status === "archived") return false;
+      if (!t.startDate) return true;
+      const msUntil = new Date(t.startDate).getTime() - Date.now();
+      return msUntil <= 48 * 60 * 60 * 1000;
+    });
+    upcoming.forEach(t => {
+      preCacheTrip(t.id, token)
+        .then(() => setCacheStatus("ready"))
+        .catch(() => {});
+    });
+    // Check if any trip already cached
+    NetInfo.fetch().then(state => {
+      if (!state.isConnected) setCacheStatus("ready");
+    });
+  }, [trips, token, user?.subscriptionTier]);
   const currentTrips = trips.filter(t => !["completed", "archived"].includes(t.status));
   const completedTrips = trips.filter(t => t.status === "completed" || t.status === "archived");
   // Most recently created non-completed trip (shown as hero if none is "active")
@@ -223,7 +252,7 @@ export default function TripsScreen() {
           </View>
         ) : heroTrip ? (
           <>
-            <ActiveHeroCard trip={heroTrip} />
+            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} />
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow}>
                 <Text style={s.switchText}>Switch trip →</Text>
@@ -359,4 +388,10 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     shadowColor: G.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8,
   },
+
+  offlinePill: {
+    alignSelf: "flex-start", backgroundColor: "rgba(16,185,129,0.18)", borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
+  },
+  offlinePillText: { fontFamily: F.semibold, fontSize: 12, fontWeight: "600", color: "#6EE7B7" },
 });
