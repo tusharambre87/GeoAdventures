@@ -13,7 +13,12 @@ export default function TermsOfService() {
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "56px 24px 80px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".15em", color: "#E8692A", textTransform: "uppercase", marginBottom: 12 }}>Legal</div>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 38, fontWeight: 700, letterSpacing: "-.8px", marginBottom: 8 }}>Terms of Service</h1>
-        <p style={{ fontSize: 13, color: "#8A8FA8", marginBottom: 48 }}>Last updated: January 1, 2026 · Entity: GeoQuest Games LLC</p>
+        <p style={{ fontSize: 13, color: "#8A8FA8", marginBottom: 32 }}>Last updated: January 1, 2026 · Entity: GeoQuest Games LLC</p>
+
+        <div style={{ background: "rgba(232,105,42,.08)", border: "1px solid rgba(232,105,42,.22)", borderLeft: "4px solid #E8692A", borderRadius: "0 12px 12px 0", padding: "18px 22px", marginBottom: 44 }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 14, color: "#1A1F2E" }}>{"⚠️ AI-Generated Content Disclaimer"}</p>
+          <p style={{ margin: 0, fontSize: 14, color: "#3d4255", lineHeight: 1.6 }}>{"RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can\u2019t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit. RoamUs is a planning and guidance tool \u2014 we\u2019re not responsible for decisions made during your trip."}</p>
+        </div>
 
         <Section title="1. Acceptance of Terms">
           <p>By downloading, installing, or using the RoamUs mobile application or related services (the "Services"), you agree to these Terms of Service ("Terms"). If you do not agree, do not use the Services.</p>
