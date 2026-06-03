@@ -129,6 +129,7 @@ type Stop = {
     xpReward: number;
     completed: boolean;
   }> | null;
+  kidFitBias?: string | null;
 };
 
 type TripTraveler = {
@@ -596,6 +597,27 @@ function showToast(msg: string) {
 
 // ─── StopCard ─────────────────────────────────────────────────────────────────
 
+const KID_FIT_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
+  high:     { label: '⭐ Great for kids',      bg: '#E8F7EF', color: '#3DAA6E' },
+  medium:   { label: '👍 Kid friendly',     bg: '#FDF0E9', color: '#E8692A' },
+  low:      { label: '👀 Check age fit',    bg: '#FFFBEB', color: '#D97706' },
+  toddler:  { label: '🧸 Toddler friendly', bg: '#E8F7EF', color: '#3DAA6E' },
+  all_ages: { label: '👪 All ages',         bg: '#F5F3FF', color: '#7C3AED' },
+};
+
+function KidFitTag({ bias }: { bias: string | null | undefined }) {
+  if (!bias) return null;
+  const normalized = bias.toLowerCase().replace(/[\s-]/g, '_');
+  const match = KID_FIT_CONFIG[normalized];
+  if (!match) return null;
+  return (
+    <View style={{ alignSelf: 'flex-start', backgroundColor: match.bg, borderRadius: 8,
+      paddingHorizontal: 8, paddingVertical: 3, marginBottom: 6 }}>
+      <Text style={{ fontSize: 11, fontWeight: '800', color: match.color }}>{match.label}</Text>
+    </View>
+  );
+}
+
 let _openSwipeable: Swipeable | null = null;
 
 function StopCard({
@@ -728,6 +750,7 @@ function StopCard({
 
       {/* Body — tags only; actionRow is rendered outside Swipeable */}
       <View style={sc.body}>
+        <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
             <Text style={sc.tagMutedText}>{duration} min</Text>
@@ -1214,6 +1237,7 @@ function DayDetail({
 
 
         {/* Stop cards — meal cards splice in after first content stop */}
+        {contentStops.length > 0 && void console.log('stop fields:', JSON.stringify(contentStops[0], null, 2))}
         {contentStops.map((stop, i) => (
           <React.Fragment key={stop.id}>
             <StopCard
@@ -1253,6 +1277,12 @@ function DayDetail({
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
         )}
+
+        <View style={dd.disclaimer}>
+          <Text style={dd.disclaimerText}>
+            {'⚠️ RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit. RoamUs is a planning and guidance tool — we’re not responsible for decisions made during your trip.'}
+          </Text>
+        </View>
       </ScrollView>
 
       {/* Footer — show for the selected day */}
@@ -3361,6 +3391,8 @@ const ov = StyleSheet.create({
   },
   runTodayText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   runSub: { fontFamily: F.regular, fontSize: 10, color: C.muted, textAlign: 'center', marginTop: 6 },
+  disclaimer: { margin: 16, marginTop: 8, padding: 14, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)' },
+  disclaimerText: { fontSize: 12, color: '#8A8FA8', lineHeight: 18, fontWeight: '500' },
 });
 
 const dc = StyleSheet.create({
@@ -3503,6 +3535,8 @@ const dd = StyleSheet.create({
   runBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   runBtnTextDone: { color: C.muted },
   runSub: { fontFamily: F.regular, fontSize: 10, color: C.muted, textAlign: 'center', marginTop: 6 },
+  disclaimer: { margin: 16, marginTop: 8, padding: 14, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)' },
+  disclaimerText: { fontSize: 12, color: '#8A8FA8', lineHeight: 18, fontWeight: '500' },
 });
 
 const sds = StyleSheet.create({

@@ -193,14 +193,6 @@ export default function AccountScreen() {
             />
           </View>
 
-          <Text style={s.terms} numberOfLines={1} adjustsFontSizeToFit>
-            {"By continuing you agree to our "}
-            <Text style={s.termsLink} onPress={() => Linking.openURL("https://roamus.app/terms")}>Terms of Service</Text>
-            {" and "}
-            <Text style={s.termsLink} onPress={() => Linking.openURL("https://roamus.app/privacy")}>Privacy Policy</Text>
-            {"."}
-          </Text>
-
           <Pressable
             style={({ pressed }) => [s.btn, { opacity: pressed || loading || !name || !email || pw.length < 6 ? 0.7 : 1 }]}
             onPress={handleCreate}
@@ -210,6 +202,18 @@ export default function AccountScreen() {
               ? <ActivityIndicator color="#fff" />
               : <Text style={s.btnText}>Create free account →</Text>}
           </Pressable>
+
+          <Text style={s.termsNote}>
+            {"By continuing you agree to our "}
+            <Text style={s.termsLink} onPress={() => Linking.openURL("https://roamus.app/terms")}>
+              {"Terms of Service"}
+            </Text>
+            {" and "}
+            <Text style={s.termsLink} onPress={() => Linking.openURL("https://roamus.app/privacy")}>
+              {"Privacy Policy"}
+            </Text>
+            {". RoamUs is an AI-assisted planning tool — always verify stop information before your visit."}
+          </Text>
 
           <Pressable onPress={() => router.push("/onboarding/login")} style={{ alignItems: "center", paddingVertical: 12 }}>
             <Text style={{ fontFamily: F.regular, fontSize: 14, color: G.muted }}>
@@ -243,7 +247,8 @@ const s = StyleSheet.create({
   },
   input: { fontFamily: F.regular, fontSize: 15 },
   terms: { fontFamily: F.regular, fontSize: 12, color: G.muted, marginBottom: 20, textAlign: "center" },
-  termsLink: { color: G.orange, textDecorationLine: "underline" },
+  termsNote: { fontSize: 11, color: '#8A8FA8', textAlign: 'center', lineHeight: 17, paddingHorizontal: 24, marginTop: 10, marginBottom: 4 },
+  termsLink: { color: G.orange, fontWeight: '700', textDecorationLine: "underline" },
   btn: { height: 56, borderRadius: 28, backgroundColor: G.orange, alignItems: "center", justifyContent: "center", marginBottom: 10 },
   btnText: { fontFamily: F.bold, fontSize: 16, fontWeight: "700", color: "#fff" },
 });
