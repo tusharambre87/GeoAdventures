@@ -104,7 +104,7 @@ function ActiveHeroCard({ trip }: { trip: Trip }) {
         <Pressable
           style={({ pressed }) => [s.viewPlanLink, { opacity: pressed ? 0.7 : 1 }]}
           onPress={handleViewPlan}>
-          <Text style={s.viewPlanLinkText}>View full plan \u2192</Text>
+          <Text style={s.viewPlanLinkText}>{"View full plan \u2192"}</Text>
         </Pressable>
       )}
     </View>
