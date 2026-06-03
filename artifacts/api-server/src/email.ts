@@ -110,7 +110,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       to: options.to,
       from: {
         email: fromEmail,
-        name: 'GeoQuest Games'
+        name: 'RoamUs'
       },
       subject: options.subject,
       html: options.html,
@@ -156,7 +156,7 @@ export async function sendEmailWithAttachments(options: EmailWithAttachmentsOpti
       to: options.to,
       from: {
         email: fromEmail,
-        name: 'GeoQuest Games'
+        name: 'RoamUs'
       },
       subject: options.subject,
       html: options.html,
