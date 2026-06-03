@@ -205,13 +205,19 @@ export default function MeScreen() {
   const activeTrip = trips.find((t) => t.status === "active" || t.status === "in_progress") ?? null;
 
   const completedTrips = trips.filter((t) => t.status === "completed");
-  const heroTrip = completedTrips.length > 0
-    ? completedTrips.sort((a, b) => {
-        const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return bDate - aDate;
-      })[0]
-    : null;
+  const heroTrip = trips.length === 0
+    ? null
+    : completedTrips.length > 0
+      ? completedTrips.sort((a, b) => {
+          const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
+          return bDate - aDate;
+        })[0]
+      : trips.slice().sort((a, b) => {
+          const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
+          return bDate - aDate;
+        })[0];
 
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.visitedStops ?? 0), 0);
@@ -303,7 +309,16 @@ export default function MeScreen() {
               {heroBg ? (
                 <Image source={{ uri: heroBg }} style={StyleSheet.absoluteFill} contentFit="cover" />
               ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1A2533" }]} />
+                <LinearGradient
+                  colors={["#1A2533", "#0C1220", "#1A2C44"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                >
+                  <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 72, opacity: 0.3 }}>{"🏙️"}</Text>
+                  </View>
+                </LinearGradient>
               )}
               <LinearGradient
                 colors={["transparent", "rgba(6,8,16,0.88)"]}
