@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -89,6 +90,19 @@ export default function AccountScreen() {
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
+  // Explorer editing state
+  const [editingExplorerId, setEditingExplorerId] = useState<string | null>(null);
+  const [editExpName, setEditExpName] = useState("");
+  const [editExpAge, setEditExpAge] = useState("");
+  const [savingExplorer, setSavingExplorer] = useState(false);
+
+  // Add family member state
+  const [addingMember, setAddingMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberAge, setNewMemberAge] = useState("");
+  const [newMemberIsParent, setNewMemberIsParent] = useState(false);
+  const [savingNewMember, setSavingNewMember] = useState(false);
+
   useEffect(() => {
     load();
   }, []);
@@ -125,6 +139,17 @@ export default function AccountScreen() {
     }
   }
 
+  async function reloadExplorers() {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/explorers/user/${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setExplorers(Array.isArray(data) ? data : data.explorers ?? []);
+      }
+    } catch {}
+  }
+
   function showToast(msg: string) {
     setToastMsg(msg);
     setToastVisible(false);
@@ -152,6 +177,87 @@ export default function AccountScreen() {
       showToast("Failed to save — try again");
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  function startEditExplorer(exp: Explorer) {
+    setEditingExplorerId(exp.id);
+    setEditExpName(exp.name);
+    setEditExpAge(exp.age ?? "");
+    setAddingMember(false);
+  }
+
+  function cancelEditExplorer() {
+    setEditingExplorerId(null);
+    setEditExpName("");
+    setEditExpAge("");
+  }
+
+  async function saveExplorer() {
+    if (!editingExplorerId || !editExpName.trim()) return;
+    setSavingExplorer(true);
+    try {
+      const ageValue = editExpAge.trim() || undefined;
+      const res = await fetch(`${API_BASE}/api/explorers/${editingExplorerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editExpName.trim(),
+          age: ageValue,
+          ageRange: ageValue,
+        }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      cancelEditExplorer();
+      await reloadExplorers();
+      showToast("Explorer updated");
+    } catch {
+      showToast("Failed to save — try again");
+    } finally {
+      setSavingExplorer(false);
+    }
+  }
+
+  function startAddMember() {
+    setAddingMember(true);
+    setNewMemberName("");
+    setNewMemberAge("");
+    setNewMemberIsParent(false);
+    cancelEditExplorer();
+  }
+
+  function cancelAddMember() {
+    setAddingMember(false);
+    setNewMemberName("");
+    setNewMemberAge("");
+    setNewMemberIsParent(false);
+  }
+
+  async function saveNewMember() {
+    if (!user?.id || !newMemberName.trim()) return;
+    setSavingNewMember(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/explorers/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          name: newMemberName.trim(),
+          age: newMemberAge.trim() || "unknown",
+          profileType: newMemberIsParent ? "adult" : "kid",
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Create failed");
+      }
+      cancelAddMember();
+      await reloadExplorers();
+      showToast("Family member added");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to add — try again");
+    } finally {
+      setSavingNewMember(false);
     }
   }
 
@@ -310,32 +416,128 @@ export default function AccountScreen() {
           <Text style={s.secLbl}>FAMILY EXPLORERS</Text>
           <View style={s.card}>
             {explorers.map((exp, i) => (
-              <View key={exp.id} style={[s.travRow, i < explorers.length - 1 && s.travBorder]}>
-                <View style={[s.travAvatar, { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length] }]}>
-                  <Text style={s.travInitial}>{exp.name[0]?.toUpperCase() ?? "?"}</Text>
+              <View key={exp.id}>
+                <View style={[s.travRow, (i < explorers.length - 1 || editingExplorerId !== exp.id) && s.travBorder]}>
+                  <View style={[s.travAvatar, { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length] }]}>
+                    <Text style={s.travInitial}>{exp.name[0]?.toUpperCase() ?? "?"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.travName}>{exp.name}</Text>
+                    <Text style={s.travRole}>
+                      {exp.isParent ? "Parent" : `Explorer${exp.age ? ` · Age ${exp.age}` : ""}`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() =>
+                      editingExplorerId === exp.id ? cancelEditExplorer() : startEditExplorer(exp)
+                    }
+                    hitSlop={8}
+                  >
+                    <Text style={[s.travEdit, editingExplorerId === exp.id && { color: G.muted }]}>
+                      {editingExplorerId === exp.id ? "Cancel" : "Edit"}
+                    </Text>
+                  </Pressable>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.travName}>{exp.name}</Text>
-                  <Text style={s.travRole}>
-                    {exp.isParent ? "Parent" : `Explorer${exp.age ? ` · Age ${exp.age}` : ""}`}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => Alert.alert("Coming soon", "Family editing coming in the next update.")}
-                >
-                  <Text style={s.travEdit}>Edit</Text>
-                </Pressable>
+
+                {editingExplorerId === exp.id && (
+                  <View style={s.explorerForm}>
+                    <TextInput
+                      style={s.input}
+                      value={editExpName}
+                      onChangeText={setEditExpName}
+                      placeholder="Name"
+                      placeholderTextColor={G.muted}
+                      autoFocus
+                    />
+                    <TextInput
+                      style={s.input}
+                      value={editExpAge}
+                      onChangeText={setEditExpAge}
+                      placeholder="Age (optional)"
+                      placeholderTextColor={G.muted}
+                      keyboardType="number-pad"
+                    />
+                    <Pressable
+                      style={({ pressed }) => [
+                        s.saveBtn,
+                        pressed && { opacity: 0.85 },
+                        !editExpName.trim() && s.disabledBtn,
+                      ]}
+                      onPress={saveExplorer}
+                      disabled={savingExplorer || !editExpName.trim()}
+                    >
+                      {savingExplorer ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={s.saveBtnText}>Save changes</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
               </View>
             ))}
-            <Pressable
-              style={s.addTravRow}
-              onPress={() => Alert.alert("Coming soon", "Adding family members coming soon.")}
-            >
-              <View style={s.addTravIcon}>
-                <Text style={{ fontSize: 18, color: G.orange }}>{"+"}</Text>
+
+            {/* Add family member row */}
+            {!addingMember ? (
+              <Pressable style={s.addTravRow} onPress={startAddMember}>
+                <View style={s.addTravIcon}>
+                  <Text style={{ fontSize: 18, color: G.orange }}>{"+"}</Text>
+                </View>
+                <Text style={s.addTravLabel}>Add family member</Text>
+              </Pressable>
+            ) : (
+              <View style={s.explorerForm}>
+                <Text style={s.formTitle}>New family member</Text>
+                <TextInput
+                  style={s.input}
+                  value={newMemberName}
+                  onChangeText={setNewMemberName}
+                  placeholder="Name"
+                  placeholderTextColor={G.muted}
+                  autoFocus
+                />
+                <TextInput
+                  style={s.input}
+                  value={newMemberAge}
+                  onChangeText={setNewMemberAge}
+                  placeholder="Age (optional)"
+                  placeholderTextColor={G.muted}
+                  keyboardType="number-pad"
+                />
+                <View style={s.toggleRow}>
+                  <Text style={s.toggleLabel}>Parent / adult</Text>
+                  <Switch
+                    value={newMemberIsParent}
+                    onValueChange={setNewMemberIsParent}
+                    trackColor={{ false: "rgba(26,31,46,0.15)", true: G.orange }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                <View style={s.editBtns}>
+                  <Pressable
+                    style={({ pressed }) => [s.cancelBtn, pressed && { opacity: 0.7 }]}
+                    onPress={cancelAddMember}
+                  >
+                    <Text style={s.cancelBtnText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      s.saveBtn,
+                      pressed && { opacity: 0.85 },
+                      !newMemberName.trim() && s.disabledBtn,
+                    ]}
+                    onPress={saveNewMember}
+                    disabled={savingNewMember || !newMemberName.trim()}
+                  >
+                    {savingNewMember ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={s.saveBtnText}>Add member</Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-              <Text style={s.addTravLabel}>Add family member</Text>
-            </Pressable>
+            )}
           </View>
 
           {/* Account settings */}
@@ -502,6 +704,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: { fontFamily: F.bold, fontSize: 14, color: "#fff" },
+  disabledBtn: { opacity: 0.45 },
   secLbl: {
     fontFamily: F.bold,
     fontSize: 11,
@@ -531,6 +734,24 @@ const s = StyleSheet.create({
   travName: { fontFamily: F.bold, fontSize: 14, color: G.deep, marginBottom: 1 },
   travRole: { fontFamily: F.regular, fontSize: 12, color: G.muted },
   travEdit: { fontFamily: F.bold, fontSize: 12, color: G.orange },
+  explorerForm: {
+    backgroundColor: G.bg,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "rgba(26,31,46,0.08)",
+  },
+  formTitle: { fontFamily: F.bold, fontSize: 13, color: G.deep, marginBottom: 2 },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  toggleLabel: { fontFamily: F.regular, fontSize: 14, color: G.deep },
   addTravRow: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 18, paddingVertical: 12,

@@ -1933,10 +1933,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/explorers/:explorerId', async (req, res) => {
     try {
       const { explorerId } = req.params;
-      const { name, avatarKey, difficultyLevel, ageRange } = req.body;
+      const { name, age, avatarKey, difficultyLevel, ageRange } = req.body;
 
       const explorer = await storage.updateExplorerProfile(explorerId, {
         name,
+        age,
         avatarKey,
         difficultyLevel,
         ageRange,
