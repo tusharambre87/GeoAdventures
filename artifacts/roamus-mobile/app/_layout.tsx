@@ -39,11 +39,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inOnboarding = segments[0] === "onboarding";
     const inLegacyLogin = segments[0] === "login";
 
+    const inAuth      = segments[0] === "auth";
     const inTabPreview = __DEV__ && (segments[1] === 'today' || segments[1] === 'atstop');
-    if (!token && !inOnboarding && !inLegacyLogin && !inTabPreview) {
-      router.replace("/onboarding/splash");
+    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview) {
+      router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
-      if (inLegacyLogin) router.replace("/(tabs)");
+      if (inLegacyLogin || inAuth) router.replace("/(tabs)");
     } else if (token && inOnboarding && !data.onboardingInProgress) {
       router.replace("/(tabs)");
     }
@@ -57,6 +58,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
       <Stack.Screen name="memories/[tripId]/index" options={{ headerShown: false }} />
