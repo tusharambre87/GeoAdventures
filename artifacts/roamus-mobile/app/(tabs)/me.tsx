@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -317,11 +319,14 @@ export default function MeScreen() {
         {/* ── 6. Privacy & Settings ── */}
         <Text style={[s.sectionLabel, { marginTop: 24 }]}>PRIVACY & SETTINGS</Text>
         <View style={[s.card, { marginBottom: 8 }]}>
-          <MenuRow icon="🛡️" iconBg="#EFF6FF" title="Privacy Policy" />
-          <MenuRow icon="⚖️" iconBg="#EEF5F2" title="Terms of Service" />
+          <MenuRow icon="🛡️" iconBg="#EFF6FF" title="Privacy Policy" onPress={() => Linking.openURL("https://roamus.app/privacy")} />
+          <MenuRow icon="⚖️" iconBg="#EEF5F2" title="Terms of Service" onPress={() => Linking.openURL("https://roamus.app/terms")} />
           <MenuRow icon="💬" iconBg="#FDF0E9" title="Support" />
           <MenuRow icon="ℹ️" iconBg="#F5F2EE" title="About Us" noDivider />
         </View>
+        <Text style={s.versionText}>
+          {"RoamUs v" + (Constants.expoConfig?.version ?? "1.0.0")}
+        </Text>
       </ScrollView>
 
       {/* ── Explorer Picker Sheet ── */}
@@ -766,4 +771,5 @@ const s = StyleSheet.create({
     fontSize: 15,
     color: G.muted,
   },
+  versionText: { fontFamily: F.regular, fontSize: 12, color: G.muted, textAlign: "center", paddingVertical: 20 },
 });

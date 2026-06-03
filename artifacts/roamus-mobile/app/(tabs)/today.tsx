@@ -1357,7 +1357,7 @@ export default function TodayScreen() {
               <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.6 }}>SOS</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#E8433A' }}>Emergency help</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#E8433A' }}>SOS</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>Medical, lost, need help fast</Text>
             </View>
             <Text style={{ color: '#E8433A', fontSize: 18 }}>{'›'}</Text>

@@ -113,7 +113,7 @@ export default function Mission2() {
               disabled={submitting}
             >
               <Text style={s.submitText}>
-                {submitting ? "Saving…" : "📤 Share what I see"}
+                {submitting ? "Saving…" : "Save memory"}
               </Text>
             </Pressable>
             <Pressable style={s.micBtn}>
