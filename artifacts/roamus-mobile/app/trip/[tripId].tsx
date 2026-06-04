@@ -1042,7 +1042,7 @@ function TripOverview({
       const di = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
       return di !== 0 ? di : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
     })[0];
-  const hideChecklist = !!(firstStop?.isVisited || firstStop?.visited);
+  const hideChecklist = false;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1369,7 +1369,7 @@ function DayDetail({
                   <Text style={sp.bucketVal}>${spend.foodMin}–${spend.foodMax}</Text>
                 </View>
                 <View style={sp.bucket}>
-                  <Text style={sp.bucketIco}>{'\uD83C\uDF7F'}</Text>
+                  <Text style={sp.bucketIco}>{'\uD83C\uDF6D'}</Text>
                   <Text style={sp.bucketLbl}>Snacks</Text>
                   <Text style={sp.bucketVal}>${spend.snacks}</Text>
                 </View>
