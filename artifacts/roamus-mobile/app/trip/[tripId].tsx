@@ -852,6 +852,39 @@ function SessionBars({ dayStops }: { dayStops: Stop[] }) {
   );
 }
 
+// ─── Spend estimate helpers ────────────────────────────────────────────────────────
+
+const CITY_TIER: Record<string, 'tier1' | 'tier2' | 'tier3'> = {
+  'New York': 'tier1', 'San Francisco': 'tier1', 'Chicago': 'tier1',
+  'Los Angeles': 'tier1', 'Boston': 'tier2', 'Seattle': 'tier2',
+  'Washington DC': 'tier2', 'Miami': 'tier2', 'Austin': 'tier2',
+};
+const ADMISSION_COST: Record<string, number> = {
+  museum: 22, aquarium: 28, childrens_museum: 18, science_museum: 24,
+  art_museum: 20, zoo: 25, theme_park: 45, observation_deck: 35,
+  theater: 30, planetarium: 20,
+  park: 0, landmark: 0, market: 0, beach: 0, trail: 0,
+};
+const FOOD_PER_PERSON: Record<string, { min: number; max: number }> = {
+  tier1: { min: 18, max: 28 },
+  tier2: { min: 14, max: 22 },
+  tier3: { min: 11, max: 17 },
+};
+const TRANSPORT_PER_STOP: Record<string, number> = {
+  tier1: 12, tier2: 9, tier3: 6,
+};
+function computeDaySpend(stops: Stop[], destination: string, familySize: number) {
+  const tier = (CITY_TIER[destination] ?? 'tier3') as 'tier1' | 'tier2' | 'tier3';
+  const admission = stops.reduce((sum, s) => sum + (ADMISSION_COST[s.stopType ?? ''] ?? 0) * familySize, 0);
+  const food = FOOD_PER_PERSON[tier];
+  const foodMin = food.min * familySize;
+  const foodMax = food.max * familySize;
+  const transport = TRANSPORT_PER_STOP[tier] * Math.max(stops.length - 1, 1);
+  return { admission, foodMin, foodMax, transport,
+    totalMin: admission + foodMin + transport,
+    totalMax: admission + foodMax + transport };
+}
+
 // ─── DayCard (Overview) ───────────────────────────────────────────────────────
 
 function DayCard({
@@ -1306,6 +1339,43 @@ function DayDetail({
           </View>
         )}
 
+        {/* Spend estimate card */}
+        {dayStops.length > 0 && (() => {
+          const familySize = trip.travelers?.length ?? 4;
+          const dest = trip.destination ?? '';
+          const spend = computeDaySpend(dayStops, dest, familySize);
+          return (
+            <View style={sp.card}>
+              <View style={sp.header}>
+                <View>
+                  <Text style={sp.label}>ESTIMATED SPEND TODAY</Text>
+                  <Text style={sp.range}>${spend.totalMin}–${spend.totalMax}</Text>
+                </View>
+                <Text style={{ fontSize: 24 }}>{'\U0001F4B0'}</Text>
+              </View>
+              <View style={sp.buckets}>
+                <View style={sp.bucket}>
+                  <Text style={sp.bucketIco}>{'\U0001F3AB'}</Text>
+                  <Text style={sp.bucketLbl}>Admission</Text>
+                  <Text style={sp.bucketVal}>${spend.admission}</Text>
+                </View>
+                <View style={sp.bucket}>
+                  <Text style={sp.bucketIco}>{'\U0001F354'}</Text>
+                  <Text style={sp.bucketLbl}>Food</Text>
+                  <Text style={sp.bucketVal}>${spend.foodMin}–${spend.foodMax}</Text>
+                </View>
+                <View style={sp.bucket}>
+                  <Text style={sp.bucketIco}>{'\U0001F697'}</Text>
+                  <Text style={sp.bucketLbl}>Transport</Text>
+                  <Text style={sp.bucketVal}>~${spend.transport}</Text>
+                </View>
+              </View>
+              <Text style={sp.note}>
+                {`Estimates for ${familySize} · ${dest || 'your destination'} pricing · Costs may vary`}
+              </Text>
+            </View>
+          );
+        })()}
 
         {/* Stop cards — meal cards splice in after first content stop */}
         {contentStops.map((stop, i) => (
@@ -3858,4 +3928,40 @@ const root = StyleSheet.create({
   errorSub:   { fontFamily: F.regular, fontSize: 14, color: C.muted, textAlign: 'center', marginBottom: 24 },
   retryBtn:   { backgroundColor: C.orange, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   retryText:  { fontFamily: F.bold, fontSize: 14, color: '#fff' },
+});
+
+const sp = StyleSheet.create({
+  card: {
+    marginHorizontal: 16, marginBottom: 14,
+    backgroundColor: '#1A1F2E',
+    borderRadius: 18, padding: 18,
+  },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: 14,
+  },
+  label: {
+    fontSize: 11, fontWeight: '800', color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 0.1, textTransform: 'uppercase', marginBottom: 4,
+  },
+  range: {
+    fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: -0.5,
+  },
+  buckets: {
+    flexDirection: 'row', gap: 8, marginBottom: 12,
+  },
+  bucket: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12, padding: 10, alignItems: 'center',
+  },
+  bucketIco: { fontSize: 16, marginBottom: 4 },
+  bucketLbl: {
+    fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.45)',
+    textTransform: 'uppercase', letterSpacing: 0.06, marginBottom: 3,
+  },
+  bucketVal: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  note: {
+    fontSize: 11, color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center', fontWeight: '600',
+  },
 });
