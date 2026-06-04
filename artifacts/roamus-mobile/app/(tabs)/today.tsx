@@ -2052,13 +2052,13 @@ export default function TodayScreen() {
                             );
                             if (uploadRes.status === 200 || uploadRes.status === 201) {
                               const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
-                              return body.photoUrl ?? localUri;
+                              if (body.photoUrl) return body.photoUrl;
                             }
-                          } catch { /* keep local URI on any error */ }
-                          return localUri;
+                          } catch { /* skip photo on upload error */ }
+                          return null;
                         }),
-                      );
-                    } catch { /* keep local URIs if upload setup fails */ }
+                      ).then(urls => urls.filter((u): u is string => u !== null));
+                    } catch { /* upload setup failed — proceed without cloud photos */ }
                     try {
                       await memoriesAPI.createMoment({
                         tripId: trip.id,

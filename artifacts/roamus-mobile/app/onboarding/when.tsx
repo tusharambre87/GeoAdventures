@@ -257,8 +257,8 @@ export default function WhenScreen() {
   // Fetch existing trips to check for date conflicts
   useEffect(() => {
     if (!token) return;
-    fetch(`\${API_BASE}/api/travel/trips`, {
-      headers: { Authorization: `Bearer \${token}` },
+    fetch(`${API_BASE}/api/travel/trips`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
       .then(json => {
@@ -279,7 +279,7 @@ export default function WhenScreen() {
       const re = new Date(r.end); re.setHours(23,59,59,999);
       if (ns <= re && ne >= rs) {
         const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        return `You already have a trip planned \${fmt(rs)}–\${fmt(re)}. Please choose different dates.`;
+        return `You already have a trip planned ${fmt(rs)}–${fmt(re)}. Please choose different dates.`;
       }
     }
     return null;

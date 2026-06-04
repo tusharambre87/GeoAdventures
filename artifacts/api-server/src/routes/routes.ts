@@ -9883,13 +9883,48 @@ Return ONLY valid JSON in this exact format:
       const bucket = gcs.bucket(bucketId);
       const gcsFile = bucket.file(objectName);
       await gcsFile.save(file.buffer, { contentType: file.mimetype || 'image/jpeg' });
-      await gcsFile.makePublic();
-
-      const photoUrl = `https://storage.googleapis.com/${bucketId}/${objectName}`;
+      // Keep file private — serve through authenticated proxy
+      const photoUrl = `/api/travel/photo/${encodeURIComponent(objectName)}`;
       res.json({ photoUrl });
     } catch (err) {
       console.error('Photo upload error:', err);
       res.status(500).json({ message: 'Upload failed' });
+    }
+  });
+
+  // Authenticated photo proxy — streams private GCS objects to authorised users
+  app.get('/api/travel/photo/:objectName', isAuthenticated, async (req: any, res) => {
+    try {
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return res.status(500).json({ message: 'Storage not configured' });
+      const objectName = decodeURIComponent(req.params.objectName as string);
+      if (!objectName.startsWith('trip-photos/')) return res.status(403).json({ message: 'Forbidden' });
+      const { Storage } = await import('@google-cloud/storage');
+      const SIDECAR = 'http://127.0.0.1:1106';
+      const gcs = new Storage({
+        credentials: {
+          audience: 'replit',
+          subject_token_type: 'access_token',
+          token_url: `${SIDECAR}/token`,
+          type: 'external_account',
+          credential_source: {
+            url: `${SIDECAR}/credential`,
+            format: { type: 'json', subject_token_field_name: 'access_token' },
+          },
+          universe_domain: 'googleapis.com',
+        },
+        projectId: '',
+      });
+      const bucket = gcs.bucket(bucketId);
+      const gcsFile = bucket.file(objectName);
+      const [metadata] = await gcsFile.getMetadata();
+      res.setHeader('Content-Type', (metadata.contentType as string) || 'image/jpeg');
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      gcsFile.createReadStream()
+        .on('error', () => res.status(404).end())
+        .pipe(res);
+    } catch {
+      res.status(404).json({ message: 'Photo not found' });
     }
   });
 

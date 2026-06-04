@@ -29,8 +29,8 @@ export default function WhoScreen() {
     // Only pre-populate if travelers is just the default "You"
     const isDefault = travelers.length === 1 && travelers[0].name === "You";
     if (!isDefault) return;
-    fetch(`\${API_BASE}/api/travel/trips`, {
-      headers: { Authorization: `Bearer \${token}` },
+    fetch(`${API_BASE}/api/travel/trips`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
       .then(json => {
