@@ -42,6 +42,8 @@ import { F, CITY_IMGS } from "@/lib/tokens";
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
+import UpgradeSheet from "@/components/UpgradeSheet";
+import { isFreePlan } from "@/lib/subscription";
 const MO_STOP_BG: Record<string, string> = {
   park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2',
   landmark: '#E1BEE7', nature: '#DCEDC8', culture: '#FFF3E0',
@@ -445,7 +447,9 @@ function haversineDistMi(lat1: number, lon1: number, lat2: number, lon2: number)
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
   useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
   const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
 
@@ -760,6 +764,7 @@ export default function TodayScreen() {
   // ── Start Day handler ──
   async function handleStartDay() {
     if (!trip) return;
+    if (isFree) { setUpgradeVisible(true); return; }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (selectedPace === 'easier') {
       setStarting(true);
@@ -1620,6 +1625,11 @@ export default function TodayScreen() {
           onClose={() => setShowHotelSheet(false)}
           onSaved={(name, addr) => { setShowHotelSheet(false); setLocalSavedHotel(addr || name); }}
         />
+        <UpgradeSheet
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          context="run_day"
+        />
       </View>
     );
   }
@@ -1822,6 +1832,7 @@ export default function TodayScreen() {
               style={er.hereBtn}
               activeOpacity={0.85}
               onPress={() => {
+                if (isFree) { setUpgradeVisible(true); return; }
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setTodayState('at_stop_frozen');
                 AsyncStorage.setItem('atStopFrozen', 'true');
@@ -1838,6 +1849,11 @@ export default function TodayScreen() {
           onClose={() => setIndoorSheetVisible(false)}
           stopId={stop.id}
           stopName={stop.name ?? ''}
+        />
+        <UpgradeSheet
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          context="run_day"
         />
         {menuOverlay}
       </View>
@@ -2030,6 +2046,7 @@ export default function TodayScreen() {
               <TouchableOpacity
                 style={sc.headThereBtn} activeOpacity={0.85}
                 onPress={() => {
+                  if (isFree) { setUpgradeVisible(true); return; }
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
                   setVisitedPhotos([]);
@@ -2050,6 +2067,11 @@ export default function TodayScreen() {
             onComplete={() => setShowFeedback(false)}
           />
         )}
+        <UpgradeSheet
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          context="run_day"
+        />
       </View>
     );
   }

@@ -36,7 +36,9 @@ import * as Haptics from "expo-haptics";
 import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 
 import { travelAPI } from "@/lib/apiClient";
-import { API_BASE } from "@/lib/authContext";
+import { API_BASE, useAuth } from "@/lib/authContext";
+import { isFreePlan } from "@/lib/subscription";
+import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
 
@@ -1202,6 +1204,8 @@ function DayDetail({
   onDelete,
   onMoveStop,
   onAddStop,
+  isFree,
+  onShowUpgrade,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1221,6 +1225,8 @@ function DayDetail({
   onDelete: (stopId: string) => Promise<void>;
   onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
   onAddStop: () => void;
+  isFree?: boolean;
+  onShowUpgrade?: () => void;
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
@@ -1308,6 +1314,8 @@ function DayDetail({
 
       {/* Body */}
       <ScrollView
+        style={isFree && selectedDay > 1 ? { opacity: 0.35 } : undefined}
+        pointerEvents={isFree && selectedDay > 1 ? 'none' : undefined}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
@@ -1432,6 +1440,23 @@ function DayDetail({
           </Text>
         </View>
       </ScrollView>
+
+      {isFree && selectedDay > 1 && (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="box-none">
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(245,242,238,0.92)' }} />
+          <View style={{ backgroundColor: C.card, borderRadius: 20, padding: 28, alignItems: 'center', marginHorizontal: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8 }}>
+            <Text style={{ fontSize: 36, marginBottom: 12 }}>{'\uD83D\uDD12'}</Text>
+            <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, textAlign: 'center', marginBottom: 6 }}>Unlock Day {selectedDay}</Text>
+            <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>Upgrade to see all stops and run every day of your trip.</Text>
+            <Pressable
+              style={{ backgroundColor: C.orange, borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 }}
+              onPress={onShowUpgrade}
+            >
+              <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>Unlock {'\u2192'}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* Footer — show for the selected day */}
       {selectedDayStops.length > 0 && (
@@ -3141,6 +3166,10 @@ export default function TripPlanScreen() {
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   const [localStops, setLocalStops]     = useState<Stop[]>([]);
+  const { user, isLoading: authLoading } = useAuth();
+  const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [upgradeContext, setUpgradeContext] = useState<UpgradeContext>('run_day');
 
   // ── Data ──
   const { data: rawTrip, isLoading, isError, refetch } = useQuery({
@@ -3266,6 +3295,11 @@ export default function TripPlanScreen() {
   }
 
   function openRunDay(preMode?: RunMode) {
+    if (isFree) {
+      setUpgradeContext('run_day');
+      setUpgradeVisible(true);
+      return;
+    }
     if (preMode) setRunMode(preMode);
     setActiveSheet('runDay');
   }
@@ -3311,7 +3345,7 @@ export default function TripPlanScreen() {
           tripStarted={tripStarted}
           getDayStatus={getDayStatus}
           getStopsForDay={getStopsForDay}
-          onSelectDay={goToDay}
+          onSelectDay={(d) => { if (isFree && d > 1) { setUpgradeContext('locked_day'); setUpgradeVisible(true); } else { goToDay(d); } }}
           onRunToday={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
         />
@@ -3327,7 +3361,7 @@ export default function TripPlanScreen() {
           getAnchorStopForDay={getAnchorStopForDay}
           tripId={tripId ?? ''}
           onBack={() => setActiveScreen('overview')}
-          onSelectDay={(d) => setSelectedDay(d)}
+          onSelectDay={(d) => { if (isFree && d > 1) { setUpgradeContext('locked_day'); setUpgradeVisible(true); } else { setSelectedDay(d); } }}
           onStopDetails={openStopDetails}
           onReplaceStop={openReplaceSheet}
           onRunDay={() => openRunDay()}
@@ -3335,6 +3369,8 @@ export default function TripPlanScreen() {
           onDelete={deleteStop}
           onMoveStop={moveStop}
           onAddStop={() => setActiveSheet('addStop')}
+          isFree={isFree}
+          onShowUpgrade={() => { setUpgradeContext('locked_day'); setUpgradeVisible(true); }}
         />
       )}
 
@@ -3421,6 +3457,11 @@ export default function TripPlanScreen() {
           />
         </SheetModal>
       )}
+      <UpgradeSheet
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        context={upgradeContext}
+      />
       <TripTabBar />
     </View>
   );

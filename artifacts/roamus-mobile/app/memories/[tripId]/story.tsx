@@ -22,6 +22,9 @@ import { useQuery } from '@tanstack/react-query';
 
 import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+import { useAuth } from '@/lib/authContext';
+import { isFreePlan } from '@/lib/subscription';
+import UpgradeSheet from '@/components/UpgradeSheet';
 
 const { width: SW } = Dimensions.get('window');
 const TOTAL_SLIDES = 5;
@@ -256,6 +259,9 @@ export default function StoryScreen() {
   });
   const [generating, setGenerating] = React.useState(false);
   const [genError, setGenError]     = React.useState(false);
+  const { user, isLoading: authLoading } = useAuth();
+  const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [upgradeVisible, setUpgradeVisible] = React.useState(false);
 
   async function handleGenerate() {
     if (!tripId) return;
@@ -363,6 +369,24 @@ export default function StoryScreen() {
           </Pressable>
         </View>
       </View>
+      {isFree && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.82)', alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={{ fontSize: 44, marginBottom: 16 }}>{'\uD83D\uDD12'}</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: 22, color: '#fff', textAlign: 'center', marginBottom: 8, paddingHorizontal: 32 }}>Your Family Story</Text>
+          <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 22, marginBottom: 24, paddingHorizontal: 40 }}>Upgrade to unlock your AI-generated trip memory.</Text>
+          <Pressable
+            style={{ backgroundColor: '#E8692A', borderRadius: 24, paddingHorizontal: 32, paddingVertical: 14 }}
+            onPress={() => setUpgradeVisible(true)}
+          >
+            <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Unlock story {'\u2192'}</Text>
+          </Pressable>
+        </View>
+      )}
+      <UpgradeSheet
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        context="story"
+      />
     </View>
   );
 }

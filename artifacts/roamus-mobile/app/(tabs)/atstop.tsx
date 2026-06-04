@@ -40,6 +40,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from '@/lib/apiClient';
 import { F, CITY_IMGS } from '@/lib/tokens';
 import StopPickerSheet from '@/components/StopPickerSheet';
+import { useAuth } from '@/lib/authContext';
+import { isFreePlan } from '@/lib/subscription';
+import UpgradeSheet from '@/components/UpgradeSheet';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -441,6 +444,12 @@ export default function AtStopScreen() {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [feedbackInputFocused, setFeedbackInputFocused] = useState(false);
   const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
+  const { user, isLoading: authLoading } = useAuth();
+  const isUserFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  useEffect(() => {
+    if (isUserFree) setUpgradeVisible(true);
+  }, [isUserFree]);
   const [foodLoading, setFoodLoading]   = useState(false);
   const [foodLoaded, setFoodLoaded]     = useState(false);
   const [breakPlaces, setBreakPlaces]   = useState<ExtraPlace[]>([]);
@@ -1533,6 +1542,14 @@ export default function AtStopScreen() {
           onSelect={handleStopSelectFromAtStop}
         />
       )}
+      <UpgradeSheet
+        visible={upgradeVisible}
+        onClose={() => {
+          setUpgradeVisible(false);
+          router.replace('/(tabs)/today');
+        }}
+        context="at_stop"
+      />
     </View>
   );
 }
