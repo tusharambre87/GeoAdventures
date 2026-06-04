@@ -66,6 +66,7 @@
     "expo-file-system": "^56.0.7",
     "expo-speech": "^56.0.3",
     "expo-store-review": "~9.0.9",
+    "lottie-react-native": "~7.3.8",
     "react-native-webview": "13.15.0"
   }
 }
