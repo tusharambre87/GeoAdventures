@@ -2010,11 +2010,14 @@ export default function TodayScreen() {
                   } catch { /* best-effort */ }
                 }
 
-                for (const [, quote] of filledQuotes) {
+                for (const [key, quote] of filledQuotes) {
                   try {
+                    const childName = key.startsWith('dw-') ? key.slice(3) : null;
                     await memoriesAPI.createMoment({
                       tripId: trip.id,
-                      kidPromptResponse: quote.trim(),
+                      kidPromptResponse: childName
+                        ? `${childName}|${quote.trim()}`
+                        : quote.trim(),
                     });
                   } catch { /* best-effort */ }
                 }

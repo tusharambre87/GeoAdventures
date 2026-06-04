@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { travelAPI, Trip } from '@/lib/apiClient';
+import { travelAPI, memoriesAPI, Trip, Moment } from '@/lib/apiClient';
 import StopPickerSheet from '@/components/StopPickerSheet';
 import { F } from '@/lib/tokens';
 
@@ -27,6 +27,7 @@ const C = {
   deep:     '#1A1F2E',
   muted:    '#8A8FA8',
   green:    '#3DAA6E',
+  quoteBar: '#E8692A',
 } as const;
 
 const GRAD_PAIRS: [string, string][] = [
@@ -60,6 +61,98 @@ function stopCount(trip: Trip): number {
 
 function visitedCount(trip: Trip): number {
   return trip.stops?.filter(s => s.isVisited || s.visited).length ?? (trip as any).visitedStops ?? 0;
+}
+
+// ─── Moment helpers ───────────────────────────────────────────────────────────
+
+function parseKidQuote(response: string | null | undefined): { name: string | null; text: string } {
+  if (!response) return { name: null, text: '' };
+  const sep = response.indexOf('|');
+  if (sep === -1) return { name: null, text: response };
+  return { name: response.slice(0, sep).trim() || null, text: response.slice(sep + 1).trim() };
+}
+
+function getDayForMoment(moment: Moment, trip: Trip): number {
+  if (moment.stopId) {
+    const stop = trip.stops?.find(s => s.id === moment.stopId);
+    if (stop?.dayIndex != null) return stop.dayIndex + 1;
+  }
+  if (trip.startDate && moment.createdAt) {
+    const start = new Date(trip.startDate).setHours(0, 0, 0, 0);
+    const created = new Date(moment.createdAt).setHours(0, 0, 0, 0);
+    const diff = Math.floor((created - start) / (1000 * 60 * 60 * 24));
+    return Math.max(1, diff + 1);
+  }
+  return 1;
+}
+
+type DayGroup = {
+  day: number;
+  photos: string[];
+  quotes: Array<{ name: string | null; text: string }>;
+};
+
+function groupMomentsByDay(moments: Moment[], trip: Trip): DayGroup[] {
+  const map = new Map<number, DayGroup>();
+
+  for (const m of moments) {
+    const day = getDayForMoment(m, trip);
+    if (!map.has(day)) map.set(day, { day, photos: [], quotes: [] });
+    const g = map.get(day)!;
+
+    const urls = m.photoUrls ?? (m.photoUrl ? [m.photoUrl] : []);
+    g.photos.push(...urls);
+
+    if (m.kidPromptResponse) {
+      const parsed = parseKidQuote(m.kidPromptResponse);
+      if (parsed.text) g.quotes.push(parsed);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.day - b.day);
+}
+
+// ─── Photo Journal section ─────────────────────────────────────────────────────
+
+function PhotoJournalSection({ trip, moments }: { trip: Trip; moments: Moment[] }) {
+  const groups = groupMomentsByDay(moments, trip);
+  if (groups.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Text style={s.sectionLabel}>Photo Journal</Text>
+      {groups.map(g => (
+        <View key={g.day} style={pj.dayBlock}>
+          {/* Day label */}
+          <View style={pj.dayChip}>
+            <Text style={pj.dayChipText}>Day {g.day}</Text>
+          </View>
+
+          {/* Photo grid */}
+          {g.photos.length > 0 && (
+            <View style={pj.photoGrid}>
+              {g.photos.slice(0, 6).map((uri, idx) => (
+                <View key={idx} style={[pj.photoCell, g.photos.length === 1 && pj.photoCellFull]}>
+                  <ExpoImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Kid quotes */}
+          {g.quotes.map((q, idx) => (
+            <View key={idx} style={pj.quoteRow}>
+              <View style={pj.quoteBar} />
+              <View style={pj.quoteBody}>
+                <Text style={pj.quoteText}>"{q.text}"</Text>
+                {q.name && <Text style={pj.quoteName}>— {q.name}</Text>}
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 // ─── State A: truly no trips ──────────────────────────────────────────────────
@@ -220,17 +313,19 @@ export default function MemoriesScreen() {
 
   const trips = data?.trips ?? [];
 
-  // Mirror trips tab logic exactly
   const activeTrip = trips.find(t => t.status === 'active' || t.status === 'in_progress');
   const currentTrips = trips.filter(t => !['completed', 'archived'].includes(t.status));
   const completedTrips = trips.filter(t => t.status === 'completed' || t.status === 'archived');
 
-  // Hero = the one explicitly active trip, or the first current trip if none
   const heroTrip = activeTrip ?? (currentTrips.length > 0 ? currentTrips[0] : null);
   const isExplicitlyActive = !!activeTrip;
-
-  // Other current trips (not the hero, not completed)
   const otherCurrentTrips = currentTrips.filter(t => t.id !== heroTrip?.id);
+
+  const { data: moments } = useQuery({
+    queryKey: ['moments', heroTrip?.id],
+    queryFn: () => memoriesAPI.getMoments(heroTrip!.id),
+    enabled: !!heroTrip?.id,
+  });
 
   if (isLoading) {
     return (
@@ -282,6 +377,13 @@ export default function MemoriesScreen() {
         </View>
       )}
 
+      {/* ── Photo Journal — day-grouped photos & kid quotes ── */}
+      {heroTrip && moments && moments.length > 0 && (
+        <View style={{ marginHorizontal: 20 }}>
+          <PhotoJournalSection trip={heroTrip} moments={moments} />
+        </View>
+      )}
+
       {/* ── Other in-progress / upcoming trips ── */}
       {otherCurrentTrips.length > 0 && (
         <>
@@ -305,7 +407,7 @@ export default function MemoriesScreen() {
       )}
 
       {/* ── If only hero, no others ── */}
-      {completedTrips.length === 0 && otherCurrentTrips.length === 0 && heroTrip && (
+      {completedTrips.length === 0 && otherCurrentTrips.length === 0 && heroTrip && !moments?.length && (
         <Text style={s.hintText}>Complete your trip to see it here as a story</Text>
       )}
       </ScrollView>
@@ -319,6 +421,76 @@ export default function MemoriesScreen() {
     </View>
   );
 }
+
+// ─── Photo journal styles ──────────────────────────────────────────────────────
+
+const CELL_GAP = 3;
+
+const pj = StyleSheet.create({
+  dayBlock: {
+    marginBottom: 24,
+  },
+  dayChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.deep,
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  dayChipText: {
+    fontSize: 11,
+    fontFamily: F.bold,
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: CELL_GAP,
+    marginBottom: 10,
+  },
+  photoCell: {
+    width: '32.3%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: C.muted,
+  },
+  photoCellFull: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  quoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 8,
+  },
+  quoteBar: {
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: C.orange,
+    minHeight: 36,
+    marginTop: 2,
+  },
+  quoteBody: {
+    flex: 1,
+  },
+  quoteText: {
+    fontSize: 14,
+    fontFamily: F.regular,
+    color: C.deep,
+    fontStyle: 'italic',
+    lineHeight: 21,
+  },
+  quoteName: {
+    fontSize: 12,
+    fontFamily: F.semibold,
+    color: C.orange,
+    marginTop: 3,
+  },
+});
 
 const s = StyleSheet.create({
   root: { flex: 1 },
