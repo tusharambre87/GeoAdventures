@@ -29,6 +29,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fonts/fraunces";
 import * as Haptics from "expo-haptics";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { API_BASE, kidsAPI, memoriesAPI } from "@/lib/apiClient";
 import { SpeechTextInput } from "@/components/SpeechTextInput";
@@ -1974,11 +1975,37 @@ export default function TodayScreen() {
                 const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
                 const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
 
+                // Upload each photo to cloud storage; fall back to local URI on error
+                let cloudPhotoUrls: string[] = filledPhotos;
                 if (filledPhotos.length > 0) {
+                  try {
+                    const token = await AsyncStorage.getItem('auth_token');
+                    cloudPhotoUrls = await Promise.all(
+                      filledPhotos.map(async (localUri) => {
+                        try {
+                          const uploadRes = await FileSystem.uploadAsync(
+                            `${API_BASE}/api/travel/upload-photo`,
+                            localUri,
+                            {
+                              httpMethod: 'POST',
+                              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                              fieldName: 'photo',
+                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                            },
+                          );
+                          if (uploadRes.status === 200 || uploadRes.status === 201) {
+                            const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+                            return body.photoUrl ?? localUri;
+                          }
+                        } catch { /* keep local URI on any error */ }
+                        return localUri;
+                      }),
+                    );
+                  } catch { /* keep local URIs if upload setup fails */ }
                   try {
                     await memoriesAPI.createMoment({
                       tripId: trip.id,
-                      photoUrls: filledPhotos,
+                      photoUrls: cloudPhotoUrls,
                     });
                   } catch { /* best-effort */ }
                 }

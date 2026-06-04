@@ -26,6 +26,7 @@ import { validateUserInput } from "../contentSafety";
 import { stripeService } from "../stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "../stripeClient";
 import OpenAI from "openai";
+import multer from "multer";
 import { getOrGenerateExperienceContent } from "../experienceContentService";
 import { sendWeeklyMetricsReport, calculateDayMetrics, calculateWeeklyMetricsReport } from "../dailyMetrics";
 import { sendAllParentSnapshots } from "../parentSnapshotEmails";
@@ -9843,6 +9844,55 @@ Return ONLY valid JSON in this exact format:
     }
   });
   
+  // ============================================================================
+  // PHOTO UPLOAD (day-wrap cloud storage)
+  // ============================================================================
+
+  const photoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
+
+  app.post('/api/travel/upload-photo', isAuthenticated, photoUpload.single('photo'), async (req: any, res) => {
+    try {
+      const file = req.file as Express.Multer.File | undefined;
+      if (!file) return res.status(400).json({ message: 'No photo provided' });
+
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return res.status(500).json({ message: 'Storage not configured' });
+
+      const { Storage } = await import('@google-cloud/storage');
+      const SIDECAR = 'http://127.0.0.1:1106';
+      const gcs = new Storage({
+        credentials: {
+          audience: 'replit',
+          subject_token_type: 'access_token',
+          token_url: `${SIDECAR}/token`,
+          type: 'external_account',
+          credential_source: {
+            url: `${SIDECAR}/credential`,
+            format: { type: 'json', subject_token_field_name: 'access_token' },
+          },
+          universe_domain: 'googleapis.com',
+        },
+        projectId: '',
+      });
+
+      const ext = file.mimetype === 'image/png' ? 'png' : 'jpg';
+      const objectName = `trip-photos/${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const bucket = gcs.bucket(bucketId);
+      const gcsFile = bucket.file(objectName);
+      await gcsFile.save(file.buffer, { contentType: file.mimetype || 'image/jpeg' });
+      await gcsFile.makePublic();
+
+      const photoUrl = `https://storage.googleapis.com/${bucketId}/${objectName}`;
+      res.json({ photoUrl });
+    } catch (err) {
+      console.error('Photo upload error:', err);
+      res.status(500).json({ message: 'Upload failed' });
+    }
+  });
+
   // ============================================================================
   // TRIP WALLET ROUTES
   // ============================================================================
