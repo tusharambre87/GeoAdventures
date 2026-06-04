@@ -853,6 +853,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/auth/user/subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { plan, annual } = req.body;
+      const tierMap: Record<string, string> = {
+        roamus:   annual ? 'annual' : 'monthly',
+        trippack: 'trip_pass',
+        bundle:   'trip_pass',
+      };
+      const newTier = tierMap[plan as string] ?? 'monthly';
+      await db.update(users).set({ subscriptionTier: newTier }).where(eq(users.id, userId));
+      const updatedUser = await storage.getUser(userId);
+      res.json(sanitizeUser(updatedUser!));
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      res.status(500).json({ message: 'Failed to update subscription' });
+    }
+  });
+
   app.post('/api/check-email', async (req, res) => {
     try {
       const { email } = req.body;

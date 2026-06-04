@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { API_BASE } from '@/lib/authContext';
+import { API_BASE, useAuth } from '@/lib/authContext';
 import { F, G } from '@/lib/tokens';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -86,6 +86,7 @@ const BUNDLE_PLAN = {
 
 export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheetProps) {
   const insets = useSafeAreaInsets();
+  const { token, refreshUser } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState('roamus');
   const [annual, setAnnual] = useState(false);
@@ -165,9 +166,18 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
   const plan     = allPlans.find(p => p.id === selected) ?? SHEET_PLANS[0];
   const ctaLabel = plan.cta.replace('{price}', selected === 'trippack' ? tripPrice : '');
 
-  function handleCta() {
+  async function handleCta() {
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/auth/user/subscription`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ plan: selected, annual }),
+        });
+        await refreshUser();
+      } catch {}
+    }
     onClose();
-    router.push('/onboarding/upgrade');
   }
 
   const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });

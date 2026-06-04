@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { memoriesAPI } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
-import { useAuth } from '@/lib/authContext';
+import { useAuth, API_BASE } from '@/lib/authContext';
 import NetInfo from '@react-native-community/netinfo';
 import { queuePhoto } from '@/lib/photoQueue';
 
@@ -47,7 +47,7 @@ export default function ConfirmPhotoScreen() {
   const isMulti = uris.length > 1;
 
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [captions, setCaptions] = useState<string[]>(() => uris.map(() => ''));
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +57,19 @@ export default function ConfirmPhotoScreen() {
       next[index] = text;
       return next;
     });
+  };
+
+  const uploadPhoto = async (uri: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('photo', { uri, type: 'image/jpeg', name: 'photo.jpg' } as any);
+    const res = await fetch(`${API_BASE}/api/travel/upload-photo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    const { photoUrl } = await res.json();
+    return photoUrl as string;
   };
 
   const savePhotos = async () => {
@@ -79,12 +92,13 @@ export default function ConfirmPhotoScreen() {
           )
         );
       } else {
+        const uploadedUrls = await Promise.all(uris.map(uploadPhoto));
         await Promise.all(
-          uris.map((uri, i) =>
+          uploadedUrls.map((photoUrl, i) =>
             memoriesAPI.createMoment({
               tripId,
               stopId: (stopId as string) || null,
-              photoUrls: [uri],
+              photoUrls: [photoUrl],
               parentPromptResponse: captions[i] || null,
             })
           )

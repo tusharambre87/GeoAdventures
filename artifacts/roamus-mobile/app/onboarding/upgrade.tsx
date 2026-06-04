@@ -58,7 +58,7 @@ const PLANS = [
 export default function UpgradeScreen() {
   const insets = useSafeAreaInsets();
   const { data, completeOnboarding } = useOnboarding();
-  const { user } = useAuth();
+  const { user, token, refreshUser } = useAuth();
   const [selected, setSelected] = useState("roamus");
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [annual, setAnnual] = useState(false);
@@ -111,7 +111,18 @@ export default function UpgradeScreen() {
     return p.cta.replace("{price}", selected === "trippack" ? tripPrice : "");
   }
 
-  function handleContinue() {
+  async function handleContinue() {
+    if (token && selected !== 'free') {
+      try {
+        await fetch(`${API_BASE}/api/pricing`, { method: 'HEAD' }).catch(() => {});
+        await fetch(`${API_BASE}/api/auth/user/subscription`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ plan: selected, annual }),
+        });
+        await refreshUser();
+      } catch {}
+    }
     completeOnboarding();
     router.replace("/(tabs)/today");
   }

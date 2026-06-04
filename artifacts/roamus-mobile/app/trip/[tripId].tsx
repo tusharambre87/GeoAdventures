@@ -1314,8 +1314,6 @@ function DayDetail({
 
       {/* Body */}
       <ScrollView
-        style={isFree && selectedDay > 1 ? { opacity: 0.35 } : undefined}
-        pointerEvents={isFree && selectedDay > 1 ? 'none' : undefined}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
@@ -1441,22 +1439,6 @@ function DayDetail({
         </View>
       </ScrollView>
 
-      {isFree && selectedDay > 1 && (
-        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="box-none">
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(245,242,238,0.92)' }} />
-          <View style={{ backgroundColor: C.card, borderRadius: 20, padding: 28, alignItems: 'center', marginHorizontal: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8 }}>
-            <Text style={{ fontSize: 36, marginBottom: 12 }}>{'\uD83D\uDD12'}</Text>
-            <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, textAlign: 'center', marginBottom: 6 }}>Unlock Day {selectedDay}</Text>
-            <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>Upgrade to see all stops and run every day of your trip.</Text>
-            <Pressable
-              style={{ backgroundColor: C.orange, borderRadius: 24, paddingHorizontal: 28, paddingVertical: 13 }}
-              onPress={onShowUpgrade}
-            >
-              <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>Unlock {'\u2192'}</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* Footer — show for the selected day */}
       {selectedDayStops.length > 0 && (
@@ -3345,7 +3327,7 @@ export default function TripPlanScreen() {
           tripStarted={tripStarted}
           getDayStatus={getDayStatus}
           getStopsForDay={getStopsForDay}
-          onSelectDay={(d) => { if (isFree && d > 1) { setUpgradeContext('locked_day'); setUpgradeVisible(true); } else { goToDay(d); } }}
+          onSelectDay={(d) => goToDay(d)}
           onRunToday={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
         />
@@ -3361,7 +3343,7 @@ export default function TripPlanScreen() {
           getAnchorStopForDay={getAnchorStopForDay}
           tripId={tripId ?? ''}
           onBack={() => setActiveScreen('overview')}
-          onSelectDay={(d) => { if (isFree && d > 1) { setUpgradeContext('locked_day'); setUpgradeVisible(true); } else { setSelectedDay(d); } }}
+          onSelectDay={(d) => setSelectedDay(d)}
           onStopDetails={openStopDetails}
           onReplaceStop={openReplaceSheet}
           onRunDay={() => openRunDay()}
