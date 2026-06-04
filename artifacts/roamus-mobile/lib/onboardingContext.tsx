@@ -44,6 +44,8 @@ export type OnboardingData = {
   generatedTrip: { days: PreviewDay[] } | null;
   /** true only while the user is actively mid-flow after registration (Account→Upgrade) */
   onboardingInProgress: boolean;
+  /** true when a logged-in user starts the "Plan a trip" flow — skips account screen */
+  returningUser: boolean;
   /** "travel" | "late" | "full" — what the last day of the trip looks like */
   lastDay: string | null;
   /** Record of "CityA→CityB" → "morning"|"midday"|"evening" transition timing */
@@ -70,6 +72,7 @@ const DEFAULT: OnboardingData = {
   createdTripId: null,
   generatedTrip: null,
   onboardingInProgress: false,
+  returningUser: false,
   lastDay: null,
   cityTransitions: {},
 };
@@ -95,7 +98,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }
 
   function completeOnboarding() {
-    setData(prev => ({ ...prev, onboardingInProgress: false }));
+    setData(prev => ({ ...prev, onboardingInProgress: false, returningUser: false }));
   }
 
   return (

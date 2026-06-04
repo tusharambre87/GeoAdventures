@@ -160,10 +160,11 @@ export default function TripsScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const [cacheStatus, setCacheStatus] = useState<"idle" | "ready">("idle");
-  const { reset: resetOnboarding } = useOnboarding();
+  const { reset: resetOnboarding, set: setOnboarding } = useOnboarding();
 
   function startNewTrip() {
     resetOnboarding();
+    setOnboarding({ onboardingInProgress: true, returningUser: true });
     router.push("/onboarding/where" as any);
   }
 

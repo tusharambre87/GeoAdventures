@@ -3,12 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Pressable, ScrollView, StyleSheet, Text, View,
+  Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { F, G } from "@/lib/tokens";
+import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP } from "@/lib/tokens";
 import { useOnboarding, type PreviewDay } from "@/lib/onboardingContext";
+import { API_BASE, useAuth } from "@/lib/authContext";
 import { useLandmarkImage } from "@/lib/useLandmarkImage";
 import { useWikiPhoto } from "@/lib/useWikiPhoto";
 
@@ -284,7 +285,9 @@ const FALLBACK_DAYS: DisplayDay[] = [
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function PreviewScreen() {
   const insets = useSafeAreaInsets();
-  const { data } = useOnboarding();
+  const { data, set, completeOnboarding } = useOnboarding();
+  const { token, user } = useAuth();
+  const [saving, setSaving] = useState(false);
 
   const primaryCity = data.cities[0] ?? "Your City";
   const isMulti = data.cities.length > 1;
@@ -417,12 +420,86 @@ export default function PreviewScreen() {
       {/* ── CTA ── */}
       <View style={[s.cta, { paddingBottom: insets.bottom + 24 }]}>
         <Pressable
-          style={({ pressed }) => [s.ctaBtn, { opacity: pressed ? 0.88 : 1 }]}
-          onPress={() => router.push("/onboarding/account")}
+          style={({ pressed }) => [s.ctaBtn, { opacity: (pressed || saving) ? 0.88 : 1 }]}
+          onPress={async () => {
+            if (!data.returningUser) {
+              router.push("/onboarding/account");
+              return;
+            }
+            if (!token) {
+              router.push("/onboarding/account");
+              return;
+            }
+            setSaving(true);
+            try {
+              const city = data.cities[0] ?? "Chicago";
+              const country = CITY_COUNTRY[city] ?? "USA";
+              const isMultiCity = data.cityMode === "multi" && data.cities.length > 1;
+              const tripName = isMultiCity
+                ? `${data.cities.slice(0, -1).join(", ")} & ${data.cities[data.cities.length - 1]} Family Trip`
+                : `${city} Family Trip`;
+              const players = data.travelers.map(t => ({
+                name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
+              }));
+              const res = await fetch(`${API_BASE}/api/travel/trips`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  name: tripName,
+                  destination: isMultiCity ? data.cities.join(", ") : city,
+                  city,
+                  country,
+                  startDate: data.startDate,
+                  endDate: data.endDate,
+                  travelers: players,
+                  adventureStyle: STYLE_MAP[data.tripStyle ?? ""] ?? "family_explorer",
+                  pace: PACE_MAP[data.pace ?? ""] ?? "balanced",
+                  adventureContext: "travel",
+                  autoGenerateStops: true,
+                  tailoring: {
+                    transport: data.transport,
+                    stroller: data.stroller,
+                    interests: data.interests,
+                    indoorOutdoor: data.indoorOutdoor ?? "both",
+                    budgetSensitivity: data.budgetLevel ?? "moderate",
+                    kidEnergyLevel: data.kidEnergyLevel ?? "mixed",
+                    arrivalMethod: data.arrivalMethod ?? null,
+                    arrivalTime: data.arrivalTime ?? null,
+                    lastDay: data.lastDay ?? "full",
+                    cityTransitions: data.cityTransitions ?? {},
+                  },
+                }),
+              });
+              if (!res.ok) {
+                throw new Error("Trip creation failed");
+              }
+              const trip = await res.json();
+              set({ createdTripId: trip.id });
+              fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+              }).catch(() => {});
+              if (user?.subscriptionTier && user.subscriptionTier !== "free") {
+                completeOnboarding();
+                router.replace("/(tabs)/today");
+              } else {
+                router.push("/onboarding/upgrade");
+              }
+            } catch {
+              Alert.alert("Couldn't save trip", "Please check your connection and try again.");
+            } finally {
+              setSaving(false);
+            }
+          }}
+          disabled={saving}
         >
-          <Text style={s.ctaBtnText}>Save this trip — it's free →</Text>
+          <Text style={s.ctaBtnText}>
+            {saving ? "Saving…" : data.returningUser ? "Save this trip →" : "Save this trip — it's free →"}
+          </Text>
         </Pressable>
-        <Text style={s.ctaHint}>Free account · All stops visible · No card needed</Text>
+        <Text style={s.ctaHint}>
+          {data.returningUser ? "Your trip will be added to your journal" : "Free account · All stops visible · No card needed"}
+        </Text>
       </View>
     </View>
   );

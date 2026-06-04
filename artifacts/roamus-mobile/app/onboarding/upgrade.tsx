@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { API_BASE } from "@/lib/authContext";
+import { API_BASE, useAuth } from "@/lib/authContext";
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 
@@ -58,9 +58,18 @@ const PLANS = [
 export default function UpgradeScreen() {
   const insets = useSafeAreaInsets();
   const { data, completeOnboarding } = useOnboarding();
+  const { user } = useAuth();
   const [selected, setSelected] = useState("roamus");
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [annual, setAnnual] = useState(false);
+
+  // Belt-and-suspenders: returning paid users should never see this screen
+  useEffect(() => {
+    if (data.returningUser && user?.subscriptionTier && user.subscriptionTier !== "free") {
+      completeOnboarding();
+      router.replace("/(tabs)/today");
+    }
+  }, [data.returningUser, user?.subscriptionTier]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/pricing`)
@@ -104,7 +113,7 @@ export default function UpgradeScreen() {
 
   function handleContinue() {
     completeOnboarding();
-    router.replace("/(tabs)");
+    router.replace("/(tabs)/today");
   }
 
   const plan = PLANS.find(p => p.id === selected) ?? PLANS[1];
