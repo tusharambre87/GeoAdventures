@@ -1,8 +1,9 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 import Reanimated, {
   useSharedValue,
   withSequence,
@@ -111,6 +112,7 @@ export default function BuildingScreen() {
   useEffect(() => {
     if (animDone && apiDone && !navigated.current) {
       navigated.current = true;
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setShowFinish(true);
       Animated.timing(finishOpacity, {
         toValue: 1,
