@@ -37,6 +37,7 @@ import { SpeechTextInput } from "@/components/SpeechTextInput";
 import ChecklistSheet from "@/components/ChecklistSheet";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
+import AddHotelSheet from "@/components/AddHotelSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
@@ -498,6 +499,7 @@ export default function TodayScreen() {
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
   const [isOffline, setIsOffline]               = useState(false);
   const [showFeedback, setShowFeedback]          = useState(false);
+  const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
   const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string; name: string }[]>([]);
@@ -520,18 +522,27 @@ export default function TodayScreen() {
   }, [todayState]);
 
 
-  // ── Last-known user location for distance pill ──
+  // ── Live user location for distance pill ──
   useEffect(() => {
-    ExpoLocation.getLastKnownPositionAsync({}).then((pos: ExpoLocation.LocationObject | null) => {
-      if (!pos) return;
-      const stop = currentStop;
-      if (!stop?.latitude || !stop?.longitude) return;
-      const dist = haversineDistMi(
-        pos.coords.latitude, pos.coords.longitude,
-        parseFloat(stop.latitude as string), parseFloat(stop.longitude as string)
-      );
-      setUserDistMi(Math.round(dist * 10) / 10);
-    }).catch(() => {});
+    (async () => {
+      try {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        const stop = currentStop;
+        if (!stop?.latitude || !stop?.longitude) return;
+        let pos: ExpoLocation.LocationObject | null = null;
+        if (status === 'granted') {
+          pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+        } else {
+          pos = await ExpoLocation.getLastKnownPositionAsync({});
+        }
+        if (!pos) return;
+        const dist = haversineDistMi(
+          pos.coords.latitude, pos.coords.longitude,
+          parseFloat(stop.latitude as string), parseFloat(stop.longitude as string)
+        );
+        setUserDistMi(Math.round(dist * 10) / 10);
+      } catch {}
+    })();
   }, [dayStops[currentStopIndex]?.id]);
 
 
@@ -1196,6 +1207,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
             activeOpacity={0.85}
+            onPress={() => setShowHotelSheet(true)}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Text style={{ fontSize: 20 }}>{'🏨'}</Text>
@@ -1249,6 +1261,13 @@ export default function TodayScreen() {
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
+        <AddHotelSheet
+          visible={showHotelSheet}
+          tripId={trip?.id ?? ''}
+          destination={trip?.destination ?? (trip as any)?.city ?? ''}
+          onClose={() => setShowHotelSheet(false)}
+          onSaved={() => setShowHotelSheet(false)}
+        />
       </View>
     );
   }
@@ -1558,6 +1577,13 @@ export default function TodayScreen() {
           </Pressable>
         </ScrollView>
         {menuOverlay}
+        <AddHotelSheet
+          visible={showHotelSheet}
+          tripId={trip?.id ?? ''}
+          destination={trip?.destination ?? (trip as any)?.city ?? ''}
+          onClose={() => setShowHotelSheet(false)}
+          onSaved={() => setShowHotelSheet(false)}
+        />
       </View>
     );
   }
