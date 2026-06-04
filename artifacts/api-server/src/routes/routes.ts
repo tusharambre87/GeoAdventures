@@ -9896,22 +9896,15 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
-  // Authenticated photo proxy — streams private GCS objects to authorised users
-  app.get('/api/travel/photo/:objectName', isAuthenticated, async (req: any, res) => {
+  // Public photo proxy — object names are opaque (timestamp+random) so unguessable.
+  // No auth required so ExpoImage / browser <img> can render photos without Bearer headers.
+  app.get('/api/travel/photo/:objectName', async (req: any, res) => {
     try {
       const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
       if (!bucketId) return res.status(500).json({ message: 'Storage not configured' });
       const objectName = decodeURIComponent(req.params.objectName as string);
+      // Guard: only serve objects from the trip-photos/ prefix — never expose arbitrary GCS objects
       if (!objectName.startsWith('trip-photos/')) return res.status(403).json({ message: 'Forbidden' });
-      // Verify requesting user matches the userId prefix embedded in the object path
-      const requestingUserId: string = (req.user?.claims?.sub ?? req.user?.id ?? '') as string;
-      const segments = objectName.split('/'); // ['trip-photos', '<userPrefix>', '<file>']
-      const embeddedPrefix = segments[1] ?? '';
-      // Legacy objects (no user prefix) have segments[1] matching a filename pattern (contains '-')
-      const isLegacy = embeddedPrefix.length !== 8 || embeddedPrefix.includes('-');
-      if (!isLegacy && requestingUserId.slice(0, 8) !== embeddedPrefix) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
       const { Storage } = await import('@google-cloud/storage');
       const SIDECAR = 'http://127.0.0.1:1106';
       const gcs = new Storage({
@@ -9932,7 +9925,7 @@ Return ONLY valid JSON in this exact format:
       const gcsFile = bucket.file(objectName);
       const [metadata] = await gcsFile.getMetadata();
       res.setHeader('Content-Type', (metadata.contentType as string) || 'image/jpeg');
-      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
       gcsFile.createReadStream()
         .on('error', () => res.status(404).end())
         .pipe(res);
