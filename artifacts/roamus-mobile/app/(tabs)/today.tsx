@@ -39,6 +39,17 @@ import { F, CITY_IMGS } from "@/lib/tokens";
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
+const MO_STOP_BG: Record<string, string> = {
+  park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2',
+  landmark: '#E1BEE7', nature: '#DCEDC8', culture: '#FFF3E0',
+  aquarium: '#B2EBF2', theme_park: '#FCE4EC', default: '#F0ECE6',
+};
+const MO_STOP_EMOJI: Record<string, string> = {
+  park: '🌿', museum: '🏛', zoo: '🦊',
+  landmark: '🗽', nature: '🌲', culture: '🎭',
+  aquarium: '🐠', theme_park: '🎡', default: '📍',
+};
+
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -1290,11 +1301,16 @@ export default function TodayScreen() {
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-          <LinearGradient
-            colors={['#1D4A42', '#163830']}
-            start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+          <ImageBackground
+            source={{ uri: CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
             style={[mo.hero, { paddingTop: insets.top + 20 }]}
+            resizeMode="cover"
           >
+            <LinearGradient
+              colors={['rgba(15,40,34,0.28)', 'rgba(15,40,34,0.72)']}
+              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
             {/* Weather pill */}
             <View style={mo.weatherPill}>
               <Text style={{ fontSize: 15 }}>{'🌤'}</Text>
@@ -1315,7 +1331,7 @@ export default function TodayScreen() {
               <View style={mo.metaPill}><Text style={mo.metaText}>{'📍'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
               <View style={mo.metaPill}><Text style={mo.metaText}>{'⏱'} {estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
             </View>
-          </LinearGradient>
+          </ImageBackground>
 
           {offlineBannerEl}
           <View style={mo.paceSection}>
@@ -1362,12 +1378,13 @@ export default function TodayScreen() {
               const isLast    = i === dayStops.length - 1;
               return (
                 <React.Fragment key={stop.id}>
-                  <View style={[mo.stopRow, isRemoved && mo.stopRowRemoved]}>
-                    <View style={mo.stopNum}><Text style={mo.stopNumText}>{i + 1}</Text></View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[mo.stopName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>
-                        {stop.name}
-                      </Text>
+                  <View style={[mo.stopCard, isRemoved && mo.stopRowRemoved]}>
+                    <View style={[mo.stopBanner, { backgroundColor: MO_STOP_BG[stop.stopType ?? ''] ?? MO_STOP_BG.default }]}>
+                      <Text style={mo.stopBannerEmoji}>{MO_STOP_EMOJI[stop.stopType ?? ''] ?? MO_STOP_EMOJI.default}</Text>
+                      <Text style={[mo.stopBannerName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
+                      <View style={mo.stopNumBadge}><Text style={mo.stopNumBadgeText}>{i + 1}</Text></View>
+                    </View>
+                    <View style={mo.stopBody}>
                       <Text style={mo.stopMeta}>
                         {stopTimes[i]} · {dispDur} min
                         {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
@@ -2515,6 +2532,13 @@ const mo = StyleSheet.create({
   emptyText:      { fontFamily: F.regular, fontSize: 14, color: C.muted, paddingVertical: 16 },
   stopRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card,
     borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  stopCard:       { backgroundColor: '#fff', borderRadius: 14, marginHorizontal: 16, marginBottom: 4, overflow: 'hidden', shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  stopBanner:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, gap: 10 },
+  stopBannerEmoji:{ fontSize: 24 },
+  stopBannerName: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#1A2030', letterSpacing: -0.2 },
+  stopNumBadge:   { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.10)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stopNumBadgeText:{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: 'rgba(0,0,0,0.50)' },
+  stopBody:       { paddingHorizontal: 12, paddingBottom: 10 },
   stopRowRemoved: { opacity: 0.4 },
   stopNum:        { width: 28, height: 28, borderRadius: 14, backgroundColor: C.bg,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
