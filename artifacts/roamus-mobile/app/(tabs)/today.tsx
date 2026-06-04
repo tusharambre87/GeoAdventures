@@ -32,6 +32,7 @@ import * as Haptics from "expo-haptics";
 
 import { API_BASE, kidsAPI } from "@/lib/apiClient";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
+import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
@@ -468,6 +469,8 @@ export default function TodayScreen() {
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
   const [isOffline, setIsOffline]               = useState(false);
+  const [showFeedback, setShowFeedback]          = useState(false);
+  const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -710,6 +713,8 @@ export default function TodayScreen() {
     bounceAnim.setValue(0);
     setCurrentStopIndex(i => i + 1);
     setTodayState('stop_complete');
+    setFeedbackStop(stop);
+    setShowFeedback(true);
   }
 
   // ── Skip / delete stop ──
@@ -1782,6 +1787,14 @@ export default function TodayScreen() {
           )}
         </ScrollView>
         {menuOverlay}
+        {showFeedback && feedbackStop && (
+          <StopFeedbackSheet
+            visible={showFeedback}
+            stop={feedbackStop}
+            tripId={trip?.id ?? ''}
+            onComplete={() => setShowFeedback(false)}
+          />
+        )}
       </View>
     );
   }
