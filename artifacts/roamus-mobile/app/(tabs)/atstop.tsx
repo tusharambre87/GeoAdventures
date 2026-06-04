@@ -448,8 +448,8 @@ export default function AtStopScreen() {
   const isUserFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   useEffect(() => {
-    if (isUserFree) setUpgradeVisible(true);
-  }, [isUserFree]);
+    if (isUserFree && dayIndex > 0) setUpgradeVisible(true);
+  }, [isUserFree, dayIndex]);
   const [foodLoading, setFoodLoading]   = useState(false);
   const [foodLoaded, setFoodLoaded]     = useState(false);
   const [breakPlaces, setBreakPlaces]   = useState<ExtraPlace[]>([]);
@@ -1127,6 +1127,7 @@ export default function AtStopScreen() {
                             (isCurrent || isVisited) && { opacity: 0.45 }]}
                           onPress={() => {
                             if (isCurrent || isVisited) return;
+                            if (isUserFree && di > 0) { setUpgradeVisible(true); return; }
                             setCurrentStop(stop);
                             if (di !== dayIndex) {
                               setDayIndex(di);

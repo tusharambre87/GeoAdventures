@@ -39,6 +39,15 @@ import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
+
+const TODAY_STOP_BG: Record<string, string> = {
+  park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2', landmark: '#E1BEE7',
+  shopping: '#FCE4EC', nature: '#DCEDC8', culture: '#FFF3E0', meal: '#FCE4EC', default: '#E0E0E0',
+};
+const TODAY_STOP_EMOJI: Record<string, string> = {
+  park: '\uD83C\uDF33', museum: '\uD83C\uDFDB', zoo: '\uD83E\uDD81', landmark: '\uD83D\uDDFA\uFE0F',
+  shopping: '\uD83D\uDECD', nature: '\uD83C\uDFD4', culture: '\uD83C\uDFAD', meal: '\uD83C\uDF7D', default: '\uD83D\uDCCD',
+};
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
@@ -1481,45 +1490,36 @@ export default function TodayScreen() {
               return (
                 <React.Fragment key={stop.id}>
                   <View style={[mo.stopCard, isRemoved && mo.stopRowRemoved]}>
-                    <View style={mo.stopBanner}>
-                      <Image
-                        source={{ uri: (stop.metadata as Record<string, unknown> | null)?.imageUrl as string ||
-                          CITY_IMGS[(stop as { cityGroup?: string | null }).cityGroup ?? ''] ||
-                          CITY_IMGS[city] ||
-                          'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
-                        style={StyleSheet.absoluteFill}
-                        resizeMode="cover"
-                      />
-                      <LinearGradient
-                        colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.62)']}
-                        style={StyleSheet.absoluteFill}
-                      />
-                      <Text style={[mo.stopBannerName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
-                      <View style={mo.stopNumBadge}><Text style={mo.stopNumBadgeText}>{i + 1}</Text></View>
-                    </View>
-                    <View style={mo.stopBody}>
-                      <Text style={mo.stopMeta}>
-                        {stopTimes[i]} · {dispDur} min
-                        {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
-                          <Text style={mo.stopMetaSaved}> (was {getStopDuration(stop)} min)</Text>
-                        )}
-                      </Text>
-                      <View style={mo.tagRow}>
-                        {isRemoved && (
-                          <View style={mo.tagRemoved}><Text style={mo.tagRemovedText}>Removed · Easier mode</Text></View>
-                        )}
-                        {hasTicket && !isRemoved && (
-                          <TouchableOpacity style={mo.tagTicket} onPress={() => openTicketSearch(stop.name)} hitSlop={6} activeOpacity={0.7}>
-                            <Text style={mo.tagTicketText}>{'\uD83C\uDFAB'} Ticket needed</Text>
-                          </TouchableOpacity>
-                        )}
-                        {isFreeStop && !isRemoved && (
-                          <View style={mo.tagFree}><Text style={mo.tagFreeText}>Free entry</Text></View>
-                        )}
-                        {isAnchor && !isRemoved && (
-                          <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>Kid friendly</Text></View>
-                        )}
+                    <View style={mo.stopCardRow}>
+                      <View style={[mo.stopIconBox, { backgroundColor: TODAY_STOP_BG[stop.stopType ?? ''] ?? TODAY_STOP_BG.default }]}>
+                        <Text style={mo.stopIconText}>{TODAY_STOP_EMOJI[stop.stopType ?? ''] ?? TODAY_STOP_EMOJI.default}</Text>
                       </View>
+                      <View style={mo.stopInfo}>
+                        <Text style={[mo.stopName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
+                        <Text style={mo.stopMeta}>
+                          {stopTimes[i]} · {dispDur} min
+                          {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
+                            <Text style={mo.stopMetaSaved}> (was {getStopDuration(stop)} min)</Text>
+                          )}
+                        </Text>
+                        <View style={mo.tagRow}>
+                          {isRemoved && (
+                            <View style={mo.tagRemoved}><Text style={mo.tagRemovedText}>Removed · Easier mode</Text></View>
+                          )}
+                          {hasTicket && !isRemoved && (
+                            <TouchableOpacity style={mo.tagTicket} onPress={() => openTicketSearch(stop.name)} hitSlop={6} activeOpacity={0.7}>
+                              <Text style={mo.tagTicketText}>{'\uD83C\uDFAB'} Ticket needed</Text>
+                            </TouchableOpacity>
+                          )}
+                          {isFreeStop && !isRemoved && (
+                            <View style={mo.tagFree}><Text style={mo.tagFreeText}>Free entry</Text></View>
+                          )}
+                          {isAnchor && !isRemoved && (
+                            <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>Kid friendly</Text></View>
+                          )}
+                        </View>
+                      </View>
+                      <View style={mo.stopNumBadgeAlt}><Text style={mo.stopNumBadgeAltText}>{i + 1}</Text></View>
                     </View>
                   </View>
                   {!isLast && (
@@ -2751,6 +2751,12 @@ const mo = StyleSheet.create({
   stopRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card,
     borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
   stopCard:       { backgroundColor: '#fff', borderRadius: 14, marginHorizontal: 16, marginBottom: 4, overflow: 'hidden', shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  stopCardRow:    { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
+  stopIconBox:    { width: 56, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stopIconText:   { fontSize: 26 },
+  stopInfo:       { flex: 1 },
+  stopNumBadgeAlt:     { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(26,31,46,0.07)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stopNumBadgeAltText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: '#8A8FA8' },
   stopBanner:     { height: 120, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 10, gap: 10 },
   stopBannerEmoji:{ fontSize: 24 },
   stopBannerName: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#fff', letterSpacing: -0.2, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
