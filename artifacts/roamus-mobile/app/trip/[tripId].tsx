@@ -37,6 +37,7 @@ import Svg, { Circle, Line, Path, Polyline, Rect } from "react-native-svg";
 import { travelAPI } from "@/lib/apiClient";
 import { API_BASE } from "@/lib/authContext";
 import { F } from "@/lib/tokens";
+import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
 
 const TAB_BAR_H = 49;
 
@@ -986,6 +987,25 @@ function TripOverview({
   const travelerCount = trip.travelers?.length ?? 0;
   const dateRange     = formatDateRange(trip.startDate, trip.endDate);
 
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [clCounts, setClCounts]           = useState<{ checked: number; total: number } | null>(null);
+
+  useEffect(() => {
+    loadChecklistCounts(trip.id, stops).then(setClCounts);
+  }, [trip.id]);
+
+  function handleChecklistClose() {
+    setChecklistOpen(false);
+    loadChecklistCounts(trip.id, stops).then(setClCounts);
+  }
+
+  const firstStop = [...stops]
+    .sort((a, b) => {
+      const di = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
+      return di !== 0 ? di : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+    })[0];
+  const hideChecklist = trip.status === 'active' || !!(firstStop?.isVisited || firstStop?.visited);
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Header */}
@@ -1036,6 +1056,42 @@ function TripOverview({
         contentContainerStyle={[ov.body, { paddingBottom: insets.bottom + 120 + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Before you go — checklist entry row */}
+        {!hideChecklist && clCounts !== null && (
+          <Pressable
+            style={cl.row}
+            onPress={() => setChecklistOpen(true)}
+          >
+            <View style={cl.rowLeft}>
+              <Text style={cl.rowTitle}>Before you go</Text>
+              <Text style={cl.rowSub}>
+                {clCounts.checked} of {clCounts.total} done{'\u00a0\u00b7\u00a0'}Tap to open
+              </Text>
+            </View>
+            <View
+              style={[
+                cl.badge,
+                clCounts.checked === clCounts.total && clCounts.total > 0
+                  ? cl.badgeDone
+                  : cl.badgePending,
+              ]}
+            >
+              <Text
+                style={[
+                  cl.badgeText,
+                  clCounts.checked === clCounts.total && clCounts.total > 0
+                    ? cl.badgeTextDone
+                    : cl.badgeTextPending,
+                ]}
+              >
+                {clCounts.checked === clCounts.total && clCounts.total > 0
+                  ? 'All done \u2713'
+                  : `${clCounts.total - clCounts.checked} left`}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
         {Array.from({ length: totalDays }, (_, i) => i + 1)
           .filter(dayNum => {
             const status = getDayStatus(dayNum);
@@ -1075,6 +1131,14 @@ function TripOverview({
           <Text style={ov.runSub}>Jump straight to live mode for today</Text>
         </View>
       )}
+
+      {/* Before you go — checklist bottom sheet */}
+      <ChecklistSheet
+        visible={checklistOpen}
+        onClose={handleChecklistClose}
+        tripId={trip.id}
+        stops={stops}
+      />
     </View>
   );
 }
@@ -3415,6 +3479,63 @@ const ov = StyleSheet.create({
   disclaimerBody: { marginHorizontal: 16, marginBottom: 16, padding: 12, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(26,31,46,0.08)' },
   disclaimer: { margin: 16, marginTop: 8, padding: 14, backgroundColor: 'rgba(26,31,46,0.04)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)' },
   disclaimerText: { fontSize: 12, color: '#8A8FA8', lineHeight: 18, fontWeight: '500' },
+});
+
+const cl = StyleSheet.create({
+  row: {
+    flexDirection:    'row',
+    alignItems:       'center',
+    backgroundColor:  C.card,
+    borderRadius:     16,
+    borderWidth:      1,
+    borderColor:      C.border,
+    paddingHorizontal: 14,
+    paddingVertical:  13,
+    marginBottom:     10,
+    shadowColor:      C.deep,
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.05,
+    shadowRadius:     6,
+    elevation:        1,
+  },
+  rowLeft: {
+    flex: 1,
+  },
+  rowTitle: {
+    fontFamily:   F.bold,
+    fontSize:     14,
+    color:        C.deep,
+    letterSpacing: -0.01,
+  },
+  rowSub: {
+    fontFamily: F.regular,
+    fontSize:   12,
+    color:      C.muted,
+    marginTop:  2,
+  },
+  badge: {
+    borderRadius:      20,
+    paddingHorizontal: 10,
+    paddingVertical:   4,
+    flexShrink:        0,
+    marginLeft:        10,
+  },
+  badgePending: {
+    backgroundColor: '#FDF0E9',
+  },
+  badgeDone: {
+    backgroundColor: '#E8F7EF',
+  },
+  badgeText: {
+    fontFamily: F.bold,
+    fontSize:   11,
+  },
+  badgeTextPending: {
+    color: '#E8692A',
+  },
+  badgeTextDone: {
+    color: '#3DAA6E',
+  },
 });
 
 const dc = StyleSheet.create({
