@@ -154,19 +154,57 @@ function Slide3Collage({ collagePhotos }: { collagePhotos: (string | null)[] }) 
   );
 }
 
-function Slide4Quotes({ highlights }: { highlights: string[] }) {
+function Slide4Quotes({
+  highlights,
+  storyMissing,
+  generating,
+  genError,
+  onGenerate,
+}: {
+  highlights: string[];
+  storyMissing?: boolean;
+  generating?: boolean;
+  genError?: boolean;
+  onGenerate?: () => void;
+}) {
+  const noHighlights = !highlights || highlights.length === 0;
+
   return (
     <View style={styles.slide}>
       <LinearGradient colors={['#2d1b4e', '#1a1f2e']} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
       <View style={styles.quotesContent}>
         <Text style={styles.eyebrow}>Through Your Explorer's Eyes</Text>
         <Text style={styles.quotesTitle}>What they'll remember most</Text>
-        {(highlights.length > 0 ? highlights : ['The whole family, together', 'Adventures around every corner']).slice(0, 4).map((h, i) => (
-          <View key={i} style={styles.quoteItem}>
-            <Text style={styles.quoteStar}>✦</Text>
-            <Text style={styles.quoteText}>"{h}"</Text>
+
+        {/* Generate story card — shown when story hasn't been generated yet */}
+        {noHighlights && storyMissing ? (
+          <View style={styles.generateCard}>
+            <Text style={styles.generateTitle}>Your trip story isn't ready yet</Text>
+            <Text style={styles.generateSub}>
+              We'll weave your stops and moments into a personalised family narrative.
+            </Text>
+            {genError ? (
+              <Text style={styles.generateError}>Something went wrong — try again.</Text>
+            ) : null}
+            <Pressable
+              style={[styles.generateBtn, generating && { opacity: 0.7 }]}
+              onPress={onGenerate}
+              disabled={generating}
+            >
+              {generating
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.generateBtnText}>Generate story →</Text>
+              }
+            </Pressable>
           </View>
-        ))}
+        ) : (
+          highlights.slice(0, 4).map((h, i) => (
+            <View key={i} style={styles.quoteItem}>
+              <Text style={styles.quoteStar}>✦</Text>
+              <Text style={styles.quoteText}>"{h}"</Text>
+            </View>
+          ))
+        )}
       </View>
       <Wordmark opacity={0.2} />
     </View>
@@ -210,12 +248,28 @@ export default function StoryScreen() {
     queryFn: () => memoriesAPI.getMoments(tripId),
     enabled: !!tripId,
   });
-  const { data: story } = useQuery({
+  const { data: story, isError: storyMissing, refetch: refetchStory } = useQuery({
     queryKey: ['story', tripId],
     queryFn: () => memoriesAPI.getStory(tripId),
     enabled: !!tripId,
     retry: false,
   });
+  const [generating, setGenerating] = React.useState(false);
+  const [genError, setGenError]     = React.useState(false);
+
+  async function handleGenerate() {
+    if (!tripId) return;
+    setGenerating(true);
+    setGenError(false);
+    try {
+      await memoriesAPI.regenerateStory(tripId);
+      await refetchStory();
+    } catch {
+      setGenError(true);
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   const { heroPhoto, collagePhotos, closingPhoto, highlights } = useMemo(() => {
     const photos = (moments as Moment[]).flatMap(m =>
@@ -258,7 +312,7 @@ export default function StoryScreen() {
     <Slide1Cover key="1" trip={trip} heroPhoto={heroPhoto} />,
     <Slide2Map key="2" trip={trip} />,
     <Slide3Collage key="3" collagePhotos={collagePhotos} />,
-    <Slide4Quotes key="4" highlights={highlights} />,
+    <Slide4Quotes key="4" highlights={highlights} storyMissing={storyMissing} generating={generating} genError={genError} onGenerate={handleGenerate} />,
     <Slide5Closing key="5" trip={trip} closingPhoto={closingPhoto} />,
   ];
 
@@ -383,6 +437,46 @@ const styles = StyleSheet.create({
   quoteItem: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   quoteStar: { color: '#F5A623', fontSize: 14, marginTop: 2 },
   quoteText: { flex: 1, fontSize: 15, fontFamily: F.regular, color: 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: 24 },
+
+  // Generate story card
+  generateCard: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    marginTop: 8,
+  },
+  generateTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 17,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  generateSub: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  generateError: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: '#fc8181',
+    marginBottom: 8,
+  },
+  generateBtn: {
+    backgroundColor: '#E8692A',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  generateBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 15,
+    color: '#fff',
+  },
 
   // Slide 5 Closing
   slide5Content: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 32, paddingBottom: 180, alignItems: 'center', textAlign: 'center' },

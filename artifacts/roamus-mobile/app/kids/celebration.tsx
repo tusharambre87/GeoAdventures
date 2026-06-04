@@ -121,15 +121,15 @@ export default function Celebration() {
           <Text style={s.primaryBtnText}>{"👆 Show your parent!"}</Text>
         </Pressable>
 
-        {/* Game link */}
+        {/* Back to Today */}
         <Pressable
           style={s.gameLink}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/kids/games");
+            router.replace("/(tabs)/today");
           }}
         >
-          <Text style={s.gameLinkText}>{"🎮 Play a quick game \u2192"}</Text>
+          <Text style={s.gameLinkText}>{'Back to today →'}</Text>
         </Pressable>
 
       </ScrollView>
