@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useRef, useEffect, useState } from 'react';
 import { Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import Reanimated, {
   useSharedValue,
   withSequence,
@@ -12,7 +14,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { API_BASE } from '@/lib/authContext';
-import { CITY_COUNTRY, STYLE_MAP, PACE_MAP } from '@/lib/tokens';
+import { CITY_COUNTRY, STYLE_MAP, PACE_MAP, CITY_IMGS } from '@/lib/tokens';
 import { useOnboarding } from '@/lib/onboardingContext';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -28,6 +30,13 @@ export default function BuildingScreen() {
 
   const city    = data.cities[0] ?? 'Chicago';
   const country = CITY_COUNTRY[city] ?? 'USA';
+
+  // ─ Multi-city hero image ─
+  const cities  = data.cities.length > 0 ? data.cities : [city];
+  const isMulti = cities.length > 1;
+  const [imgIdx, setImgIdx] = useState(0);
+  const heroCity = cities[imgIdx % cities.length];
+  const heroImg  = CITY_IMGS[heroCity] ?? null;
 
   const tripDays   = data.generatedTrip?.days?.length ?? 0;
   const totalStops = (data.generatedTrip?.days ?? []).reduce(
@@ -81,6 +90,13 @@ export default function BuildingScreen() {
     const t = setTimeout(() => setAnimDone(true), MIN_ANIM_MS);
     return () => clearTimeout(t);
   }, []);
+
+  // ─ Multi-city image rotation every 3 s ─
+  useEffect(() => {
+    if (!isMulti) return;
+    const iv = setInterval(() => setImgIdx(i => i + 1), 3000);
+    return () => clearInterval(iv);
+  }, [isMulti]);
 
   // ─ Navigate when both gates clear ─
   useEffect(() => {
@@ -151,8 +167,24 @@ export default function BuildingScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
 
+      {/* City hero photo */}
+      {heroImg && (
+        <>
+          <Image
+            source={{ uri: heroImg }}
+            style={[StyleSheet.absoluteFill, { opacity: 0.45 }]}
+            contentFit="cover"
+          />
+          <LinearGradient
+            colors={['rgba(6,8,16,0.28)', 'rgba(6,8,16,0.68)', '#060810']}
+            locations={[0, 0.52, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </>
+      )}
+
       {/* Orange radial glow — absolutely positioned */}
-      <View style={styles.glow} />
+      <View style={[styles.glow, heroImg && styles.glowWithImage]} />
 
       {/* Wordmark top-left */}
       <View style={styles.wordmarkRow}>
@@ -167,8 +199,18 @@ export default function BuildingScreen() {
         <Reanimated.View style={headingStyle}>
           <Text style={styles.heading}>
             {'Building your\n'}
-            <Text style={styles.headingCity}>{city} adventure</Text>
+            <Text style={styles.headingCity}>{heroCity} adventure</Text>
           </Text>
+          {isMulti && (
+            <View style={styles.cityDots}>
+              {cities.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.cityDot, i === imgIdx % cities.length && styles.cityDotActive]}
+                />
+              ))}
+            </View>
+          )}
         </Reanimated.View>
 
         {/* Progress track */}
@@ -193,7 +235,7 @@ export default function BuildingScreen() {
 
       {/* Footer */}
       <Text style={styles.footer}>
-        {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''} \u00b7 ${city}`}
+        {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''} \u00b7 ${isMulti ? cities.join(' \u00b7 ') : city}`}
       </Text>
 
     </View>
@@ -222,6 +264,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 60,
     elevation: 20,
+  },
+  glowWithImage: {
+    backgroundColor: 'rgba(232,105,42,0.02)',
+    shadowOpacity: 0.18,
+  },
+
+  cityDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  cityDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  cityDotActive: {
+    backgroundColor: '#E8692A',
+    width: 14,
   },
 
   wordmarkRow: {

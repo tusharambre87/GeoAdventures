@@ -157,6 +157,15 @@ export const CITY_IMGS: Record<string, string> = {
   'New Orleans': 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=400&q=80',
   Honolulu: 'https://images.unsplash.com/photo-1542259009477-d625272157b7?w=400&q=80',
   Kyoto: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&q=80',
+  Minneapolis: 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?w=400&q=80',
+  Portland: 'https://images.unsplash.com/photo-1541943181603-d8fe267a5dcf?w=400&q=80',
+  Atlanta: 'https://images.unsplash.com/photo-1575917649705-5b59aaa12e6b?w=400&q=80',
+  Phoenix: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f655?w=400&q=80',
+  Dallas: 'https://images.unsplash.com/photo-1598714805247-5dd1e3e1a5d7?w=400&q=80',
+  Houston: 'https://images.unsplash.com/photo-1530089711124-9ca31fb9e863?w=400&q=80',
+  'San Diego': 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400&q=80',
+  Vancouver: 'https://images.unsplash.com/photo-1559656914-a30970c1affd?w=400&q=80',
+  'San Antonio': 'https://images.unsplash.com/photo-1606814893907-88b33b6a4c86?w=400&q=80',
 };
 
 export type PopularRoute = { cities: CityEntry[]; label: string };

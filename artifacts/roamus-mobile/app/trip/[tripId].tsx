@@ -1092,9 +1092,10 @@ function TripOverview({
       >
         {/* Before you go — checklist entry row */}
         {!hideChecklist && clCounts !== null && (
-          <Pressable
+          <GHTouchable
             style={cl.row}
             onPress={() => setChecklistOpen(true)}
+            activeOpacity={0.75}
           >
             <View style={cl.rowLeft}>
               <Text style={cl.rowTitle}>Before you go</Text>
@@ -1123,7 +1124,7 @@ function TripOverview({
                   : `${clCounts.total - clCounts.checked} left`}
               </Text>
             </View>
-          </Pressable>
+          </GHTouchable>
         )}
 
         {Array.from({ length: totalDays }, (_, i) => i + 1)

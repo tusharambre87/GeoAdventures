@@ -225,7 +225,7 @@ export default function AccountScreen() {
             <Text style={s.termsLink} onPress={() => Linking.openURL("https://roamus.app/privacy")}>
               {"Privacy Policy"}
             </Text>
-            {". RoamUs is an AI-assisted planning tool — always verify stop information before your visit."}
+            {"."}
           </Text>
 
           <Pressable onPress={() => router.push("/onboarding/login")} style={{ alignItems: "center", paddingVertical: 12 }}>
