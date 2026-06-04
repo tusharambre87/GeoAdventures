@@ -488,8 +488,8 @@ export default function TodayScreen() {
   const [kidQuotes, setKidQuotes]               = useState<Record<string, string>>({});
   const [dayRating, setDayRating]               = useState<'okay' | 'good' | 'amazing' | null>(null);
   const [submittingRating, setSubmittingRating] = useState(false);
-  const [visitedPhotos, setVisitedPhotos]       = useState<(string | null)[]>([null, null, null]);
-  const [wrapPhotos, setWrapPhotos]             = useState<(string | null)[]>([null, null, null, null, null, null]);
+  const [visitedPhotos, setVisitedPhotos]       = useState<string[]>([]);
+  const [wrapPhotos, setWrapPhotos]             = useState<string[]>([]);
   const [isWrapping, setIsWrapping]             = useState(false);
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
@@ -825,9 +825,9 @@ export default function TodayScreen() {
     setSubmittingRating(false);
   }
 
-  async function handlePhotoSlot(source: 'visited' | 'wrap', idx: number) {
+  async function handleAddPhotos(source: 'visited' | 'wrap') {
     Alert.alert(
-      'Add photo',
+      'Add photos',
       'Choose a source',
       [
         {
@@ -839,20 +839,15 @@ export default function TodayScreen() {
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
+              mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.85,
             });
             if (!result.canceled && result.assets[0]) {
               const uri = result.assets[0].uri;
               if (source === 'visited') {
-                setVisitedPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
-                setWrapPhotos(prev => {
-                  if (prev.includes(uri)) return prev;
-                  const slot = prev.findIndex(s => s === null);
-                  if (slot === -1) return prev;
-                  const n = [...prev]; n[slot] = uri; return n;
-                });
+                setVisitedPhotos(prev => prev.includes(uri) ? prev : [...prev, uri]);
+                setWrapPhotos(prev => prev.includes(uri) ? prev : [...prev, uri]);
               } else {
-                setWrapPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
+                setWrapPhotos(prev => prev.includes(uri) ? prev : [...prev, uri]);
               }
             }
           },
@@ -866,20 +861,27 @@ export default function TodayScreen() {
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
+              mediaTypes: ['images'],
+              allowsMultipleSelection: true,
+              selectionLimit: 20,
+              quality: 0.85,
             });
-            if (!result.canceled && result.assets[0]) {
-              const uri = result.assets[0].uri;
+            if (!result.canceled && result.assets.length > 0) {
+              const uris = result.assets.map(a => a.uri);
               if (source === 'visited') {
-                setVisitedPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
+                setVisitedPhotos(prev => {
+                  const toAdd = uris.filter(u => !prev.includes(u));
+                  return [...prev, ...toAdd];
+                });
                 setWrapPhotos(prev => {
-                  if (prev.includes(uri)) return prev;
-                  const slot = prev.findIndex(s => s === null);
-                  if (slot === -1) return prev;
-                  const n = [...prev]; n[slot] = uri; return n;
+                  const toAdd = uris.filter(u => !prev.includes(u));
+                  return [...prev, ...toAdd];
                 });
               } else {
-                setWrapPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
+                setWrapPhotos(prev => {
+                  const toAdd = uris.filter(u => !prev.includes(u));
+                  return [...prev, ...toAdd];
+                });
               }
             }
           },
@@ -889,19 +891,20 @@ export default function TodayScreen() {
     );
   }
 
-  function mergeVisitedIntoWrap(
-    visited: (string | null)[],
-    wrap: (string | null)[]
-  ): (string | null)[] {
-    const result = [...wrap];
-    for (const uri of visited) {
-      if (!uri) continue;
-      if (result.includes(uri)) continue;
-      const slot = result.findIndex(s => s === null);
-      if (slot === -1) break;
-      result[slot] = uri;
+  function removePhoto(source: 'visited' | 'wrap', uri: string) {
+    if (source === 'visited') {
+      setVisitedPhotos(prev => prev.filter(p => p !== uri));
+    } else {
+      setWrapPhotos(prev => prev.filter(p => p !== uri));
     }
-    return result;
+  }
+
+  function mergeVisitedIntoWrap(
+    visited: string[],
+    wrap: string[]
+  ): string[] {
+    const toAdd = visited.filter(u => !wrap.includes(u));
+    return [...wrap, ...toAdd];
   }
 
   // ── Derived ──
@@ -1940,18 +1943,35 @@ export default function TodayScreen() {
 
           <View style={sc.card}>
             <Text style={sc.cardLabel}>QUICK SNAP</Text>
-            <View style={sc.photoRow}>
-              {[0, 1, 2].map(idx => (
-                <TouchableOpacity key={idx} style={sc.photoSlot} activeOpacity={0.7}
-                  onPress={() => handlePhotoSlot('visited', idx)}>
-                  {visitedPhotos[idx] ? (
-                    <Image source={{ uri: visitedPhotos[idx]! }} style={sc.photoImg} />
-                  ) : (
-                    <Text style={sc.photoPlus}>+</Text>
-                  )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={sc.photoScrollContent}
+            >
+              {visitedPhotos.map(uri => (
+                <TouchableOpacity
+                  key={uri}
+                  style={sc.photoThumb}
+                  activeOpacity={0.85}
+                  onLongPress={() => removePhoto('visited', uri)}
+                >
+                  <Image source={{ uri }} style={sc.photoThumbImg} />
                 </TouchableOpacity>
               ))}
-            </View>
+              <TouchableOpacity
+                style={sc.photoAddBtn}
+                activeOpacity={0.7}
+                onPress={() => handleAddPhotos('visited')}
+              >
+                <Text style={sc.photoAddPlus}>+</Text>
+                <Text style={sc.photoAddLabel}>Add</Text>
+              </TouchableOpacity>
+            </ScrollView>
+            {visitedPhotos.length > 0 && (
+              <Text style={sc.photoHint}>
+                {visitedPhotos.length} photo{visitedPhotos.length !== 1 ? 's' : ''}{' \u00b7 '}Long-press to remove
+              </Text>
+            )}
           </View>
 
           {isLastStop ? (
@@ -1979,7 +1999,7 @@ export default function TodayScreen() {
                 onPress={() => {
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
-                  setVisitedPhotos([null, null, null]);
+                  setVisitedPhotos([]);
                   setTodayState('en_route');
                 }}
               >
@@ -2048,20 +2068,31 @@ export default function TodayScreen() {
           <View style={dc.card}>
             <Text style={dc.cardLabel}>BEST PHOTOS FROM TODAY</Text>
             <View style={dc.photoGrid}>
-              {[0, 1, 2, 3, 4, 5].map(idx => (
-                <TouchableOpacity key={idx} style={dc.photoSlot} activeOpacity={0.7}
-                  onPress={() => handlePhotoSlot('wrap', idx)}>
-                  {wrapPhotos[idx] ? (
-                    <Image source={{ uri: wrapPhotos[idx]! }} style={dc.photoImg} />
-                  ) : (
-                    <Text style={dc.photoPlus}>+</Text>
-                  )}
+              {wrapPhotos.map(uri => (
+                <TouchableOpacity
+                  key={uri}
+                  style={dc.photoSlotFilled}
+                  activeOpacity={0.85}
+                  onLongPress={() => removePhoto('wrap', uri)}
+                >
+                  <Image source={{ uri }} style={dc.photoImg} />
                 </TouchableOpacity>
               ))}
+              <TouchableOpacity
+                style={dc.photoSlotAdd}
+                activeOpacity={0.7}
+                onPress={() => handleAddPhotos('wrap')}
+              >
+                <Text style={dc.photoPlus}>+</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={dc.photoCount}>
-              {wrapPhotos.filter(Boolean).length} of 6 added · Tap to add more
-            </Text>
+            {wrapPhotos.length > 0 ? (
+              <Text style={dc.photoCount}>
+                {wrapPhotos.length} photo{wrapPhotos.length !== 1 ? 's' : ''}{' \u00b7 '}Long-press to remove
+              </Text>
+            ) : (
+              <Text style={dc.photoCount}>Tap + to add photos from your library</Text>
+            )}
           </View>
 
           {children.length > 0 && (
@@ -2122,7 +2153,7 @@ export default function TodayScreen() {
                 } catch { /* best-effort */ }
 
                 if (trip?.id) {
-                  const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
+                  const filledPhotos = [...wrapPhotos];
                   const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
 
                   // Upload each filled photo; any failure stops the wrap and alerts the user
@@ -2844,11 +2875,15 @@ const sc = StyleSheet.create({
   cardLabel:   { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 12 },
   quoteInput:  { fontFamily: F.regular, fontSize: 14, color: C.deep, backgroundColor: C.bg,
     borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, minHeight: 70, textAlignVertical: 'top' },
-  photoRow:    { flexDirection: 'row', gap: 10 },
-  photoSlot:   { flex: 1, aspectRatio: 1, backgroundColor: C.bg, borderRadius: 12, borderWidth: 1.5,
-    borderColor: C.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  photoPlus:   { fontSize: 24, color: C.muted },
-  photoImg:    { width: '100%', height: '100%', borderRadius: 10 },
+  photoScrollContent: { flexDirection: 'row', gap: 10, paddingVertical: 2 },
+  photoThumb:  { width: 88, height: 88, borderRadius: 12, overflow: 'hidden' },
+  photoThumbImg: { width: '100%', height: '100%' },
+  photoAddBtn: { width: 88, height: 88, borderRadius: 12, borderWidth: 1.5,
+    borderColor: C.border, borderStyle: 'dashed', backgroundColor: C.bg,
+    alignItems: 'center', justifyContent: 'center', gap: 2 },
+  photoAddPlus: { fontSize: 22, color: C.muted, lineHeight: 26 },
+  photoAddLabel: { fontFamily: F.medium, fontSize: 11, color: C.muted },
+  photoHint:   { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 8, textAlign: 'center' },
   nextStopName:{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 },
   nextStopMeta:{ fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 16 },
   headThereBtn:{ backgroundColor: C.orange, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
@@ -2875,8 +2910,9 @@ const dc = StyleSheet.create({
   card:         { marginHorizontal: 20, marginTop: 14, backgroundColor: C.card, borderRadius: 16, padding: 18,
     borderWidth: 1, borderColor: C.border },
   cardLabel:    { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 12 },
-  photoGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  photoSlot:    { width: '31%', aspectRatio: 1, backgroundColor: C.bg, borderRadius: 10, borderWidth: 1.5,
+  photoGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  photoSlotFilled:  { width: '31%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden' },
+  photoSlotAdd:     { width: '31%', aspectRatio: 1, backgroundColor: C.bg, borderRadius: 10, borderWidth: 1.5,
     borderColor: C.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   photoPlus:    { fontSize: 22, color: C.muted },
   photoImg:     { width: '100%', height: '100%', borderRadius: 8 },
