@@ -500,7 +500,7 @@ export default function TodayScreen() {
   const [showFeedback, setShowFeedback]          = useState(false);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
-  const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string }[]>([]);
+  const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string; name: string }[]>([]);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -538,11 +538,12 @@ export default function TodayScreen() {
   // ── Fetch real kid quotes when trip is complete ──
   useEffect(() => {
     if (todayState !== 'trip_complete' || !resolvedTripId) return;
-    apiFetch<{ moments: Array<{ parentPromptResponse?: string | null }> }>(`/api/travel/trips/${resolvedTripId}/moments`)
+    apiFetch<{ moments: Array<{ kidPromptResponse?: string | null; explorerName?: string | null }> }>(`/api/travel/trips/${resolvedTripId}/moments`)
       .then((data) => {
         const quotes = (data.moments ?? [])
-          .filter((m) => m.parentPromptResponse?.trim())
-          .map((m) => ({ quote: m.parentPromptResponse! }));
+          .filter((m) => m.kidPromptResponse?.trim())
+          .slice(0, 3)
+          .map((m) => ({ quote: m.kidPromptResponse!, name: m.explorerName ?? 'Explorer' }));
         setTcMomentQuotes(quotes);
       })
       .catch(() => {});
@@ -1586,10 +1587,7 @@ export default function TodayScreen() {
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
     const afterStops = dayStops.slice(currentStopIndex + 1);
-    const didYouKnow = stop.enrichment?.whyNow
-      ?? (stop as any).storyPack?.quickFact
-      ?? (stop as any).placeProfileData?.description
-      ?? null;
+    const didYouKnow = stop.enrichment?.whyNow ?? null;
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -2263,9 +2261,10 @@ export default function TodayScreen() {
           {tcMomentQuotes.length > 0 && (
             <View style={tc.kidSection}>
               <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
-              {tcMomentQuotes.slice(0, 4).map((q, i) => (
+              {tcMomentQuotes.map((q, i) => (
                 <View key={i} style={tc.kidCard}>
                   <Text style={tc.kidQuote}>"{q.quote}"</Text>
+                  <Text style={tc.kidName}>{q.name}</Text>
                 </View>
               ))}
             </View>
@@ -2921,6 +2920,7 @@ const tc = StyleSheet.create({
     padding: 14, marginBottom: 8,
   },
   kidQuote: { fontFamily: F.medium, fontSize: 14, color: C.purplePrimary, fontStyle: 'italic', marginBottom: 4 },
+  kidName:  { fontFamily: F.medium, fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2, textAlign: 'right' },
   kidAttrib: { fontFamily: F.bold, fontSize: 12, color: C.muted },
   gamesBtn: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,

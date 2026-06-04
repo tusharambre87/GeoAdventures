@@ -76,9 +76,6 @@ export default function PassScreen() {
     }
   }
 
-  // TODO: remove after verifying subscriptionTier value from API
-  console.log('subscriptionTier raw value:', user?.subscriptionTier);
-
   const tier = user?.subscriptionTier?.toLowerCase() ?? 'free';
 
   const isFree = !user?.subscriptionTier ||

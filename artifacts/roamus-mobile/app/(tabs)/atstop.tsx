@@ -940,6 +940,7 @@ export default function AtStopScreen() {
             onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/need' as never, params: {
               stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
               address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
+              destination: encodeURIComponent(trip?.destination ?? trip?.city ?? ''),
             } }); }}>
             <Text style={dt.gridIcon}>🔀</Text>
             <Text style={dt.gridTitle}>Need something?</Text>

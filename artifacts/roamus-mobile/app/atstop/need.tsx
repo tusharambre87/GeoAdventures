@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  Animated, Linking, Alert, Platform,
+  ActivityIndicator, Animated, Linking, Alert, Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,15 +27,23 @@ export default function NeedScreen() {
     address?: string;
     stopId?: string;
     tripId?: string;
+    destination?: string;
   }>();
 
   const stopName = params.stopName ? decodeURIComponent(params.stopName) : 'This Stop';
   const address  = params.address  ? decodeURIComponent(params.address)  : '';
   const stopId   = params.stopId   ?? '';
-  const tripId   = params.tripId   ?? '';
+  const tripId     = params.tripId      ?? '';
+  const destination = params.destination ? decodeURIComponent(params.destination) : stopName;
 
   // ── Running behind sub-sheet animation ────────────────────────────────────
   const [showRunning, setShowRunning] = useState(false);
+  const [showRescue, setShowRescue]   = useState(false);
+  const [rescueTitle, setRescueTitle] = useState('');
+  const [rescueLoading, setRescueLoading] = useState(false);
+  const [rescueResults, setRescueResults] = useState<Array<{ name: string; distance?: string; description?: string }>>([]);
+  const rescueOverlayAnim = useRef(new Animated.Value(0)).current;
+  const rescueSheetAnim   = useRef(new Animated.Value(400)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(380)).current;
 
@@ -53,6 +61,49 @@ export default function NeedScreen() {
       Animated.spring(overlayAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 180 }),
       Animated.spring(sheetAnim,   { toValue: 380, useNativeDriver: true, damping: 22, stiffness: 180 }),
     ]).start(() => setShowRunning(false));
+  }
+
+  function openRescue(title: string) {
+    setRescueTitle(title);
+    setRescueResults([]);
+    setShowRescue(true);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.parallel([
+      Animated.spring(rescueOverlayAnim, { toValue: 1, useNativeDriver: true, damping: 22, stiffness: 180 }),
+      Animated.spring(rescueSheetAnim,   { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 180 }),
+    ]).start();
+  }
+
+  function closeRescue() {
+    Animated.parallel([
+      Animated.spring(rescueOverlayAnim, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 180 }),
+      Animated.spring(rescueSheetAnim,   { toValue: 400, useNativeDriver: true, damping: 22, stiffness: 180 }),
+    ]).start(() => setShowRescue(false));
+  }
+
+  async function handleRescueExtras(type: 'break' | 'kids') {
+    openRescue(type === 'break' ? 'Break spots nearby' : 'Fun options nearby');
+    setRescueLoading(true);
+    try {
+      const data = await apiFetch<{ places?: Array<{ name: string; distance?: string; description?: string }> }>(
+        '/api/travel/stops/rescue-extras',
+        { method: 'POST', body: JSON.stringify({ type, destination, stopName }) }
+      );
+      setRescueResults(data.places ?? []);
+    } catch { setRescueResults([]); }
+    finally { setRescueLoading(false); }
+  }
+
+  async function handleFoodNearby() {
+    openRescue('Food nearby');
+    setRescueLoading(true);
+    try {
+      const data = await apiFetch<{ food?: Array<{ name: string; distance?: string; description?: string }> }>(
+        `/api/travel/stops/${stopId}/nearby`
+      );
+      setRescueResults(data.food ?? []);
+    } catch { setRescueResults([]); }
+    finally { setRescueLoading(false); }
   }
 
   // ── Running behind handlers ────────────────────────────────────────────────
@@ -89,9 +140,6 @@ export default function NeedScreen() {
   }
 
   // ── Map URLs ──────────────────────────────────────────────────────────────
-  const foodUrl     = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`family restaurants near ${address || stopName}`)}`;
-  const activityUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`fun activities near ${address || stopName}`)}`;
-  const parkUrl     = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`park cafe near ${address || stopName}`)}`;
 
   // ── Cards ─────────────────────────────────────────────────────────────────
   const items = [
@@ -105,40 +153,19 @@ export default function NeedScreen() {
       icon: '😥',
       title: 'Kids are tired',
       sub: 'Find a break spot or easier next stop',
-      onPress: () => Alert.alert(
-        'Kids are tired',
-        'Break spot finder is coming soon. Want to search for parks and cafes near ' + stopName + ' on Google Maps?',
-        [
-          { text: 'Open Maps', onPress: () => Linking.openURL(parkUrl) },
-          { text: 'Not now', style: 'cancel' },
-        ]
-      ),
+      onPress: () => handleRescueExtras('break'),
     },
     {
       icon: '🎉',
       title: 'Need more fun',
       sub: 'Swap for something more exciting nearby',
-      onPress: () => Alert.alert(
-        'Need more fun',
-        'Activity swap is coming soon. Want to search for fun things near ' + stopName + ' on Google Maps?',
-        [
-          { text: 'Open Maps', onPress: () => Linking.openURL(activityUrl) },
-          { text: 'Not now', style: 'cancel' },
-        ]
-      ),
+      onPress: () => handleRescueExtras('kids'),
     },
     {
       icon: '🍕',
       title: 'Find food nearby',
       sub: 'Family-friendly restaurants near your stop',
-      onPress: () => Alert.alert(
-        'Find food nearby',
-        'In-app food finder is coming soon. Want to open Google Maps for family restaurants near ' + stopName + '?',
-        [
-          { text: 'Open Maps', onPress: () => Linking.openURL(foodUrl) },
-          { text: 'Not now', style: 'cancel' },
-        ]
-      ),
+      onPress: () => handleFoodNearby(),
     },
     {
       icon: '\u23ED',
@@ -252,6 +279,39 @@ export default function NeedScreen() {
                 <Text style={styles.sheetOptArrow}>{'›'}</Text>
               </TouchableOpacity>
             </View>
+          </Animated.View>
+        </Animated.View>
+      )}
+
+      {/* ── Rescue Results sheet (Kids tired / Need fun / Food nearby) ── */}
+      {showRescue && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.overlay, { opacity: rescueOverlayAnim }]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeRescue} />
+          <Animated.View style={[styles.sheet, { transform: [{ translateY: rescueSheetAnim }] }]}>
+            <View style={styles.sheetDarkHeader}>
+              <TouchableOpacity onPress={closeRescue} style={styles.sheetBackWrap}>
+                <Text style={styles.sheetBackBtn}>{'←'} Back</Text>
+              </TouchableOpacity>
+              <Text style={styles.sheetTitle}>{rescueTitle}</Text>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+              {rescueLoading ? (
+                <ActivityIndicator size="large" color="#E8692A" style={{ marginTop: 32 }} />
+              ) : rescueResults.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#8A8FA8', marginTop: 32, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14 }}>No results found nearby</Text>
+              ) : (
+                rescueResults.map((place, i) => (
+                  <View key={i} style={{ backgroundColor: '#F9F6F2', borderRadius: 14, padding: 14 }}>
+                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#1A1F2E', marginBottom: 3 }}>{place.name}</Text>
+                    {place.distance ? <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: '#E8692A', marginBottom: 2 }}>{place.distance}</Text> : null}
+                    {place.description ? <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, color: '#6B7280', lineHeight: 18 }}>{place.description}</Text> : null}
+                  </View>
+                ))
+              )}
+            </ScrollView>
           </Animated.View>
         </Animated.View>
       )}

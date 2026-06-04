@@ -1,3 +1,4 @@
+import { formatOpenStatus } from '@/lib/formatOpenStatus';
 /**
  * RoamUs — Trip Plan Screen v2
  * Visual ref: roamus-trip-plan-v5.html
@@ -1456,6 +1457,7 @@ function StopDetailSheet({
   const parking   = enrichment?.parkingNotes ?? '—';
   const restrooms = meta?.restroomConfidence ?? '—';
   const bestTime  = enrichment?.bestTimeOfDay ?? '—';
+  const openStatus = formatOpenStatus((stop as any).openingHours ?? (stop as any).placeReferenceData?.openingHours);
   const waitTime  = waitTimeForType(stop.stopType) ?? '—';
   const address   = stop.address;
   const foodNearby = meta?.foodNearby ?? [];
@@ -1526,7 +1528,11 @@ function StopDetailSheet({
 
           {/* Chips */}
           <View style={sds.chips}>
-            <View style={sds.chip}><Text style={sds.chipText}>Open now</Text></View>
+            {openStatus ? (
+              <View style={[sds.chip, { borderColor: openStatus.color }]}>
+                <Text style={[sds.chipText, { color: openStatus.color }]}>{openStatus.label}</Text>
+              </View>
+            ) : null}
             {meta?.parkingSignal && (
               <View style={sds.chip}>
                 <Text style={sds.chipText}>{meta.parkingSignal.split('—')[0].trim()}</Text>
