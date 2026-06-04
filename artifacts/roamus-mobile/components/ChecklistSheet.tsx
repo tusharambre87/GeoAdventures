@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { F } from '@/lib/tokens';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -29,6 +30,8 @@ const C = {
   greenLt:  '#E8F7EF',
   border:   'rgba(26,31,46,0.09)',
   borderMed:'rgba(26,31,46,0.16)',
+  red:      '#E53E3E',
+  redLt:    '#FFF5F5',
 } as const;
 
 const TICKET_TYPES = new Set([
@@ -102,6 +105,18 @@ export interface ChecklistSheetProps {
   stops:    ChecklistStop[];
 }
 
+function DeleteAction({ onDelete }: { onDelete: () => void }) {
+  return (
+    <TouchableOpacity
+      style={s.deleteAction}
+      onPress={onDelete}
+      activeOpacity={0.8}
+    >
+      <Text style={s.deleteActionText}>Delete</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function ChecklistSheet({
   visible,
   onClose,
@@ -113,6 +128,8 @@ export default function ChecklistSheet({
   const mounted   = useRef(false);
   const closeRef  = useRef(onClose);
   closeRef.current = onClose;
+
+  const swipeableRefs = useRef<Map<string, Swipeable | null>>(new Map());
 
   const [items,       setItems]       = useState<ChecklistItem[]>([]);
   const [addingCustom, setAddingCustom] = useState(false);
@@ -191,6 +208,18 @@ export default function ChecklistSheet({
     });
   }
 
+  function deleteItem(id: string) {
+    swipeableRefs.current.get(id)?.close();
+    setItems(prev => {
+      const next = prev.filter(item => item.id !== id);
+      checkAnimRefs.current.delete(id);
+      swipeableRefs.current.delete(id);
+      persist(next);
+      updateProgress(next);
+      return next;
+    });
+  }
+
   function submitCustom() {
     const label = customDraft.trim();
     if (!label) return;
@@ -248,6 +277,64 @@ export default function ChecklistSheet({
     inputRange:  [0, 1],
     outputRange: [SCREEN_H, 0],
   });
+
+  function renderItem(item: ChecklistItem) {
+    const checkAnim = getCheckAnim(item.id);
+    const row = (
+      <TouchableOpacity
+        style={s.itemRow}
+        activeOpacity={0.75}
+        onPress={() => toggleItem(item.id)}
+      >
+        {/* Animated checkbox */}
+        <View style={s.checkboxWrap}>
+          <View style={[s.checkboxBase, item.checked && s.checkboxChecked]}>
+            <Animated.View
+              style={{
+                opacity: checkAnim,
+                transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+              }}
+            >
+              <Text style={s.checkmark}>{'\u2713'}</Text>
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Label */}
+        <View style={s.itemText}>
+          <Text
+            style={[
+              s.itemLabel,
+              item.checked && s.itemLabelDone,
+            ]}
+            numberOfLines={2}
+          >
+            {item.label}
+          </Text>
+          {!!item.subtitle && (
+            <Text style={s.itemSub}>{item.subtitle}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+
+    if (!item.custom) return <React.Fragment key={item.id}>{row}</React.Fragment>;
+
+    return (
+      <Swipeable
+        key={item.id}
+        ref={ref => { swipeableRefs.current.set(item.id, ref); }}
+        friction={2}
+        rightThreshold={40}
+        renderRightActions={() => (
+          <DeleteAction onDelete={() => deleteItem(item.id)} />
+        )}
+        overshootRight={false}
+      >
+        {row}
+      </Swipeable>
+    );
+  }
 
   return (
     <Animated.View
@@ -308,47 +395,7 @@ export default function ChecklistSheet({
               <Text style={s.emptyText}>Nothing to check off yet.</Text>
             )}
 
-            {items.map(item => {
-              const checkAnim = getCheckAnim(item.id);
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={s.itemRow}
-                  activeOpacity={0.75}
-                  onPress={() => toggleItem(item.id)}
-                >
-                  {/* Animated checkbox */}
-                  <View style={s.checkboxWrap}>
-                    <View style={[s.checkboxBase, item.checked && s.checkboxChecked]}>
-                      <Animated.View
-                        style={{
-                          opacity: checkAnim,
-                          transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
-                        }}
-                      >
-                        <Text style={s.checkmark}>{'\u2713'}</Text>
-                      </Animated.View>
-                    </View>
-                  </View>
-
-                  {/* Label */}
-                  <View style={s.itemText}>
-                    <Text
-                      style={[
-                        s.itemLabel,
-                        item.checked && s.itemLabelDone,
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {item.label}
-                    </Text>
-                    {!!item.subtitle && (
-                      <Text style={s.itemSub}>{item.subtitle}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {items.map(item => renderItem(item))}
 
             {/* Add custom item */}
             {addingCustom ? (
@@ -481,6 +528,7 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
+    backgroundColor: C.card,
   },
   checkboxWrap: {
     paddingTop: 1,
@@ -524,6 +572,19 @@ const s = StyleSheet.create({
     fontSize:   11,
     color:      C.muted,
     marginTop:  2,
+  },
+  deleteAction: {
+    backgroundColor:   C.red,
+    justifyContent:    'center',
+    alignItems:        'center',
+    width:             80,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  deleteActionText: {
+    fontFamily: F.semibold,
+    fontSize:   14,
+    color:      '#fff',
   },
   addRow: {
     flexDirection:  'row',
