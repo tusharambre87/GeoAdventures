@@ -126,7 +126,8 @@ export default function ChecklistSheet({
 }: ChecklistSheetProps) {
   const anim      = useRef(new Animated.Value(0)).current;
   const progressA = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted]       = useState(false);
+  const [dismissable, setDismissable] = useState(false);
   const closeRef  = useRef(onClose);
   closeRef.current = onClose;
 
@@ -247,6 +248,15 @@ export default function ChecklistSheet({
   }, [visible]);
 
   useEffect(() => {
+    if (visible) {
+      setDismissable(false);
+      const t = setTimeout(() => setDismissable(true), 350);
+      return () => clearTimeout(t);
+    }
+    setDismissable(false);
+  }, [visible]);
+
+  useEffect(() => {
     if (visible) setMounted(true);
     Animated.spring(anim, {
       toValue: visible ? 1 : 0,
@@ -343,7 +353,7 @@ export default function ChecklistSheet({
         style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
         pointerEvents="auto"
       >
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
 
         <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
         <KeyboardAvoidingView

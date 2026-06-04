@@ -5,6 +5,7 @@ import {
   Animated,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -29,84 +30,88 @@ const C = {
   green:  '#16A34A',
 } as const;
 
-interface Hotel { name: string; address?: string; placeId?: string }
+const HOTEL_CHAINS = [
+  'Marriott', 'JW Marriott', 'Marriott Marquis', 'The Ritz-Carlton',
+  'Sheraton', 'Westin', 'W Hotels', 'Renaissance by Marriott',
+  'Autograph Collection', 'Courtyard by Marriott', 'Residence Inn',
+  'Fairfield Inn', 'SpringHill Suites', 'TownPlace Suites', 'AC Hotels',
+  'Hilton', 'Hilton Garden Inn', 'DoubleTree by Hilton', 'Hampton Inn',
+  'Embassy Suites', 'Curio Collection by Hilton', 'Tapestry Collection',
+  'Canopy by Hilton', 'Tru by Hilton', 'Home2 Suites', 'Signia by Hilton',
+  'Hyatt', 'Grand Hyatt', 'Park Hyatt', 'Hyatt Regency', 'Andaz',
+  'Thompson Hotels', 'Alila Hotels', 'Caption by Hyatt',
+  'InterContinental', 'Crowne Plaza', 'Holiday Inn', 'Holiday Inn Express',
+  'Hotel Indigo', 'voco Hotels', 'Staybridge Suites', 'Kimpton Hotels',
+  'Four Seasons', 'St. Regis', 'Waldorf Astoria', 'Conrad Hotels',
+  'Omni Hotels', 'Loews Hotels', 'Radisson Blu', 'Radisson',
+  'Best Western', 'Best Western Plus', 'BW Premier Collection',
+  'Wyndham', 'La Quinta', 'Ramada', 'Travelodge', 'Days Inn',
+  'Aloft Hotels', 'Element Hotels', 'EVEN Hotels', 'Le Méridien',
+  'Sofitel', 'Novotel', 'MGallery', 'Swissôtel', 'Delta Hotels',
+  'Tribute Portfolio', 'Moxy Hotels', 'Edition Hotels', 'Pendry Hotels',
+];
+
+function getSuggestions(query: string, city: string): Array<{ name: string; sub: string }> {
+  if (query.trim().length < 2) return [];
+  const q = query.toLowerCase();
+  return HOTEL_CHAINS
+    .filter(c => c.toLowerCase().includes(q))
+    .slice(0, 6)
+    .map(c => ({ name: `${c} ${city}`, sub: c }));
+}
 
 interface Props {
   visible: boolean;
   tripId: string;
   destination: string;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (hotelName: string, fullAddress: string) => void;
 }
 
 export default function AddHotelSheet({ visible, tripId, destination, onClose, onSaved }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets      = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(500)).current;
+  const [mounted, setMounted] = useState(false);
 
-  const [query, setQuery]         = useState('');
-  const [results, setResults]     = useState<Hotel[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [selected, setSelected]   = useState<Hotel | null>(null);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hotelName,   setHotelName]   = useState('');
+  const [address,     setAddress]     = useState('');
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; sub: string }>>([]);
+  const [saving,      setSaving]      = useState(false);
+  const [saved,       setSaved]       = useState(false);
 
-  // Animate in/out
   useEffect(() => {
     if (visible) {
-      setSaved(false);
-      setQuery('');
-      setResults([]);
-      setSelected(null);
+      setMounted(true);
+      setSaved(false); setHotelName(''); setAddress(''); setSuggestions([]);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-        Animated.spring(sheetAnim, { toValue: 0, damping: 24, stiffness: 200, useNativeDriver: true }),
+        Animated.spring(sheetAnim,   { toValue: 0, damping: 24, stiffness: 200, useNativeDriver: true }),
       ]).start();
     } else {
       Keyboard.dismiss();
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
-        Animated.spring(sheetAnim, { toValue: 500, damping: 24, stiffness: 200, useNativeDriver: true }),
-      ]).start();
+        Animated.spring(sheetAnim,   { toValue: 500, damping: 24, stiffness: 200, useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) setMounted(false); });
     }
   }, [visible]);
 
-  // Debounced hotel search
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setSelected(null);
-    if (query.trim().length < 2) { setResults([]); return; }
+    setSuggestions(getSuggestions(hotelName, destination));
+  }, [hotelName, destination]);
 
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const token = await AsyncStorage.getItem('auth_token');
-        const enc   = encodeURIComponent(destination);
-        const q     = encodeURIComponent(query.trim());
-        const res   = await fetch(
-          `${API_BASE}/api/travel/cities/${enc}/hotels?q=${q}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-        );
-        if (res.ok) {
-          const data = await res.json() as { hotels?: Hotel[] };
-          setResults(data.hotels ?? []);
-        } else {
-          setResults([]);
-        }
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 420);
-
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, destination]);
+  function selectSuggestion(item: { name: string; sub: string }) {
+    setHotelName(item.sub);
+    setSuggestions([]);
+    Keyboard.dismiss();
+  }
 
   async function handleSave() {
-    const address = selected?.address ?? selected?.name ?? query.trim();
-    if (!address) return;
+    const name = hotelName.trim();
+    const addr = address.trim();
+    if (!name && !addr) return;
+    const combined = name && addr ? `${name}, ${addr}` : (name || addr);
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('auth_token');
@@ -117,111 +122,126 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          stayLocations: [{ cityName: destination, address }],
+          stayLocations: [{ cityName: destination, address: combined }],
         }),
       });
       setSaved(true);
-      setTimeout(() => { onSaved(); onClose(); }, 700);
+      setTimeout(() => { onSaved(name, combined); onClose(); }, 700);
     } catch {
       setSaving(false);
     }
   }
 
-  if (!visible) return null;
-
-  const inputValue = selected ? (selected.address ?? selected.name) : query;
+  const canSave = (hotelName.trim().length > 0 || address.trim().length > 0) && !saving && !saved;
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, s.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kav}>
-        <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetAnim }] }]}>
-          {/* Handle */}
-          <View style={s.handle} />
+    <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[s.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kav}>
+          <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + 24, transform: [{ translateY: sheetAnim }] }]}>
+            <View style={s.handle} />
 
-          {/* Header */}
-          <View style={s.header}>
-            <Text style={s.title}>Add hotel / start point</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Text style={s.closeBtn}>{'×'}</Text>
-            </Pressable>
-          </View>
-          <Text style={s.sub}>We'll use this for directions and timing</Text>
-
-          {/* Input */}
-          <View style={s.inputWrap}>
-            <Text style={s.inputIcon}>{'\uD83C\uDFE8'}</Text>
-            <TextInput
-              style={s.input}
-              placeholder="Hotel name or address"
-              placeholderTextColor={C.muted}
-              value={inputValue}
-              onChangeText={text => { setSelected(null); setQuery(text); }}
-              autoFocus
-              returnKeyType="search"
-            />
-            {searching && <ActivityIndicator size="small" color={C.orange} style={{ marginRight: 8 }} />}
-            {inputValue.length > 0 && !searching && (
-              <Pressable onPress={() => { setQuery(''); setSelected(null); setResults([]); }} hitSlop={8}>
-                <Text style={s.clearBtn}>{'×'}</Text>
+            <View style={s.header}>
+              <Text style={s.title}>Add hotel / start point</Text>
+              <Pressable onPress={onClose} hitSlop={12}>
+                <Text style={s.closeBtn}>{'×'}</Text>
               </Pressable>
+            </View>
+            <Text style={s.sub}>Set your daily starting point for better travel times</Text>
+
+            <Text style={s.fieldLabel}>HOTEL NAME</Text>
+            <View style={s.inputWrap}>
+              <Text style={s.inputIcon}>{'\uD83C\uDFE8'}</Text>
+              <TextInput
+                style={s.input}
+                placeholder={`Search hotel in ${destination}...`}
+                placeholderTextColor={C.muted}
+                value={hotelName}
+                onChangeText={text => setHotelName(text)}
+                autoFocus
+                returnKeyType="next"
+              />
+              {hotelName.length > 0 && (
+                <Pressable onPress={() => { setHotelName(''); setSuggestions([]); }} hitSlop={8}>
+                  <Text style={s.clearBtn}>{'×'}</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {suggestions.length > 0 && (
+              <ScrollView
+                style={s.suggList}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {suggestions.map((item, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[s.suggRow, i < suggestions.length - 1 && s.suggRowBorder]}
+                    onPress={() => selectSuggestion(item)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.suggIco}>{'\uD83D\uDCCD'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.suggName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.suggSub} numberOfLines={1}>{item.sub} · {destination}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             )}
-          </View>
 
-          {/* Search results */}
-          {results.length > 0 && !selected && (
-            <ScrollView
-              style={s.resultsList}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            <Text style={[s.fieldLabel, { marginTop: 14 }]}>ADDRESS (optional)</Text>
+            <View style={s.inputWrap}>
+              <Text style={s.inputIcon}>{'\uD83D\uDCCD'}</Text>
+              <TextInput
+                style={s.input}
+                placeholder={`e.g. 540 N Michigan Ave, ${destination}`}
+                placeholderTextColor={C.muted}
+                value={address}
+                onChangeText={setAddress}
+                returnKeyType="done"
+                onSubmitEditing={canSave ? handleSave : undefined}
+              />
+              {address.length > 0 && (
+                <Pressable onPress={() => setAddress('')} hitSlop={8}>
+                  <Text style={s.clearBtn}>{'×'}</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <Pressable
+              style={[s.saveBtn, saved && s.saveBtnDone, !canSave && { opacity: 0.5 }]}
+              onPress={handleSave}
+              disabled={!canSave}
             >
-              {results.map((h, i) => (
-                <TouchableOpacity
-                  key={h.placeId ?? i}
-                  style={[s.resultRow, i < results.length - 1 && s.resultRowBorder]}
-                  onPress={() => { setSelected(h); setResults([]); Keyboard.dismiss(); }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={s.resultIcon}>{'\uD83D\uDCCD'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.resultName} numberOfLines={1}>{h.name}</Text>
-                    {h.address ? <Text style={s.resultAddr} numberOfLines={1}>{h.address}</Text> : null}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Save button */}
-          <Pressable
-            style={[s.saveBtn, saved && s.saveBtnDone, (saving || !inputValue.trim()) && { opacity: 0.6 }]}
-            onPress={handleSave}
-            disabled={saving || saved || !inputValue.trim()}
-          >
-            {saving
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={s.saveBtnText}>{saved ? 'Saved!' : 'Save start point'}</Text>
-            }
-          </Pressable>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Animated.View>
+              {saving
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
+              }
+            </Pressable>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </Modal>
   );
 }
 
 const s = StyleSheet.create({
   overlay: {
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
-  kav: { justifyContent: 'flex-end' },
+  kav:   { justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: C.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 8,
-    maxHeight: '85%',
+    maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
@@ -239,9 +259,13 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  title:    { fontFamily: F.bold, fontSize: 18, color: C.deep },
-  closeBtn: { fontSize: 24, color: C.muted, lineHeight: 28 },
-  sub:      { fontFamily: F.regular, fontSize: 13, color: C.muted, marginBottom: 16 },
+  title:      { fontFamily: F.bold, fontSize: 18, color: C.deep },
+  closeBtn:   { fontSize: 24, color: C.muted, lineHeight: 28 },
+  sub:        { fontFamily: F.regular, fontSize: 13, color: C.muted, marginBottom: 14 },
+  fieldLabel: {
+    fontFamily: F.semibold, fontSize: 10, color: C.muted,
+    letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6,
+  },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -250,7 +274,7 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.border,
     paddingHorizontal: 12,
-    marginBottom: 12,
+    marginBottom: 4,
     gap: 8,
   },
   inputIcon: { fontSize: 18, flexShrink: 0 },
@@ -262,32 +286,32 @@ const s = StyleSheet.create({
     paddingVertical: 14,
   },
   clearBtn: { fontSize: 18, color: C.muted, paddingHorizontal: 4 },
-  resultsList: {
-    maxHeight: 200,
+  suggList: {
+    maxHeight: 220,
     backgroundColor: C.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.border,
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  resultRow: {
+  suggRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  resultRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  resultIcon: { fontSize: 16 },
-  resultName: { fontFamily: F.semibold, fontSize: 14, color: C.deep },
-  resultAddr: { fontFamily: F.regular, fontSize: 12, color: C.muted, marginTop: 1 },
+  suggRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  suggIco:  { fontSize: 16 },
+  suggName: { fontFamily: F.semibold, fontSize: 14, color: C.deep },
+  suggSub:  { fontFamily: F.regular, fontSize: 12, color: C.muted, marginTop: 1 },
   saveBtn: {
     backgroundColor: C.orange,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 16,
   },
-  saveBtnDone: { backgroundColor: C.green },
+  saveBtnDone: { backgroundColor: '#16A34A' },
   saveBtnText: { fontFamily: F.bold, fontSize: 16, color: '#fff' },
 });

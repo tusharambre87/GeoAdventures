@@ -164,6 +164,7 @@ type TripData = {
   travelers?: Array<{ name: string; isParent?: boolean; age?: string }> | null;
   coverImageUrl?: string | null;
   firstPhotoUrl?: string | null;
+  stayLocations?: Array<{ cityName: string; address?: string; lat?: number; lng?: number }> | null;
   stops: Stop[];
 };
 
@@ -500,6 +501,7 @@ export default function TodayScreen() {
   const [isOffline, setIsOffline]               = useState(false);
   const [showFeedback, setShowFeedback]          = useState(false);
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
+  const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
   const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string; name: string }[]>([]);
@@ -1536,20 +1538,36 @@ export default function TodayScreen() {
           )}
 
           {/* Hotel / start point card */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
-            activeOpacity={0.85}
-            onPress={() => setShowHotelSheet(true)}
-          >
-            <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
-              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with travel times</Text>
-            </View>
-            <Text style={{ color: C.orange, fontSize: 20, fontWeight: '700' }}>+</Text>
-          </TouchableOpacity>
+          {(() => {
+            const savedHotel = localSavedHotel
+              ?? (trip?.stayLocations ?? []).find(s => !s.cityName || s.cityName === (trip?.destination ?? (trip as any)?.city))?.address
+              ?? null;
+            return (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+                activeOpacity={0.85}
+                onPress={() => setShowHotelSheet(true)}
+              >
+                <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
+                </View>
+                {savedHotel ? (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }} numberOfLines={1}>{savedHotel}</Text>
+                    <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Starting point · tap to edit</Text>
+                  </View>
+                ) : (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
+                    <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with travel times</Text>
+                  </View>
+                )}
+                <Text style={{ color: savedHotel ? C.muted : C.orange, fontSize: savedHotel ? 13 : 20, fontWeight: '700' }}>
+                  {savedHotel ? 'Edit' : '+'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* SOS / Emergency button */}
           <TouchableOpacity
@@ -1600,7 +1618,7 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
-          onSaved={() => setShowHotelSheet(false)}
+          onSaved={(name, addr) => { setShowHotelSheet(false); setLocalSavedHotel(addr || name); }}
         />
       </View>
     );

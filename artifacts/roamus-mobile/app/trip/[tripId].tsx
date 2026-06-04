@@ -1096,10 +1096,9 @@ function TripOverview({
       >
         {/* Before you go — checklist entry row */}
         {!hideChecklist && clCounts !== null && (
-          <GHTouchable
+          <Pressable
             style={cl.row}
             onPress={() => setChecklistOpen(true)}
-            activeOpacity={0.75}
           >
             <View style={cl.rowLeft}>
               <Text style={cl.rowTitle}>Before you go</Text>
@@ -1128,7 +1127,7 @@ function TripOverview({
                   : `${clCounts.total - clCounts.checked} left`}
               </Text>
             </View>
-          </GHTouchable>
+          </Pressable>
         )}
 
         {Array.from({ length: totalDays }, (_, i) => i + 1)
@@ -1360,22 +1359,22 @@ function DayDetail({
               <View style={sp.buckets}>
                 <View style={sp.bucket}>
                   <Text style={sp.bucketIco}>{'\uD83C\uDFAB'}</Text>
-                  <Text style={sp.bucketLbl}>Admission</Text>
+                  <Text style={sp.bucketLbl} numberOfLines={1}>Entry</Text>
                   <Text style={sp.bucketVal}>${spend.admission}</Text>
                 </View>
                 <View style={sp.bucket}>
                   <Text style={sp.bucketIco}>{'\uD83C\uDF54'}</Text>
-                  <Text style={sp.bucketLbl}>Food</Text>
+                  <Text style={sp.bucketLbl} numberOfLines={1}>Food</Text>
                   <Text style={sp.bucketVal}>${spend.foodMin}–${spend.foodMax}</Text>
                 </View>
                 <View style={sp.bucket}>
                   <Text style={sp.bucketIco}>{'\uD83C\uDF6D'}</Text>
-                  <Text style={sp.bucketLbl}>Snacks</Text>
+                  <Text style={sp.bucketLbl} numberOfLines={1}>Snacks</Text>
                   <Text style={sp.bucketVal}>${spend.snacks}</Text>
                 </View>
                 <View style={sp.bucket}>
                   <Text style={sp.bucketIco}>{'\uD83D\uDE97'}</Text>
-                  <Text style={sp.bucketLbl}>Transport</Text>
+                  <Text style={sp.bucketLbl} numberOfLines={1}>Travel</Text>
                   <Text style={sp.bucketVal}>~${spend.transport}</Text>
                 </View>
               </View>
@@ -3961,7 +3960,7 @@ const sp = StyleSheet.create({
   },
   bucket: {
     flex: 1, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12, padding: 10, alignItems: 'center',
+    borderRadius: 12, paddingVertical: 10, paddingHorizontal: 5, alignItems: 'center',
   },
   bucketIco: { fontSize: 16, marginBottom: 4 },
   bucketLbl: {
