@@ -139,7 +139,7 @@ async function installRuntimeExternals() {
   // Hardcoded list of externalized-AND-installed deps that the runtime needs.
   // Keep in sync with build.mjs externals + package.json dependencies.
   // These are the only externalized packages actually present in dependencies.
-  const RUNTIME_EXTERNALS = ["@google-cloud/text-to-speech", "bcrypt"];
+  const RUNTIME_EXTERNALS = ["@google-cloud/storage", "@google-cloud/text-to-speech", "bcrypt"];
 
   const toInstall = {};
   for (const name of RUNTIME_EXTERNALS) {
