@@ -1,24 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, PermissionsAndroid } from 'react-native';
-import Voice, {
-  SpeechErrorEvent,
-  SpeechResultsEvent,
-} from '@react-native-voice/voice';
 
-/**
- * Module-level singleton so that multiple mounted SpeechTextInput instances
- * share a single Voice session. Global listeners are set once and route
- * transcripts to whichever field is currently active (activeCallback).
- * When `start()` fires it resets ALL instances' isListening to false first,
- * then marks only the caller as active — preventing multi-field listener
- * clobbering when e.g. multiple kid-quote inputs are mounted simultaneously.
- */
+type SpeechResultsEvent = { value?: string[] };
+type SpeechErrorEvent = { error?: { message?: string } };
+
+interface VoiceModule {
+  onSpeechResults: ((e: SpeechResultsEvent) => void) | null;
+  onSpeechPartialResults: ((e: SpeechResultsEvent) => void) | null;
+  onSpeechEnd: (() => void) | null;
+  onSpeechError: ((e: SpeechErrorEvent) => void) | null;
+  isAvailable: () => Promise<boolean>;
+  start: (locale: string) => Promise<void>;
+  stop: () => Promise<void>;
+  destroy: () => Promise<void>;
+}
+
+let Voice: VoiceModule | null = null;
+try {
+  Voice = require('@react-native-voice/voice').default as VoiceModule;
+} catch {
+  Voice = null;
+}
+
 const listeningSetters = new Set<(v: boolean) => void>();
 let activeCallback: ((text: string) => void) | null = null;
 let voiceInitialized = false;
 
 function ensureVoice() {
-  if (voiceInitialized || Platform.OS === 'web') return;
+  if (!Voice || voiceInitialized || Platform.OS === 'web') return;
   voiceInitialized = true;
 
   Voice.onSpeechResults = (e: SpeechResultsEvent) => {
@@ -38,7 +47,7 @@ function ensureVoice() {
 }
 
 async function requestPermissions(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  if (!Voice || Platform.OS === 'web') return false;
 
   if (Platform.OS === 'android') {
     try {
@@ -81,6 +90,7 @@ export function useSpeechToText() {
   const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
+    if (!Voice) return;
     ensureVoice();
     listeningSetters.add(setIsListening);
     return () => {
@@ -88,13 +98,13 @@ export function useSpeechToText() {
       if (listeningSetters.size === 0) {
         activeCallback = null;
         voiceInitialized = false;
-        Voice.destroy().catch(() => {});
+        Voice?.destroy().catch(() => {});
       }
     };
   }, []);
 
   const start = useCallback(async (onResult: (text: string) => void) => {
-    if (Platform.OS === 'web') return;
+    if (!Voice || Platform.OS === 'web') return;
 
     const ok = await requestPermissions();
     if (!ok) return;
@@ -112,7 +122,7 @@ export function useSpeechToText() {
   }, []);
 
   const stop = useCallback(async () => {
-    if (Platform.OS === 'web') return;
+    if (!Voice || Platform.OS === 'web') return;
     try {
       await Voice.stop();
     } catch {}
