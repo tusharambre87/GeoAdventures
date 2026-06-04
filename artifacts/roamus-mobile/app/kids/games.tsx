@@ -17,7 +17,7 @@ import { F } from "@/lib/tokens";
 const GRID_GAMES = [
   {
     type: "scavenger",
-    icon: "🔍",
+    icon: "\uD83D\uDD0D",
     name: "Scavenger Hunt",
     desc: "Find hidden things at this stop",
     tag: "TEAM",
@@ -29,7 +29,7 @@ const GRID_GAMES = [
   },
   {
     type: "geoguess",
-    icon: "🌍",
+    icon: "\uD83C\uDF0D",
     name: "GeoGuess",
     desc: "Ask yes/no clues to guess a place",
     tag: "SOLO",
@@ -41,7 +41,7 @@ const GRID_GAMES = [
   },
   {
     type: "bag",
-    icon: "👜",
+    icon: "\uD83D\uDC5C",
     name: "What's In My Bag",
     desc: "Memory chain game",
     tag: "FAMILY",
@@ -53,7 +53,7 @@ const GRID_GAMES = [
   },
   {
     type: "geospy",
-    icon: "👁",
+    icon: "\uD83D\uDC41",
     name: "GeoSpy",
     desc: "I Spy — observation prompts",
     tag: "FAMILY",
@@ -109,7 +109,7 @@ export default function GameHub() {
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <Text style={s.heroBigEmoji}>⚡</Text>
+            <Text style={s.heroBigEmoji}>{'\u26A1'}</Text>
             <View style={s.heroBadge}>
               <Text style={s.heroBadgeText}>MOST PLAYED</Text>
             </View>

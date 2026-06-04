@@ -66,7 +66,7 @@ export function OCard({
         {sub ? <Text style={a.oCardSub}>{sub}</Text> : null}
       </View>
       <View style={[a.oCardRadio, { borderColor: selected ? G.orange : "rgba(138,143,168,0.3)", backgroundColor: selected ? G.orange : "transparent" }]}>
-        {selected && <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>✓</Text>}
+        {selected && <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{'\u2713'}</Text>}
       </View>
     </Pressable>
   );

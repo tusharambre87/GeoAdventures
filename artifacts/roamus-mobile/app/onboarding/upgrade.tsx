@@ -195,7 +195,7 @@ export default function UpgradeScreen() {
           <Text style={s.featureHeader}>{plan.name.toUpperCase()} INCLUDES</Text>
           {plan.features.map((f, i) => (
             <View key={i} style={s.featureRow}>
-              <Text style={s.featureCheck}>✓</Text>
+              <Text style={s.featureCheck}>{'\u2713'}</Text>
               <Text style={s.featureText}>{f}</Text>
             </View>
           ))}

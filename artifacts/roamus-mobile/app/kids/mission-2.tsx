@@ -120,7 +120,7 @@ export default function Mission2() {
                 ]}
               >
                 <Text style={[s.mDotText, (i === 0 || i === 1) && s.mDotTextAlt]}>
-                  {i === 0 ? "✓" : i + 1}
+                  {i === 0 ? "\u2713" : i + 1}
                 </Text>
               </View>
             ))}
@@ -129,7 +129,7 @@ export default function Mission2() {
 
         {/* ── White card ── */}
         <View style={s.card}>
-          <Text style={s.typeLabel}>{"👁 OBSERVATION · +5 XP"}</Text>
+          <Text style={s.typeLabel}>{"\uD83D\uDC41 OBSERVATION · +5 XP"}</Text>
           <Text style={s.question}>{instruction}</Text>
           <TextInput
             style={[s.textarea, focused && s.textareaFocused]}
@@ -154,7 +154,7 @@ export default function Mission2() {
               </Text>
             </Pressable>
             <Pressable style={s.micBtn}>
-              <Text style={{ fontSize: 24 }}>{"🎤"}</Text>
+              <Text style={{ fontSize: 24 }}>{"\uD83C\uDFA4"}</Text>
             </Pressable>
           </View>
         </View>

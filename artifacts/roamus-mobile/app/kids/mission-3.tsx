@@ -94,7 +94,7 @@ export default function Mission3() {
                 ]}
               >
                 <Text style={[s.mDotText, s.mDotTextAlt]}>
-                  {i < 2 ? "✓" : "3"}
+                  {i < 2 ? "\u2713" : "3"}
                 </Text>
               </View>
             ))}
@@ -103,7 +103,7 @@ export default function Mission3() {
 
         {/* ── White card ── */}
         <View style={s.card}>
-          <Text style={s.typeLabel}>{"📸 PHOTO · +5 XP"}</Text>
+          <Text style={s.typeLabel}>{"\uD83D\uDCF8 PHOTO · +5 XP"}</Text>
           <Text style={s.question}>{instruction}</Text>
 
           {photoUri ? (
@@ -115,7 +115,7 @@ export default function Mission3() {
             </View>
           ) : (
             <View style={s.photoCenter}>
-              <Text style={s.cameraIcon}>{"📷"}</Text>
+              <Text style={s.cameraIcon}>{"\uD83D\uDCF7"}</Text>
               <Text style={s.photoSub}>Find something amazing to capture!</Text>
             </View>
           )}
@@ -125,7 +125,7 @@ export default function Mission3() {
             onPress={handleTakePhoto}
           >
             <Text style={s.photoBtnText}>
-              {photoUri ? "📷 Retake Photo" : "📷 Take a photo!"}
+              {photoUri ? "\uD83D\uDCF7 Retake Photo" : "\uD83D\uDCF7 Take a photo!"}
             </Text>
           </Pressable>
           <Pressable style={s.libraryLink} onPress={handlePickPhoto}>

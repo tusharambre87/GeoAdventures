@@ -29,9 +29,9 @@ const K = {
 } as const;
 
 const STORIES = [
-  { label: "📖 Main Story", duration: "5:12", key: "main" as const },
-  { label: "⚡ Quick Hits", duration: "2:30", key: "quickHits" as const },
-  { label: "🏛 History", duration: "3:45", key: "history" as const },
+  { label: "\uD83D\uDCD6 Main Story", duration: "5:12", key: "main" as const },
+  { label: "\u26A1 Quick Hits", duration: "2:30", key: "quickHits" as const },
+  { label: "\uD83C\uDFDB History", duration: "3:45", key: "history" as const },
 ];
 
 
@@ -433,11 +433,11 @@ export default function StoryPlayer() {
         {/* Voice + transcript row */}
         <View style={s.auxRow}>
           <View style={s.voicePill}>
-            <Text style={s.voiceText}>{"🔊 Eva ▾"}</Text>
+            <Text style={s.voiceText}>{"\uD83D\uDD0A Eva ▾"}</Text>
           </View>
           <Pressable onPress={() => setTranscriptOpen(true)}>
             <Text style={s.transcriptBtn} numberOfLines={1}>
-              {"📄 Read transcript"}
+              {"\uD83D\uDCC4 Read transcript"}
             </Text>
           </Pressable>
         </View>

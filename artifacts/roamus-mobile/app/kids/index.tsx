@@ -109,8 +109,8 @@ export default function ExplorerHome() {
   const stopIndex = kids.exploreContent?.stopIndex;
   const totalStops = kids.exploreContent?.totalStops;
   const stopBadge = stopIndex && totalStops
-    ? `📖 Story Pack · Stop ${stopIndex} of ${totalStops}`
-    : "📖 Story Pack";
+    ? `\uD83D\uDCD6 Story Pack · Stop ${stopIndex} of ${totalStops}`
+    : "\uD83D\uDCD6 Story Pack";
   const mainDuration = kids.exploreContent?.stories?.main?.durationSeconds
     ? fmtSec(kids.exploreContent.stories.main.durationSeconds)
     : "5:00";
@@ -190,10 +190,10 @@ export default function ExplorerHome() {
               router.push("/kids/wonder");
             }}
           >
-            <Text style={s.tileIcon}>{"🤔"}</Text>
+            <Text style={s.tileIcon}>{"\uD83E\uDD14"}</Text>
             <Text style={s.tileName}>Wonder Time</Text>
             <Text style={s.tileSub}>What are you curious about?</Text>
-            <Text style={s.tileXp}>{"⚡ +5 XP"}</Text>
+            <Text style={s.tileXp}>{"\u26A1 +5 XP"}</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [s.tile, pressed && { backgroundColor: K.bg }]}
@@ -202,10 +202,10 @@ export default function ExplorerHome() {
               router.push("/kids/mission-1");
             }}
           >
-            <Text style={s.tileIcon}>{"🎯"}</Text>
+            <Text style={s.tileIcon}>{"\uD83C\uDFAF"}</Text>
             <Text style={s.tileName}>Missions</Text>
             <Text style={s.tileSub}>3 challenges to complete</Text>
-            <Text style={s.tileXp}>{"⚡ +15 XP"}</Text>
+            <Text style={s.tileXp}>{"\u26A1 +15 XP"}</Text>
           </Pressable>
         </View>
 
@@ -218,7 +218,7 @@ export default function ExplorerHome() {
               router.push("/kids/games");
             }}
           >
-            <Text style={s.gameBtnText}>🎮 Play a quick game →</Text>
+            <Text style={s.gameBtnText}>{'\uD83C\uDFAE'} Play a quick game →</Text>
           </Pressable>
         </View>
 

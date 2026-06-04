@@ -40,11 +40,11 @@ const C = {
 } as const;
 
 const STOP_EMOJI: Record<string, string> = {
-  museum: '🏛', landmark: '📍', park: '🌿', restaurant: '🍽',
-  beach: '🏖', market: '🛍', viewpoint: '🌅', temple: '⛩',
-  activity: '🎯', hotel: '🏨', cafe: '☕',
+  museum: '\uD83C\uDFDB', landmark: '\uD83D\uDCCD', park: '\uD83C\uDF3F', restaurant: '\uD83C\uDF7D',
+  beach: '\uD83C\uDFD6', market: '\uD83D\uDECD', viewpoint: '\uD83C\uDF05', temple: '\u26E9',
+  activity: '\uD83C\uDFAF', hotel: '\uD83C\uDFE8', cafe: '\u2615',
 };
-function stopEmoji(t?: string | null) { return STOP_EMOJI[t ?? ''] ?? '📍'; }
+function stopEmoji(t?: string | null) { return STOP_EMOJI[t ?? ''] ?? '\uD83D\uDCCD'; }
 
 function formatTime(d?: string | null): string {
   if (!d) return '';
@@ -117,7 +117,7 @@ export default function TripMemoryIndex() {
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{tripName}</Text>
         <Pressable style={styles.addBtn} onPress={openPhotoSheet} hitSlop={8}>
-          <Text style={styles.addBtnText}>📷 Add</Text>
+          <Text style={styles.addBtnText}>{'\uD83D\uDCF7'} Add</Text>
         </Pressable>
       </View>
 

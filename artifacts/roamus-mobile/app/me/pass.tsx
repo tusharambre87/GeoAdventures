@@ -28,11 +28,11 @@ type UserData = {
 };
 
 const FEATURES = [
-  { icon: "🗺️", title: "Full trip plans", sub: "Day-by-day itineraries for every city" },
-  { icon: "🧭", title: "Kids Explorer Zone", sub: "Stories, missions, and games" },
-  { icon: "📸", title: "Memories & stories", sub: "Auto-generated photo journals" },
-  { icon: "✈️", title: "Unlimited trips", sub: "Plan as many adventures as you like" },
-  { icon: "📶", title: "Offline mode", sub: "Access your trip without signal" },
+  { icon: "\uD83D\uDDFA\uFE0F", title: "Full trip plans", sub: "Day-by-day itineraries for every city" },
+  { icon: "\uD83E\uDDED", title: "Kids Explorer Zone", sub: "Stories, missions, and games" },
+  { icon: "\uD83D\uDCF8", title: "Memories & stories", sub: "Auto-generated photo journals" },
+  { icon: "\u2708\uFE0F", title: "Unlimited trips", sub: "Plan as many adventures as you like" },
+  { icon: "\uD83D\uDCF6", title: "Offline mode", sub: "Access your trip without signal" },
 ];
 
 function formatDate(dateStr?: string | null): string {
@@ -151,7 +151,7 @@ export default function PassScreen() {
               {/* Founding Explorer */}
               {user?.isFoundingFamily && (
                 <View style={s.foundingCard}>
-                  <Text style={s.foundingIco}>{"🌟"}</Text>
+                  <Text style={s.foundingIco}>{"\uD83C\uDF1F"}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={s.foundingTitle}>
                       {"Founding Explorer #"}{user.foundingFamilyNumber ?? ""}
@@ -173,7 +173,7 @@ export default function PassScreen() {
                       <Text style={s.featTitle}>{f.title}</Text>
                       <Text style={s.featSub}>{f.sub}</Text>
                     </View>
-                    <Text style={s.featCheck}>{"✓"}</Text>
+                    <Text style={s.featCheck}>{"\u2713"}</Text>
                   </View>
                 ))}
               </View>
@@ -193,7 +193,7 @@ export default function PassScreen() {
                       }
                     >
                       <View style={s.upgradeIconWrap}>
-                        <Text style={{ fontSize: 20 }}>{"📅"}</Text>
+                        <Text style={{ fontSize: 20 }}>{"\uD83D\uDCC5"}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.upgradeTitle}>{"Switch to Annual"}</Text>
@@ -242,7 +242,7 @@ export default function PassScreen() {
                       <Text style={s.featTitle}>{f.title}</Text>
                       <Text style={s.featSub}>{f.sub}</Text>
                     </View>
-                    <Text style={s.featLock}>{"🔒"}</Text>
+                    <Text style={s.featLock}>{"\uD83D\uDD12"}</Text>
                   </View>
                 ))}
               </View>

@@ -96,7 +96,7 @@ function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boo
 
       {offlineReady && (
         <View style={s.offlinePill}>
-          <Text style={s.offlinePillText}>{"✓ Available offline"}</Text>
+          <Text style={s.offlinePillText}>{"\u2713 Available offline"}</Text>
         </View>
       )}
 

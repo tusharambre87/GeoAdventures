@@ -62,8 +62,8 @@ const STOP_HERO_BG: Record<string, string> = {
 };
 
 const STOP_HERO_EMOJI: Record<string, string> = {
-  park: '🌳', museum: '🏛', zoo: '🦁', landmark: '🗺️',
-  shopping: '🛍', nature: '🏔', culture: '🎭', meal: '🍽', default: '📍',
+  park: '\uD83C\uDF33', museum: '\uD83C\uDFDB', zoo: '\uD83E\uDD81', landmark: '\uD83D\uDDFA\uFE0F',
+  shopping: '\uD83D\uDECD', nature: '\uD83C\uDFD4', culture: '\uD83C\uDFAD', meal: '\uD83C\uDF7D', default: '\uD83D\uDCCD',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -587,7 +587,7 @@ export default function AtStopScreen() {
   function handleAddPhoto() {
     if (!trip?.id || !currentStop) return;
     keepDetailOnFocus.current = true;
-    const stopIcon = STOP_HERO_EMOJI[currentStop.stopType ?? ''] ?? STOP_HERO_EMOJI.default ?? '📍';
+    const stopIcon = STOP_HERO_EMOJI[currentStop.stopType ?? ''] ?? STOP_HERO_EMOJI.default ?? '\uD83D\uDCCD';
     router.push({
       pathname: `/memories/${trip.id}/add-photo` as never,
       params: { stopId: currentStop.id, stopName: currentStop.name, stopIcon },
@@ -666,7 +666,7 @@ export default function AtStopScreen() {
     return (
       <View style={[sc.screen, { paddingTop }]}>
         <View style={sc.noTripWrap}>
-          <View style={sc.noTripIcon}><Text style={sc.noTripIconEmoji}>📍</Text></View>
+          <View style={sc.noTripIcon}><Text style={sc.noTripIconEmoji}>{'\uD83D\uDCCD'}</Text></View>
           <Text style={sc.noTripTitle}>You're not on a trip yet</Text>
           <Text style={sc.noTripSub}>
             {loadErr ?? 'At Stop shows live details when you’re out exploring with your family. Start by planning your next trip.'}
@@ -714,7 +714,7 @@ export default function AtStopScreen() {
                     <View style={sc.stopBody}>
                       <Text style={sc.stopMeta}>Stop {gi + 1} · {stop.durationMinutes ?? 60} min{time ? ` · ${time}` : ''}</Text>
                       <View style={sc.tagsRow}>
-                        {hasTicket && <View style={[sc.tag, sc.tagRed]}><Text style={[sc.tagTxt, sc.tagTxtRed]}>🎫 Ticket needed</Text></View>}
+                        {hasTicket && <View style={[sc.tag, sc.tagRed]}><Text style={[sc.tagTxt, sc.tagTxtRed]}>{'\uD83C\uDFAB'} Ticket needed</Text></View>}
                         {isFree && !hasTicket && <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>Free entry</Text></View>}
                         {isAnchor && <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>Kid friendly</Text></View>}
                       </View>
@@ -741,7 +741,7 @@ export default function AtStopScreen() {
                     <View style={sc.stopBody}>
                       <Text style={sc.stopMeta}>Stop {gi + 1} · {stop.durationMinutes ?? 60} min</Text>
                       <View style={sc.tagsRow}>
-                        <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>✓ Done</Text></View>
+                        <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>{'\u2713'} Done</Text></View>
                       </View>
                     </View>
                   </View>
@@ -751,7 +751,7 @@ export default function AtStopScreen() {
           )}
           {dayStops.length === 0 && (
             <View style={sc.emptyDay}>
-              <Text style={sc.emptyDayEmoji}>🗺️</Text>
+              <Text style={sc.emptyDayEmoji}>{'\uD83D\uDDFA\uFE0F'}</Text>
               <Text style={sc.emptyDayTitle}>No stops planned for today</Text>
               <Text style={sc.emptyDaySub}>Add stops to your trip to get started.</Text>
             </View>
@@ -817,7 +817,7 @@ export default function AtStopScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[dt.heroPill, dt.heroPillDanger]} activeOpacity={0.85}
                 onPress={() => openSheet('didnt')}>
-                <Text style={[dt.heroPillText, { color: C.red }]}>🚫 Didn’t visit</Text>
+                <Text style={[dt.heroPillText, { color: C.red }]}>{'\uD83D\uDEAB'} Didn’t visit</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
@@ -829,7 +829,7 @@ export default function AtStopScreen() {
               }}
               onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/sos' as never,
                 params: { tripId: trip?.id ?? '', destination: trip?.destination ?? trip?.city ?? '' } }); }}>
-              <Text style={{ fontSize: 12 }}>🆘</Text>
+              <Text style={{ fontSize: 12 }}>{'\uD83C\uDD98'}</Text>
               <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
             </TouchableOpacity>
           </View>
@@ -872,13 +872,13 @@ export default function AtStopScreen() {
             <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6,
               borderColor: 'rgba(245,166,35,0.4)' }]} activeOpacity={0.8}
               onPress={() => Linking.openURL(ticketUrl(currentStop.name, bookingHref))}>
-              <Text style={dt.actIcon}>🎟</Text>
+              <Text style={dt.actIcon}>{'\uD83C\uDF9F'}</Text>
               <Text style={[dt.actLabel, { fontSize: 13, color: '#D97706' }]}>Book tickets</Text>
             </TouchableOpacity>
           ) : (
             <View style={[dt.actBtn, { flexDirection: 'row', gap: 6,
               borderColor: 'rgba(74,222,128,0.3)' }]}>
-              <Text style={dt.actIcon}>✓</Text>
+              <Text style={dt.actIcon}>{'\u2713'}</Text>
               <Text style={[dt.actLabel, { fontSize: 13, color: '#16A34A' }]}>No ticket needed</Text>
             </View>
           )}
@@ -904,7 +904,7 @@ export default function AtStopScreen() {
               lon: currentStop.longitude ?? '',
               bookingUrl: encodeURIComponent(bookingHref ?? ''),
             }}); }}>
-            <Text style={dt.gridIcon}>✨</Text>
+            <Text style={dt.gridIcon}>{'\u2728'}</Text>
             <Text style={dt.gridTitle}>What to expect</Text>
             <Text style={dt.gridSub}>Experience {'&'} best tips</Text>
           </TouchableOpacity>
@@ -922,7 +922,7 @@ export default function AtStopScreen() {
                 explorerName: encodeURIComponent(explorerName),
               }});
             }}>
-            <Text style={dt.gridIcon}>🧭</Text>
+            <Text style={dt.gridIcon}>{'\uD83E\uDDED'}</Text>
             <Text style={dt.gridTitle}>Kids explorer</Text>
             <Text style={dt.gridSub}>Missions and stories</Text>
           </TouchableOpacity>
@@ -930,7 +930,7 @@ export default function AtStopScreen() {
           {/* Capture moment */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
             onPress={handleAddPhoto}>
-            <Text style={dt.gridIcon}>📸</Text>
+            <Text style={dt.gridIcon}>{'\uD83D\uDCF8'}</Text>
             <Text style={dt.gridTitle}>Capture moment</Text>
             <Text style={dt.gridSub}>Photo, note, kid quote</Text>
           </TouchableOpacity>
@@ -942,7 +942,7 @@ export default function AtStopScreen() {
               address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
               destination: encodeURIComponent(trip?.destination ?? trip?.city ?? ''),
             } }); }}>
-            <Text style={dt.gridIcon}>🔀</Text>
+            <Text style={dt.gridIcon}>{'\uD83D\uDD00'}</Text>
             <Text style={dt.gridTitle}>Need something?</Text>
             <Text style={dt.gridSub}>Adjust, skip, or swap</Text>
           </TouchableOpacity>
@@ -964,7 +964,7 @@ export default function AtStopScreen() {
             ))}
             <TouchableOpacity style={dt.photoAdd} activeOpacity={0.8}
               onPress={handleAddPhoto}>
-              <Text style={dt.photoAddIcon}>📷</Text>
+              <Text style={dt.photoAddIcon}>{'\uD83D\uDCF7'}</Text>
               <Text style={dt.photoAddLabel}>Add yours</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -978,7 +978,7 @@ export default function AtStopScreen() {
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setExploreOpen(o => !o);
             }}>
-            <Text style={dt.exploreTitle}>💡 Timing, access {'&'} logistics</Text>
+            <Text style={dt.exploreTitle}>{'\uD83D\uDCA1'} Timing, access {'&'} logistics</Text>
             <Text style={[dt.exploreChev, exploreOpen && { transform: [{ rotate: '180deg' }] }]}>▾</Text>
           </TouchableOpacity>
 
@@ -1029,7 +1029,7 @@ export default function AtStopScreen() {
                 meta.sessionFit ? ['Best for', meta.sessionFit] : null,
                 enrichment.bestTimeOfDay ? ['Crowd level now', enrichment.bestTimeOfDay] : null,
                 enrichment.strollerFriendly != null
-                  ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes ✓' : 'No'] : null,
+                  ? ['Stroller friendly', enrichment.strollerFriendly ? 'Yes \u2713' : 'No'] : null,
               ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x)).map(([k, v]) => (
                 <View key={k} style={dt.exploreRow}>
                   <Text style={dt.exploreKey}>{k}</Text>
@@ -1059,7 +1059,7 @@ export default function AtStopScreen() {
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
           <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
             onPress={() => openSheet('feedback')}>
-            <Text style={dt.ctaPrimaryText}>✓ We visited — mark complete</Text>
+            <Text style={dt.ctaPrimaryText}>{'\u2713'} We visited — mark complete</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.7}
             onPress={() => openSheet('didnt')}
@@ -1081,12 +1081,12 @@ export default function AtStopScreen() {
         {nextStop && (
           <TouchableOpacity style={[sh.row, sh.rowHighlighted]} activeOpacity={0.8}
             onPress={() => { setCurrentStop(nextStop); setActiveSheet('none'); }}>
-            <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>🗺️</Text></View>
+            <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>{'\uD83D\uDDFA\uFE0F'}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={[sh.rowName, { color: C.orange }]}>Follow Planned Route</Text>
               <Text style={[sh.rowDesc, { color: 'rgba(232,105,42,0.65)' }]}>{nextStop.name} · next stop</Text>
             </View>
-            <Text style={{ fontSize: 20, color: C.orange }}>✅</Text>
+            <Text style={{ fontSize: 20, color: C.orange }}>{'\u2705'}</Text>
           </TouchableOpacity>
         )}
 
@@ -1134,7 +1134,7 @@ export default function AtStopScreen() {
                               {stop.name}
                             </Text>
                             <Text style={[sh.rowDesc, isNext && { color: 'rgba(232,105,42,0.65)' }]}>
-                              {isCurrent ? 'current stop' : isVisited ? '✓ Visited' : isNext ? 'next up' : stLabel}
+                              {isCurrent ? 'current stop' : isVisited ? '\u2713 Visited' : isNext ? 'next up' : stLabel}
                             </Text>
                           </View>
                           {!isCurrent && !isVisited && (
@@ -1160,9 +1160,9 @@ export default function AtStopScreen() {
         <Text style={sh.sub}>That’s fine — tell us why so we can adjust your day and improve future trips.</Text>
         {([
           { icon: '⏰', bg: '#FFF3E0', name: 'Ran out of time',       desc: 'We’ll skip it and keep the rest of your day',  signal: 'time'          },
-          { icon: '😤', bg: C.redLt,   name: 'Kids didn’t want to go', desc: 'Noted — won’t suggest similar stops next time', signal: 'kids_rejected' },
-          { icon: '🔒', bg: C.bg,      name: 'It was closed',          desc: 'We’ll flag this for future families',         signal: 'closed'        },
-          { icon: '✌️', bg: C.bg,      name: 'Just skipping it',       desc: 'No reason needed — moving on',                signal: 'skipped'       },
+          { icon: '\uD83D\uDE24', bg: C.redLt,   name: 'Kids didn’t want to go', desc: 'Noted — won’t suggest similar stops next time', signal: 'kids_rejected' },
+          { icon: '\uD83D\uDD12', bg: C.bg,      name: 'It was closed',          desc: 'We’ll flag this for future families',         signal: 'closed'        },
+          { icon: '\u270C\uFE0F', bg: C.bg,      name: 'Just skipping it',       desc: 'No reason needed — moving on',                signal: 'skipped'       },
         ] as const).map(row => (
           <TouchableOpacity key={row.signal} style={sh.row} activeOpacity={0.8}
             onPress={async () => {
@@ -1186,7 +1186,7 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Food Nearby ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'food'} onClose={() => setActiveSheet('none')}>
-        <Text style={sh.title}>🍔 Food nearby</Text>
+        <Text style={sh.title}>{'\uD83C\uDF54'} Food nearby</Text>
         <Text style={sh.sub}>Near {currentStop.name}</Text>
         {foodLoading ? (
           <View style={{ alignItems: 'center', paddingVertical: 32 }}>
@@ -1199,7 +1199,7 @@ export default function AtStopScreen() {
               <View key={place.id} style={sh.extraCard}>
                 <View style={sh.extraCardTop}>
                   <View style={[sh.rowIcon, { backgroundColor: '#FFF3E0' }]}>
-                    <Text>🍽</Text>
+                    <Text>{'\uD83C\uDF7D'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={sh.rowName}>{place.name}</Text>
@@ -1246,7 +1246,7 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Quick Break ──────────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'break'} onClose={() => setActiveSheet('none')}>
-        <Text style={sh.title}>🛋 Quick break spots</Text>
+        <Text style={sh.title}>{'\uD83D\uDECB'} Quick break spots</Text>
         <Text style={sh.sub}>Near {currentStop.name}</Text>
         <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
           {breakLoading ? (
@@ -1259,7 +1259,7 @@ export default function AtStopScreen() {
               {breakPlaces.map(place => (
                 <View key={place.name} style={sh.extraCard}>
                   <View style={sh.extraCardTop}>
-                    <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🌳</Text></View>
+                    <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>{'\uD83C\uDF33'}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={sh.rowName}>{place.name}</Text>
                       <Text style={sh.rowDesc}>{place.distance}</Text>
@@ -1297,7 +1297,7 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Kid-Friendly Extras ────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'kidExtras'} onClose={() => setActiveSheet('none')}>
-        <Text style={sh.title}>🐻 Kid-friendly extras</Text>
+        <Text style={sh.title}>{'\uD83D\uDC3B'} Kid-friendly extras</Text>
         <Text style={sh.sub}>Near {currentStop.name}</Text>
         <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
           {kidLoading ? (
@@ -1310,7 +1310,7 @@ export default function AtStopScreen() {
               {kidPlaces.map(place => (
                 <View key={place.name} style={sh.extraCard}>
                   <View style={sh.extraCardTop}>
-                    <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>🎠</Text></View>
+                    <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>{'\uD83C\uDFA0'}</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={sh.rowName}>{place.name}</Text>
                       <Text style={sh.rowDesc}>{place.distance}{place.ages ? ` · ${place.ages}` : ''}</Text>
@@ -1352,9 +1352,9 @@ export default function AtStopScreen() {
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
         <View style={sh.emojiRow}>
           {([
-            { emoji: '🌟', label: 'Big Hit',        sub: 'Kids loved it',   val: 'big_hit'        as FeedbackRating },
-            { emoji: '👍', label: 'Good',           sub: 'Worth the time',  val: 'good'           as FeedbackRating },
-            { emoji: '⏭️', label: 'Skip next time', sub: "Wouldn’t return", val: 'skip_next_time' as FeedbackRating },
+            { emoji: '\uD83C\uDF1F', label: 'Big Hit',        sub: 'Kids loved it',   val: 'big_hit'        as FeedbackRating },
+            { emoji: '\uD83D\uDC4D', label: 'Good',           sub: 'Worth the time',  val: 'good'           as FeedbackRating },
+            { emoji: '⏭\uFE0F', label: 'Skip next time', sub: "Wouldn’t return", val: 'skip_next_time' as FeedbackRating },
           ] as const).map(opt => (
             <TouchableOpacity key={opt.val}
               style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
@@ -1399,9 +1399,9 @@ export default function AtStopScreen() {
             <Text style={sh.title}>Running behind?</Text>
             <Text style={sh.sub}>Here’s how we can catch up</Text>
             {[
-              { icon: '⚡', bg: '#FFF3E0', name: 'Tighten travel gaps', desc: 'Cut buffer — still doable',
+              { icon: '\u26A1', bg: '#FFF3E0', name: 'Tighten travel gaps', desc: 'Cut buffer — still doable',
                 onPress: () => { Alert.alert('Travel gaps tightened', 'Buffers between stops reduced.'); setActiveSheet('none'); } },
-              { icon: '✂️', bg: C.sageLt,  name: 'Shorten this stop', desc: 'Highlights only — 45 min',
+              { icon: '\u2702\uFE0F', bg: C.sageLt,  name: 'Shorten this stop', desc: 'Highlights only — 45 min',
                 onPress: () => { Alert.alert('Stop shortened', 'Focus on highlights — 45 min.'); setActiveSheet('none'); } },
               { icon: '⏭', bg: C.redLt,   name: 'Skip this stop',    desc: 'Jump to next stop',
                 onPress: handleSkipStop },
@@ -1431,7 +1431,7 @@ export default function AtStopScreen() {
                 }
                 setActiveSheet('food');
               }}>
-              <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>☕</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: C.orangeLt }]}><Text>{'\u2615'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Find a nearby cafe</Text>
                 <Text style={sh.rowDesc}>Browse cafes and snack spots close by</Text>
@@ -1440,7 +1440,7 @@ export default function AtStopScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
               onPress={() => loadBreakPlaces()}>
-              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🌳</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>{'\uD83C\uDF33'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Quick outdoor break</Text>
                 <Text style={sh.rowDesc}>Find a nearby park or break spot</Text>
@@ -1449,7 +1449,7 @@ export default function AtStopScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
               onPress={() => loadKidPlaces()}>
-              <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>🐻</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: '#EEE8F8' }]}><Text>{'\uD83D\uDC3B'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Kid-friendly extras</Text>
                 <Text style={sh.rowDesc}>Museums, play spots &amp; treats nearby</Text>
@@ -1458,7 +1458,7 @@ export default function AtStopScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
               onPress={() => { setActiveSheet('none'); router.push('/(tabs)/today'); }}>
-              <View style={[sh.rowIcon, { backgroundColor: C.bg }]}><Text>🏠</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: C.bg }]}><Text>{'\uD83C\uDFE0'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Head back early</Text>
                 <Text style={sh.rowDesc}>Wrap up — great job today!</Text>
@@ -1473,7 +1473,7 @@ export default function AtStopScreen() {
             <Text style={sh.sub}>We’ll keep the rest of your day</Text>
             {[
               { icon: '⏭', bg: C.redLt, name: 'Skip, go to next', desc: 'Move to the next stop', onPress: handleSkipStop },
-              { icon: '🏠', bg: C.bg,    name: 'Wrap up for the day', desc: 'End here — great job today',
+              { icon: '\uD83C\uDFE0', bg: C.bg,    name: 'Wrap up for the day', desc: 'End here — great job today',
                 onPress: () => { setActiveSheet('none'); router.push('/(tabs)/today'); } },
             ].map(row => (
               <TouchableOpacity key={row.name} style={sh.row} activeOpacity={0.8} onPress={row.onPress}>
@@ -1493,7 +1493,7 @@ export default function AtStopScreen() {
             <Text style={sh.sub}>Let’s turn it up</Text>
             <TouchableOpacity style={sh.row} activeOpacity={0.8}
               onPress={() => setActiveSheet('food')}>
-              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>🍕</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: C.sageLt }]}><Text>{'\uD83C\uDF55'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Upgrade lunch</Text>
                 <Text style={sh.rowDesc}>Find great restaurants nearby</Text>
@@ -1512,7 +1512,7 @@ export default function AtStopScreen() {
                   ]
                 );
               }}>
-              <View style={[sh.rowIcon, { backgroundColor: C.purpleLt }]}><Text>🎭</Text></View>
+              <View style={[sh.rowIcon, { backgroundColor: C.purpleLt }]}><Text>{'\uD83C\uDFAD'}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={sh.rowName}>Find something active</Text>
                 <Text style={sh.rowDesc}>Trampoline park, mini golf, arcade…</Text>

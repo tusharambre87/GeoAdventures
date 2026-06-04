@@ -18,12 +18,12 @@ const STOP_BG: Record<string, string> = {
   activity: '#FCE7F3', viewpoint: '#FEF9C3',
 };
 const STOP_ICON: Record<string, string> = {
-  museum: '🏛', landmark: '📍', park: '🌿',
-  restaurant: '🍽', food: '🍽', beach: '🏖',
-  market: '🛍', viewpoint: '🌅', temple: '⛩',
-  activity: '🎯', hotel: '🏨', cafe: '☕',
+  museum: '\uD83C\uDFDB', landmark: '\uD83D\uDCCD', park: '\uD83C\uDF3F',
+  restaurant: '\uD83C\uDF7D', food: '\uD83C\uDF7D', beach: '\uD83C\uDFD6',
+  market: '\uD83D\uDECD', viewpoint: '\uD83C\uDF05', temple: '\u26E9',
+  activity: '\uD83C\uDFAF', hotel: '\uD83C\uDFE8', cafe: '\u2615',
 };
-function getStopIcon(t?: string | null) { return STOP_ICON[t ?? ''] ?? '📍'; }
+function getStopIcon(t?: string | null) { return STOP_ICON[t ?? ''] ?? '\uD83D\uDCCD'; }
 function getStopBg(t?: string | null)   { return STOP_BG[t ?? ''] ?? '#F5F2EE'; }
 
 interface Props {
@@ -73,7 +73,7 @@ export default function StopPickerSheet({ trip, onDismiss, onSelect }: Props) {
             <Text style={sh.subtitle}>Tag your photo to the right moment</Text>
           </View>
           <TouchableOpacity style={sh.closeBtn} onPress={onDismiss} hitSlop={8} activeOpacity={0.75}>
-            <Text style={sh.closeBtnText}>{'✕'}</Text>
+            <Text style={sh.closeBtnText}>{'\u2715'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -106,7 +106,7 @@ export default function StopPickerSheet({ trip, onDismiss, onSelect }: Props) {
                         </Text>
                         {isVisited && (
                           <View style={sh.visitedBadge}>
-                            <Text style={sh.visitedBadgeText}>{'✓'} Visited</Text>
+                            <Text style={sh.visitedBadgeText}>{'\u2713'} Visited</Text>
                           </View>
                         )}
                       </View>
@@ -131,10 +131,10 @@ export default function StopPickerSheet({ trip, onDismiss, onSelect }: Props) {
           <TouchableOpacity
             style={sh.stopRow}
             activeOpacity={0.7}
-            onPress={() => onSelect(null, 'General trip photo', '📸')}
+            onPress={() => onSelect(null, 'General trip photo', '\uD83D\uDCF8')}
           >
             <View style={[sh.stopIconWrap, { backgroundColor: '#F5F2EE' }]}>
-              <Text style={sh.stopIconText}>{'📸'}</Text>
+              <Text style={sh.stopIconText}>{'\uD83D\uDCF8'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={sh.stopName}>General trip photo</Text>

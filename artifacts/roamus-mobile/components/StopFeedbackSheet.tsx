@@ -35,9 +35,9 @@ const OPTIONS: {
   border: string;
   bg: string;
 }[] = [
-  { id: 'big_hit',        emoji: '🌟',  label: 'Big Hit',        sub: 'Kids loved it',        border: '#F59E0B', bg: '#FFFBEB' },
-  { id: 'good',           emoji: '👍',      label: 'Good',           sub: 'Worth the time',             border: '#10B981', bg: '#ECFDF5' },
-  { id: 'skip_next_time', emoji: '⏭️',      label: 'Skip next time', sub: 'Wouldn\u2019t return', border: '#7C3AED', bg: '#F5F3FF' },
+  { id: 'big_hit',        emoji: '\uD83C\uDF1F',  label: 'Big Hit',        sub: 'Kids loved it',        border: '#F59E0B', bg: '#FFFBEB' },
+  { id: 'good',           emoji: '\uD83D\uDC4D',      label: 'Good',           sub: 'Worth the time',             border: '#10B981', bg: '#ECFDF5' },
+  { id: 'skip_next_time', emoji: '⏭\uFE0F',      label: 'Skip next time', sub: 'Wouldn\u2019t return', border: '#7C3AED', bg: '#F5F3FF' },
 ];
 
 export default function StopFeedbackSheet({

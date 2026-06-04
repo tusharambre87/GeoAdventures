@@ -166,14 +166,14 @@ function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets>
       </View>
       <View style={s.emptyCenter}>
         <View style={s.emptyIcon}>
-          <Text style={{ fontSize: 36 }}>📸</Text>
+          <Text style={{ fontSize: 36 }}>{'\uD83D\uDCF8'}</Text>
         </View>
         <Text style={s.emptyTitle}>Your stories start here</Text>
         <Text style={s.emptySub}>
           Every trip you take becomes a permanent chapter — photos, kid quotes, and a shareable story.
         </Text>
         <Pressable style={s.orangePill} onPress={() => router.push('/onboarding/splash' as any)}>
-          <Text style={s.orangePillText}>🗺 Plan your first trip</Text>
+          <Text style={s.orangePillText}>{'\uD83D\uDDFA'} Plan your first trip</Text>
         </Pressable>
       </View>
     </View>
@@ -227,7 +227,7 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
             <View style={s.chipRow}>
               {visited > 0 && (
                 <View style={s.chipDone}>
-                  <Text style={s.chipDoneText}>📍 {visited} stops done</Text>
+                  <Text style={s.chipDoneText}>{'\uD83D\uDCCD'} {visited} stops done</Text>
                 </View>
               )}
               {remaining > 0 && (
@@ -239,7 +239,7 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
           )}
         </View>
         <Pressable style={s.addBtn} onPress={onAddPhoto}>
-          <Text style={s.addBtnText}>📷 Add</Text>
+          <Text style={s.addBtnText}>{'\uD83D\uDCF7'} Add</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -276,7 +276,7 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
           {variant === 'completed' ? (
             <View style={[s.badge, hasStory ? s.badgeStory : s.badgeMuted]}>
               <Text style={[s.badgeText, hasStory ? s.badgeTextStory : s.badgeTextMuted]}>
-                {hasStory ? '✨ Story' : 'Generate'}
+                {hasStory ? '\u2728 Story' : 'Generate'}
               </Text>
             </View>
           ) : (

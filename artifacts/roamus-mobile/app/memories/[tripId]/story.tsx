@@ -121,7 +121,7 @@ function Slide2Map({ trip }: { trip: any }) {
 
       {/* Attribution pill */}
       <View style={styles.mapPill}>
-        <Text style={styles.mapPillText}>📍 {visitedCount} places explored</Text>
+        <Text style={styles.mapPillText}>{'\uD83D\uDCCD'} {visitedCount} places explored</Text>
       </View>
 
       <Wordmark opacity={0.3} />
@@ -200,7 +200,7 @@ function Slide4Quotes({
         ) : (
           highlights.slice(0, 4).map((h, i) => (
             <View key={i} style={styles.quoteItem}>
-              <Text style={styles.quoteStar}>✦</Text>
+              <Text style={styles.quoteStar}>{'\u2726'}</Text>
               <Text style={styles.quoteText}>"{h}"</Text>
             </View>
           ))
@@ -303,7 +303,7 @@ export default function StoryScreen() {
     try {
       await Share.share({
         url: `https://roamus.app/story/${tripId}`,
-        message: `Our ${trip?.destination ?? ''} family adventure 🗺`,
+        message: `Our ${trip?.destination ?? ''} family adventure \uD83D\uDDFA`,
       });
     } catch {}
   }
@@ -350,16 +350,16 @@ export default function StoryScreen() {
         </Pressable>
         <View style={styles.shareRow}>
           <Pressable style={styles.shareSmall} onPress={handleShare}>
-            <Text style={styles.shareSmallText}>🔗 Share link</Text>
+            <Text style={styles.shareSmallText}>{'\uD83D\uDD17'} Share link</Text>
           </Pressable>
           <Pressable style={styles.shareSmall} onPress={nextSlide}>
-            <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next →' : 'Done ✓'}</Text>
+            <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next →' : 'Done \u2713'}</Text>
           </Pressable>
           <Pressable
             style={styles.shareSmall}
             onPress={() => {}} // save functionality placeholder
           >
-            <Text style={styles.shareSmallText}>⬇ Save</Text>
+            <Text style={styles.shareSmallText}>{'\u2B07'} Save</Text>
           </Pressable>
         </View>
       </View>

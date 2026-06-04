@@ -13,21 +13,21 @@ export default function SosScreen() {
   const options = [
     {
       bg: '#FEF2F2',
-      emoji: '🤒',
+      emoji: '\uD83E\uDD12',
       title: "Someone isn't feeling well",
       sub: 'Find urgent care or pharmacy nearby',
       onPress: () => router.push({ pathname: '/atstop/sos-care' as never, params: { tripId, destination } }),
     },
     {
       bg: '#FEF2F2',
-      emoji: '🚨',
+      emoji: '\uD83D\uDEA8',
       title: 'We need emergency help',
       sub: 'Call emergency services',
       onPress: () => router.push({ pathname: '/atstop/sos-emergency' as never, params: { tripId, destination } }),
     },
     {
       bg: '#EFF6FF',
-      emoji: '📍',
+      emoji: '\uD83D\uDCCD',
       title: "We're lost",
       sub: 'Get back to your hotel or a safe place',
       onPress: () => router.push({ pathname: '/atstop/sos-lost' as never, params: { tripId, destination } }),
@@ -62,7 +62,7 @@ export default function SosScreen() {
 
         <View style={styles.privacyNote}>
           <Text style={styles.privacyText}>
-            🔒 Your location is only used to find nearby help. Never stored or shared.
+            {'\uD83D\uDD12'} Your location is only used to find nearby help. Never stored or shared.
           </Text>
         </View>
       </ScrollView>

@@ -51,13 +51,13 @@ export default function SosEmergencyScreen() {
       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {/* Big call card */}
         <View style={styles.callCard}>
-          <Text style={styles.phoneEmoji}>📞</Text>
+          <Text style={styles.phoneEmoji}>{'\uD83D\uDCDE'}</Text>
           <Text style={styles.callTitle}>Call emergency services</Text>
           <Text style={styles.emergencyNum}>{primaryNumber}</Text>
           <TouchableOpacity
             style={styles.callBtn}
             onPress={() => Linking.openURL(`tel:${primaryNumber}`)}>
-            <Text style={styles.callBtnText}>📞  Call {primaryNumber} now</Text>
+            <Text style={styles.callBtnText}>{'\uD83D\uDCDE'}  Call {primaryNumber} now</Text>
           </TouchableOpacity>
         </View>
 

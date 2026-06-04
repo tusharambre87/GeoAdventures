@@ -150,19 +150,19 @@ export default function NeedScreen() {
       onPress: openRunning,
     },
     {
-      icon: '😥',
+      icon: '\uD83D\uDE25',
       title: 'Kids are tired',
       sub: 'Find a break spot or easier next stop',
       onPress: () => handleRescueExtras('break'),
     },
     {
-      icon: '🎉',
+      icon: '\uD83C\uDF89',
       title: 'Need more fun',
       sub: 'Swap for something more exciting nearby',
       onPress: () => handleRescueExtras('kids'),
     },
     {
-      icon: '🍕',
+      icon: '\uD83C\uDF55',
       title: 'Find food nearby',
       sub: 'Family-friendly restaurants near your stop',
       onPress: () => handleFoodNearby(),
@@ -259,7 +259,7 @@ export default function NeedScreen() {
 
               <TouchableOpacity style={styles.sheetOption} activeOpacity={0.8} onPress={handleHighlightsOnly}>
                 <View style={[styles.sheetOptIcon, { backgroundColor: '#EEF5F2' }]}>
-                  <Text style={{ fontSize: 20 }}>{'⚡'}</Text>
+                  <Text style={{ fontSize: 20 }}>{'\u26A1'}</Text>
                 </View>
                 <View style={styles.sheetOptBody}>
                   <Text style={styles.sheetOptTitle}>Highlights only — 45 min</Text>

@@ -150,7 +150,7 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
 
           {/* Input */}
           <View style={s.inputWrap}>
-            <Text style={s.inputIcon}>{'🏨'}</Text>
+            <Text style={s.inputIcon}>{'\uD83C\uDFE8'}</Text>
             <TextInput
               style={s.input}
               placeholder="Hotel name or address"
@@ -182,7 +182,7 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
                   onPress={() => { setSelected(h); setResults([]); Keyboard.dismiss(); }}
                   activeOpacity={0.75}
                 >
-                  <Text style={s.resultIcon}>{'📍'}</Text>
+                  <Text style={s.resultIcon}>{'\uD83D\uDCCD'}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={s.resultName} numberOfLines={1}>{h.name}</Text>
                     {h.address ? <Text style={s.resultAddr} numberOfLines={1}>{h.address}</Text> : null}

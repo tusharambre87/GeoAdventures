@@ -273,7 +273,7 @@ export default function MeScreen() {
               <Text style={s.headerEmail} numberOfLines={1}>{email}</Text>
               {isSubscribed && (
                 <View style={s.passBadge}>
-                  <Text style={s.passBadgeText}>{"✦ RoamUs Pass Active"}</Text>
+                  <Text style={s.passBadgeText}>{"\u2726 RoamUs Pass Active"}</Text>
                 </View>
               )}
             </View>
@@ -297,7 +297,7 @@ export default function MeScreen() {
         {/* ── 2. My Travel Journal ── */}
         <View style={s.journalSection}>
           <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionTitleText}>{"📖 My Travel Journal"}</Text>
+            <Text style={s.sectionTitleText}>{"\uD83D\uDCD6 My Travel Journal"}</Text>
             <Text style={s.sectionCount}>{tripCount} {tripCount === 1 ? "story" : "stories"}</Text>
           </View>
 
@@ -316,7 +316,7 @@ export default function MeScreen() {
                   style={StyleSheet.absoluteFill}
                 >
                   <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                    <Text style={{ fontSize: 72, opacity: 0.3 }}>{"🏙️"}</Text>
+                    <Text style={{ fontSize: 72, opacity: 0.3 }}>{"\uD83C\uDFD9\uFE0F"}</Text>
                   </View>
                 </LinearGradient>
               )}
@@ -364,14 +364,14 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>MEMORIES & COLLECTIONS</Text>
         <View style={s.card}>
           <MenuRow
-            icon="🖼️"
+            icon="\uD83D\uDDBC\uFE0F"
             iconBg="#FDF0E9"
             title="Moments"
             subtitle="All your captured memories"
             onPress={() => router.push("/memories" as never)}
           />
           <MenuRow
-            icon="🗺️"
+            icon="\uD83D\uDDFA\uFE0F"
             iconBg="#EEF5F2"
             title="Travel Map"
             subtitle="Everywhere your family has explored"
@@ -383,7 +383,7 @@ export default function MeScreen() {
             }
           />
           <MenuRow
-            icon="✨"
+            icon="\u2728"
             iconBg="#FDF0E9"
             title="Keepsakes"
             subtitle="Digital collectibles from your adventures"
@@ -414,7 +414,7 @@ export default function MeScreen() {
                     </View>
                     <View>
                       <Text style={s.explorerName}>{exp.name}</Text>
-                      <Text style={s.explorerXp}>{"⚡"} {exp.totalXp ?? 0} XP</Text>
+                      <Text style={s.explorerXp}>{"\u26A1"} {exp.totalXp ?? 0} XP</Text>
                     </View>
                   </View>
                 ))}
@@ -434,7 +434,7 @@ export default function MeScreen() {
             disabled={!activeTrip}
           >
             <View style={[s.rowIconWrap, { backgroundColor: "#EDE9FE" }]}>
-              <Text style={s.rowIconText}>{"🧭"}</Text>
+              <Text style={s.rowIconText}>{"\uD83E\uDDED"}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <View style={s.kidsZoneTitleRow}>
@@ -463,7 +463,7 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>YOUR ACCOUNT</Text>
         <View style={s.card}>
           <MenuRow
-            icon="✦"
+            icon="\u2726"
             iconBg="rgba(232,105,42,0.12)"
             title="RoamUs Pass"
             subtitle={isSubscribed ? "Active subscription" : "Free plan"}
@@ -477,7 +477,7 @@ export default function MeScreen() {
             onPress={() => router.push("/me/pass" as never)}
           />
           <MenuRow
-            icon="⚙️"
+            icon="\u2699\uFE0F"
             iconBg="#F5F2EE"
             title="Account"
             subtitle="Family & traveler profiles"
@@ -490,14 +490,14 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>SUPPORT</Text>
         <View style={[s.card, { marginBottom: 8 }]}>
           <MenuRow
-            icon="💬"
+            icon="\uD83D\uDCAC"
             iconBg="#F5F2EE"
             title="Help & FAQ"
             subtitle="Common questions answered"
             onPress={() => router.push("/me/support" as never)}
           />
           <MenuRow
-            icon="⭐"
+            icon="\u2B50"
             iconBg="#FFFBEB"
             title="Rate RoamUs"
             subtitle="Enjoying the app? Let us know"
@@ -507,14 +507,14 @@ export default function MeScreen() {
             onPress={handleRateApp}
           />
           <MenuRow
-            icon="🛡️"
+            icon="\uD83D\uDEE1\uFE0F"
             iconBg="#F5F2EE"
             title="Privacy Policy"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}
             onPress={() => Linking.openURL("https://roamus.app/privacy").catch(() => {})}
           />
           <MenuRow
-            icon="⚖️"
+            icon="\u2696\uFE0F"
             iconBg="#EEF5F2"
             title="Terms of Service"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}
@@ -560,7 +560,7 @@ export default function MeScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.pickerName}>{exp.name}</Text>
-                    <Text style={s.pickerXp}>{"⚡"} {exp.totalXp ?? 0} XP earned</Text>
+                    <Text style={s.pickerXp}>{"\u26A1"} {exp.totalXp ?? 0} XP earned</Text>
                   </View>
                   <Text style={s.pickerArrow}>{"›"}</Text>
                 </TouchableOpacity>

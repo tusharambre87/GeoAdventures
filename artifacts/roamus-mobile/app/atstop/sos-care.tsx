@@ -97,7 +97,7 @@ export default function SosCareScreen() {
 
         <View style={styles.tipCard}>
           <Text style={styles.tipText}>
-            💡 Tip: Save your travel insurance number in your phone contacts before every trip.
+            {'\uD83D\uDCA1'} Tip: Save your travel insurance number in your phone contacts before every trip.
           </Text>
         </View>
       </ScrollView>

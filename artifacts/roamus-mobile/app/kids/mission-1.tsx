@@ -74,7 +74,7 @@ export default function Mission1() {
   if (kids.exploreError) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40, paddingHorizontal: 32 }}>
-        <Text style={{ fontSize: 32, marginBottom: 16 }}>{"😕"}</Text>
+        <Text style={{ fontSize: 32, marginBottom: 16 }}>{"\uD83D\uDE15"}</Text>
         <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 18, color: "#1C1917", marginBottom: 8, textAlign: "center" }}>Couldn't load this mission</Text>
         <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 14, color: "#78716C", marginBottom: 24, textAlign: "center" }}>Head back and try again</Text>
         <Pressable
@@ -185,7 +185,7 @@ export default function Mission1() {
 
         {/* ── White card ── */}
         <View style={s.card}>
-          <Text style={s.typeLabel}>{"🧠 KNOWLEDGE · +5 XP"}</Text>
+          <Text style={s.typeLabel}>{"\uD83E\uDDE0 KNOWLEDGE · +5 XP"}</Text>
           <Text style={s.question}>{quiz.question}</Text>
           <View style={s.opts}>
             {quiz.options.map((opt, i) => (

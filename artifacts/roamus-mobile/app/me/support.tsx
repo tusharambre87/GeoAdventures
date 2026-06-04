@@ -72,7 +72,7 @@ export default function SupportScreen() {
         </View>
 
         <View style={s.contactCard}>
-          <Text style={s.contactIco}>{"👋"}</Text>
+          <Text style={s.contactIco}>{"\uD83D\uDC4B"}</Text>
           <Text style={s.contactH}>{"We're here to help"}</Text>
           <Text style={s.contactS}>
             {"Can't find your answer? Reach us directly — we reply within a few hours."}

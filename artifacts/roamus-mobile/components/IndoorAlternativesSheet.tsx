@@ -37,15 +37,15 @@ interface KidsNearbyItem {
 
 function getStopEmoji(item: KidsNearbyItem): string {
   const text = `${item.name} ${item.description ?? ""}`.toLowerCase();
-  if (text.includes("aquarium"))                              return "🐠";
-  if (text.includes("theater") || text.includes("theatre"))  return "🎭";
-  if (text.includes("planetarium"))                           return "🔭";
-  if (text.includes("science"))                               return "🔬";
-  if (text.includes("art museum") || text.includes("art gal"))return "🎨";
-  if (text.includes("history"))                               return "📜";
-  if (text.includes("children") || text.includes("kids"))    return "🧒";
-  if (text.includes("shop") || text.includes("market") || text.includes("mall")) return "🛍";
-  return "🏛";
+  if (text.includes("aquarium"))                              return "\uD83D\uDC20";
+  if (text.includes("theater") || text.includes("theatre"))  return "\uD83C\uDFAD";
+  if (text.includes("planetarium"))                           return "\uD83D\uDD2D";
+  if (text.includes("science"))                               return "\uD83D\uDD2C";
+  if (text.includes("art museum") || text.includes("art gal"))return "\uD83C\uDFA8";
+  if (text.includes("history"))                               return "\uD83D\uDCDC";
+  if (text.includes("children") || text.includes("kids"))    return "\uD83E\uDDD2";
+  if (text.includes("shop") || text.includes("market") || text.includes("mall")) return "\uD83D\uDECD";
+  return "\uD83C\uDFDB";
 }
 
 async function fetchNearby(stopId: string): Promise<KidsNearbyItem[]> {

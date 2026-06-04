@@ -66,7 +66,7 @@ export default function SplashScreen() {
           style={({ pressed }) => [styles.btn, { opacity: pressed ? 0.88 : 1 }]}
           onPress={() => router.push("/onboarding/where")}
         >
-          <Text style={styles.btnText}>✈️  Start planning — it's free</Text>
+          <Text style={styles.btnText}>{'\u2708\uFE0F'}  Start planning — it's free</Text>
         </Pressable>
 
         <Pressable

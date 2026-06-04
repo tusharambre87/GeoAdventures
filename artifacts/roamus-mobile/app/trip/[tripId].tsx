@@ -325,13 +325,13 @@ function waitTimeForType(stopType?: string | null): string {
 
 function stopTypeEmoji(stopType?: string | null): string {
   const t = stopType?.toLowerCase() ?? '';
-  if (t.includes('zoo') || t.includes('wildlife') || t.includes('aquarium')) return '🦁';
-  if (t.includes('museum') || t.includes('art') || t.includes('gallery'))   return '🏛️';
-  if (t.includes('park') || t.includes('nature') || t.includes('garden'))   return '🌳';
-  if (t.includes('shopping') || t.includes('mall'))                          return '🛍️';
-  if (t.includes('landmark') || t.includes('monument'))                      return '🌉';
-  if (t.includes('restaurant') || t.includes('food') || t.includes('cafe')) return '🍽️';
-  return '📍';
+  if (t.includes('zoo') || t.includes('wildlife') || t.includes('aquarium')) return '\uD83E\uDD81';
+  if (t.includes('museum') || t.includes('art') || t.includes('gallery'))   return '\uD83C\uDFDB\uFE0F';
+  if (t.includes('park') || t.includes('nature') || t.includes('garden'))   return '\uD83C\uDF33';
+  if (t.includes('shopping') || t.includes('mall'))                          return '\uD83D\uDECD\uFE0F';
+  if (t.includes('landmark') || t.includes('monument'))                      return '\uD83C\uDF09';
+  if (t.includes('restaurant') || t.includes('food') || t.includes('cafe')) return '\uD83C\uDF7D\uFE0F';
+  return '\uD83D\uDCCD';
 }
 
 // ─── SVG Icon components ──────────────────────────────────────────────────────
@@ -605,11 +605,11 @@ function showToast(msg: string) {
 // ─── StopCard ─────────────────────────────────────────────────────────────────
 
 const KID_FIT_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  high:     { label: '⭐ Great for kids',      bg: '#E8F7EF', color: '#3DAA6E' },
-  medium:   { label: '👍 Kid friendly',     bg: '#FDF0E9', color: '#E8692A' },
-  low:      { label: '👀 Check age fit',    bg: '#FFFBEB', color: '#D97706' },
-  toddler:  { label: '🧸 Toddler friendly', bg: '#E8F7EF', color: '#3DAA6E' },
-  all_ages: { label: '👪 All ages',         bg: '#F5F3FF', color: '#7C3AED' },
+  high:     { label: '\u2B50 Great for kids',      bg: '#E8F7EF', color: '#3DAA6E' },
+  medium:   { label: '\uD83D\uDC4D Kid friendly',     bg: '#FDF0E9', color: '#E8692A' },
+  low:      { label: '\uD83D\uDC40 Check age fit',    bg: '#FFFBEB', color: '#D97706' },
+  toddler:  { label: '\uD83E\uDDF8 Toddler friendly', bg: '#E8F7EF', color: '#3DAA6E' },
+  all_ages: { label: '\uD83D\uDC6A All ages',         bg: '#F5F3FF', color: '#7C3AED' },
 };
 
 function KidFitTag({ bias }: { bias: string | null | undefined }) {
@@ -808,7 +808,7 @@ function StopCard({
 // ─── MealCard ─────────────────────────────────────────────────────────────────
 
 function MealCard({ stop }: { stop: Stop }) {
-  const emoji = stop.stopType?.toLowerCase().includes('cafe') ? '☕' : '🍕';
+  const emoji = stop.stopType?.toLowerCase().includes('cafe') ? '\u2615' : '\uD83C\uDF55';
   return (
     <View style={meal.card}>
       <View style={meal.left}>
@@ -1294,7 +1294,7 @@ function DayDetail({
                   !isOn && isToday && dd.tabTextTodayOff,
                   !isOn && isPast && dd.tabTextPast,
                 ]}>
-                  {isPast && !isOn ? `✓ Day ${d}` : `Day ${d}`}
+                  {isPast && !isOn ? `\u2713 Day ${d}` : `Day ${d}`}
                 </Text>
               </Pressable>
             );
@@ -1420,7 +1420,7 @@ function DayDetail({
 
         <View style={dd.disclaimer}>
           <Text style={dd.disclaimerText}>
-            {'⚠️ RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit. RoamUs is a planning and guidance tool — we’re not responsible for decisions made during your trip.'}
+            {'\u26A0\uFE0F RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit. RoamUs is a planning and guidance tool — we’re not responsible for decisions made during your trip.'}
           </Text>
         </View>
       </ScrollView>
@@ -1433,7 +1433,7 @@ function DayDetail({
             onPress={runBtnDisabled ? undefined : onRunDay}
             disabled={runBtnDisabled}>
             {isDayComplete
-              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'✓'} Day {selectedDay} Complete</Text>
+              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'\u2713'} Day {selectedDay} Complete</Text>
               : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run Day {selectedDay}</Text></>}
           </Pressable>
           {!isDayComplete && (
@@ -1454,7 +1454,7 @@ function TravelConnector({ travelMins }: { travelMins?: number | null }) {
     <View style={tc.row}>
       <View style={tc.line} />
       <Text style={[tc.label, isLong && tc.labelAmber]}>
-        🚗 {travelMins} min drive
+        {'\uD83D\uDE97'} {travelMins} min drive
       </Text>
       <View style={tc.line} />
     </View>
@@ -1667,7 +1667,7 @@ function StopDetailSheet({
                   {foodNearby.slice(0, 3).map((f, i) => (
                     <View key={i} style={sds.nearbyRow}>
                       <View style={sds.nearbyIco}>
-                        <Text style={{ fontSize: 15 }}>🍽️</Text>
+                        <Text style={{ fontSize: 15 }}>{'\uD83C\uDF7D\uFE0F'}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={sds.nearbyName}>{f.name}</Text>
@@ -2082,7 +2082,7 @@ function RunDaySheet({
             >
               {kidBestMode === m.key && (
                 <View style={rds.kidBadge}>
-                  <Text style={rds.kidBadgeText}>👧 Best for kids</Text>
+                  <Text style={rds.kidBadgeText}>{'\uD83D\uDC67'} Best for kids</Text>
                 </View>
               )}
               <View style={rds.modeHead}>
@@ -2377,9 +2377,9 @@ function CompareDaysSheet({
                 </View>
               </View>
               <View style={cds.dayMeta}>
-                <Text style={cds.metaItem}>📍 {ds.length} stop{ds.length !== 1 ? 's' : ''}</Text>
+                <Text style={cds.metaItem}>{'\uD83D\uDCCD'} {ds.length} stop{ds.length !== 1 ? 's' : ''}</Text>
                 <Text style={cds.metaItem}>  {hrs} hrs</Text>
-                <Text style={cds.metaItem}>🚗 ~20 min travel</Text>
+                <Text style={cds.metaItem}>{'\uD83D\uDE97'} ~20 min travel</Text>
               </View>
               <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
                 <SessionBars dayStops={ds} />
@@ -2467,9 +2467,9 @@ function iconBgForCategory(cat: 'food' | 'kids' | 'landmarks'): string {
 }
 
 function stopIconForCategory(cat: 'food' | 'kids' | 'landmarks'): string {
-  if (cat === 'food') return '🍽️';
-  if (cat === 'kids') return '🎪';
-  return '📍';
+  if (cat === 'food') return '\uD83C\uDF7D\uFE0F';
+  if (cat === 'kids') return '\uD83C\uDFAA';
+  return '\uD83D\uDCCD';
 }
 
 function parseDurationMins(opt: StopOption, cat: 'food' | 'kids' | 'landmarks'): number {
@@ -2515,7 +2515,7 @@ function StopOptionCard({
         disabled={adding || isSelected}
       >
         <Text style={[as.soAddBtnText, isSelected && as.soAddBtnTextSelected]}>
-          {isSelected ? '✓ Added to plan' : '+ Add to plan'}
+          {isSelected ? '\u2713 Added to plan' : '+ Add to plan'}
         </Text>
       </Pressable>
     </View>
@@ -2648,7 +2648,7 @@ function AddStopSheet({
           onPress={() => { onClose(); setSelectedOpt(null); }}
           hitSlop={8}
         >
-          <Text style={as.closeX}>{'✕'}</Text>
+          <Text style={as.closeX}>{'\u2715'}</Text>
         </Pressable>
       </View>
 
@@ -2660,7 +2660,7 @@ function AddStopSheet({
             style={[as.pill, category === cat && as.pillOn]}
             onPress={() => changeCategory(cat)}
           >
-            <Text style={as.pillIcon}>{cat === 'food' ? '🍔' : cat === 'kids' ? '🧒' : '📍'}</Text>
+            <Text style={as.pillIcon}>{cat === 'food' ? '\uD83C\uDF54' : cat === 'kids' ? '\uD83E\uDDD2' : '\uD83D\uDCCD'}</Text>
             <Text style={[as.pillText, category === cat && as.pillTextOn]}>
               {cat === 'food' ? 'Food' : cat === 'kids' ? 'Kids extras' : 'Landmarks'}
             </Text>
@@ -2671,7 +2671,7 @@ function AddStopSheet({
       {/* Search bar */}
       <View style={as.searchWrap}>
         <View style={as.searchBar}>
-          <Text style={as.searchIcon}>{'🔍'}</Text>
+          <Text style={as.searchIcon}>{'\uD83D\uDD0D'}</Text>
           <TextInput
             style={as.searchInput}
             placeholder={`Search ${city}...`}
@@ -2771,7 +2771,7 @@ function AddStopSheet({
         {isAdded && selectedOpt && (
           <View style={as.confirmStrip}>
             <Text style={as.confirmText}>
-              {'✓ '}{selectedOpt.name} added · system will schedule it
+              {'\u2713 '}{selectedOpt.name} added · system will schedule it
             </Text>
           </View>
         )}
@@ -2889,7 +2889,7 @@ function AddStopDetailSheet({
           <Text style={asd.backArrow}>{'←'}</Text>
         </Pressable>
         <Pressable style={as.closeBtn} onPress={onClose} hitSlop={8}>
-          <Text style={as.closeX}>{'✕'}</Text>
+          <Text style={as.closeX}>{'\u2715'}</Text>
         </Pressable>
       </View>
 
@@ -2937,7 +2937,7 @@ function AddStopDetailSheet({
 
         <Pressable style={asd.mapsRow} onPress={() => Linking.openURL(mapsUrl)}>
           <Text style={asd.mapsAddr} numberOfLines={1}>
-            {'📍 '}{opt.address ?? `${opt.name}, ${city}`}
+            {'\uD83D\uDCCD '}{opt.address ?? `${opt.name}, ${city}`}
           </Text>
           <Text style={asd.mapsLink}>Open in Maps</Text>
         </Pressable>
@@ -3041,7 +3041,7 @@ function PositionPickerSheet({
           <Text style={asd.backArrow}>{'←'}</Text>
         </Pressable>
         <Pressable style={as.closeBtn} onPress={onClose} hitSlop={8}>
-          <Text style={as.closeX}>{'✕'}</Text>
+          <Text style={as.closeX}>{'\u2715'}</Text>
         </Pressable>
       </View>
 
@@ -3074,7 +3074,7 @@ function PositionPickerSheet({
                 <Text style={pps.rowLabel}>{row.label}</Text>
                 <Text style={pps.rowSub}>{row.timeSub}</Text>
                 {row.warning ? (
-                  <Text style={pps.rowWarn}>{'⚠️ '}{row.warning}</Text>
+                  <Text style={pps.rowWarn}>{'\u26A0\uFE0F '}{row.warning}</Text>
                 ) : null}
               </View>
               {adding ? (

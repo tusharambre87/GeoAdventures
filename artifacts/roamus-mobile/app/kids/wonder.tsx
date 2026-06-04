@@ -29,12 +29,12 @@ const K = {
 } as const;
 
 const TOPIC_CHIPS = [
-  "🌿 nature",
-  "🦎 animals",
-  "📜 history",
-  "😮 it's huge!",
-  "✨ beautiful",
-  "💬 other",
+  "\uD83C\uDF3F nature",
+  "\uD83E\uDD8E animals",
+  "\uD83D\uDCDC history",
+  "\uD83D\uDE2E it's huge!",
+  "\u2728 beautiful",
+  "\uD83D\uDCAC other",
 ];
 
 export default function WonderTime() {
@@ -103,7 +103,7 @@ export default function WonderTime() {
         {/* ── Purple header ── */}
         <View style={[s.header, { paddingTop: insets.top + 16 }]}>
           <View style={s.circle} />
-          <Text style={s.headerLabel}>{"🤔 WONDER TIME"}</Text>
+          <Text style={s.headerLabel}>{"\uD83E\uDD14 WONDER TIME"}</Text>
           <Text style={s.headerTitle}>What are you curious about?</Text>
           <Text style={s.headerSub}>{stopName}</Text>
         </View>
@@ -159,7 +159,7 @@ export default function WonderTime() {
               }}
             >
               <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <Text style={{ fontSize: 22 }}>{"🎤"}</Text>
+                <Text style={{ fontSize: 22 }}>{"\uD83C\uDFA4"}</Text>
               </Animated.View>
             </Pressable>
           </View>

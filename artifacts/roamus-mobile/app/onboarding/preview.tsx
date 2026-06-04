@@ -19,27 +19,27 @@ type DisplayDay  = { label: string; city: string; stops: DisplayStop[] };
 
 // ─── Stop type → tag + color ─────────────────────────────────────────────────
 const STOP_TAG: Record<string, { label: string; color: string }> = {
-  museum:        { label: "🏛️ Museum",   color: "#7B6FE8" },
-  park:          { label: "🌿 Outdoors", color: G.sage   },
-  nature:        { label: "🌿 Outdoors", color: G.sage   },
-  garden:        { label: "🌿 Outdoors", color: G.sage   },
-  food:          { label: "🍕 Food",     color: G.amber  },
-  restaurant:    { label: "🍕 Food",     color: G.amber  },
-  market:        { label: "🍕 Food",     color: G.amber  },
-  landmark:      { label: "📍 Landmark", color: G.muted  },
-  monument:      { label: "📍 Landmark", color: G.muted  },
-  viewpoint:     { label: "🔭 Viewpoint", color: G.sage  },
-  palace:        { label: "📍 Landmark", color: G.muted  },
-  temple:        { label: "📍 Landmark", color: G.muted  },
-  zoo:           { label: "🦁 Animals",  color: G.orange },
-  aquarium:      { label: "🦁 Animals",  color: G.orange },
-  art:           { label: "🎨 Art",      color: "#E86A9A"},
-  gallery:       { label: "🎨 Art",      color: "#E86A9A"},
-  science:       { label: "🔬 Science",  color: G.sage   },
-  entertainment: { label: "🎡 Fun",      color: "#7B6FE8"},
-  playground:    { label: "🎡 Fun",      color: "#7B6FE8"},
-  beach:         { label: "🌊 Beach",    color: "#4B9EE8"},
-  other:         { label: "⭐ Stop",     color: G.muted  },
+  museum:        { label: "\uD83C\uDFDB\uFE0F Museum",   color: "#7B6FE8" },
+  park:          { label: "\uD83C\uDF3F Outdoors", color: G.sage   },
+  nature:        { label: "\uD83C\uDF3F Outdoors", color: G.sage   },
+  garden:        { label: "\uD83C\uDF3F Outdoors", color: G.sage   },
+  food:          { label: "\uD83C\uDF55 Food",     color: G.amber  },
+  restaurant:    { label: "\uD83C\uDF55 Food",     color: G.amber  },
+  market:        { label: "\uD83C\uDF55 Food",     color: G.amber  },
+  landmark:      { label: "\uD83D\uDCCD Landmark", color: G.muted  },
+  monument:      { label: "\uD83D\uDCCD Landmark", color: G.muted  },
+  viewpoint:     { label: "\uD83D\uDD2D Viewpoint", color: G.sage  },
+  palace:        { label: "\uD83D\uDCCD Landmark", color: G.muted  },
+  temple:        { label: "\uD83D\uDCCD Landmark", color: G.muted  },
+  zoo:           { label: "\uD83E\uDD81 Animals",  color: G.orange },
+  aquarium:      { label: "\uD83E\uDD81 Animals",  color: G.orange },
+  art:           { label: "\uD83C\uDFA8 Art",      color: "#E86A9A"},
+  gallery:       { label: "\uD83C\uDFA8 Art",      color: "#E86A9A"},
+  science:       { label: "\uD83D\uDD2C Science",  color: G.sage   },
+  entertainment: { label: "\uD83C\uDFA1 Fun",      color: "#7B6FE8"},
+  playground:    { label: "\uD83C\uDFA1 Fun",      color: "#7B6FE8"},
+  beach:         { label: "\uD83C\uDF0A Beach",    color: "#4B9EE8"},
+  other:         { label: "\u2B50 Stop",     color: G.muted  },
 };
 
 // ─── Stop type → images (multiple per type for variety) ──────────────────────
@@ -168,7 +168,7 @@ function toDisplayDays(previewDays: PreviewDay[], cities: string[]): DisplayDay[
       city,
       stops: day.stops.map((stop, si) => {
         const typeKey = Object.keys(STOP_TAG).find(k => stop.stopType?.toLowerCase().includes(k));
-        const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: "⭐ Stop", color: G.muted };
+        const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: "\u2B50 Stop", color: G.muted };
         return {
           time: stop.time,
           name: stop.name,
@@ -268,16 +268,16 @@ const FALLBACK_DAYS: DisplayDay[] = [
   {
     label: "Day 1", city: "Your City",
     stops: [
-      { time: "9:30 AM",  name: "City Welcome Walk",  desc: "Get your bearings with a morning stroll through the historic heart.",        tag: "🌿 Outdoors", tagColor: G.sage,   img: STOP_IMGS.park[0] },
-      { time: "12:00 PM", name: "Local Food Market",   desc: "Lunch surrounded by flavours the whole family will love.",                   tag: "🍕 Food",     tagColor: G.amber,  img: STOP_IMGS.food[0] },
-      { time: "3:00 PM",  name: "Family Museum",       desc: "Interactive exhibits designed for curious minds at every age.",              tag: "🔬 Science",  tagColor: "#7B6FE8", img: STOP_IMGS.museum[0] },
+      { time: "9:30 AM",  name: "City Welcome Walk",  desc: "Get your bearings with a morning stroll through the historic heart.",        tag: "\uD83C\uDF3F Outdoors", tagColor: G.sage,   img: STOP_IMGS.park[0] },
+      { time: "12:00 PM", name: "Local Food Market",   desc: "Lunch surrounded by flavours the whole family will love.",                   tag: "\uD83C\uDF55 Food",     tagColor: G.amber,  img: STOP_IMGS.food[0] },
+      { time: "3:00 PM",  name: "Family Museum",       desc: "Interactive exhibits designed for curious minds at every age.",              tag: "\uD83D\uDD2C Science",  tagColor: "#7B6FE8", img: STOP_IMGS.museum[0] },
     ],
   },
   {
     label: "Day 2", city: "Your City",
     stops: [
-      { time: "10:00 AM", name: "Nature & Wildlife",  desc: "Connect with the local ecosystem — perfect for your youngest explorer.",     tag: "🦁 Animals",  tagColor: G.orange, img: STOP_IMGS.zoo[0] },
-      { time: "2:00 PM",  name: "Iconic Landmark",    desc: "The shot everyone takes — and the story your family will tell for years.",   tag: "📍 Landmark", tagColor: G.muted,  img: STOP_IMGS.landmark[0] },
+      { time: "10:00 AM", name: "Nature & Wildlife",  desc: "Connect with the local ecosystem — perfect for your youngest explorer.",     tag: "\uD83E\uDD81 Animals",  tagColor: G.orange, img: STOP_IMGS.zoo[0] },
+      { time: "2:00 PM",  name: "Iconic Landmark",    desc: "The shot everyone takes — and the story your family will tell for years.",   tag: "\uD83D\uDCCD Landmark", tagColor: G.muted,  img: STOP_IMGS.landmark[0] },
     ],
   },
 ];
@@ -319,8 +319,8 @@ export default function PreviewScreen() {
 
   // Title
   const tripTitle = isMulti
-    ? `Your ${data.cities.slice(0,-1).join(", ")} & ${data.cities[data.cities.length-1]} trip is ready 🎉`
-    : `Your ${primaryCity} trip is ready 🎉`;
+    ? `Your ${data.cities.slice(0,-1).join(", ")} & ${data.cities[data.cities.length-1]} trip is ready \uD83C\uDF89`
+    : `Your ${primaryCity} trip is ready \uD83C\uDF89`;
   const routeStr = isMulti ? data.cities.join(" → ") : "";
 
   return (
@@ -411,7 +411,7 @@ export default function PreviewScreen() {
 
         {/* Lock teaser */}
         <View style={s.blurCard}>
-          <Text style={s.blurIcon}>🔒</Text>
+          <Text style={s.blurIcon}>{'\uD83D\uDD12'}</Text>
           <Text style={s.blurTitle}>Your full {allDays.length}-day plan is ready</Text>
           <Text style={s.blurSub}>Create a free account to unlock all stops, offline access, and photo journals</Text>
         </View>

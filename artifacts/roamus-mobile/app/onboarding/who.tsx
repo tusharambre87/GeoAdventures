@@ -91,7 +91,7 @@ export default function WhoScreen() {
           <View style={{ flex: 1, alignItems: "center" }}><ProgressDots total={4} cur={1} /></View>
           <View style={{ width: 40 }} />
         </View>
-        <Text style={s.title}>Who's going? 👨‍👩‍👧‍👦</Text>
+        <Text style={s.title}>Who's going? {'\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66'}</Text>
         <Text style={s.sub}>We'll adjust every stop for their ages.</Text>
       </View>
 
@@ -191,7 +191,7 @@ export default function WhoScreen() {
         {/* Smart adaptation note */}
         {youngest && (
           <View style={s.note}>
-            <Text style={s.noteTitle}>✓ Plan adapts for your family</Text>
+            <Text style={s.noteTitle}>{'\u2713'} Plan adapts for your family</Text>
             <Text style={s.noteBody}>
               {(youngest.age ?? 0) <= 4
                 ? `With a ${youngest.age}-year-old, we'll keep stops under 45 min and build in rest breaks.`
@@ -199,7 +199,7 @@ export default function WhoScreen() {
                 ? "We'll mix hands-on experiences with landmarks — right for ages 5–7."
                 : "Old enough for deep exploration, missions, and real discovery."}
             </Text>
-            {hasU5 && <Text style={s.noteExtra}>🚼 Stroller-friendly stops prioritised</Text>}
+            {hasU5 && <Text style={s.noteExtra}>{'\uD83D\uDEBC'} Stroller-friendly stops prioritised</Text>}
           </View>
         )}
       </ScrollView>

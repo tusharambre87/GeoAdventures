@@ -230,7 +230,7 @@ export default function ExpectScreen() {
     if (cs.phase === 'added') {
       return (
         <View style={styles.addedRow}>
-          <Text style={styles.addedText}>{"✓"} Added to your day</Text>
+          <Text style={styles.addedText}>{"\u2713"} Added to your day</Text>
         </View>
       );
     }
@@ -614,7 +614,7 @@ export default function ExpectScreen() {
               style={[styles.actionBtn, styles.ticketBtn]}
               onPress={() => Linking.openURL(ticketHref).catch(() => {})}
             >
-              <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{"🏟  Book tickets"}</Text>
+              <Text style={[styles.actionBtnText, { color: '#D97706' }]}>{"\uD83C\uDFDF  Book tickets"}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -671,7 +671,7 @@ export default function ExpectScreen() {
           <Text style={styles.sectionLabel}>NEARBY ESSENTIALS</Text>
 
           <TouchableOpacity style={styles.essRow} onPress={() => setNearbySheet('food')}>
-            <Text style={styles.essIcon}>{"🍔"}</Text>
+            <Text style={styles.essIcon}>{"\uD83C\uDF54"}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.essTitle}>Food nearby</Text>
               <Text style={styles.essSub}>
@@ -684,7 +684,7 @@ export default function ExpectScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.essRow} onPress={() => setNearbySheet('breaks')}>
-            <Text style={styles.essIcon}>{"🌿"}</Text>
+            <Text style={styles.essIcon}>{"\uD83C\uDF3F"}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.essTitle}>Quick break spots</Text>
               <Text style={styles.essSub}>
@@ -700,7 +700,7 @@ export default function ExpectScreen() {
             style={[styles.essRow, { borderBottomWidth: 0 }]}
             onPress={() => setNearbySheet('kids')}
           >
-            <Text style={styles.essIcon}>{"🧒"}</Text>
+            <Text style={styles.essIcon}>{"\uD83E\uDDD2"}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.essTitle}>Kid-friendly extras</Text>
               <Text style={styles.essSub}>
@@ -721,7 +721,7 @@ export default function ExpectScreen() {
           <View style={styles.sheet}>
             <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
-              <Text style={{ fontSize: 20 }}>{"🍔"}</Text>
+              <Text style={{ fontSize: 20 }}>{"\uD83C\uDF54"}</Text>
               <Text style={styles.sheetTitle}>Food nearby</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -746,7 +746,7 @@ export default function ExpectScreen() {
           <View style={styles.sheet}>
             <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
-              <Text style={{ fontSize: 20 }}>{"🌿"}</Text>
+              <Text style={{ fontSize: 20 }}>{"\uD83C\uDF3F"}</Text>
               <Text style={styles.sheetTitle}>Quick break spots</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -771,7 +771,7 @@ export default function ExpectScreen() {
           <View style={styles.sheet}>
             <View {...swipeDismiss.panHandlers} style={styles.handle} />
             <View style={styles.sheetHeader}>
-              <Text style={{ fontSize: 20 }}>{"🧒"}</Text>
+              <Text style={{ fontSize: 20 }}>{"\uD83E\uDDD2"}</Text>
               <Text style={styles.sheetTitle}>Kid-friendly extras</Text>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>

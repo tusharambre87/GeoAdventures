@@ -549,7 +549,7 @@ export default function AccountScreen() {
               onPress={handleChangePassword}
             >
               <View style={[s.settingsIcon, { backgroundColor: "#EFF6FF" }]}>
-                <Text style={{ fontSize: 18 }}>{"🔑"}</Text>
+                <Text style={{ fontSize: 18 }}>{"\uD83D\uDD11"}</Text>
               </View>
               <Text style={s.settingsTitle}>Change password</Text>
               <Text style={s.rowArrow}>{"›"}</Text>
@@ -562,7 +562,7 @@ export default function AccountScreen() {
                 onPress={() => { setChangingEmail((v) => !v); setEmailSent(false); setNewEmail(""); }}
               >
                 <View style={[s.settingsIcon, { backgroundColor: G.oLt }]}>
-                  <Text style={{ fontSize: 18 }}>{"📧"}</Text>
+                  <Text style={{ fontSize: 18 }}>{"\uD83D\uDCE7"}</Text>
                 </View>
                 <Text style={s.settingsTitle}>Change email</Text>
                 <Text style={s.rowArrow}>{"›"}</Text>
@@ -603,7 +603,7 @@ export default function AccountScreen() {
               onPress={handleDeleteAccount}
             >
               <View style={[s.settingsIcon, { backgroundColor: "#FEF2F1" }]}>
-                <Text style={{ fontSize: 18 }}>{"🗑️"}</Text>
+                <Text style={{ fontSize: 18 }}>{"\uD83D\uDDD1\uFE0F"}</Text>
               </View>
               <Text style={[s.settingsTitle, { color: "#DC2626" }]}>Delete account</Text>
               <Text style={s.rowArrow}>{"›"}</Text>

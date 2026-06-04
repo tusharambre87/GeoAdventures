@@ -50,10 +50,10 @@ function formatDateRange(start?: string | null, end?: string | null): string {
 }
 
 const CITY_EMOJI: Record<string, string> = {
-  USA: "🇺🇸", UK: "🇬🇧", France: "🇫🇷", Italy: "🇮🇹", Spain: "🇪🇸",
-  Japan: "🇯🇵", Australia: "🇦🇺", Canada: "🇨🇦", Mexico: "🇲🇽",
-  Netherlands: "🇳🇱", Ireland: "🇮🇪", Portugal: "🇵🇹", "Czech Republic": "🇨🇿",
-  Austria: "🇦🇹",
+  USA: "\uD83C\uDDFA\uD83C\uDDF8", UK: "\uD83C\uDDEC\uD83C\uDDE7", France: "\uD83C\uDDEB\uD83C\uDDF7", Italy: "\uD83C\uDDEE\uD83C\uDDF9", Spain: "\uD83C\uDDEA\uD83C\uDDF8",
+  Japan: "\uD83C\uDDEF\uD83C\uDDF5", Australia: "\uD83C\uDDE6\uD83C\uDDFA", Canada: "\uD83C\uDDE8\uD83C\uDDE6", Mexico: "\uD83C\uDDF2\uD83C\uDDFD",
+  Netherlands: "\uD83C\uDDF3\uD83C\uDDF1", Ireland: "\uD83C\uDDEE\uD83C\uDDEA", Portugal: "\uD83C\uDDF5\uD83C\uDDF9", "Czech Republic": "\uD83C\uDDE8\uD83C\uDDFF",
+  Austria: "\uD83C\uDDE6\uD83C\uDDF9",
 };
 
 export default function TravelMapScreen() {
@@ -155,7 +155,7 @@ export default function TravelMapScreen() {
                     onPress={() => handlePinPress(city.name)}
                   >
                     <View style={[s.pinDot, isExpanded && s.pinDotActive]}>
-                      <Text style={s.pinEmoji}>{"📍"}</Text>
+                      <Text style={s.pinEmoji}>{"\uD83D\uDCCD"}</Text>
                     </View>
                     <View style={s.pinLabel}>
                       <Text style={s.pinLabelText}>{city.name}</Text>
@@ -204,7 +204,7 @@ export default function TravelMapScreen() {
                     }
                   >
                     <View style={s.cityFlag}>
-                      <Text style={{ fontSize: 22 }}>{"📍"}</Text>
+                      <Text style={{ fontSize: 22 }}>{"\uD83D\uDCCD"}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.cityName}>{city.name}</Text>
@@ -230,7 +230,7 @@ export default function TravelMapScreen() {
                               <View style={s.stopDot} />
                               <Text style={s.stopName} numberOfLines={1}>{stop.name}</Text>
                               <Text style={visited ? s.visitedTag : s.skippedTag}>
-                                {visited ? "✓ Visited" : "Skipped"}
+                                {visited ? "\u2713 Visited" : "Skipped"}
                               </Text>
                             </View>
                           );

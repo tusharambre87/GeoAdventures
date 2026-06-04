@@ -14,28 +14,28 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const STYLES = [
-  { id: "highlights", icon: "🏛️", label: "Iconic highlights", sub: "The must-see landmarks everyone loves" },
-  { id: "balanced",   icon: "⚖️",  label: "Balanced explorer",  sub: "Mix of famous and hidden gems" },
-  { id: "offbeat",    icon: "🧭", label: "Offbeat & local",    sub: "Skip the crowds, find the real city" },
-  { id: "easy",       icon: "🌿", label: "Easy does it",       sub: "Slow pace, short stops, all ages happy" },
+  { id: "highlights", icon: "\uD83C\uDFDB\uFE0F", label: "Iconic highlights", sub: "The must-see landmarks everyone loves" },
+  { id: "balanced",   icon: "\u2696\uFE0F",  label: "Balanced explorer",  sub: "Mix of famous and hidden gems" },
+  { id: "offbeat",    icon: "\uD83E\uDDED", label: "Offbeat & local",    sub: "Skip the crowds, find the real city" },
+  { id: "easy",       icon: "\uD83C\uDF3F", label: "Easy does it",       sub: "Slow pace, short stops, all ages happy" },
 ];
 
 const PACES = [
-  { id: "relaxed",  icon: "😌", label: "Relaxed",  sub: "2–3 stops/day, plenty of downtime" },
-  { id: "moderate", icon: "🚶", label: "Moderate",  sub: "4–5 stops/day, good balance" },
-  { id: "busy",     icon: "⚡",  label: "Go-getter", sub: "6+ stops/day, maximum experience" },
+  { id: "relaxed",  icon: "\uD83D\uDE0C", label: "Relaxed",  sub: "2–3 stops/day, plenty of downtime" },
+  { id: "moderate", icon: "\uD83D\uDEB6", label: "Moderate",  sub: "4–5 stops/day, good balance" },
+  { id: "busy",     icon: "\u26A1",  label: "Go-getter", sub: "6+ stops/day, maximum experience" },
 ];
 
 const TRANSPORTS = [
-  { id: "walk",    icon: "🚶", label: "Mostly walking",     sub: "Best for central areas" },
-  { id: "transit", icon: "🚇", label: "Public transit",     sub: "Metro, bus, tram" },
-  { id: "drive",   icon: "🚗", label: "We have a car",      sub: "Flexible, great for suburbs" },
-  { id: "mix",     icon: "🔀", label: "Mix it up",           sub: "Whatever works best each day" },
+  { id: "walk",    icon: "\uD83D\uDEB6", label: "Mostly walking",     sub: "Best for central areas" },
+  { id: "transit", icon: "\uD83D\uDE87", label: "Public transit",     sub: "Metro, bus, tram" },
+  { id: "drive",   icon: "\uD83D\uDE97", label: "We have a car",      sub: "Flexible, great for suburbs" },
+  { id: "mix",     icon: "\uD83D\uDD00", label: "Mix it up",           sub: "Whatever works best each day" },
 ];
 
 const INTERESTS = [
-  "Animals 🦁","Art 🎨","Science 🔬","History 📜","Sports ⚽",
-  "Food 🍕","Nature 🌿","Music 🎵","Shopping 🛍️","Architecture 🏛️","Interactive 🎮","Shows 🎭",
+  "Animals \uD83E\uDD81","Art \uD83C\uDFA8","Science \uD83D\uDD2C","History \uD83D\uDCDC","Sports \u26BD",
+  "Food \uD83C\uDF55","Nature \uD83C\uDF3F","Music \uD83C\uDFB5","Shopping \uD83D\uDECD\uFE0F","Architecture \uD83C\uDFDB\uFE0F","Interactive \uD83C\uDFAE","Shows \uD83C\uDFAD",
 ];
 
 function useFadeIn(active: boolean) {
@@ -106,7 +106,7 @@ export default function HowScreen() {
           <View style={{ flex: 1, alignItems: "center" }}><ProgressDots total={4} cur={3} /></View>
           <View style={{ width: 40 }} />
         </View>
-        <Text style={s.title}>How do you like to explore? 🧭</Text>
+        <Text style={s.title}>How do you like to explore? {'\uD83E\uDDED'}</Text>
         <Text style={s.sub}>Build a vibe that fits your family.</Text>
       </View>
 
@@ -162,13 +162,13 @@ export default function HowScreen() {
         <Animated.View style={{ opacity: stroller3 }}>
           {step >= 3 && (
             stroller !== null && step >= 4 ? (
-              <AChip num="4" icon={stroller ? "🚼" : "🚫"} label={stroller ? "Stroller-friendly stops" : "No stroller needed"} onEdit={() => { setStroller(null); setStep(3); }} />
+              <AChip num="4" icon={stroller ? "\uD83D\uDEBC" : "\uD83D\uDEAB"} label={stroller ? "Stroller-friendly stops" : "No stroller needed"} onEdit={() => { setStroller(null); setStep(3); }} />
             ) : (
               <>
-                <Text style={s.sectionTitle}>Stroller-friendly stops? 🚼</Text>
-                <OCard icon="✅" label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
+                <Text style={s.sectionTitle}>Stroller-friendly stops? {'\uD83D\uDEBC'}</Text>
+                <OCard icon="\u2705" label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
                   selected={stroller === true} onPress={() => selectStroller(true)} />
-                <OCard icon="🚫" label="Not needed" sub="Full range of stops available"
+                <OCard icon="\uD83D\uDEAB" label="Not needed" sub="Full range of stops available"
                   selected={stroller === false} onPress={() => selectStroller(false)} />
               </>
             )

@@ -57,7 +57,7 @@ export default function SosLostScreen() {
               {!!hotelAddress && <Text style={styles.cardBody}>{hotelAddress}</Text>}
               <TouchableOpacity style={styles.navBtn}
                 onPress={() => navigateToHotel(hotelAddress ?? hotelName ?? '')}>
-                <Text style={styles.navBtnText}>📍  Navigate to hotel</Text>
+                <Text style={styles.navBtnText}>{'\uD83D\uDCCD'}  Navigate to hotel</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -78,7 +78,7 @@ export default function SosLostScreen() {
                 style={[styles.navBtn, !hotelInput.trim() && styles.navBtnDisabled]}
                 disabled={!hotelInput.trim()}
                 onPress={() => navigateToHotel(hotelInput.trim())}>
-                <Text style={styles.navBtnText}>📍  Navigate</Text>
+                <Text style={styles.navBtnText}>{'\uD83D\uDCCD'}  Navigate</Text>
               </TouchableOpacity>
             </>
           )}
@@ -96,7 +96,7 @@ export default function SosLostScreen() {
                 {coords.lat.toFixed(5)}, {coords.lon.toFixed(5)}
               </Text>
               <TouchableOpacity style={styles.secondaryBtn} onPress={openCurrentLocation}>
-                <Text style={styles.secondaryBtnText}>🗺  Open in Maps</Text>
+                <Text style={styles.secondaryBtnText}>{'\uD83D\uDDFA'}  Open in Maps</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -108,7 +108,7 @@ export default function SosLostScreen() {
 
         <View style={styles.tipCard}>
           <Text style={styles.tipText}>
-            💡 If you're lost, stay calm. Stay visible in a public, busy place. Ask a staff member or
+            {'\uD83D\uDCA1'} If you're lost, stay calm. Stay visible in a public, busy place. Ask a staff member or
             security guard for help — they're usually trained for this.
           </Text>
         </View>

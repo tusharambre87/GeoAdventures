@@ -79,7 +79,7 @@ export default function Celebration() {
         <Animated.Text
           style={[s.starEmoji, { transform: [{ scale: starScale }, { rotate }] }]}
         >
-          {"⭐"}
+          {"\u2B50"}
         </Animated.Text>
 
         <Text style={s.title}>You leveled up!</Text>
@@ -88,15 +88,15 @@ export default function Celebration() {
         {/* Achievement rows */}
         <View style={s.list}>
           <View style={s.row}>
-            <Text style={s.rowIcon}>{"🎧"}</Text>
+            <Text style={s.rowIcon}>{"\uD83C\uDFA7"}</Text>
             <Text style={s.rowText}>You listened to the story</Text>
           </View>
           <View style={s.row}>
-            <Text style={s.rowIcon}>{"🎯"}</Text>
+            <Text style={s.rowIcon}>{"\uD83C\uDFAF"}</Text>
             <Text style={s.rowText}>You completed 3 missions!</Text>
           </View>
           <View style={[s.row, s.rowPurple]}>
-            <Text style={s.rowIcon}>{"💬"}</Text>
+            <Text style={s.rowIcon}>{"\uD83D\uDCAC"}</Text>
             <Text style={[s.rowText, s.rowTextPurple]} numberOfLines={2}>
               {`You noticed "${wonder.length > 50 ? wonder.slice(0, 50) + "…" : wonder}"`}
             </Text>
@@ -105,7 +105,7 @@ export default function Celebration() {
 
         {/* XP badge */}
         <View style={s.xpBadge}>
-          <Text style={s.xpText}>{`✨ +${xpEarned} XP earned`}</Text>
+          <Text style={s.xpText}>{`\u2728 +${xpEarned} XP earned`}</Text>
         </View>
 
         {/* Primary button */}
@@ -118,7 +118,7 @@ export default function Celebration() {
             setTimeout(() => router.dismiss(), 50);
           }}
         >
-          <Text style={s.primaryBtnText}>{"👆 Show your parent!"}</Text>
+          <Text style={s.primaryBtnText}>{"\uD83D\uDC46 Show your parent!"}</Text>
         </Pressable>
 
         {/* Back to Today */}

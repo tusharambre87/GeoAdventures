@@ -213,7 +213,7 @@ function QSection({
             <Text style={q.optSub}>{opt.sub}</Text>
           </View>
           <View style={[q.radio, selected===opt.id && {backgroundColor:G.orange, borderColor:G.orange}]}>
-            {selected===opt.id && <Text style={{color:"#fff",fontSize:10,fontWeight:"700"}}>✓</Text>}
+            {selected===opt.id && <Text style={{color:"#fff",fontSize:10,fontWeight:"700"}}>{'\u2713'}</Text>}
           </View>
         </Pressable>
       ))}
@@ -223,26 +223,26 @@ function QSection({
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TRANSPORT: Option[] = [
-  {id:"flight", icon:"✈️", label:"Flying in", sub:"Arriving by plane"},
-  {id:"drive",  icon:"🚗", label:"Road trip", sub:"Driving to the destination"},
-  {id:"train",  icon:"🚂", label:"Train",     sub:"Arriving by rail"},
-  {id:"local",  icon:"🏠", label:"Day trip / we live here", sub:"No travel needed"},
+  {id:"flight", icon:"\u2708\uFE0F", label:"Flying in", sub:"Arriving by plane"},
+  {id:"drive",  icon:"\uD83D\uDE97", label:"Road trip", sub:"Driving to the destination"},
+  {id:"train",  icon:"\uD83D\uDE82", label:"Train",     sub:"Arriving by rail"},
+  {id:"local",  icon:"\uD83C\uDFE0", label:"Day trip / we live here", sub:"No travel needed"},
 ];
 const ARRIVAL: Option[] = [
-  {id:"morning",   icon:"☀️",  label:"Morning",    sub:"Before noon — full day ahead"},
-  {id:"afternoon", icon:"🌤️", label:"Afternoon",  sub:"12–5pm — about half a day"},
-  {id:"evening",   icon:"🌆",  label:"Evening",    sub:"After 5pm — dinner and settle in"},
-  {id:"late",      icon:"🌙",  label:"Late night", sub:"After 9pm — Day 1 is rest"},
+  {id:"morning",   icon:"\u2600\uFE0F",  label:"Morning",    sub:"Before noon — full day ahead"},
+  {id:"afternoon", icon:"\uD83C\uDF24\uFE0F", label:"Afternoon",  sub:"12–5pm — about half a day"},
+  {id:"evening",   icon:"\uD83C\uDF06",  label:"Evening",    sub:"After 5pm — dinner and settle in"},
+  {id:"late",      icon:"\uD83C\uDF19",  label:"Late night", sub:"After 9pm — Day 1 is rest"},
 ];
 const LASTDAY: Option[] = [
-  {id:"travel",   icon:"✈️", label:"Travel day",            sub:"Heading home — can't do stops"},
-  {id:"late",     icon:"🌅", label:"Leaving late afternoon", sub:"Room for a morning stop or two"},
-  {id:"full",     icon:"🎉", label:"Full day available",     sub:"Leaving after 5pm — use the whole day"},
+  {id:"travel",   icon:"\u2708\uFE0F", label:"Travel day",            sub:"Heading home — can't do stops"},
+  {id:"late",     icon:"\uD83C\uDF05", label:"Leaving late afternoon", sub:"Room for a morning stop or two"},
+  {id:"full",     icon:"\uD83C\uDF89", label:"Full day available",     sub:"Leaving after 5pm — use the whole day"},
 ];
 const TRANSITION_OPTS: Option[] = [
-  {id:"morning", icon:"☀️", label:"Traveling in the morning", sub:"We'll plan stops in the second city that afternoon"},
-  {id:"midday",  icon:"🌤️",label:"Traveling midday",          sub:"Keep it light — no major stops, arrive and settle"},
-  {id:"evening", icon:"🌆", label:"Traveling in the evening",  sub:"We'll finish stops in the first city that morning"},
+  {id:"morning", icon:"\u2600\uFE0F", label:"Traveling in the morning", sub:"We'll plan stops in the second city that afternoon"},
+  {id:"midday",  icon:"\uD83C\uDF24\uFE0F",label:"Traveling midday",          sub:"Keep it light — no major stops, arrive and settle"},
+  {id:"evening", icon:"\uD83C\uDF06", label:"Traveling in the evening",  sub:"We'll finish stops in the first city that morning"},
 ];
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -421,7 +421,7 @@ export default function WhenScreen() {
           <View style={{ flex:1, alignItems:"center" }}><ProgressDots total={4} cur={2} /></View>
           <View style={{ width:40 }} />
         </View>
-        <Text style={s.title}>When is your trip? 📅</Text>
+        <Text style={s.title}>When is your trip? {'\uD83D\uDCC5'}</Text>
         <Text style={s.sub}>We'll plan the right stops for each day.</Text>
       </View>
 
@@ -495,7 +495,7 @@ export default function WhenScreen() {
             <QSection
               title="How are you getting there?"
               sub="Affects how we plan your first day."
-              iconEmoji="ℹ️"
+              iconEmoji="ℹ\uFE0F"
               options={TRANSPORT}
               selected={transport}
               onSelect={setTransport}
@@ -560,7 +560,7 @@ export default function WhenScreen() {
                 <QSection
                   title={`When do you travel from ${city} to ${nextCity}?`}
                   sub="We'll plan that day around your travel timing."
-                  iconEmoji="↔️"
+                  iconEmoji="↔\uFE0F"
                   options={TRANSITION_OPTS}
                   selected={chosen}
                   onSelect={v=>setTransitions(p=>({...p,[key]:v}))}

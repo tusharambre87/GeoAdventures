@@ -39,110 +39,110 @@ const GENERIC_PROMPTS: ThinkFastPrompt[] = [
     category: "school",
     prompt: "Name 10 things you might find in a school",
     exampleAnswers: [
-      { emoji: "📚", answer: "books" }, { emoji: "✏️", answer: "pencils" },
-      { emoji: "🎒", answer: "backpacks" }, { emoji: "🔔", answer: "a bell" },
-      { emoji: "🖼️", answer: "posters" }, { emoji: "🪑", answer: "desks" },
-      { emoji: "📝", answer: "notebooks" }, { emoji: "🧑‍🏫", answer: "teachers" },
-      { emoji: "🖍️", answer: "crayons" }, { emoji: "🏫", answer: "classrooms" },
+      { emoji: "\uD83D\uDCDA", answer: "books" }, { emoji: "\u270F\uFE0F", answer: "pencils" },
+      { emoji: "\uD83C\uDF92", answer: "backpacks" }, { emoji: "\uD83D\uDD14", answer: "a bell" },
+      { emoji: "\uD83D\uDDBC\uFE0F", answer: "posters" }, { emoji: "\uD83E\uDE91", answer: "desks" },
+      { emoji: "\uD83D\uDCDD", answer: "notebooks" }, { emoji: "\uD83E\uDDD1\u200D\uD83C\uDFEB", answer: "teachers" },
+      { emoji: "\uD83D\uDD8D\uFE0F", answer: "crayons" }, { emoji: "\uD83C\uDFEB", answer: "classrooms" },
     ],
   },
   {
     category: "blue_things",
     prompt: "Name 10 things that are blue",
     exampleAnswers: [
-      { emoji: "🌊", answer: "ocean" }, { emoji: "☁️", answer: "sky" },
-      { emoji: "🫐", answer: "blueberries" }, { emoji: "🐳", answer: "whales" },
-      { emoji: "👖", answer: "jeans" }, { emoji: "🦋", answer: "butterflies" },
-      { emoji: "💎", answer: "sapphires" }, { emoji: "🐦", answer: "bluebirds" },
-      { emoji: "🧊", answer: "ice" }, { emoji: "🎀", answer: "ribbons" },
+      { emoji: "\uD83C\uDF0A", answer: "ocean" }, { emoji: "\u2601\uFE0F", answer: "sky" },
+      { emoji: "\uD83E\uDED0", answer: "blueberries" }, { emoji: "\uD83D\uDC33", answer: "whales" },
+      { emoji: "\uD83D\uDC56", answer: "jeans" }, { emoji: "\uD83E\uDD8B", answer: "butterflies" },
+      { emoji: "\uD83D\uDC8E", answer: "sapphires" }, { emoji: "\uD83D\uDC26", answer: "bluebirds" },
+      { emoji: "\uD83E\uDDCA", answer: "ice" }, { emoji: "\uD83C\uDF80", answer: "ribbons" },
     ],
   },
   {
     category: "swimming_animals",
     prompt: "Name 10 animals that can swim",
     exampleAnswers: [
-      { emoji: "🐟", answer: "fish" }, { emoji: "🐢", answer: "turtles" },
-      { emoji: "🦆", answer: "ducks" }, { emoji: "🦭", answer: "seals" },
-      { emoji: "🐊", answer: "crocodiles" }, { emoji: "🐬", answer: "dolphins" },
-      { emoji: "🦈", answer: "sharks" }, { emoji: "🐸", answer: "frogs" },
-      { emoji: "🦩", answer: "flamingos" }, { emoji: "🐻‍❄️", answer: "polar bears" },
+      { emoji: "\uD83D\uDC1F", answer: "fish" }, { emoji: "\uD83D\uDC22", answer: "turtles" },
+      { emoji: "\uD83E\uDD86", answer: "ducks" }, { emoji: "\uD83E\uDDAD", answer: "seals" },
+      { emoji: "\uD83D\uDC0A", answer: "crocodiles" }, { emoji: "\uD83D\uDC2C", answer: "dolphins" },
+      { emoji: "\uD83E\uDD88", answer: "sharks" }, { emoji: "\uD83D\uDC38", answer: "frogs" },
+      { emoji: "\uD83E\uDDA9", answer: "flamingos" }, { emoji: "\uD83D\uDC3B\u200D\u2744\uFE0F", answer: "polar bears" },
     ],
   },
   {
     category: "kitchen",
     prompt: "Name 10 things in a kitchen",
     exampleAnswers: [
-      { emoji: "🍳", answer: "pans" }, { emoji: "🥄", answer: "spoons" },
-      { emoji: "🧊", answer: "refrigerator" }, { emoji: "🍽️", answer: "plates" },
-      { emoji: "🫖", answer: "kettle" }, { emoji: "🔪", answer: "knives" },
-      { emoji: "🧂", answer: "salt" }, { emoji: "🥣", answer: "bowls" },
-      { emoji: "🧽", answer: "sponge" }, { emoji: "🍴", answer: "forks" },
+      { emoji: "\uD83C\uDF73", answer: "pans" }, { emoji: "\uD83E\uDD44", answer: "spoons" },
+      { emoji: "\uD83E\uDDCA", answer: "refrigerator" }, { emoji: "\uD83C\uDF7D\uFE0F", answer: "plates" },
+      { emoji: "\uD83E\uDED6", answer: "kettle" }, { emoji: "\uD83D\uDD2A", answer: "knives" },
+      { emoji: "\uD83E\uDDC2", answer: "salt" }, { emoji: "\uD83E\uDD63", answer: "bowls" },
+      { emoji: "\uD83E\uDDFD", answer: "sponge" }, { emoji: "\uD83C\uDF74", answer: "forks" },
     ],
   },
   {
     category: "breakfast",
     prompt: "Name 10 things people eat for breakfast",
     exampleAnswers: [
-      { emoji: "🥣", answer: "cereal" }, { emoji: "🍳", answer: "eggs" },
-      { emoji: "🥞", answer: "pancakes" }, { emoji: "🍞", answer: "toast" },
-      { emoji: "🍌", answer: "bananas" }, { emoji: "🥓", answer: "bacon" },
-      { emoji: "🧇", answer: "waffles" }, { emoji: "🍊", answer: "oranges" },
-      { emoji: "🥛", answer: "milk" }, { emoji: "🍩", answer: "donuts" },
+      { emoji: "\uD83E\uDD63", answer: "cereal" }, { emoji: "\uD83C\uDF73", answer: "eggs" },
+      { emoji: "\uD83E\uDD5E", answer: "pancakes" }, { emoji: "\uD83C\uDF5E", answer: "toast" },
+      { emoji: "\uD83C\uDF4C", answer: "bananas" }, { emoji: "\uD83E\uDD53", answer: "bacon" },
+      { emoji: "\uD83E\uDDC7", answer: "waffles" }, { emoji: "\uD83C\uDF4A", answer: "oranges" },
+      { emoji: "\uD83E\uDD5B", answer: "milk" }, { emoji: "\uD83C\uDF69", answer: "donuts" },
     ],
   },
   {
     category: "playground",
     prompt: "Name 10 things at a playground",
     exampleAnswers: [
-      { emoji: "🛝", answer: "slide" }, { emoji: "🎠", answer: "swings" },
-      { emoji: "⚽", answer: "balls" }, { emoji: "🧗", answer: "climbing frame" },
-      { emoji: "🪣", answer: "sandbox" }, { emoji: "🌳", answer: "trees" },
-      { emoji: "🪢", answer: "ropes" }, { emoji: "🎡", answer: "merry-go-round" },
-      { emoji: "🪜", answer: "ladders" }, { emoji: "🏃", answer: "kids running" },
+      { emoji: "\uD83D\uDEDD", answer: "slide" }, { emoji: "\uD83C\uDFA0", answer: "swings" },
+      { emoji: "\u26BD", answer: "balls" }, { emoji: "\uD83E\uDDD7", answer: "climbing frame" },
+      { emoji: "\uD83E\uDEA3", answer: "sandbox" }, { emoji: "\uD83C\uDF33", answer: "trees" },
+      { emoji: "\uD83E\uDEA2", answer: "ropes" }, { emoji: "\uD83C\uDFA1", answer: "merry-go-round" },
+      { emoji: "\uD83E\uDE9C", answer: "ladders" }, { emoji: "\uD83C\uDFC3", answer: "kids running" },
     ],
   },
   {
     category: "flying",
     prompt: "Name 10 things that can fly",
     exampleAnswers: [
-      { emoji: "🐦", answer: "birds" }, { emoji: "✈️", answer: "airplanes" },
-      { emoji: "🦋", answer: "butterflies" }, { emoji: "🎈", answer: "balloons" },
-      { emoji: "🚁", answer: "helicopters" }, { emoji: "🐝", answer: "bees" },
-      { emoji: "🪁", answer: "kites" }, { emoji: "🦅", answer: "eagles" },
-      { emoji: "🪰", answer: "flies" }, { emoji: "🚀", answer: "rockets" },
+      { emoji: "\uD83D\uDC26", answer: "birds" }, { emoji: "\u2708\uFE0F", answer: "airplanes" },
+      { emoji: "\uD83E\uDD8B", answer: "butterflies" }, { emoji: "\uD83C\uDF88", answer: "balloons" },
+      { emoji: "\uD83D\uDE81", answer: "helicopters" }, { emoji: "\uD83D\uDC1D", answer: "bees" },
+      { emoji: "\uD83E\uDE81", answer: "kites" }, { emoji: "\uD83E\uDD85", answer: "eagles" },
+      { emoji: "\uD83E\uDEB0", answer: "flies" }, { emoji: "\uD83D\uDE80", answer: "rockets" },
     ],
   },
   {
     category: "birthday_party",
     prompt: "Name 10 things at a birthday party",
     exampleAnswers: [
-      { emoji: "🎂", answer: "cake" }, { emoji: "🎁", answer: "presents" },
-      { emoji: "🎈", answer: "balloons" }, { emoji: "🎉", answer: "party hats" },
-      { emoji: "🕯️", answer: "candles" }, { emoji: "🍭", answer: "candy" },
-      { emoji: "🎵", answer: "music" }, { emoji: "🎮", answer: "games" },
-      { emoji: "🍕", answer: "pizza" }, { emoji: "👯", answer: "friends" },
+      { emoji: "\uD83C\uDF82", answer: "cake" }, { emoji: "\uD83C\uDF81", answer: "presents" },
+      { emoji: "\uD83C\uDF88", answer: "balloons" }, { emoji: "\uD83C\uDF89", answer: "party hats" },
+      { emoji: "\uD83D\uDD6F\uFE0F", answer: "candles" }, { emoji: "\uD83C\uDF6D", answer: "candy" },
+      { emoji: "\uD83C\uDFB5", answer: "music" }, { emoji: "\uD83C\uDFAE", answer: "games" },
+      { emoji: "\uD83C\uDF55", answer: "pizza" }, { emoji: "\uD83D\uDC6F", answer: "friends" },
     ],
   },
   {
     category: "round_things",
     prompt: "Name 10 things that are round",
     exampleAnswers: [
-      { emoji: "🏀", answer: "basketball" }, { emoji: "🍊", answer: "orange" },
-      { emoji: "🌍", answer: "Earth" }, { emoji: "🍪", answer: "cookies" },
-      { emoji: "⏰", answer: "clock" }, { emoji: "🍕", answer: "pizza" },
-      { emoji: "🌕", answer: "moon" }, { emoji: "🎯", answer: "target" },
-      { emoji: "💿", answer: "CD" }, { emoji: "🍩", answer: "donut" },
+      { emoji: "\uD83C\uDFC0", answer: "basketball" }, { emoji: "\uD83C\uDF4A", answer: "orange" },
+      { emoji: "\uD83C\uDF0D", answer: "Earth" }, { emoji: "\uD83C\uDF6A", answer: "cookies" },
+      { emoji: "⏰", answer: "clock" }, { emoji: "\uD83C\uDF55", answer: "pizza" },
+      { emoji: "\uD83C\uDF15", answer: "moon" }, { emoji: "\uD83C\uDFAF", answer: "target" },
+      { emoji: "\uD83D\uDCBF", answer: "CD" }, { emoji: "\uD83C\uDF69", answer: "donut" },
     ],
   },
   {
     category: "car_trip",
     prompt: "Name 10 things you might bring on a car trip",
     exampleAnswers: [
-      { emoji: "🎧", answer: "headphones" }, { emoji: "🍿", answer: "snacks" },
-      { emoji: "📱", answer: "tablet" }, { emoji: "🧸", answer: "stuffed animal" },
-      { emoji: "📖", answer: "books" }, { emoji: "🎮", answer: "games" },
-      { emoji: "🧃", answer: "juice box" }, { emoji: "🛏️", answer: "pillow" },
-      { emoji: "🗺️", answer: "map" }, { emoji: "🎵", answer: "music" },
+      { emoji: "\uD83C\uDFA7", answer: "headphones" }, { emoji: "\uD83C\uDF7F", answer: "snacks" },
+      { emoji: "\uD83D\uDCF1", answer: "tablet" }, { emoji: "\uD83E\uDDF8", answer: "stuffed animal" },
+      { emoji: "\uD83D\uDCD6", answer: "books" }, { emoji: "\uD83C\uDFAE", answer: "games" },
+      { emoji: "\uD83E\uDDC3", answer: "juice box" }, { emoji: "\uD83D\uDECF\uFE0F", answer: "pillow" },
+      { emoji: "\uD83D\uDDFA\uFE0F", answer: "map" }, { emoji: "\uD83C\uDFB5", answer: "music" },
     ],
   },
 ];
@@ -153,44 +153,44 @@ function getContextualPrompts(place: string): ThinkFastPrompt[] {
       category: "see_here",
       prompt: `Name 10 things you might see in ${place}`,
       exampleAnswers: [
-        { emoji: "🏛️", answer: "buildings" }, { emoji: "🌳", answer: "trees" },
-        { emoji: "🚗", answer: "cars" }, { emoji: "👨‍👩‍👧‍👦", answer: "families" },
-        { emoji: "🏪", answer: "shops" }, { emoji: "🚶", answer: "people walking" },
-        { emoji: "🚌", answer: "buses" }, { emoji: "🌸", answer: "flowers" },
-        { emoji: "🏠", answer: "houses" }, { emoji: "☀️", answer: "sunshine" },
+        { emoji: "\uD83C\uDFDB\uFE0F", answer: "buildings" }, { emoji: "\uD83C\uDF33", answer: "trees" },
+        { emoji: "\uD83D\uDE97", answer: "cars" }, { emoji: "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66", answer: "families" },
+        { emoji: "\uD83C\uDFEA", answer: "shops" }, { emoji: "\uD83D\uDEB6", answer: "people walking" },
+        { emoji: "\uD83D\uDE8C", answer: "buses" }, { emoji: "\uD83C\uDF38", answer: "flowers" },
+        { emoji: "\uD83C\uDFE0", answer: "houses" }, { emoji: "\u2600\uFE0F", answer: "sunshine" },
       ],
     },
     {
       category: "eat_here",
       prompt: `Name 10 foods people might eat in ${place}`,
       exampleAnswers: [
-        { emoji: "🍕", answer: "local dishes" }, { emoji: "🍦", answer: "ice cream" },
-        { emoji: "🥗", answer: "fresh food" }, { emoji: "🍰", answer: "desserts" },
-        { emoji: "🥤", answer: "drinks" }, { emoji: "🍜", answer: "noodles" },
-        { emoji: "🍞", answer: "bread" }, { emoji: "🍎", answer: "fruits" },
-        { emoji: "🧀", answer: "cheese" }, { emoji: "☕", answer: "coffee" },
+        { emoji: "\uD83C\uDF55", answer: "local dishes" }, { emoji: "\uD83C\uDF66", answer: "ice cream" },
+        { emoji: "\uD83E\uDD57", answer: "fresh food" }, { emoji: "\uD83C\uDF70", answer: "desserts" },
+        { emoji: "\uD83E\uDD64", answer: "drinks" }, { emoji: "\uD83C\uDF5C", answer: "noodles" },
+        { emoji: "\uD83C\uDF5E", answer: "bread" }, { emoji: "\uD83C\uDF4E", answer: "fruits" },
+        { emoji: "\uD83E\uDDC0", answer: "cheese" }, { emoji: "\u2615", answer: "coffee" },
       ],
     },
     {
       category: "sounds_here",
       prompt: `Name 10 sounds you might hear in ${place}`,
       exampleAnswers: [
-        { emoji: "🚗", answer: "traffic" }, { emoji: "🐦", answer: "birds" },
-        { emoji: "🗣️", answer: "people talking" }, { emoji: "🎵", answer: "music" },
-        { emoji: "🌊", answer: "nature sounds" }, { emoji: "🔔", answer: "bells" },
-        { emoji: "👏", answer: "clapping" }, { emoji: "🚂", answer: "trains" },
-        { emoji: "🐕", answer: "dogs barking" }, { emoji: "💨", answer: "wind" },
+        { emoji: "\uD83D\uDE97", answer: "traffic" }, { emoji: "\uD83D\uDC26", answer: "birds" },
+        { emoji: "\uD83D\uDDE3\uFE0F", answer: "people talking" }, { emoji: "\uD83C\uDFB5", answer: "music" },
+        { emoji: "\uD83C\uDF0A", answer: "nature sounds" }, { emoji: "\uD83D\uDD14", answer: "bells" },
+        { emoji: "\uD83D\uDC4F", answer: "clapping" }, { emoji: "\uD83D\uDE82", answer: "trains" },
+        { emoji: "\uD83D\uDC15", answer: "dogs barking" }, { emoji: "\uD83D\uDCA8", answer: "wind" },
       ],
     },
     {
       category: "daily_use",
       prompt: `Name 10 things people in ${place} might use every day`,
       exampleAnswers: [
-        { emoji: "📱", answer: "phone" }, { emoji: "🔑", answer: "keys" },
-        { emoji: "👜", answer: "bag" }, { emoji: "🚌", answer: "bus" },
-        { emoji: "☕", answer: "coffee" }, { emoji: "💳", answer: "card" },
-        { emoji: "🌂", answer: "umbrella" }, { emoji: "📰", answer: "newspaper" },
-        { emoji: "🚲", answer: "bicycle" }, { emoji: "🥗", answer: "lunch" },
+        { emoji: "\uD83D\uDCF1", answer: "phone" }, { emoji: "\uD83D\uDD11", answer: "keys" },
+        { emoji: "\uD83D\uDC5C", answer: "bag" }, { emoji: "\uD83D\uDE8C", answer: "bus" },
+        { emoji: "\u2615", answer: "coffee" }, { emoji: "\uD83D\uDCB3", answer: "card" },
+        { emoji: "\uD83C\uDF02", answer: "umbrella" }, { emoji: "\uD83D\uDCF0", answer: "newspaper" },
+        { emoji: "\uD83D\uDEB2", answer: "bicycle" }, { emoji: "\uD83E\uDD57", answer: "lunch" },
       ],
     },
   ];
@@ -796,7 +796,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
           contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40, paddingHorizontal: 32 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={{ fontSize: 64, marginBottom: 12 }}>⚡</Text>
+          <Text style={{ fontSize: 64, marginBottom: 12 }}>{'\u26A1'}</Text>
           <Text style={{ fontFamily: F.bold, fontSize: 26, color: "#fff", textAlign: "center", marginBottom: 6 }}>Think Fast!</Text>
           <Text style={{ fontFamily: F.semibold, fontSize: 15, color: "rgba(255,255,255,0.8)", textAlign: "center", marginBottom: 12 }}>Name 10 things in 30 seconds</Text>
           <Text style={{ fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.75)", textAlign: "center", lineHeight: 22 }}>Everyone shouts answers as fast as they can. Tap once for each answer!</Text>
@@ -840,7 +840,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
 
         {/* Prompt */}
         <View style={tf.promptCard}>
-          <Text style={tf.promptLabel}>⚡ NAME 10 THINGS…</Text>
+          <Text style={tf.promptLabel}>{'\u26A1'} NAME 10 THINGS…</Text>
           <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
         </View>
 
@@ -848,7 +848,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
         <View style={tf.dots}>
           {Array.from({ length: 10 }).map((_, i) => (
             <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#fff" : "rgba(255,255,255,0.35)" }]}>
-              {i < tapCount && <Text style={tf.dotCheck}>✓</Text>}
+              {i < tapCount && <Text style={tf.dotCheck}>{'\u2713'}</Text>}
             </View>
           ))}
         </View>
@@ -865,7 +865,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
           }}
           disabled={tapCount >= 10}
         >
-          <Text style={tf.tapBtnText}>👆 Tap!</Text>
+          <Text style={tf.tapBtnText}>{'\uD83D\uDC46'} Tap!</Text>
         </Pressable>
 
         {/* Bottom row — Close first, Show Me Answers second */}
@@ -894,7 +894,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
         <Text style={[sh.doneSub, { color: "rgba(255,255,255,0.8)" }]}>You named {tapCount} / 10</Text>
 
         <View style={tf.revealBox}>
-          <Text style={tf.revealLabel}>Some example answers — great job if you got any! 🌟</Text>
+          <Text style={tf.revealLabel}>Some example answers — great job if you got any! {'\uD83C\uDF1F'}</Text>
           {/* Answer chips */}
           <View style={tf.chipRow}>
             {prompt.exampleAnswers.map((a, i) => (
@@ -911,7 +911,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
           style={[sh.btn, { backgroundColor: "#fff", marginTop: 24, alignSelf: "stretch" }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
         >
-          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>⚡ Play Again</Text>
+          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>{'\u26A1'} Play Again</Text>
         </Pressable>
         <Pressable
           style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.2)", marginTop: 12, alignSelf: "stretch" }]}
@@ -928,14 +928,14 @@ function ThinkFast({ stopName }: { stopName: string }) {
     <View style={{ flex: 1, backgroundColor: "#FF6B2B" }}>
       <Confetti />
       <View style={[sh.centered, { backgroundColor: "transparent" }]}>
-        <Text style={{ fontSize: 72, marginBottom: 12 }}>⚡</Text>
+        <Text style={{ fontSize: 72, marginBottom: 12 }}>{'\u26A1'}</Text>
         <Text style={[sh.doneTitle, { color: "#fff" }]}>Amazing!</Text>
         <Text style={[sh.doneSub, { marginBottom: 0, color: "rgba(255,255,255,0.8)" }]}>You named them all!</Text>
         <Pressable
           style={[sh.btn, { backgroundColor: "#fff", marginTop: 32 }]}
           onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); startGame(); }}
         >
-          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>⚡ Play Again</Text>
+          <Text style={[sh.btnText, { color: "#FF6B2B" }]}>{'\u26A1'} Play Again</Text>
         </Pressable>
         <Pressable
           style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.2)", marginTop: 12 }]}
@@ -991,7 +991,7 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
           <Pressable style={sc.hdrBack} onPress={() => router.back()}>
             <Text style={sc.hdrBackText}>← Games</Text>
           </Pressable>
-          <Text style={sc.hdrTitle}>🔍 Your Hunt</Text>
+          <Text style={sc.hdrTitle}>{'\uD83D\uDD0D'} Your Hunt</Text>
           <Text style={sc.hdrSub}>
             {foundCount > 0 ? `${foundCount} / ${items.length} found` : "Tap when you find something!"}
           </Text>
@@ -1022,7 +1022,7 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
               {/* Icon box */}
               <View style={[sc.iconBox, item.found && sc.iconBoxFound]}>
                 <Text style={[sc.iconGlyph, item.found && sc.iconGlyphFound]}>
-                  {item.found ? "✓" : "📍"}
+                  {item.found ? "\u2713" : "\uD83D\uDCCD"}
                 </Text>
               </View>
 
@@ -1059,7 +1059,7 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
         <Pressable style={sc.hdrBack} onPress={() => router.back()}>
           <Text style={sc.hdrBackText}>← Games</Text>
         </Pressable>
-        <Text style={sc.hdrTitle}>🎉 Hunt Complete!</Text>
+        <Text style={sc.hdrTitle}>{'\uD83C\uDF89'} Hunt Complete!</Text>
         <Text style={sc.hdrSub}>You found everything!</Text>
         <View style={sc.progBar}>
           <View style={[sc.progFill, { width: "100%" }]} />
@@ -1075,12 +1075,12 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
         }}
       >
 
-        {/* All items shown with green ✓ */}
+        {/* All items shown with green \u2713 */}
         <View style={{ width: "100%", marginBottom: 32 }}>
           {items.map((item, i) => (
             <View key={i} style={[sc.card, sc.cardFound, { marginBottom: 8 }]}>
               <View style={sc.iconBoxFound}>
-                <Text style={sc.iconGlyphFound}>✓</Text>
+                <Text style={sc.iconGlyphFound}>{'\u2713'}</Text>
               </View>
               <Text style={sc.cardTextFound}>{item.text}</Text>
             </View>
@@ -1091,7 +1091,7 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
           style={[sh.btn, { backgroundColor: "#7C3AED", alignSelf: "stretch" }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); seedHunt(usedTexts); }}
         >
-          <Text style={sh.btnText}>🔍 New Hunt</Text>
+          <Text style={sh.btnText}>{'\uD83D\uDD0D'} New Hunt</Text>
         </Pressable>
         <Pressable
           style={[sh.btn, { backgroundColor: "#F3F4F6", alignSelf: "stretch", marginTop: 12 }]}
@@ -1269,7 +1269,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
   if (phase === "intro") {
     return (
       <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
-        <Text style={{ fontSize: 64, marginBottom: 12 }}>🌍</Text>
+        <Text style={{ fontSize: 64, marginBottom: 12 }}>{'\uD83C\uDF0D'}</Text>
         <Text style={[gg.introTitle, { color: "#fff" }]}>I'm thinking of a place...</Text>
         <Text style={[gg.introSub, { color: "rgba(255,255,255,0.6)" }]}>Ask yes/no questions to figure it out</Text>
         <View style={[gg.introCountBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
@@ -1306,7 +1306,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <Text style={gg.title}>🌍 I'm thinking of a place...</Text>
+          <Text style={gg.title}>{'\uD83C\uDF0D'} I'm thinking of a place...</Text>
           <Text style={gg.asked}>Questions asked: {questionsAsked} / 20</Text>
 
           {/* Question cards */}
@@ -1388,7 +1388,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
   // ── COMPLETE ──
   return (
     <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
-      <Text style={{ fontSize: 72, marginBottom: 12 }}>🌍</Text>
+      <Text style={{ fontSize: 72, marginBottom: 12 }}>{'\uD83C\uDF0D'}</Text>
       <Text style={[sh.doneTitle, { color: "#fff" }]}>You got it!</Text>
       <View style={gg.revealBox}>
         <Text style={gg.revealLabel}>The place was</Text>
@@ -1398,7 +1398,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
         style={[sh.btn, { backgroundColor: "#3B82F6", marginTop: 32 }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
       >
-        <Text style={sh.btnText}>🌍 Play Again</Text>
+        <Text style={sh.btnText}>{'\uD83C\uDF0D'} Play Again</Text>
       </Pressable>
       <Pressable
         style={[sh.btn, { backgroundColor: "rgba(255,255,255,0.15)", marginTop: 12 }]}
@@ -1437,7 +1437,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
   if (phase === "intro") {
     return (
       <View style={[sh.centered, { backgroundColor: "#FFF8F0" }]}>
-        <Text style={{ fontSize: 64, marginBottom: 12 }}>👜</Text>
+        <Text style={{ fontSize: 64, marginBottom: 12 }}>{'\uD83D\uDC5C'}</Text>
         <Text style={bag.introTitle}>What's In My Bag?</Text>
         <Text style={bag.introSub}>One person reads, everyone repeats!</Text>
         <View style={bag.themeBadge}>
@@ -1469,7 +1469,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
           <Pressable style={bag.hdrBack} onPress={() => router.back()}>
             <Text style={bag.hdrBackText}>← Games</Text>
           </Pressable>
-          <Text style={bag.hdrTitle}>👜 What's In My Bag?</Text>
+          <Text style={bag.hdrTitle}>{'\uD83D\uDC5C'} What's In My Bag?</Text>
           <Text style={bag.hdrSub}>One person reads, everyone repeats!</Text>
           <Text style={bag.hdrCount}>Item {index + 1} of {MAX_BAG_ITEMS}</Text>
         </View>
@@ -1483,7 +1483,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
           }}
         >
           <View style={bag.readerBadge}>
-            <Text style={bag.readerText}>🔊 Reader, say this out loud:</Text>
+            <Text style={bag.readerText}>{'\uD83D\uDD0A'} Reader, say this out loud:</Text>
           </View>
 
           <View style={bag.sentenceBox}>
@@ -1506,7 +1506,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
                 if (isLast) { setPhase("complete"); } else { setIndex((n) => n + 1); }
               }}
             >
-              <Text style={sh.btnText}>{isLast ? "Finish! 🎒" : "Next Item →"}</Text>
+              <Text style={sh.btnText}>{isLast ? "Finish! \uD83C\uDF92" : "Next Item →"}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -1520,7 +1520,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
     : "";
   return (
     <View style={[sh.centered, { backgroundColor: "#FFF8F0", paddingHorizontal: 24 }]}>
-      <Text style={{ fontSize: 72, marginBottom: 12 }}>🎒</Text>
+      <Text style={{ fontSize: 72, marginBottom: 12 }}>{'\uD83C\uDF92'}</Text>
       <Text style={[sh.doneTitle, { color: "#7C3AED" }]}>Amazing memory!</Text>
       <View style={bag.sentenceBox}>
         <Text style={bag.sentence}>"{fullSentence}"</Text>
@@ -1529,7 +1529,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
         style={[sh.btn, { backgroundColor: "#7C3AED", marginTop: 24 }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startGame(); }}
       >
-        <Text style={sh.btnText}>👜 Play Again</Text>
+        <Text style={sh.btnText}>{'\uD83D\uDC5C'} Play Again</Text>
       </Pressable>
       <Pressable
         style={[sh.btn, { backgroundColor: "#F3F4F6", marginTop: 12 }]}
@@ -1594,11 +1594,11 @@ function GeoSpy() {
           <Pressable style={spy.hdrBack} onPress={() => router.back()}>
             <Text style={spy.hdrBackText}>← Games</Text>
           </Pressable>
-          <Text style={spy.hdrTitle}>👁 GeoSpy</Text>
+          <Text style={spy.hdrTitle}>{'\uD83D\uDC41'} GeoSpy</Text>
           <Text style={spy.hdrSub}>Look around and call out what you see!</Text>
         </View>
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
-          <Text style={{ fontSize: 64, marginBottom: 28 }}>👁</Text>
+          <Text style={{ fontSize: 64, marginBottom: 28 }}>{'\uD83D\uDC41'}</Text>
           <Pressable
             style={[sh.btn, { backgroundColor: "#5B21B6", paddingHorizontal: 40, alignSelf: "stretch" }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startSpy(); }}
@@ -1620,7 +1620,7 @@ function GeoSpy() {
         <Pressable style={spy.hdrBack} onPress={() => router.back()}>
           <Text style={spy.hdrBackText}>← Games</Text>
         </Pressable>
-        <Text style={spy.hdrTitle}>👁 GeoSpy</Text>
+        <Text style={spy.hdrTitle}>{'\uD83D\uDC41'} GeoSpy</Text>
         <Text style={spy.hdrSub}>Look around and call out what you see!</Text>
       </View>
       <ScrollView
@@ -1635,7 +1635,7 @@ function GeoSpy() {
         }}
       >
         <View style={spy.promptCard}>
-          <Text style={spy.promptIcon}>🔊</Text>
+          <Text style={spy.promptIcon}>{'\uD83D\uDD0A'}</Text>
           <Text style={spy.promptText}>{currentPrompt}</Text>
         </View>
 
@@ -1645,7 +1645,7 @@ function GeoSpy() {
           style={[sh.btn, { backgroundColor: "#3DAA6E", alignSelf: "stretch", marginTop: 28 }]}
           onPress={nextPrompt}
         >
-          <Text style={sh.btnText}>✨ Next one →</Text>
+          <Text style={sh.btnText}>{'\u2728'} Next one →</Text>
         </Pressable>
 
         <Pressable

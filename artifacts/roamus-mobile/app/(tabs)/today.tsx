@@ -48,9 +48,9 @@ const MO_STOP_BG: Record<string, string> = {
   aquarium: '#B2EBF2', theme_park: '#FCE4EC', default: '#F0ECE6',
 };
 const MO_STOP_EMOJI: Record<string, string> = {
-  park: '🌿', museum: '🏛', zoo: '🦊',
-  landmark: '🗽', nature: '🌲', culture: '🎭',
-  aquarium: '🐠', theme_park: '🎡', default: '📍',
+  park: '\uD83C\uDF3F', museum: '\uD83C\uDFDB', zoo: '\uD83E\uDD8A',
+  landmark: '\uD83D\uDDFD', nature: '\uD83C\uDF32', culture: '\uD83C\uDFAD',
+  aquarium: '\uD83D\uDC20', theme_park: '\uD83C\uDFA1', default: '\uD83D\uDCCD',
 };
 
 
@@ -86,15 +86,15 @@ const C = {
 
 // ─── Stop-type thumbnail helpers ──────────────────────────────────────────────
 const STOP_TYPE_EMOJI: Record<string, string> = {
-  museum: '🏛️', nature: '🌿', park: '🌳',
-  garden: '🌸', beach: '🏖️', restaurant: '🍽️',
-  food: '🍜', street_food: '🥢', viewpoint: '🔭',
-  landmark: '📍', temple: '⛩️', market: '🛍️',
-  zoo: '🦁', aquarium: '🐠', palace: '🏰',
-  plaza: '🏛️', bridge: '🌉', waterfall: '💧',
-  volcano: '🌋', mountain: '🏔️', adventure: '⚡',
-  neighborhood: '🏘️', street: '🛤️', city: '🏙️',
-  culture: '🎭', other: '📍',
+  museum: '\uD83C\uDFDB\uFE0F', nature: '\uD83C\uDF3F', park: '\uD83C\uDF33',
+  garden: '\uD83C\uDF38', beach: '\uD83C\uDFD6\uFE0F', restaurant: '\uD83C\uDF7D\uFE0F',
+  food: '\uD83C\uDF5C', street_food: '\uD83E\uDD62', viewpoint: '\uD83D\uDD2D',
+  landmark: '\uD83D\uDCCD', temple: '\u26E9\uFE0F', market: '\uD83D\uDECD\uFE0F',
+  zoo: '\uD83E\uDD81', aquarium: '\uD83D\uDC20', palace: '\uD83C\uDFF0',
+  plaza: '\uD83C\uDFDB\uFE0F', bridge: '\uD83C\uDF09', waterfall: '\uD83D\uDCA7',
+  volcano: '\uD83C\uDF0B', mountain: '\uD83C\uDFD4\uFE0F', adventure: '\u26A1',
+  neighborhood: '\uD83C\uDFD8\uFE0F', street: '\uD83D\uDEE4\uFE0F', city: '\uD83C\uDFD9\uFE0F',
+  culture: '\uD83C\uDFAD', other: '\uD83D\uDCCD',
 };
 const STOP_TYPE_COLOR: Record<string, string> = {
   museum: '#3B82F6', nature: '#3DAA6E', park: '#3DAA6E', garden: '#3DAA6E',
@@ -959,7 +959,7 @@ export default function TodayScreen() {
               setPreviousState(todayState);
               setTodayState(resolvedDayIndex > 0 ? 'day_history' : 'day_history_empty');
             }}>
-              <Text style={mx.dropIcon}>📅</Text>
+              <Text style={mx.dropIcon}>{'\uD83D\uDCC5'}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={mx.dropTitle}>Day history</Text>
                 <Text style={mx.dropSub}>
@@ -1002,7 +1002,7 @@ export default function TodayScreen() {
     return (
       <View style={[misc.center, { paddingTop: insets.top, backgroundColor: C.bg }]}>
         <View style={nt.iconWrap}>
-          <Text style={nt.iconEmoji}>🗺️</Text>
+          <Text style={nt.iconEmoji}>{'\uD83D\uDDFA\uFE0F'}</Text>
         </View>
         <Text style={nt.heading}>Where will your family go next?</Text>
         <Text style={nt.sub}>
@@ -1063,11 +1063,11 @@ export default function TodayScreen() {
             {stopCount > 0 && (
               <View style={ptf.pillsRow}>
                 <View style={ptf.pill}>
-                  <Text style={ptf.pillText}>{'📍 '}{stopCount}{' stops'}</Text>
+                  <Text style={ptf.pillText}>{'\uD83D\uDCCD '}{stopCount}{' stops'}</Text>
                 </View>
                 {totalMins > 0 && (
                   <View style={ptf.pill}>
-                    <Text style={ptf.pillText}>{'🕐 ~'}{totalHoursLabel}</Text>
+                    <Text style={ptf.pillText}>{'\uD83D\uDD50 ~'}{totalHoursLabel}</Text>
                   </View>
                 )}
               </View>
@@ -1104,7 +1104,7 @@ export default function TodayScreen() {
                 <View style={ptf.stopNum}><Text style={ptf.stopNumText}>{i + 1}</Text></View>
                 <Text style={ptf.stopName} numberOfLines={1}>{s.name}</Text>
                 {hasTicketSignal(s.metadata) && (
-                  <View style={ptf.ticketBadge}><Text style={ptf.ticketText}>{'🎫'}</Text></View>
+                  <View style={ptf.ticketBadge}><Text style={ptf.ticketText}>{'\uD83C\uDFAB'}</Text></View>
                 )}
               </View>
             ))}
@@ -1127,7 +1127,7 @@ export default function TodayScreen() {
                   activeOpacity={0.75}
                   onPress={() => openTicketSearch(s.name)}
                 >
-                  <Text style={ptf.ticketStopIcon}>{'🎫'}</Text>
+                  <Text style={ptf.ticketStopIcon}>{'\uD83C\uDFAB'}</Text>
                   <Text style={ptf.ticketStopName} numberOfLines={2}>{s.name}</Text>
                   <Text style={ptf.ticketStopArrow}>{'→'}</Text>
                 </TouchableOpacity>
@@ -1170,7 +1170,7 @@ export default function TodayScreen() {
 
           {ticketCount > 0 && (
             <View style={ptt.alertBanner}>
-              <Text style={ptt.alertIcon}>{'🎫'}</Text>
+              <Text style={ptt.alertIcon}>{'\uD83C\uDFAB'}</Text>
               <Text style={ptt.alertText}>
                 {ticketCount} stop{ticketCount !== 1 ? 's' : ''} need{ticketCount === 1 ? 's' : ''} tickets — book tonight
               </Text>
@@ -1179,7 +1179,7 @@ export default function TodayScreen() {
 
           {/* Rain alert */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}>
-            <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
+            <Text style={{ fontSize: 20 }}>{'\uD83C\uDF27'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected tomorrow 2–4pm</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Plan ahead for outdoor stops</Text>
@@ -1210,7 +1210,7 @@ export default function TodayScreen() {
             onPress={() => setShowHotelSheet(true)}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'🏨'}</Text>
+              <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
@@ -1230,7 +1230,7 @@ export default function TodayScreen() {
                 </View>
                 {hasTicketSignal(s.metadata) && (
                   <TouchableOpacity onPress={() => openTicketSearch(s.name)} hitSlop={8}>
-                    <View style={ptt.ticketBadge}><Text style={ptt.ticketText}>{'🎫'} Book</Text></View>
+                    <View style={ptt.ticketBadge}><Text style={ptt.ticketText}>{'\uD83C\uDFAB'} Book</Text></View>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1317,7 +1317,7 @@ export default function TodayScreen() {
             {isPast ? (
               <View style={alt.card}>
                 <View style={alt.doneRow}>
-                  <Text style={alt.doneIcon}>{'✓'}</Text>
+                  <Text style={alt.doneIcon}>{'\u2713'}</Text>
                   <Text style={alt.doneTitle}>Day {viewingDay + 1} Complete</Text>
                 </View>
                 <Text style={alt.doneSub}>{city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}</Text>
@@ -1338,7 +1338,7 @@ export default function TodayScreen() {
                 {viewingDayStops.map((stop, i) => (
                   <View key={stop.id} style={alt.stopRow}>
                     <View style={[alt.stopCheck, (stop.isVisited || stop.visited) && alt.stopCheckDone]}>
-                      <Text style={alt.stopCheckText}>{(stop.isVisited || stop.visited) ? '✓' : String(i + 1)}</Text>
+                      <Text style={alt.stopCheckText}>{(stop.isVisited || stop.visited) ? '\u2713' : String(i + 1)}</Text>
                     </View>
                     <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
                   </View>
@@ -1361,7 +1361,7 @@ export default function TodayScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
                       {stop.travelMinsFromPrevious ? (
-                        <Text style={alt.stopTravel}>{'🚗'} {stop.travelMinsFromPrevious} min from prev</Text>
+                        <Text style={alt.stopTravel}>{'\uD83D\uDE97'} {stop.travelMinsFromPrevious} min from prev</Text>
                       ) : null}
                     </View>
                     <Text style={alt.stopDur}>{stop.durationMinutes ?? 60}m</Text>
@@ -1400,12 +1400,12 @@ export default function TodayScreen() {
             />
             {/* Weather pill */}
             <View style={mo.weatherPill}>
-              <Text style={{ fontSize: 15 }}>{'🌤'}</Text>
+              <Text style={{ fontSize: 15 }}>{'\uD83C\uDF24'}</Text>
               <Text style={mo.weatherText}>72°F</Text>
             </View>
             {/* Bottom copy */}
             <View style={mo.heroBottom}>
-              <Text style={mo.greeting}>Good morning 👋</Text>
+              <Text style={mo.greeting}>Good morning {'\uD83D\uDC4B'}</Text>
               <Text style={mo.heroHeadline}>
                 Day {resolvedDayIndex + 1}{city ? ` in ${city}` : ''}
               </Text>
@@ -1415,7 +1415,7 @@ export default function TodayScreen() {
               </Text>
             </View>
             <View style={mo.metaRow}>
-              <View style={mo.metaPill}><Text style={mo.metaText}>{'📍'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
+              <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDCCD'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
               <View style={mo.metaPill}><Text style={mo.metaText}>{'⏱'} {estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
             </View>
           </ImageBackground>
@@ -1432,7 +1432,7 @@ export default function TodayScreen() {
                 >
                   {kidBestPace === p && (
                     <View style={mo.kidBadge}>
-                      <Text style={mo.kidBadgeText}>👧 Best for kids</Text>
+                      <Text style={mo.kidBadgeText}>{'\uD83D\uDC67'} Best for kids</Text>
                     </View>
                   )}
                   <Text style={[mo.paceChipName, selectedPace === p && mo.paceChipNameSel]}>
@@ -1486,7 +1486,7 @@ export default function TodayScreen() {
                         )}
                         {hasTicket && !isRemoved && (
                           <TouchableOpacity style={mo.tagTicket} onPress={() => openTicketSearch(stop.name)} hitSlop={6} activeOpacity={0.7}>
-                            <Text style={mo.tagTicketText}>{'🎫'} Ticket needed</Text>
+                            <Text style={mo.tagTicketText}>{'\uD83C\uDFAB'} Ticket needed</Text>
                           </TouchableOpacity>
                         )}
                         {isFreeStop && !isRemoved && (
@@ -1501,7 +1501,7 @@ export default function TodayScreen() {
                   {!isLast && (
                     <View style={mo.travelConnector}>
                       <View style={mo.travelLine} />
-                      <Text style={mo.travelLabel}>{'🚗'} {travelNext} min</Text>
+                      <Text style={mo.travelLabel}>{'\uD83D\uDE97'} {travelNext} min</Text>
                       <View style={mo.travelLine} />
                     </View>
                   )}
@@ -1513,7 +1513,7 @@ export default function TodayScreen() {
           {ticketStops.length > 0 && (
             <View style={mo.alertStrip}>
               <Text style={mo.alertText}>
-                {'🎫'} {ticketStops.length} ticket{ticketStops.length !== 1 ? 's' : ''} needed — book before you go
+                {'\uD83C\uDFAB'} {ticketStops.length} ticket{ticketStops.length !== 1 ? 's' : ''} needed — book before you go
               </Text>
             </View>
           )}
@@ -1524,7 +1524,7 @@ export default function TodayScreen() {
             activeOpacity={0.85}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'🏨'}</Text>
+              <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
@@ -1648,7 +1648,7 @@ export default function TodayScreen() {
             {/* ETA row — pinned to bottom */}
             <View style={er.etaRow}>
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'🚗'}</Text>
+                <Text style={er.etaIcon}>{'\uD83D\uDE97'}</Text>
                 <View>
                   <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
                   <Text style={er.etaLbl}>ETA</Text>
@@ -1681,7 +1681,7 @@ export default function TodayScreen() {
             activeOpacity={0.85}
             onPress={() => setIndoorSheetVisible(true)}
           >
-            <Text style={{ fontSize: 20 }}>{'🌧'}</Text>
+            <Text style={{ fontSize: 20 }}>{'\uD83C\uDF27'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain likely in the next 3 hours ({rainAlert.chance}%)</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
@@ -1693,7 +1693,7 @@ export default function TodayScreen() {
           {!!didYouKnow && (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
               <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                <Text style={{ fontSize: 16 }}>{'✨'}</Text>
+                <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
@@ -1709,7 +1709,7 @@ export default function TodayScreen() {
               params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' },
             })}
           >
-            <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'🧭'}</Text></View>
+            <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={er.kidsTitle}>Let kids explore</Text>
               <Text style={er.kidsSub}>Missions for the ride over</Text>
@@ -1744,7 +1744,7 @@ export default function TodayScreen() {
                 const imgUrl = (s.metadata as Record<string, unknown> | null)?.imageUrl as string | undefined;
                 const stopNum = currentStopIndex + 2 + idx;
                 const typeKey = s.stopType ?? 'other';
-                const typeEmoji = STOP_TYPE_EMOJI[typeKey] ?? '📍';
+                const typeEmoji = STOP_TYPE_EMOJI[typeKey] ?? '\uD83D\uDCCD';
                 const typeBg   = STOP_TYPE_COLOR[typeKey] ?? C.orange;
                 return (
                   <View key={s.id} style={er.afterRow}>
@@ -1762,7 +1762,7 @@ export default function TodayScreen() {
                     </View>
                     <Text style={er.afterName} numberOfLines={1}>{s.name}</Text>
                     {hasTicketSignal(s.metadata) && (
-                      <View style={er.afterTicket}><Text style={er.afterTicketText}>{'🎫'}</Text></View>
+                      <View style={er.afterTicket}><Text style={er.afterTicketText}>{'\uD83C\uDFAB'}</Text></View>
                     )}
                     <Text style={er.afterDur}>{getStopDuration(s)} min</Text>
                   </View>
@@ -1793,7 +1793,7 @@ export default function TodayScreen() {
                 router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
               }}
             >
-              <Text style={er.hereBtnText}>I’m here ✓</Text>
+              <Text style={er.hereBtnText}>I’m here {'\u2713'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1839,7 +1839,7 @@ export default function TodayScreen() {
                 start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '📍'}</Text>
+              <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '\uD83D\uDCCD'}</Text>
               <View style={er.headingBadge}>
                 <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
                 <Text style={er.headingText}>HEADING THERE</Text>
@@ -1851,7 +1851,7 @@ export default function TodayScreen() {
               </View>
               <View style={er.etaRow}>
                 <View style={er.etaPill}>
-                  <Text style={er.etaIcon}>{'🚗'}</Text>
+                  <Text style={er.etaIcon}>{'\uD83D\uDE97'}</Text>
                   <View>
                     <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
                     <Text style={er.etaLbl}>ETA</Text>
@@ -1914,7 +1914,7 @@ export default function TodayScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={[sc.hero, { paddingTop: insets.top + 24 }]}>
             <Animated.View style={{ transform: [{ scale: bounceScale }] }}>
-              <Text style={sc.heroEmoji}>{'🎉'}</Text>
+              <Text style={sc.heroEmoji}>{'\uD83C\uDF89'}</Text>
             </Animated.View>
             <Text style={sc.heroTitle}>Stop done!</Text>
             <Text style={sc.heroSub}>{visitedStop?.name ?? ''}</Text>
@@ -2025,7 +2025,7 @@ export default function TodayScreen() {
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
             style={[dc.hero, { paddingTop: insets.top + 52 }]}
           >
-            <Text style={dc.heroStars}>{'⭐⭐⭐'}</Text>
+            <Text style={dc.heroStars}>{'\u2B50\u2B50\u2B50'}</Text>
             <Text style={dc.heroLabel}>DAY {resolvedDayIndex + 1} DONE!</Text>
             <Text style={dc.heroTheme}>{city || 'Your trip'} Adventure</Text>
             <Text style={dc.heroMeta}>{dayLabel || ''}</Text>
@@ -2206,7 +2206,7 @@ export default function TodayScreen() {
                 <Text style={dc.tomorrowLabel}>TOMORROW</Text>
                 {ticketCount > 0 && (
                   <View style={dc.ticketAlert}>
-                    <Text style={dc.ticketAlertText}>🎫 {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} needed</Text>
+                    <Text style={dc.ticketAlertText}>{'\uD83C\uDFAB'} {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} needed</Text>
                   </View>
                 )}
                 {tomorrowStops.map((s, i) => (
@@ -2232,7 +2232,7 @@ export default function TodayScreen() {
             style={dc.kidsZoneBtn} activeOpacity={0.85}
             onPress={() => router.push('/kids' as never)}
           >
-            <Text style={dc.kidsZoneBtnText}>🧸 Kids zone →</Text>
+            <Text style={dc.kidsZoneBtnText}>{'\uD83E\uDDF8'} Kids zone →</Text>
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
@@ -2255,7 +2255,7 @@ export default function TodayScreen() {
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
             style={[tc.hero, { paddingTop: insets.top + 32 }]}
           >
-            <Text style={tc.heroEmoji}>{'🏆'}</Text>
+            <Text style={tc.heroEmoji}>{'\uD83C\uDFC6'}</Text>
             <Text style={tc.heroEyebrow}>TRIP COMPLETE!</Text>
             <Text style={tc.heroTitle}>{trip?.name ?? city}</Text>
             <Text style={tc.heroSub}>{tripDays} day{tripDays !== 1 ? 's' : ''} of family memories</Text>
@@ -2312,7 +2312,7 @@ export default function TodayScreen() {
             style={tc.gamesBtn} activeOpacity={0.85}
             onPress={() => router.push('/kids/games' as never)}
           >
-            <Text style={tc.gamesBtnText}>🎮 Travel games for the way home</Text>
+            <Text style={tc.gamesBtnText}>{'\uD83C\uDFAE'} Travel games for the way home</Text>
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
@@ -2367,7 +2367,7 @@ export default function TodayScreen() {
                     onPress={() => setHistoryDayIndex(i)}
                   >
                     <Text style={[ds.pillText, isPast && ds.pillTextPast]}>
-                      {isPast ? '✓ ' : ''}Day {i + 1}
+                      {isPast ? '\u2713 ' : ''}Day {i + 1}
                     </Text>
                   </Pressable>
                 );
@@ -2377,7 +2377,7 @@ export default function TodayScreen() {
 
           {(todayState === 'day_history_empty' || hStops.length === 0) ? (
             <View style={dh.emptyCard}>
-              <Text style={dh.emptyEmoji}>{'🗓️'}</Text>
+              <Text style={dh.emptyEmoji}>{'\uD83D\uDDD3\uFE0F'}</Text>
               <Text style={dh.emptyTitle}>No stops recorded for Day {historyDayIndex + 1}</Text>
               <Text style={dh.emptySub}>This day may not have had any planned stops.</Text>
             </View>
@@ -2409,7 +2409,7 @@ export default function TodayScreen() {
                   <View style={dh.stopRow}>
                     <View style={[dh.stopCheck, (stop.isVisited || stop.visited) && dh.stopCheckDone]}>
                       <Text style={dh.stopCheckText}>
-                        {(stop.isVisited || stop.visited) ? '✓' : String(i + 1)}
+                        {(stop.isVisited || stop.visited) ? '\u2713' : String(i + 1)}
                       </Text>
                     </View>
                     <Text style={dh.stopName} numberOfLines={1}>{stop.name}</Text>
@@ -2419,7 +2419,7 @@ export default function TodayScreen() {
                   <View style={dh.photoRow}>
                     {[0, 1, 2].map(slot => (
                       <View key={slot} style={dh.photoSlot}>
-                        <Text style={dh.photoSlotIcon}>📷</Text>
+                        <Text style={dh.photoSlotIcon}>{'\uD83D\uDCF7'}</Text>
                       </View>
                     ))}
                   </View>
@@ -2433,7 +2433,7 @@ export default function TodayScreen() {
                   <TouchableOpacity style={dh.playRow} activeOpacity={0.7}
                     onPress={() => trip ? router.push({ pathname: '/memories/[tripId]/recap' as never, params: { tripId: trip.id } } as never) : undefined}>
                     <View style={dh.playBtn}>
-                      <Text style={dh.playBtnIcon}>▶️</Text>
+                      <Text style={dh.playBtnIcon}>▶{'\uFE0F'}</Text>
                     </View>
                     <Text style={dh.playLabel}>Play story</Text>
                   </TouchableOpacity>

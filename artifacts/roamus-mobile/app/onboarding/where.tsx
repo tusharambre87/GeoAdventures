@@ -118,10 +118,10 @@ const STOP_IMGS_MULTI: Record<string, string[]> = {
 
 // emoji → type fallback (when API type field is missing)
 const EMOJI_TYPE: Record<string, string> = {
-  "🏛️": "museum", "🌿": "nature", "🗺️": "landmark", "🌄": "nature",
-  "🦁": "zoo", "🐠": "aquarium", "🏖️": "beach", "🛒": "market",
-  "🛝": "playground", "🍽️": "restaurant", "🔭": "viewpoint",
-  "🌸": "garden", "🏰": "palace", "🛕": "temple", "⭐": "other",
+  "\uD83C\uDFDB\uFE0F": "museum", "\uD83C\uDF3F": "nature", "\uD83D\uDDFA\uFE0F": "landmark", "\uD83C\uDF04": "nature",
+  "\uD83E\uDD81": "zoo", "\uD83D\uDC20": "aquarium", "\uD83C\uDFD6\uFE0F": "beach", "\uD83D\uDED2": "market",
+  "\uD83D\uDEDD": "playground", "\uD83C\uDF7D\uFE0F": "restaurant", "\uD83D\uDD2D": "viewpoint",
+  "\uD83C\uDF38": "garden", "\uD83C\uDFF0": "palace", "\uD83D\uDED5": "temple", "\u2B50": "other",
 };
 
 function stopImg(spot: { type?: string; emoji?: string }, idx = 0) {
@@ -135,20 +135,20 @@ function stopImg(spot: { type?: string; emoji?: string }, idx = 0) {
 }
 
 function stopTag(type?: string): string {
-  if (!type) return "⭐ All ages";
+  if (!type) return "\u2B50 All ages";
   const t = type.toLowerCase();
-  if (t.includes("museum"))               return "🏛️ Museum";
-  if (t.includes("zoo"))                  return "🦁 Animals";
-  if (t.includes("aquarium"))             return "🐟 Aquarium";
-  if (t.includes("science"))              return "🔬 Science";
-  if (t.includes("art") || t.includes("gallery")) return "🎨 Art";
-  if (t.includes("food") || t.includes("restaurant") || t.includes("market")) return "🍕 Food";
-  if (t.includes("park") || t.includes("garden") || t.includes("nature"))     return "🌿 Outdoors";
-  if (t.includes("beach"))                return "🌊 Beach";
-  if (t.includes("landmark") || t.includes("monument")) return "📍 Landmark";
-  if (t.includes("entertainment") || t.includes("playground")) return "🎡 Fun";
-  if (t.includes("viewpoint"))            return "🔭 Views";
-  return "⭐ Stop";
+  if (t.includes("museum"))               return "\uD83C\uDFDB\uFE0F Museum";
+  if (t.includes("zoo"))                  return "\uD83E\uDD81 Animals";
+  if (t.includes("aquarium"))             return "\uD83D\uDC1F Aquarium";
+  if (t.includes("science"))              return "\uD83D\uDD2C Science";
+  if (t.includes("art") || t.includes("gallery")) return "\uD83C\uDFA8 Art";
+  if (t.includes("food") || t.includes("restaurant") || t.includes("market")) return "\uD83C\uDF55 Food";
+  if (t.includes("park") || t.includes("garden") || t.includes("nature"))     return "\uD83C\uDF3F Outdoors";
+  if (t.includes("beach"))                return "\uD83C\uDF0A Beach";
+  if (t.includes("landmark") || t.includes("monument")) return "\uD83D\uDCCD Landmark";
+  if (t.includes("entertainment") || t.includes("playground")) return "\uD83C\uDFA1 Fun";
+  if (t.includes("viewpoint"))            return "\uD83D\uDD2D Views";
+  return "\u2B50 Stop";
 }
 
 // ─── City grid card image: Wikipedia photo, Unsplash fallback ────────────────
@@ -166,7 +166,7 @@ function RouteCard({ route, selected, onSelect }: { route: PopularRoute; selecte
     <Pressable onPress={onSelect} style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}>
       <Image source={{ uri: src }} style={StyleSheet.absoluteFill} contentFit="cover" />
       <View style={s.cardGrad} />
-      {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
+      {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{'\u2713'}</Text></View>}
       <View style={s.cardLabel}>
         <Text style={s.cardName} numberOfLines={2}>{names}</Text>
         <Text style={s.cardSub}>{route.label}</Text>
@@ -378,7 +378,7 @@ export default function WhereScreen() {
           {(["one", "multi"] as const).map(v => (
             <Pressable key={v} onPress={() => switchMode(v)} style={[s.toggleTab, mode === v && s.toggleTabActive]}>
               <Text style={[s.toggleText, { color: mode === v ? G.deep : G.muted }]}>
-                {v === "one" ? "📍 One City" : "🗺️ Multi-City"}
+                {v === "one" ? "\uD83D\uDCCD One City" : "\uD83D\uDDFA\uFE0F Multi-City"}
               </Text>
             </Pressable>
           ))}
@@ -386,7 +386,7 @@ export default function WhereScreen() {
 
         {/* Search bar */}
         <View style={[s.searchBar, query ? { borderColor: "rgba(232,105,42,0.4)" } : {}]}>
-          <Text style={{ fontSize: 14, color: G.muted }}>🔍</Text>
+          <Text style={{ fontSize: 14, color: G.muted }}>{'\uD83D\uDD0D'}</Text>
           <TextInput
             ref={searchRef}
             style={s.searchInput}
@@ -441,13 +441,13 @@ export default function WhereScreen() {
                     onPress={() => selectCity(item.name)}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                      <Text style={{ fontSize: 16 }}>📍</Text>
+                      <Text style={{ fontSize: 16 }}>{'\uD83D\uDCCD'}</Text>
                       <View>
                         <Text style={[s.suggestName, isSel && { color: G.orange }]}>{item.name}</Text>
                         <Text style={s.suggestSub}>{item.state ? `${item.state}, ` : ""}{item.country}</Text>
                       </View>
                     </View>
-                    {isSel && <Text style={{ color: G.orange }}>✓</Text>}
+                    {isSel && <Text style={{ color: G.orange }}>{'\u2713'}</Text>}
                   </Pressable>
                 );
               }}
@@ -488,7 +488,7 @@ export default function WhereScreen() {
                         >
                           <CityCardImage name={c.name} />
                           <View style={s.cardGrad} />
-                          {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>✓</Text></View>}
+                          {selected && <View style={s.checkBadge}><Text style={{ color: "#fff", fontSize: 11, fontWeight: "700" }}>{'\u2713'}</Text></View>}
                           <View style={s.cardLabel}>
                             <Text style={s.cardName}>{c.name}</Text>
                             <Text style={s.cardSub}>{c.state ?? c.country}</Text>
