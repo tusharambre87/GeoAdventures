@@ -853,7 +853,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // MOCK PURCHASE — dev/sandbox only. Disabled in production.
+  // Replace with server-side Stripe/RevenueCat webhook verification before going live.
   app.patch('/api/auth/user/subscription', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'Not available in production — use payment provider webhook.' });
+    }
     try {
       const userId = req.user.claims.sub;
       const { plan, annual } = req.body;
