@@ -131,6 +131,7 @@ type Stop = {
   cityGroup?: string | null;
   latitude?: string | null;
   longitude?: string | null;
+  kidFitBias?: string | null;
 };
 
 type TripData = {
@@ -1151,6 +1152,21 @@ export default function TodayScreen() {
       : -Infinity;
     const easierFallbackIdx = selectedPace === 'easier' && !isFinite(maxDropPriority)
       ? dayStops.length - 1 : -1;
+    // Kid-fit badge: find which pace option has the most kid-friendly stops
+    const kfPos = ['high', 'toddler', 'all_ages'];
+    const kfCount = (stops: Stop[]) =>
+      stops.filter(s => kfPos.includes(((s as any).kidFitBias ?? (s as any).kid_fit_bias ?? '').toLowerCase())).length;
+    const kfDropStop = dayStops.slice().sort(
+      (a, b) => (parseMetadata(a.metadata).anchorScore ?? 0) - (parseMetadata(b.metadata).anchorScore ?? 0)
+    )[0];
+    const kfEasierStops = dayStops.filter(s => s.id !== kfDropStop?.id);
+    const kfScores: Record<Pace, number> = {
+      balanced: kfCount(dayStops), easier: kfCount(kfEasierStops), faster: kfCount(dayStops),
+    };
+    const kfMax = Math.max(kfScores.balanced, kfScores.easier, kfScores.faster);
+    const kidBestPace: Pace | null = kfMax > 0
+      ? (['balanced', 'easier', 'faster'] as Pace[]).find(k => kfScores[k] === kfMax) ?? null
+      : null;
 
     // Alternate day view (past or future)
     if (viewingDay !== currentDayIndex && trip) {
@@ -1280,6 +1296,11 @@ export default function TodayScreen() {
                   style={[mo.paceChip, selectedPace === p && mo.paceChipSel]}
                   onPress={() => setSelectedPace(p)}
                 >
+                  {kidBestPace === p && (
+                    <View style={mo.kidBadge}>
+                      <Text style={mo.kidBadgeText}>👧 Best for kids</Text>
+                    </View>
+                  )}
                   <Text style={[mo.paceChipName, selectedPace === p && mo.paceChipNameSel]}>
                     {p.charAt(0).toUpperCase() + p.slice(1)}
                   </Text>
@@ -1511,9 +1532,7 @@ export default function TodayScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
-              <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>
-                Fun facts await — explore with your kids as you head over.
-              </Text>
+              <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{'Fun facts await — explore with your kids as you head over.'}</Text>
             </View>
           </View>
 
@@ -1718,9 +1737,9 @@ export default function TodayScreen() {
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={[sc.hero, { paddingTop: insets.top + 24 }]}>
-            <Animated.Text style={[sc.heroEmoji, { transform: [{ scale: bounceScale }] }]}>
-              {'🎉'}
-            </Animated.Text>
+            <Animated.View style={{ transform: [{ scale: bounceScale }] }}>
+              <Text style={sc.heroEmoji}>{'🎉'}</Text>
+            </Animated.View>
             <Text style={sc.heroTitle}>Stop done!</Text>
             <Text style={sc.heroSub}>{visitedStop?.name ?? ''}</Text>
             {visitedElapsed != null && (
@@ -2378,11 +2397,17 @@ const mo = StyleSheet.create({
   paceLabel:      { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 10 },
   paceRow:        { flexDirection: 'row', gap: 8 },
   paceChip:       { flex: 1, paddingVertical: 10, paddingHorizontal: 6, borderRadius: 12,
-    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, alignItems: 'center' },
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, alignItems: 'center',
+    overflow: 'visible' as const },
   paceChipSel:    { borderColor: C.orange, backgroundColor: C.orangeLt },
   paceChipName:   { fontFamily: F.bold, fontSize: 12, color: C.deep },
   paceChipNameSel:{ color: C.orange },
   paceChipSub:    { fontFamily: F.regular, fontSize: 10, color: C.muted, marginTop: 1 },
+  kidBadge:       { position: 'absolute', top: -11, alignSelf: 'center',
+    backgroundColor: '#3DAA6E', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3,
+    zIndex: 10, shadowColor: '#3DAA6E', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
+  kidBadgeText:   { fontSize: 9, fontFamily: F.bold, color: '#fff', letterSpacing: 0.2 },
   stopsSection:   { paddingHorizontal: 20, paddingTop: 14 },
   stopsLabel:     { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 10 },
   emptyText:      { fontFamily: F.regular, fontSize: 14, color: C.muted, paddingVertical: 16 },

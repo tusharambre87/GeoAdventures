@@ -295,6 +295,11 @@ function getDropStop(dayStops: Stop[]): Stop | null {
   );
 }
 
+const KID_FIT_POSITIVE = ['high', 'toddler', 'all_ages'];
+function getKidFitScore(stops: Stop[]): number {
+  return stops.filter(s => KID_FIT_POSITIVE.includes(((s as any).kidFitBias ?? (s as any).kid_fit_bias ?? '').toLowerCase())).length;
+}
+
 function formatDate(isoDate: string, dayOffset = 0): string {
   const d = new Date(isoDate);
   d.setDate(d.getDate() + dayOffset);
@@ -1855,6 +1860,13 @@ function RunDaySheet({
   const dropSt  = getDropStop(dayStops);
   const keptStops = dayStops.filter(s => s.id !== dropSt?.id);
   const dropMin   = dropSt ? getStopDuration(dropSt) : 0;
+  const kfBalanced = getKidFitScore(dayStops);
+  const kfEasier   = getKidFitScore(keptStops);
+  const kfFaster   = getKidFitScore(dayStops);
+  const kfMax = Math.max(kfBalanced, kfEasier, kfFaster);
+  const kidBestMode: RunMode | null = kfMax > 0
+    ? (kfBalanced === kfMax ? 'balanced' : kfEasier === kfMax ? 'easier' : 'faster')
+    : null;
   const totalMin  = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
 
   const singleStop = dayStops.length <= 1;
@@ -1928,6 +1940,11 @@ function RunDaySheet({
               ]}
               onPress={() => onModeChange(m.key)}
             >
+              {kidBestMode === m.key && (
+                <View style={rds.kidBadge}>
+                  <Text style={rds.kidBadgeText}>👧 Best for kids</Text>
+                </View>
+              )}
               <View style={rds.modeHead}>
                 <Text style={rds.modeName}>{m.name}</Text>
                 <View style={[
@@ -3626,7 +3643,7 @@ const rds = StyleSheet.create({
   title: { fontFamily: F.bold, fontSize: 16, color: C.deep, letterSpacing: -0.01 },
   sub:   { fontFamily: F.regular, fontSize: 12, color: C.muted },
   body:  { padding: 16, paddingHorizontal: 20, paddingBottom: 8 },
-  modeCard: { borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 13, paddingHorizontal: 14, marginBottom: 8 },
+  modeCard: { borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 13, paddingHorizontal: 14, marginBottom: 8, overflow: 'visible' as const },
   modeCardSel:    { borderColor: C.orange, backgroundColor: C.orangeLt },
   modeCardEasier: { borderColor: C.green,  backgroundColor: C.greenLt },
   modeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
@@ -3638,6 +3655,12 @@ const rds = StyleSheet.create({
   modeBadgeSelText:    { color: C.orange },
   modeBadgeEasierText: { color: '#1A6B3A' },
   modeDesc: { fontFamily: F.regular, fontSize: 12, color: C.muted, lineHeight: 17 },
+  kidBadge: { position: 'absolute', top: -11, right: 14, backgroundColor: '#3DAA6E',
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row',
+    alignItems: 'center', gap: 4,
+    shadowColor: '#3DAA6E', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 4, zIndex: 10 },
+  kidBadgeText: { fontSize: 10, fontFamily: F.bold, color: '#fff', letterSpacing: 0.2 },
   consequence: { backgroundColor: C.bg, borderRadius: 12, borderWidth: 1, borderColor: C.border, overflow: 'hidden', marginBottom: 14 },
   conHeader: { padding: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.border },
   conTitle: { fontFamily: F.bold, fontSize: 13, color: C.deep, marginBottom: 2 },
