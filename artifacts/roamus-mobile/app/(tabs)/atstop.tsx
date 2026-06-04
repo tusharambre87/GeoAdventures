@@ -161,7 +161,7 @@ type TripData = {
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
 type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food' | 'break' | 'kidExtras';
 type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
-type FeedbackRating = 'okay' | 'good' | 'amazing';
+type FeedbackRating = 'big_hit' | 'good' | 'skip_next_time';
 type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
 type ExtraPlace     = { name: string; distance: string; description: string; stopType: string; ages?: string };
 type Moment         = { id: string; photoUrl: string };
@@ -409,7 +409,7 @@ export default function AtStopScreen() {
   const [stopImages, setStopImages]     = useState<(string | null)[]>([null, null, null]);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [rescueType, setRescueType]     = useState<RescueType>('behind');
-  const [feedbackRating, setFeedbackRating] = useState<FeedbackRating>('amazing');
+  const [feedbackRating, setFeedbackRating] = useState<FeedbackRating>('good');
   const [feedbackText, setFeedbackText]     = useState('');
   const [exploreOpen, setExploreOpen]       = useState(false);
   const [atStopFrozen, setAtStopFrozen]      = useState(false);
@@ -548,7 +548,7 @@ export default function AtStopScreen() {
       if (!skipFeedback) {
         await apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
           method: 'POST',
-          body: JSON.stringify({ signal: feedbackRating, notes: feedbackText || undefined }),
+          body: JSON.stringify({ rating: feedbackRating, notes: feedbackText || undefined }),
         });
       }
       // Mark visited locally
@@ -1351,9 +1351,9 @@ export default function AtStopScreen() {
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
         <View style={sh.emojiRow}>
           {([
-            { emoji: '😐', label: 'Okay',    val: 'okay'    as FeedbackRating },
-            { emoji: '😊', label: 'Good',    val: 'good'    as FeedbackRating },
-            { emoji: '🤩', label: 'Amazing', val: 'amazing' as FeedbackRating },
+            { emoji: '🌟', label: 'Big Hit',        sub: 'Kids loved it',   val: 'big_hit'        as FeedbackRating },
+            { emoji: '👍', label: 'Good',           sub: 'Worth the time',  val: 'good'           as FeedbackRating },
+            { emoji: '⏭️', label: 'Skip next time', sub: "Wouldn’t return", val: 'skip_next_time' as FeedbackRating },
           ] as const).map(opt => (
             <TouchableOpacity key={opt.val}
               style={[sh.emojiOpt, feedbackRating === opt.val && sh.emojiOptSel]}
@@ -1361,6 +1361,7 @@ export default function AtStopScreen() {
               onPress={() => { Keyboard.dismiss(); setFeedbackRating(opt.val); }}>
               <Text style={sh.emojiOptIcon}>{opt.emoji}</Text>
               <Text style={sh.emojiOptLabel}>{opt.label}</Text>
+              <Text style={sh.emojiOptSub}>{opt.sub}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1714,6 +1715,7 @@ const sh = StyleSheet.create({
   emojiOptSel: { borderColor: C.orange, backgroundColor: C.orangeLt },
   emojiOptIcon: { fontSize: 28, marginBottom: 4 },
   emojiOptLabel: { fontFamily: F.semibold, fontSize: 11, color: C.muted },
+  emojiOptSub:   { fontFamily: F.regular,  fontSize: 10, color: C.muted, marginTop: 2 },
   feedbackInput: { fontFamily: F.regular, fontSize: 14, color: C.deep, backgroundColor: C.bg,
     borderRadius: 12, borderWidth: 1.5, borderColor: C.border, padding: 12,
     marginBottom: 14, minHeight: 72, textAlignVertical: 'top' },

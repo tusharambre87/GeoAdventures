@@ -36,7 +36,7 @@ const OPTIONS: {
   bg: string;
 }[] = [
   { id: 'big_hit',        emoji: '🌟',  label: 'Big Hit',        sub: 'Kids loved it',        border: '#F59E0B', bg: '#FFFBEB' },
-  { id: 'good',           emoji: '👍',      label: 'Good',           sub: 'Worth it',             border: '#10B981', bg: '#ECFDF5' },
+  { id: 'good',           emoji: '👍',      label: 'Good',           sub: 'Worth the time',             border: '#10B981', bg: '#ECFDF5' },
   { id: 'skip_next_time', emoji: '⏭️',      label: 'Skip next time', sub: 'Wouldn\u2019t return', border: '#7C3AED', bg: '#F5F3FF' },
 ];
 
