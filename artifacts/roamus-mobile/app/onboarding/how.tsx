@@ -166,9 +166,9 @@ export default function HowScreen() {
             ) : (
               <>
                 <Text style={s.sectionTitle}>Stroller-friendly stops? {'\uD83D\uDEBC'}</Text>
-                <OCard icon="\u2705" label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
+                <OCard icon={'\u2705'} label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
                   selected={stroller === true} onPress={() => selectStroller(true)} />
-                <OCard icon="\uD83D\uDEAB" label="Not needed" sub="Full range of stops available"
+                <OCard icon={'\uD83D\uDEAB'} label="Not needed" sub="Full range of stops available"
                   selected={stroller === false} onPress={() => selectStroller(false)} />
               </>
             )
