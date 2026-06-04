@@ -1,4 +1,5 @@
 - [expo-file-system v56 legacy API](expo-file-system-v56.md) — use `expo-file-system/legacy` for cacheDirectory, writeAsStringAsync, getInfoAsync (v56 broke the top-level export)
 - [atstop emoji/regex edits](atstop-edit-rules.md) — Python `\n` in triple-quoted strings writes literal newlines into JSX; NEVER use the write/edit tool directly on atstop.tsx (or any file with emoji); always use Python scripts via bash.
 - [atstop API data shape](atstop-api-shape.md) — Stop enrichment is a flat JSON blob; field names, fallback chains, and keepDetailOnFocus ref pattern.
+- [emoji rendering fix — RN Android](emoji-rn-fix.md) — Raw emoji in TSX render as tofu boxes; fix with state-machine script at /tmp/fix_emoji_v2.py.
 - [Animated.Text in RN 0.76 Fabric](animated-text-fabric.md) — Animated.Text HOC does not propagate isInAParentText context; use Animated.View + Text instead.
