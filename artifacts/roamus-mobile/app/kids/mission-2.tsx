@@ -45,6 +45,30 @@ export default function Mission2() {
     ? kids.exploreContent!.missions[1].instruction
     : __DEV__ ? MOCK_OBS.instruction : null;
 
+  // Show loading/error BEFORE any mock fallback
+  if (kids.isLoadingExplore) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 16, fontSize: 15, color: "#78716C", fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
+  }
+  if (kids.exploreError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40, paddingHorizontal: 32 }}>
+        <Text style={{ fontSize: 32, marginBottom: 16 }}>{"\U0001f615"}</Text>
+        <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 18, color: "#1C1917", marginBottom: 8, textAlign: "center" }}>{"Couldn't load this mission"}</Text>
+        <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 14, color: "#78716C", marginBottom: 24, textAlign: "center" }}>{"Head back and try again"}</Text>
+        <Pressable
+          style={{ backgroundColor: "#7C3AED", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 15, color: "#fff" }}>{"Go back"}</Text>
+        </Pressable>
+      </View>
+    );
+  }
   if (!hasRealContent && !__DEV__) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
@@ -58,17 +82,19 @@ export default function Mission2() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     kids.setWonderObservation(obs);
     setSubmitting(true);
+    let missionResult: { missionXpAwarded?: number } | undefined;
     try {
       if (kids.stopId) {
-        await kidsAPI.completeMission(kids.stopId, {
+        missionResult = await kidsAPI.completeMission(kids.stopId, {
           explorerId: kids.explorerId || "explorer",
           missionId: "observation",
           answer: obs || "—",
-        });
+        }) as { missionXpAwarded?: number } | undefined;
       }
     } catch {
     }
-    kids.addSessionXp(hasRealContent ? (kids.exploreContent?.missions?.[1]?.xp ?? MOCK_OBS.xp) : MOCK_OBS.xp);
+    const xpAwarded = missionResult?.missionXpAwarded ?? (hasRealContent ? (kids.exploreContent?.missions?.[1]?.xp ?? MOCK_OBS.xp) : MOCK_OBS.xp);
+    kids.addSessionXp(xpAwarded);
     setSubmitting(false);
     router.push("/kids/mission-3");
   }

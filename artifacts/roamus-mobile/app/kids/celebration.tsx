@@ -29,7 +29,7 @@ const K = {
 export default function Celebration() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
-  const xpEarned = kids.sessionXpEarned > 0 ? kids.sessionXpEarned : (kids.exploreContent?.missions?.[0]?.xp ?? 15);
+  const xpEarned = kids.sessionXpEarned > 0 ? kids.sessionXpEarned : 20;
   const starScale = useRef(new Animated.Value(0)).current;
   const starRotate = useRef(new Animated.Value(0)).current;
 

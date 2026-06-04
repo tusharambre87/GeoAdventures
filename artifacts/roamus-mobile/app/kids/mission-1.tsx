@@ -62,6 +62,30 @@ export default function Mission1() {
       }
     : __DEV__ ? MOCK_QUIZ : null;
 
+  // Show loading/error BEFORE any mock fallback
+  if (kids.isLoadingExplore) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 16, fontSize: 15, color: "#78716C", fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
+  }
+  if (kids.exploreError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40, paddingHorizontal: 32 }}>
+        <Text style={{ fontSize: 32, marginBottom: 16 }}>{"😕"}</Text>
+        <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 18, color: "#1C1917", marginBottom: 8, textAlign: "center" }}>Couldn't load this mission</Text>
+        <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 14, color: "#78716C", marginBottom: 24, textAlign: "center" }}>Head back and try again</Text>
+        <Pressable
+          style={{ backgroundColor: "#7C3AED", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 15, color: "#fff" }}>{"Go back"}</Text>
+        </Pressable>
+      </View>
+    );
+  }
   if (!quiz) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
@@ -71,7 +95,7 @@ export default function Mission1() {
     );
   }
 
-  function handleOption(idx: number) {
+  async function handleOption(idx: number) {
     if (answered) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelected(idx);
@@ -83,16 +107,26 @@ export default function Mission1() {
       useNativeDriver: true,
     }).start();
 
-    if (kids.stopId) {
-      kidsAPI.completeMission(kids.stopId, {
-        explorerId: kids.explorerId || "explorer",
-        missionId: "quiz",
-        answer: quiz!.options[idx] ?? String(idx),
-      }).catch(() => {});
-    }
-
     const isCorrect = idx === quiz!.correctIndex;
-    if (isCorrect) {
+    if (kids.stopId) {
+      try {
+        const result = await kidsAPI.completeMission(kids.stopId, {
+          explorerId: kids.explorerId || "explorer",
+          missionId: "quiz",
+          answer: quiz!.options[idx] ?? String(idx),
+        }) as { missionXpAwarded?: number } | undefined;
+        const xpAwarded = result?.missionXpAwarded ?? (isCorrect ? quiz!.xp : 0);
+        if (xpAwarded > 0) {
+          kids.setXpToday(kids.xpToday + xpAwarded);
+          kids.addSessionXp(xpAwarded);
+        }
+      } catch {
+        if (isCorrect) {
+          kids.setXpToday(kids.xpToday + quiz!.xp);
+          kids.addSessionXp(quiz!.xp);
+        }
+      }
+    } else if (isCorrect) {
       kids.setXpToday(kids.xpToday + quiz!.xp);
       kids.addSessionXp(quiz!.xp);
     }

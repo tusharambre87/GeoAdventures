@@ -34,6 +34,7 @@ interface KidsCtx extends KidsState {
   setXpToday: (xp: number) => void;
   setExplorerId: (id: string) => void;
   addSessionXp: (xp: number) => void;
+  resetSessionXp: () => void;
 }
 
 const KidsContext = createContext<KidsCtx>({} as KidsCtx);
@@ -81,6 +82,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
     setKidName: (kidName) => setState((s) => ({ ...s, kidName })),
     setXpToday: (xpToday) => setState((s) => ({ ...s, xpToday })),
     addSessionXp: (xp) => setState((s) => ({ ...s, sessionXpEarned: s.sessionXpEarned + xp, xpToday: s.xpToday + xp })),
+    resetSessionXp: () => setState((s) => ({ ...s, sessionXpEarned: 0 })),
     setExplorerId: (explorerId) => setState((s) => ({ ...s, explorerId })),
   };
 
