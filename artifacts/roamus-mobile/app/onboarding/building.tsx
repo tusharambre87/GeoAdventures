@@ -1,17 +1,13 @@
-import LottieView from 'lottie-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useRef, useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import Animated, {
+import { Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
+import Reanimated, {
   useSharedValue,
   withSequence,
   withTiming,
   withDelay,
   useAnimatedStyle,
-  FadeIn,
-  FadeOut,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,11 +15,12 @@ import { API_BASE } from '@/lib/authContext';
 import { CITY_COUNTRY, STYLE_MAP, PACE_MAP } from '@/lib/tokens';
 import { useOnboarding } from '@/lib/onboardingContext';
 
-// ─── Constants ─────────────────────────────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────
 
-const MIN_ANIM_MS = 6500;
+const MIN_ANIM_MS  = 6500;
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// ─── BuildingScreen ───────────────────────────────────────────────────────────────
+// ─── BuildingScreen ─────────────────────────────────────────────────────────
 
 export default function BuildingScreen() {
   const insets = useSafeAreaInsets();
@@ -40,28 +37,44 @@ export default function BuildingScreen() {
   const travelerCount = data.travelers.length;
 
   const MESSAGES = [
-    `Mapping ${city}…`,
-    'Finding family-friendly stops…',
-    'Checking ages & interests…',
-    'Calculating travel times…',
-    'Finding free-entry options…',
-    'Scoring stops for your pace…',
-    'Adding wonder moments for kids…',
-    'Building your day-by-day plan…',
-    'Almost ready…',
+    `Mapping ${city}\u2026`,
+    'Finding family-friendly stops\u2026',
+    'Checking ages & interests\u2026',
+    'Calculating travel times\u2026',
+    'Finding free-entry options\u2026',
+    'Scoring stops for your pace\u2026',
+    'Adding wonder moments for kids\u2026',
+    'Building your day-by-day plan\u2026',
+    'Almost ready\u2026',
   ];
 
-  // ─ Phase & message state ─
-  const [phase,    setPhase]    = useState<'building' | 'finishing'>('building');
+  // ─ State ─
   const [msgIdx,   setMsgIdx]   = useState(0);
   const [animDone, setAnimDone] = useState(false);
   const [apiDone,  setApiDone]  = useState(false);
   const navigated = useRef(false);
 
-  const mapLottieRef     = useRef<LottieView>(null);
-  const successLottieRef = useRef<LottieView>(null);
-  const msgOpacity       = useSharedValue(1);
-  const msgStyle         = useAnimatedStyle(() => ({ opacity: msgOpacity.value }));
+  // ─ Progress bar (RN core Animated — width cannot use native driver) ─
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  // ─ Message opacity (Reanimated) ─
+  const msgOpacity = useSharedValue(1);
+  const msgStyle   = useAnimatedStyle(() => ({ opacity: msgOpacity.value }));
+
+  // ─ Heading / finish opacity (Reanimated) ─
+  const headingOpacity = useSharedValue(1);
+  const finishOpacity  = useSharedValue(0);
+  const headingStyle   = useAnimatedStyle(() => ({ opacity: headingOpacity.value }));
+  const finishStyle    = useAnimatedStyle(() => ({ opacity: finishOpacity.value }));
+
+  // ─ Drive progress bar on mount ─
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: MIN_ANIM_MS,
+      useNativeDriver: false,
+    }).start();
+  }, []);
 
   // ─ Minimum animation timer ─
   useEffect(() => {
@@ -74,8 +87,9 @@ export default function BuildingScreen() {
     if (animDone && apiDone && !navigated.current) {
       navigated.current = true;
       if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setPhase('finishing');
-      setTimeout(() => successLottieRef.current?.play(), 50);
+      headingOpacity.value = withTiming(0.3, { duration: 400 }, () => {
+        finishOpacity.value = withTiming(1, { duration: 400 });
+      });
       setTimeout(() => router.replace('/onboarding/preview'), 1800);
     }
   }, [animDone, apiDone]);
@@ -129,124 +143,158 @@ export default function BuildingScreen() {
     })();
   }, []);
 
+  const progressWidth = progressAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [0, SCREEN_WIDTH - 64],
+  });
+
   return (
-    <View style={styles.root}>
-      {/* Dark base */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0D1B2A' }]} />
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
 
-      {/* Top gradient vignette */}
-      <LinearGradient
-        colors={['#060810', '#060810', 'transparent']}
-        locations={[0, 0.25, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-      />
+      {/* Orange radial glow — absolutely positioned */}
+      <View style={styles.glow} />
 
-      {/* Bottom gradient vignette */}
-      <LinearGradient
-        colors={['transparent', '#060810', '#060810']}
-        locations={[0, 0.6, 1]}
-        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%' }}
-      />
-
-      {/* Map-pins Lottie — building phase */}
-      {phase === 'building' && (
-        <LottieView
-          ref={mapLottieRef}
-          source={require('../../assets/animations/map-pins.json')}
-          autoPlay
-          loop
-          style={[StyleSheet.absoluteFill, { opacity: 0.9 }]}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Success Lottie — finishing phase */}
-      {phase === 'finishing' && (
-        <LottieView
-          ref={successLottieRef}
-          source={require('../../assets/animations/success.json')}
-          autoPlay={false}
-          loop={false}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* Content layer */}
-      <View style={[styles.content, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 48 }]}>
-        {/* Wordmark */}
-        <View style={styles.logoRow}>
-          <Text style={styles.logoRoam}>Roam</Text>
-          <Text style={styles.logoUs}>Us</Text>
-        </View>
-
-        <View style={styles.center}>
-          {phase === 'building' ? (
-            <>
-              <Text style={styles.heading}>
-                {'Building your\n'}
-                <Text style={styles.headingCity}>{city} adventure</Text>
-              </Text>
-
-              <Animated.Text style={[styles.message, msgStyle]}>
-                {MESSAGES[msgIdx]}
-              </Animated.Text>
-            </>
-          ) : (
-            <Animated.View entering={FadeIn.duration(400)} style={styles.finishWrap}>
-              <Text style={styles.finishTitle}>Your adventure is ready</Text>
-              <Text style={styles.finishSub}>
-                {city}{tripDays > 0 ? ` · ${tripDays} days` : ''}{totalStops > 0 ? ` · ${totalStops} stops` : ''}
-              </Text>
-            </Animated.View>
-          )}
-        </View>
-
-        <Text style={styles.footer}>
-          {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''} · ${city}`}
-        </Text>
+      {/* Wordmark top-left */}
+      <View style={styles.wordmarkRow}>
+        <Text style={styles.wordmarkRoam}>Roam</Text>
+        <Text style={styles.wordmarkUs}>Us</Text>
       </View>
+
+      {/* Center block */}
+      <View style={styles.center}>
+
+        {/* Heading — fades to 0.3 on finish */}
+        <Reanimated.View style={headingStyle}>
+          <Text style={styles.heading}>
+            {'Building your\n'}
+            <Text style={styles.headingCity}>{city} adventure</Text>
+          </Text>
+        </Reanimated.View>
+
+        {/* Progress track */}
+        <View style={styles.progressTrack}>
+          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+        </View>
+
+        {/* Cycling message */}
+        <Reanimated.View style={msgStyle}>
+          <Text style={styles.message}>{MESSAGES[msgIdx]}</Text>
+        </Reanimated.View>
+
+        {/* Finish overlay — fades in when done */}
+        <Reanimated.View style={[StyleSheet.absoluteFill, styles.finishWrap, finishStyle]} pointerEvents="none">
+          <Text style={styles.finishTitle}>Your adventure is ready</Text>
+          <Text style={styles.finishSub}>
+            {city}{tripDays > 0 ? ` \u00b7 ${tripDays} days` : ''}{totalStops > 0 ? ` \u00b7 ${totalStops} stops` : ''}
+          </Text>
+        </Reanimated.View>
+
+      </View>
+
+      {/* Footer */}
+      <Text style={styles.footer}>
+        {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''} \u00b7 ${city}`}
+      </Text>
+
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#060810' },
-  content: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'column',
+  root: {
+    flex: 1,
+    backgroundColor: '#060810',
     justifyContent: 'space-between',
   },
-  logoRow: { flexDirection: 'row', paddingHorizontal: 24 },
-  logoRoam: { fontFamily: 'serif', fontSize: 22, color: '#fff', fontWeight: '900' },
-  logoUs:   { fontFamily: 'serif', fontSize: 22, color: '#E8692A', fontWeight: '900' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 140, paddingHorizontal: 32 },
+
+  glow: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(232,105,42,0.05)',
+    alignSelf: 'center',
+    top: '28%',
+    shadowColor: '#E8692A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 60,
+    elevation: 20,
+  },
+
+  wordmarkRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  wordmarkRoam: { fontFamily: 'serif', fontSize: 22, color: '#fff',     fontWeight: '900' },
+  wordmarkUs:   { fontFamily: 'serif', fontSize: 22, color: '#E8692A',  fontWeight: '900' },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+
   heading: {
-    fontSize: 34, fontWeight: '900', color: '#fff',
-    textAlign: 'center', letterSpacing: -0.6, lineHeight: 40,
-    marginBottom: 20,
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#fff',
+    textAlign: 'center',
+    letterSpacing: -0.6,
+    lineHeight: 42,
+    marginBottom: 24,
   },
   headingCity: { color: '#E8692A' },
-  message: {
-    fontSize: 15, fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'center',
+
+  progressTrack: {
+    width: '100%',
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 1,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
-  finishWrap: { alignItems: 'center' },
+  progressFill: {
+    height: 2,
+    backgroundColor: '#E8692A',
+    borderRadius: 1,
+  },
+
+  message: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  finishWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   finishTitle: {
-    fontFamily: 'serif', fontSize: 30, fontWeight: '900',
-    color: '#fff', letterSpacing: -0.5, textAlign: 'center',
+    fontFamily: 'serif',
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: -0.5,
+    textAlign: 'center',
     marginBottom: 8,
   },
   finishSub: {
-    fontSize: 15, color: 'rgba(255,255,255,0.55)',
-    fontWeight: '600', textAlign: 'center',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
   },
+
   footer: {
-    fontSize: 12, color: 'rgba(255,255,255,0.3)',
-    fontWeight: '600', textAlign: 'center',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.25)',
+    textAlign: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 16,
   },
 });
