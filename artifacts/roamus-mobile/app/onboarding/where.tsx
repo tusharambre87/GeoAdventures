@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
@@ -316,14 +316,29 @@ export default function WhereScreen() {
     const apiCity = CITY_CANONICAL[city] ?? city;
     setPreviews(prev => ({ ...prev, [city]: null }));
     fetch(`${API_BASE}/api/travel/builder-preview?city=${encodeURIComponent(apiCity)}&childAges=5,8`)
-      .then(r => r.ok ? r.json() : { spots: [] })
-      .then(body => setPreviews(prev => ({ ...prev, [city]: body })))
-      .catch(() => setPreviews(prev => ({ ...prev, [city]: { spots: [] } })));
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('not_ok')))
+      .then((body: { spots: any[] }) => {
+        // If we got 0 spots (city not seeded), remove from ref so user can retry
+        if (!body.spots?.length) fetchingRef.current.delete(city);
+        setPreviews(prev => ({ ...prev, [city]: body }));
+      })
+      .catch(() => {
+        // Network error or non-ok → clear so the next focus / re-select retries
+        fetchingRef.current.delete(city);
+        setPreviews(prev => ({ ...prev, [city]: { spots: [] } }));
+      });
   }
 
   useEffect(() => {
     sel.forEach(fetchPreview);
   }, [sel]);
+
+  // Retry failed / empty previews every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      sel.forEach(fetchPreview);
+    }, [sel]),
+  );
 
   function selectCity(name: string) {
     if (mode === "one") {
