@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE = "https://geoquestgame.live";
+import { API_BASE } from "@/lib/apiClient";
 
 const C = {
   bg: "#F5F2EE",
