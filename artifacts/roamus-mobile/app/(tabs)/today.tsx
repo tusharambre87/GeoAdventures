@@ -30,7 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fonts/fraunces";
 import * as Haptics from "expo-haptics";
 
-import { API_BASE, kidsAPI } from "@/lib/apiClient";
+import { API_BASE, kidsAPI, memoriesAPI } from "@/lib/apiClient";
 import { SpeechTextInput } from "@/components/SpeechTextInput";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
@@ -1969,6 +1969,30 @@ export default function TodayScreen() {
               try {
                 await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
               } catch { /* best-effort */ }
+
+              if (trip?.id) {
+                const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
+                const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
+
+                if (filledPhotos.length > 0) {
+                  try {
+                    await memoriesAPI.createMoment({
+                      tripId: trip.id,
+                      photoUrls: filledPhotos,
+                    });
+                  } catch { /* best-effort */ }
+                }
+
+                for (const [, quote] of filledQuotes) {
+                  try {
+                    await memoriesAPI.createMoment({
+                      tripId: trip.id,
+                      kidPromptResponse: quote.trim(),
+                    });
+                  } catch { /* best-effort */ }
+                }
+              }
+
               router.push('/(tabs)/memories' as never);
             }}
           >
