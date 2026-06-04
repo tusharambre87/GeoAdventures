@@ -38,7 +38,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_BASE } from '@/lib/apiClient';
-import { F } from '@/lib/tokens';
+import { F, CITY_IMGS } from '@/lib/tokens';
 import StopPickerSheet from '@/components/StopPickerSheet';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -460,7 +460,8 @@ export default function AtStopScreen() {
     setHeroImageUrl(null);
     setStopImages([null, null, null]);
     fetchWikiImages(currentStop.name).then(urls => {
-      const fallback = `https://source.unsplash.com/800x600/?${encodeURIComponent(currentStop.name + ' landmark')}`;
+      const fallback = CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
+        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
       const hero = urls[0] ?? fallback;
       setHeroImageUrl(hero);
       setStopImages([hero, urls[1] ?? null, urls[2] ?? null]);

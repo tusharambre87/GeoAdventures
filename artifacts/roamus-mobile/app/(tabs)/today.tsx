@@ -923,7 +923,6 @@ export default function TodayScreen() {
       .filter(s => (s.dayIndex ?? 0) === 0)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .slice(0, 4);
-    console.log('trip firstPhotoUrl:', trip?.firstPhotoUrl);
     const day0Stops = trip?.stops?.filter(s => (s.dayIndex ?? 0) === 0) ?? previewStops;
     const stopCount = day0Stops.length || (trip?.stops?.length ?? 0);
     const totalMins = stopCount * 75;
@@ -931,7 +930,8 @@ export default function TodayScreen() {
       ? `${Math.floor(totalMins / 60)}h${totalMins % 60 > 0 ? ' ' + (totalMins % 60) + 'm' : ''}`
       : `${totalMins}m`;
     const heroImageUrl = trip?.firstPhotoUrl
-      ?? `https://source.unsplash.com/800x600/?${encodeURIComponent((trip?.destination ?? 'travel') + ' city landmark')}`;
+      ?? CITY_IMGS[city]
+      ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -1446,7 +1446,9 @@ export default function TodayScreen() {
           <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
             <Image
               source={{ uri: (stop.metadata as Record<string, unknown> | null)?.imageUrl as string ||
-                `https://source.unsplash.com/800x600/?${encodeURIComponent(stop.name + ' landmark')}` }}
+                CITY_IMGS[(stop as { cityGroup?: string | null }).cityGroup ?? ''] ||
+                CITY_IMGS[city] ||
+                'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
             />
