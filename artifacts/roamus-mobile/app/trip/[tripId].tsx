@@ -873,16 +873,20 @@ const FOOD_PER_PERSON: Record<string, { min: number; max: number }> = {
 const TRANSPORT_PER_STOP: Record<string, number> = {
   tier1: 12, tier2: 9, tier3: 6,
 };
+const SNACK_PER_PERSON: Record<string, number> = {
+  tier1: 8, tier2: 6, tier3: 4,
+};
 function computeDaySpend(stops: Stop[], destination: string, familySize: number) {
   const tier = (CITY_TIER[destination] ?? 'tier3') as 'tier1' | 'tier2' | 'tier3';
   const admission = stops.reduce((sum, s) => sum + (ADMISSION_COST[s.stopType ?? ''] ?? 0) * familySize, 0);
   const food = FOOD_PER_PERSON[tier];
   const foodMin = food.min * familySize;
   const foodMax = food.max * familySize;
+  const snacks = SNACK_PER_PERSON[tier] * familySize;
   const transport = TRANSPORT_PER_STOP[tier] * Math.max(stops.length - 1, 1);
-  return { admission, foodMin, foodMax, transport,
-    totalMin: admission + foodMin + transport,
-    totalMax: admission + foodMax + transport };
+  return { admission, foodMin, foodMax, snacks, transport,
+    totalMin: admission + foodMin + snacks + transport,
+    totalMax: admission + foodMax + snacks + transport };
 }
 
 // ─── DayCard (Overview) ───────────────────────────────────────────────────────
@@ -1038,7 +1042,7 @@ function TripOverview({
       const di = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
       return di !== 0 ? di : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
     })[0];
-  const hideChecklist = trip.status === 'active' || !!(firstStop?.isVisited || firstStop?.visited);
+  const hideChecklist = !!(firstStop?.isVisited || firstStop?.visited);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1352,21 +1356,25 @@ function DayDetail({
                   <Text style={sp.label}>ESTIMATED SPEND TODAY</Text>
                   <Text style={sp.range}>${spend.totalMin}–${spend.totalMax}</Text>
                 </View>
-                <Text style={{ fontSize: 24 }}>{'\U0001F4B0'}</Text>
               </View>
               <View style={sp.buckets}>
                 <View style={sp.bucket}>
-                  <Text style={sp.bucketIco}>{'\U0001F3AB'}</Text>
+                  <Text style={sp.bucketIco}>{'\uD83C\uDFAB'}</Text>
                   <Text style={sp.bucketLbl}>Admission</Text>
                   <Text style={sp.bucketVal}>${spend.admission}</Text>
                 </View>
                 <View style={sp.bucket}>
-                  <Text style={sp.bucketIco}>{'\U0001F354'}</Text>
+                  <Text style={sp.bucketIco}>{'\uD83C\uDF54'}</Text>
                   <Text style={sp.bucketLbl}>Food</Text>
                   <Text style={sp.bucketVal}>${spend.foodMin}–${spend.foodMax}</Text>
                 </View>
                 <View style={sp.bucket}>
-                  <Text style={sp.bucketIco}>{'\U0001F697'}</Text>
+                  <Text style={sp.bucketIco}>{'\uD83C\uDF7F'}</Text>
+                  <Text style={sp.bucketLbl}>Snacks</Text>
+                  <Text style={sp.bucketVal}>${spend.snacks}</Text>
+                </View>
+                <View style={sp.bucket}>
+                  <Text style={sp.bucketIco}>{'\uD83D\uDE97'}</Text>
                   <Text style={sp.bucketLbl}>Transport</Text>
                   <Text style={sp.bucketVal}>~${spend.transport}</Text>
                 </View>
