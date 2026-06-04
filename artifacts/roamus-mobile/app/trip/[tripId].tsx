@@ -772,7 +772,7 @@ function StopCard({
           )}
           {isAnchor && (
             <View style={sc.tagAnchor}>
-              <Text style={sc.tagAnchorText}>anchor stop</Text>
+              <Text style={sc.tagAnchorText}>Kid friendly</Text>
             </View>
           )}
         </View>
@@ -3608,8 +3608,8 @@ const sc = StyleSheet.create({
   tagTicketText: { fontFamily: F.bold, fontSize: 10, color: '#C0392B' },
   tagFree:    { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: C.greenLt },
   tagFreeText:{ fontFamily: F.bold, fontSize: 10, color: '#1A6B3A' },
-  tagAnchor:  { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: '#F0EBFF', borderWidth: 1, borderColor: '#D8CFEF' },
-  tagAnchorText: { fontFamily: F.bold, fontSize: 10, color: '#5B3FA8' },
+  tagAnchor:  { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, backgroundColor: '#E8F7EF', borderWidth: 1, borderColor: '#B2DFCA' },
+  tagAnchorText: { fontFamily: F.bold, fontSize: 10, color: '#1A6640' },
   actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9, paddingHorizontal: 12, paddingBottom: 11 },
   detailsBtn: { backgroundColor: C.deep, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 8 },
   detailsBtnText: { fontFamily: F.bold, fontSize: 12, color: '#fff' },

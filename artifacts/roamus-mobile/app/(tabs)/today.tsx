@@ -572,7 +572,8 @@ export default function TodayScreen() {
 
   // ── Load trip ──
   const loadTrip = useCallback(async () => {
-    setLoading(true);
+    const wasAlreadyResolved = !!resolvedTripId;
+    if (!wasAlreadyResolved) setLoading(true);
     setError(null);
     try {
       // Check for state override from atstop.tsx feedback
@@ -622,7 +623,7 @@ export default function TodayScreen() {
         } else if (__DEV__) {
           t = MOCK_TRIP;
         } else {
-          setError('Failed to load trip details.');
+          if (!wasAlreadyResolved) setError('Failed to load trip details.');
           return;
         }
       }
@@ -1386,7 +1387,7 @@ export default function TodayScreen() {
                           <View style={mo.tagFree}><Text style={mo.tagFreeText}>Free entry</Text></View>
                         )}
                         {isAnchor && !isRemoved && (
-                          <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>{'⭐'} Anchor</Text></View>
+                          <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>Kid friendly</Text></View>
                         )}
                       </View>
                     </View>
@@ -2530,8 +2531,8 @@ const mo = StyleSheet.create({
   tagTicketText:  { fontFamily: F.bold, fontSize: 10, color: C.red },
   tagFree:        { backgroundColor: C.greenLt, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
   tagFreeText:    { fontFamily: F.bold, fontSize: 10, color: C.green },
-  tagAnchor:      { backgroundColor: '#F0EBFF', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
-  tagAnchorText:  { fontFamily: F.bold, fontSize: 10, color: C.purple },
+  tagAnchor:      { backgroundColor: '#E8F7EF', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
+  tagAnchorText:  { fontFamily: F.bold, fontSize: 10, color: '#1A6640' },
   tagRemoved:     { backgroundColor: '#f5f5f5', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
   tagRemovedText: { fontFamily: F.medium, fontSize: 10, color: '#bbb' },
   alertStrip:     { marginHorizontal: 20, marginTop: 6, borderRadius: 10,

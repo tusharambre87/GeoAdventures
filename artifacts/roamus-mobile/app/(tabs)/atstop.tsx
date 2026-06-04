@@ -716,7 +716,7 @@ export default function AtStopScreen() {
                       <View style={sc.tagsRow}>
                         {hasTicket && <View style={[sc.tag, sc.tagRed]}><Text style={[sc.tagTxt, sc.tagTxtRed]}>🎫 Ticket needed</Text></View>}
                         {isFree && !hasTicket && <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>Free entry</Text></View>}
-                        {isAnchor && <View style={[sc.tag, sc.tagPurple]}><Text style={[sc.tagTxt, sc.tagTxtPurple]}>⚓ Anchor stop</Text></View>}
+                        {isAnchor && <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>Kid friendly</Text></View>}
                       </View>
                     </View>
                     <Text style={sc.stopChevron}>›</Text>
