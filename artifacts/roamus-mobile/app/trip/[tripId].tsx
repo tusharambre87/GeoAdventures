@@ -750,7 +750,6 @@ function StopCard({
 
       {/* Body — tags only; actionRow is rendered outside Swipeable */}
       <View style={sc.body}>
-        {console.log('kidFitBias raw:', stop.id, stop.name, stop.kidFitBias, (stop as any).kid_fit_bias) as any}
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
@@ -1239,7 +1238,6 @@ function DayDetail({
 
 
         {/* Stop cards — meal cards splice in after first content stop */}
-        {contentStops.length > 0 && void console.log('stop fields:', JSON.stringify(contentStops[0], null, 2))}
         {contentStops.map((stop, i) => (
           <React.Fragment key={stop.id}>
             <StopCard

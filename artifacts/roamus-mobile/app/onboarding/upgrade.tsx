@@ -71,9 +71,12 @@ export default function UpgradeScreen() {
 
   const sym = pricing?.symbol ?? "$";
   const passMonthly = pricing ? `${sym}${pricing.geopass}` : "$4.99";
-  const passAnnual = pricing ? `${sym}${(parseFloat(pricing.geopass) * 10).toFixed(0)}` : "$49";
+  const passAnnual = "$39.99";
   const tripPrice = pricing ? `${sym}${pricing.trippack}` : "$9.99";
   const cadence = pricing?.cadence ?? "month";
+  const annualSavingsPct = pricing
+    ? Math.round((1 - 39.99 / (parseFloat(pricing.geopass) * 12)) * 100)
+    : 33;
 
   function planPrice(id: string): string {
     if (id === "free") return "$0";
@@ -128,7 +131,7 @@ export default function UpgradeScreen() {
             style={[s.toggleBtn, annual && s.toggleBtnActive]}
           >
             <Text style={[s.toggleBtnText, annual && s.toggleBtnTextActive]}>Annual</Text>
-            <View style={s.saveBadge}><Text style={s.saveBadgeText}>Save 17%</Text></View>
+            <View style={s.saveBadge}><Text style={s.saveBadgeText}>Save {annualSavingsPct}%</Text></View>
           </Pressable>
         </View>
 

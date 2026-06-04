@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
@@ -23,6 +23,19 @@ export default function AccountScreen() {
   const [error, setError] = useState<string | null>(null);
   const emailRef = useRef<TextInput>(null);
   const pwRef = useRef<TextInput>(null);
+
+  // If already logged in, skip registration — just create the trip and advance
+  useEffect(() => {
+    if (!token) return;
+    set({ onboardingInProgress: true });
+    setLoading(true);
+    const jwt = token;
+    createTripWithJwt(jwt).then(() => {
+      setLoading(false);
+      router.replace("/onboarding/upgrade");
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function createTripWithJwt(jwt: string) {
     try {
