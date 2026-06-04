@@ -9903,8 +9903,7 @@ Return ONLY valid JSON in this exact format:
   function signPhotoSig(objectName: string): string {
     const secret = process.env.JWT_SECRET;
     if (!secret) throw new Error('JWT_SECRET env var is required for photo URL signing');
-    const { createHmac } = require('crypto') as typeof import('crypto');
-    return createHmac('sha256', secret).update(objectName).digest('hex').slice(0, 32);
+    return crypto.createHmac('sha256', secret).update(objectName).digest('hex').slice(0, 32);
   }
 
   app.get('/api/travel/photo/:objectName', async (req: any, res) => {
