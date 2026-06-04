@@ -4,6 +4,7 @@ import {
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   PanResponder,
   Platform,
   ScrollView,
@@ -125,7 +126,7 @@ export default function ChecklistSheet({
 }: ChecklistSheetProps) {
   const anim      = useRef(new Animated.Value(0)).current;
   const progressA = useRef(new Animated.Value(0)).current;
-  const mounted   = useRef(false);
+  const [mounted, setMounted] = useState(false);
   const closeRef  = useRef(onClose);
   closeRef.current = onClose;
 
@@ -139,7 +140,6 @@ export default function ChecklistSheet({
 
   const storageKey = `roamus_checklist_${tripId}`;
 
-  if (visible && !mounted.current) mounted.current = true;
 
   function getCheckAnim(id: string): Animated.Value {
     if (!checkAnimRefs.current.has(id)) {
@@ -247,13 +247,15 @@ export default function ChecklistSheet({
   }, [visible]);
 
   useEffect(() => {
+    if (visible) setMounted(true);
     Animated.spring(anim, {
       toValue: visible ? 1 : 0,
       useNativeDriver: true,
       damping:   22,
       stiffness: 180,
-    }).start(() => {
-      if (!visible) {
+    }).start(({ finished }) => {
+      if (finished && !visible) {
+        setMounted(false);
         setAddingCustom(false);
         setCustomDraft('');
       }
@@ -267,7 +269,6 @@ export default function ChecklistSheet({
     })
   ).current;
 
-  if (!mounted.current) return null;
 
   const checkedCount = items.filter(i => i.checked).length;
   const totalCount   = items.length;
@@ -337,13 +338,14 @@ export default function ChecklistSheet({
   }
 
   return (
-    <Animated.View
-      style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
-      pointerEvents={visible ? 'auto' : 'none'}
-    >
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+    <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
+        pointerEvents="auto"
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
 
-      <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
+        <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
@@ -436,8 +438,9 @@ export default function ChecklistSheet({
             <View style={{ height: 24 }} />
           </ScrollView>
         </KeyboardAvoidingView>
+        </Animated.View>
       </Animated.View>
-    </Animated.View>
+    </Modal>
   );
 }
 

@@ -1,13 +1,14 @@
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated, Pressable, ScrollView, StyleSheet, Text, View,
+  Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackBtn, BigBtn, ProgressDots } from "@/lib/onboardingAtoms";
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { useAuth, API_BASE } from "@/lib/authContext";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -250,6 +251,39 @@ type CalState = { viewYear:number; viewMonth:number; start:Date|null; end:Date|n
 export default function WhenScreen() {
   const insets = useSafeAreaInsets();
   const { data, set } = useOnboarding();
+  const { token } = useAuth();
+  const [existingRanges, setExistingRanges] = useState<{ start: string; end: string }[]>([]);
+
+  // Fetch existing trips to check for date conflicts
+  useEffect(() => {
+    if (!token) return;
+    fetch(`\${API_BASE}/api/travel/trips`, {
+      headers: { Authorization: `Bearer \${token}` },
+    })
+      .then(r => r.json())
+      .then(json => {
+        const ranges = (json.trips ?? [])
+          .filter((t: any) => t.startDate && t.endDate && t.status !== "completed" && t.status !== "archived")
+          .map((t: any) => ({ start: t.startDate as string, end: t.endDate as string }));
+        setExistingRanges(ranges);
+      })
+      .catch(() => {});
+  }, [token]);
+
+  function datesOverlapExisting(newStart: string | null, newEnd: string | null): string | null {
+    if (!newStart || !newEnd) return null;
+    const ns = new Date(newStart); ns.setHours(0,0,0,0);
+    const ne = new Date(newEnd); ne.setHours(23,59,59,999);
+    for (const r of existingRanges) {
+      const rs = new Date(r.start); rs.setHours(0,0,0,0);
+      const re = new Date(r.end); re.setHours(23,59,59,999);
+      if (ns <= re && ne >= rs) {
+        const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return `You already have a trip planned \${fmt(rs)}–\${fmt(re)}. Please choose different dates.`;
+      }
+    }
+    return null;
+  }
   const today = useMemo(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; },[]);
   const isMulti = data.cityMode === "multi" && data.cities.length >= 2;
 
@@ -360,6 +394,12 @@ export default function WhenScreen() {
       const cal = cals["__single"];
       startDate = cal.start ? toISO(cal.start) : null;
       endDate   = cal.end   ? toISO(cal.end)   : null;
+    }
+
+    const overlapMsg = datesOverlapExisting(startDate, endDate);
+    if (overlapMsg) {
+      Alert.alert("Dates conflict", overlapMsg, [{ text: "OK" }]);
+      return;
     }
 
     set({ startDate, endDate, cityDates, arrivalMethod: transport, arrivalTime: isLocal ? null : arrivalTime, lastDay, cityTransitions: transitions });

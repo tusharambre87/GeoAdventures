@@ -87,7 +87,7 @@ export default function GameHub() {
               router.back();
             }}
           >
-            <Text style={s.hdrBackText}>← Hand back to parent</Text>
+            <Text style={s.hdrBackText}>← Back</Text>
           </Pressable>
           <Text style={s.hdrTitle}>Travel Games</Text>
           <Text style={s.hdrSub}>Quick family games · {stopName}</Text>

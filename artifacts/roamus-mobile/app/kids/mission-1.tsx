@@ -51,7 +51,7 @@ export default function Mission1() {
   const [answered, setAnswered] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const quiz = kids.exploreContent?.missions[0]?.type === "quiz"
+  const quiz = kids.exploreContent?.missions?.[0]?.type === "quiz"
     ? {
         question: kids.exploreContent.missions[0].question,
         options: kids.exploreContent.missions[0].options,

@@ -33,6 +33,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { API_BASE, kidsAPI, memoriesAPI } from "@/lib/apiClient";
 import { SpeechTextInput } from "@/components/SpeechTextInput";
+import ChecklistSheet from "@/components/ChecklistSheet";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
@@ -450,6 +451,7 @@ export default function TodayScreen() {
   const [selectedPace, setSelectedPace]         = useState<Pace>('balanced');
   const [loading, setLoading]                   = useState(true);
   const [starting, setStarting]                 = useState(false);
+  const [checklistOpen, setChecklistOpen]       = useState(false);
   const [error, setError]                       = useState<string | null>(null);
   const [resolvedTripId, setResolvedTripId]     = useState<string | null>(params.tripId ?? null);
   // Always auto-advance to today's day — no user override
@@ -615,7 +617,14 @@ export default function TodayScreen() {
             return;
           }
         }
-        const active = data.trips?.find(t => t.status === 'active') ?? data.trips?.[0];
+        const todayMs = new Date().setHours(0,0,0,0);
+        const active = data.trips?.find(t => {
+          if (t.status === 'active' || t.status === 'in_progress') return true;
+          if (!t.startDate || !t.endDate) return false;
+          const s = new Date(t.startDate); s.setHours(0,0,0,0);
+          const e = new Date(t.endDate);   e.setHours(23,59,59,999);
+          return todayMs >= s.getTime() && todayMs <= e.getTime();
+        }) ?? data.trips?.[0];
         if (!active) {
           if (!devState) setTodayState('no_trip');
           return;
@@ -1124,6 +1133,22 @@ export default function TodayScreen() {
             </View>
           </View>
 
+          {/* Before you go — checklist row */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+            activeOpacity={0.85}
+            onPress={() => setChecklistOpen(true)}
+          >
+            <View style={{ width: 40, height: 40, backgroundColor: '#FFF8F0', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Text style={{ fontSize: 18 }}>{'\u2713'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#1A1F2E' }}>Before you go</Text>
+              <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>Tickets, snacks, sunscreen…</Text>
+            </View>
+            <Text style={{ color: '#E8692A', fontSize: 18 }}>{'\u203a'}</Text>
+          </TouchableOpacity>
+
           {/* Hotel / start point card */}
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
@@ -1470,6 +1495,16 @@ export default function TodayScreen() {
               {'View full trip plan →'}
             </Text>
           </TouchableOpacity>
+
+          {/* Checklist bottom sheet */}
+          {trip && (
+            <ChecklistSheet
+              visible={checklistOpen}
+              onClose={() => setChecklistOpen(false)}
+              tripId={trip.id}
+              stops={dayStops}
+            />
+          )}
 
           <Pressable style={[mo.startBtn, starting && { opacity: 0.7 }]} onPress={handleStartDay} disabled={starting}>
             {starting

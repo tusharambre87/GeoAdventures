@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
@@ -8,18 +8,48 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackBtn, BigBtn, ProgressDots } from "@/lib/onboardingAtoms";
 import { CHIP_COLORS, F, G } from "@/lib/tokens";
 import { useOnboarding, type Traveler } from "@/lib/onboardingContext";
+import { useAuth, API_BASE } from "@/lib/authContext";
 
 const AGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
 export default function WhoScreen() {
   const insets = useSafeAreaInsets();
   const { data, set } = useOnboarding();
+  const { token } = useAuth();
 
   const [travelers, setTravelers] = useState<Traveler[]>(
     data.travelers.length > 0
       ? data.travelers
       : [{ id: 0, init: "Y", name: "You", isParent: true }]
   );
+
+  // Pre-populate travelers from user's existing trips when returning user
+  useEffect(() => {
+    if (!data.returningUser || !token) return;
+    // Only pre-populate if travelers is just the default "You"
+    const isDefault = travelers.length === 1 && travelers[0].name === "You";
+    if (!isDefault) return;
+    fetch(`\${API_BASE}/api/travel/trips`, {
+      headers: { Authorization: `Bearer \${token}` },
+    })
+      .then(r => r.json())
+      .then(json => {
+        const allTrips: any[] = json.trips ?? [];
+        const trip = allTrips.find(t => t.status !== "completed" && t.status !== "archived") ?? allTrips[0];
+        const raw: any[] = trip?.travelers ?? [];
+        if (raw.length > 0) {
+          const fetched: Traveler[] = raw.map((tv: any, i: number) => ({
+            id: typeof tv.id === "number" ? tv.id : Date.now() + i,
+            init: ((tv.name as string)?.[0] ?? "T").toUpperCase(),
+            name: (tv.name as string) ?? "Traveler",
+            isParent: Boolean(tv.isParent ?? tv.is_parent),
+            ...(tv.age != null ? { age: Number(tv.age) } : {}),
+          }));
+          setTravelers(fetched);
+        }
+      })
+      .catch(() => {});
+  }, [data.returningUser, token]);
   const [addingType, setAddingType] = useState<"child" | "adult" | null>(null);
   const [newName, setNewName] = useState("");
   const [newAge, setNewAge] = useState(8);

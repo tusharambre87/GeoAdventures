@@ -182,8 +182,17 @@ export default function TripsScreen() {
   });
 
   const trips = data?.trips ?? [];
-  // Treat active + planned + in_progress trips as "current"
-  const activeTrip = trips.find(t => t.status === "active" || t.status === "in_progress");
+
+  // Date-aware trip status helper
+  function isTripDateActive(t: Trip): boolean {
+    if (!t.startDate || !t.endDate) return false;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const start = new Date(t.startDate); start.setHours(0, 0, 0, 0);
+    const end = new Date(t.endDate); end.setHours(23, 59, 59, 999);
+    return now >= start && now <= end;
+  }
+
+  const activeTrip = trips.find(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
 
   // On mount — restore cacheStatus only if an active/upcoming trip is actually cached
   useEffect(() => {
@@ -222,7 +231,9 @@ export default function TripsScreen() {
   }, [trips, token, user?.subscriptionTier]);
   const currentTrips = trips.filter(t => !["completed", "archived"].includes(t.status));
   const completedTrips = trips.filter(t => t.status === "completed" || t.status === "archived");
-  // Most recently created non-completed trip (shown as hero if none is "active")
+  const inProgressTrips = currentTrips.filter(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
+  const upcomingTrips = currentTrips.filter(t => !inProgressTrips.some(ip => ip.id === t.id));
+  // Hero: prefer date-active trip, fall back to first current trip
   const heroTrip = activeTrip ?? (currentTrips.length > 0 ? currentTrips[0] : null);
 
   const displayName = user?.firstName || user?.username || user?.email?.split("@")[0] || "";
@@ -285,11 +296,20 @@ export default function TripsScreen() {
                   <Text style={s.sectionCount}>{trips.length} total →</Text>
                 </View>
 
-                {currentTrips.length > 0 && (
+                {inProgressTrips.length > 0 && (
                   <>
                     <Text style={s.sectionSub}>IN PROGRESS</Text>
                     <View style={s.cardRow}>
-                      {currentTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                      {inProgressTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                    </View>
+                  </>
+                )}
+
+                {upcomingTrips.length > 0 && (
+                  <>
+                    <Text style={[s.sectionSub, { marginTop: inProgressTrips.length > 0 ? 16 : 0 }]}>UPCOMING</Text>
+                    <View style={s.cardRow}>
+                      {upcomingTrips.map(t => <TripCard key={t.id} trip={t} />)}
                     </View>
                   </>
                 )}

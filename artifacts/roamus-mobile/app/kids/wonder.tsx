@@ -1,7 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
+import { useSpeechToText } from "@/lib/useSpeechToText";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 
@@ -42,6 +44,8 @@ export default function WonderTime() {
   const [text, setText] = useState(kids.wonderObservation);
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { isListening, start, stop } = useSpeechToText();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const stopName = kids.stopName || "Millennium Park";
   const topicChips =
@@ -130,12 +134,19 @@ export default function WonderTime() {
               onPress={handleSubmit}
               disabled={submitting}
             >
-              <Text style={s.submitText}>
-                {submitting ? "Saving…" : "📍 I found something!"}
-              </Text>
+              <Text style={s.submitText}>{submitting ? "Saving…" : "Save"}</Text>
             </Pressable>
-            <Pressable style={s.micBtn}>
-              <Text style={{ fontSize: 22 }}>{"🎤"}</Text>
+            <Pressable
+              style={[s.micBtn, isListening && s.micBtnActive]}
+              onPress={() => {
+                if (isListening) { stop(); } else {
+                  start((t) => { setText(prev => prev ? prev + " " + t : t); });
+                }
+              }}
+            >
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <Text style={{ fontSize: 22 }}>{"🎤"}</Text>
+              </Animated.View>
             </Pressable>
           </View>
         </View>
@@ -296,6 +307,10 @@ const s = StyleSheet.create({
     backgroundColor: K.card,
     alignItems: "center",
     justifyContent: "center",
+  },
+  micBtnActive: {
+    borderColor: "#7C3AED",
+    backgroundColor: "#F5F3FF",
   },
   nav: {
     backgroundColor: K.card,
