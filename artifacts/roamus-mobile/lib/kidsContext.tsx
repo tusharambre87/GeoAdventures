@@ -18,6 +18,7 @@ interface KidsState {
   exploreContent: ExploreContent | null;
   isLoadingExplore: boolean;
   exploreError: boolean;
+  sessionXpEarned: number;
 }
 
 interface KidsCtx extends KidsState {
@@ -32,6 +33,7 @@ interface KidsCtx extends KidsState {
   setKidName: (name: string) => void;
   setXpToday: (xp: number) => void;
   setExplorerId: (id: string) => void;
+  addSessionXp: (xp: number) => void;
 }
 
 const KidsContext = createContext<KidsCtx>({} as KidsCtx);
@@ -51,12 +53,13 @@ export function KidsProvider({ children }: { children: ReactNode }) {
     exploreContent: null,
     isLoadingExplore: false,
     exploreError: false,
+    sessionXpEarned: 0,
   });
 
   const ctx: KidsCtx = {
     ...state,
     setStopInfo: (stopId, stopName, tripId) =>
-      setState((s) => ({ ...s, stopId, stopName, tripId })),
+      setState((s) => ({ ...s, stopId, stopName, tripId, sessionXpEarned: 0 })),
     setCurrentStoryIndex: (n) =>
       setState((s) => ({ ...s, currentStoryIndex: n })),
     markStoryComplete: (n) =>
@@ -77,6 +80,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, exploreError })),
     setKidName: (kidName) => setState((s) => ({ ...s, kidName })),
     setXpToday: (xpToday) => setState((s) => ({ ...s, xpToday })),
+    addSessionXp: (xp) => setState((s) => ({ ...s, sessionXpEarned: s.sessionXpEarned + xp, xpToday: s.xpToday + xp })),
     setExplorerId: (explorerId) => setState((s) => ({ ...s, explorerId })),
   };
 

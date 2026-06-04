@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -215,7 +216,11 @@ export default function PassScreen() {
               <Pressable
                 style={s.manageLink}
                 onPress={() =>
-                  Linking.openURL("https://apps.apple.com/account/subscriptions").catch(() => {})
+                  Linking.openURL(
+                  Platform.OS === 'ios'
+                    ? 'https://apps.apple.com/account/subscriptions'
+                    : 'https://play.google.com/store/account/subscriptions'
+                ).catch(() => {})
                 }
               >
                 <Text style={s.manageLinkText}>{"Manage subscription →"}</Text>

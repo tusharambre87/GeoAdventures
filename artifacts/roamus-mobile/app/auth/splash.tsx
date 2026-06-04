@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ImageBackground,
   Platform,
@@ -11,11 +11,19 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const splashBg = require("@/assets/images/splash-bg.jpg");
 
 export default function AuthSplash() {
   const insets = useSafeAreaInsets();
+  const [isReturningUser, setIsReturningUser] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("auth_token").then((token) => {
+      setIsReturningUser(!!token);
+    }).catch(() => {});
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -38,9 +46,11 @@ export default function AuthSplash() {
             <Text style={styles.wmRoam}>Roam</Text>
             <Text style={styles.wmUs}>Us</Text>
           </Text>
-          <View style={styles.welcomePill}>
-            <Text style={styles.welcomeText}>WELCOME BACK</Text>
-          </View>
+          {isReturningUser && (
+            <View style={styles.welcomePill}>
+              <Text style={styles.welcomeText}>WELCOME BACK</Text>
+            </View>
+          )}
         </View>
 
         {/* ── Bottom content ── */}

@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView,
@@ -51,14 +52,24 @@ export default function Mission1() {
   const [answered, setAnswered] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const quiz = kids.exploreContent?.missions?.[0]?.type === "quiz"
+  const hasRealContent = kids.exploreContent?.missions?.[0]?.type === "quiz";
+  const quiz = hasRealContent
     ? {
-        question: kids.exploreContent.missions[0].question,
-        options: kids.exploreContent.missions[0].options,
-        correctIndex: kids.exploreContent.missions[0].correctIndex,
-        xp: kids.exploreContent.missions[0].xp,
+        question: kids.exploreContent!.missions[0].question,
+        options: kids.exploreContent!.missions[0].options,
+        correctIndex: kids.exploreContent!.missions[0].correctIndex,
+        xp: kids.exploreContent!.missions[0].xp,
       }
-    : MOCK_QUIZ;
+    : __DEV__ ? MOCK_QUIZ : null;
+
+  if (!quiz) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 16, fontSize: 15, color: "#78716C", fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
+  }
 
   function handleOption(idx: number) {
     if (answered) return;
@@ -76,11 +87,15 @@ export default function Mission1() {
       kidsAPI.completeMission(kids.stopId, {
         explorerId: kids.explorerId || "explorer",
         missionId: "quiz",
-        answer: quiz.options[idx] ?? String(idx),
+        answer: quiz!.options[idx] ?? String(idx),
       }).catch(() => {});
     }
 
-    const isCorrect = idx === quiz.correctIndex;
+    const isCorrect = idx === quiz!.correctIndex;
+    if (isCorrect) {
+      kids.setXpToday(kids.xpToday + quiz!.xp);
+      kids.addSessionXp(quiz!.xp);
+    }
     const delay = isCorrect ? 700 : 1300;
     setTimeout(() => {
       router.push("/kids/mission-2");
@@ -89,22 +104,22 @@ export default function Mission1() {
 
   function getOptionStyle(idx: number) {
     if (!answered) return [s.opt];
-    if (idx === quiz.correctIndex) return [s.opt, s.optCorrect];
-    if (idx === selected && idx !== quiz.correctIndex) return [s.opt, s.optWrong];
+    if (idx === quiz!.correctIndex) return [s.opt, s.optCorrect];
+    if (idx === selected && idx !== quiz!.correctIndex) return [s.opt, s.optWrong];
     return [s.opt];
   }
 
   function getLetterStyle(idx: number) {
     if (!answered) return s.letter;
-    if (idx === quiz.correctIndex) return [s.letter, { backgroundColor: K.greenLt }];
-    if (idx === selected && idx !== quiz.correctIndex) return [s.letter, { backgroundColor: K.redLt }];
+    if (idx === quiz!.correctIndex) return [s.letter, { backgroundColor: K.greenLt }];
+    if (idx === selected && idx !== quiz!.correctIndex) return [s.letter, { backgroundColor: K.redLt }];
     return s.letter;
   }
 
   function getOptionTextColor(idx: number) {
     if (!answered) return K.deep;
-    if (idx === quiz.correctIndex) return K.green;
-    if (idx === selected && idx !== quiz.correctIndex) return K.red;
+    if (idx === quiz!.correctIndex) return K.green;
+    if (idx === selected && idx !== quiz!.correctIndex) return K.red;
     return K.deep;
   }
 

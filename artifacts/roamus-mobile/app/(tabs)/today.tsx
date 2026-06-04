@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ExpoLocation from "expo-location";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -430,6 +431,16 @@ const sm = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+function haversineDistMi(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -488,6 +499,8 @@ export default function TodayScreen() {
   const [isOffline, setIsOffline]               = useState(false);
   const [showFeedback, setShowFeedback]          = useState(false);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
+  const [userDistMi, setUserDistMi]             = useState<number | null>(null);
+  const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string }[]>([]);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -505,6 +518,35 @@ export default function TodayScreen() {
     loop.start();
     return () => loop.stop();
   }, [todayState]);
+
+
+  // ── Last-known user location for distance pill ──
+  useEffect(() => {
+    ExpoLocation.getLastKnownPositionAsync({}).then((pos: ExpoLocation.LocationObject | null) => {
+      if (!pos) return;
+      const stop = currentStop;
+      if (!stop?.latitude || !stop?.longitude) return;
+      const dist = haversineDistMi(
+        pos.coords.latitude, pos.coords.longitude,
+        parseFloat(stop.latitude as string), parseFloat(stop.longitude as string)
+      );
+      setUserDistMi(Math.round(dist * 10) / 10);
+    }).catch(() => {});
+  }, [dayStops[currentStopIndex]?.id]);
+
+
+  // ── Fetch real kid quotes when trip is complete ──
+  useEffect(() => {
+    if (todayState !== 'trip_complete' || !resolvedTripId) return;
+    apiFetch<{ moments: Array<{ parentPromptResponse?: string | null }> }>(`/api/travel/trips/${resolvedTripId}/moments`)
+      .then((data) => {
+        const quotes = (data.moments ?? [])
+          .filter((m) => m.parentPromptResponse?.trim())
+          .map((m) => ({ quote: m.parentPromptResponse! }));
+        setTcMomentQuotes(quotes);
+      })
+      .catch(() => {});
+  }, [todayState, resolvedTripId]);
 
   // ── Open-Meteo weather fetch for EN_ROUTE rain alert ──
   useEffect(() => {
@@ -1397,7 +1439,9 @@ export default function TodayScreen() {
               );
               const hasTicket = hasTicketSignal(stop.metadata);
               const isFreeStop = !hasTicket && ['park', 'nature', 'landmark'].includes(stop.stopType ?? '');
-              const isAnchor  = (meta.anchorScore ?? 0) >= 8;
+              const KID_FIT_POSITIVE = ['high', 'toddler', 'all_ages'];
+              const kidFitNorm = (stop.kidFitBias ?? '').toLowerCase().replace(/[\s-]/g, '_');
+              const isAnchor  = KID_FIT_POSITIVE.includes(kidFitNorm);
               const dispDur   = effectiveDuration(stop, selectedPace);
               const travelNext = getTravelToNext(dayStops, i);
               const isLast    = i === dayStops.length - 1;
@@ -1542,6 +1586,10 @@ export default function TodayScreen() {
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
     const afterStops = dayStops.slice(currentStopIndex + 1);
+    const didYouKnow = stop.enrichment?.whyNow
+      ?? (stop as any).storyPack?.quickFact
+      ?? (stop as any).placeProfileData?.description
+      ?? null;
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1582,13 +1630,23 @@ export default function TodayScreen() {
                   <Text style={er.etaLbl}>ETA</Text>
                 </View>
               </View>
+              {userDistMi !== null ? (
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'📍'}</Text>
+                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
                 <View>
-                  <Text style={er.etaVal}>~3 mi</Text>
+                  <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
                   <Text style={er.etaLbl}>Away</Text>
                 </View>
               </View>
+            ) : travelMins ? (
+              <View style={er.etaPill}>
+                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <View>
+                  <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
+                  <Text style={er.etaLbl}>Away</Text>
+                </View>
+              </View>
+            ) : null}
             </View>
           </View> {/* heroWrap */}
 
@@ -1608,16 +1666,17 @@ export default function TodayScreen() {
           </TouchableOpacity>
           )}
 
-          {/* Did you know teaser */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
-            <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-              <Text style={{ fontSize: 16 }}>{'✨'}</Text>
+          {!!didYouKnow && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+              <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                <Text style={{ fontSize: 16 }}>{'✨'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
+                <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{didYouKnow}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
-              <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{'Fun facts await — explore with your kids as you head over.'}</Text>
-            </View>
-          </View>
+          )}
 
           <TouchableOpacity
             style={er.kidsStrip} activeOpacity={0.85}
@@ -1774,13 +1833,23 @@ export default function TodayScreen() {
                     <Text style={er.etaLbl}>ETA</Text>
                   </View>
                 </View>
-                <View style={er.etaPill}>
-                  <Text style={er.etaIcon}>{'📍'}</Text>
-                  <View>
-                    <Text style={er.etaVal}>~3 mi</Text>
-                    <Text style={er.etaLbl}>Away</Text>
-                  </View>
+                {userDistMi !== null ? (
+              <View style={er.etaPill}>
+                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <View>
+                  <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
+                  <Text style={er.etaLbl}>Away</Text>
                 </View>
+              </View>
+            ) : travelMins ? (
+              <View style={er.etaPill}>
+                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <View>
+                  <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
+                  <Text style={er.etaLbl}>Away</Text>
+                </View>
+              </View>
+            ) : null}
               </View>
             </View>
           </View>
@@ -2190,19 +2259,17 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* WHAT THE KIDS SAID */}
-          <View style={tc.kidSection}>
-            <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
-            {[
-              { quote: 'That was the BEST day ever!', name: 'Emma, 8' },
-              { quote: 'Can we do it again tomorrow?', name: 'Liam, 6' },
-            ].map((q, i) => (
-              <View key={i} style={tc.kidCard}>
-                <Text style={tc.kidQuote}>“{q.quote}”</Text>
-                <Text style={tc.kidAttrib}>— {q.name}</Text>
-              </View>
-            ))}
-          </View>
+          {/* WHAT THE KIDS SAID — real quotes from moments, hidden if none */}
+          {tcMomentQuotes.length > 0 && (
+            <View style={tc.kidSection}>
+              <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
+              {tcMomentQuotes.slice(0, 4).map((q, i) => (
+                <View key={i} style={tc.kidCard}>
+                  <Text style={tc.kidQuote}>"{q.quote}"</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <TouchableOpacity
             style={tc.newTripBtn} activeOpacity={0.85}

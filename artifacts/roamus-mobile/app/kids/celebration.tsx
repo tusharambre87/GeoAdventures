@@ -29,6 +29,7 @@ const K = {
 export default function Celebration() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+  const xpEarned = kids.sessionXpEarned > 0 ? kids.sessionXpEarned : (kids.exploreContent?.missions?.[0]?.xp ?? 15);
   const starScale = useRef(new Animated.Value(0)).current;
   const starRotate = useRef(new Animated.Value(0)).current;
 
@@ -104,7 +105,7 @@ export default function Celebration() {
 
         {/* XP badge */}
         <View style={s.xpBadge}>
-          <Text style={s.xpText}>{"✨ +15 XP earned"}</Text>
+          <Text style={s.xpText}>{`✨ +${xpEarned} XP earned`}</Text>
         </View>
 
         {/* Primary button */}

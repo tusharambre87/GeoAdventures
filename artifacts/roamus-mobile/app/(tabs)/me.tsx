@@ -226,7 +226,7 @@ export default function MeScreen() {
   const user = fetchedUser ?? cachedUser;
   const firstLetter = (user?.firstName ?? user?.username ?? user?.email ?? "U")[0];
   const initials = firstLetter.toUpperCase();
-  const displayName = user?.firstName ?? user?.username ?? "Explorer";
+  const displayName = user?.firstName ?? user?.username ?? user?.email?.split('@')[0] ?? 'Explorer';
   const email = user?.email ?? "";
   const isSubscribed = user?.subscriptionTier && user.subscriptionTier !== "free";
 

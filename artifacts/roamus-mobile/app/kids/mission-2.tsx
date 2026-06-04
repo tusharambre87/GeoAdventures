@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -39,10 +40,19 @@ export default function Mission2() {
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const instruction =
-    kids.exploreContent?.missions[1]?.type === "observation"
-      ? kids.exploreContent.missions[1].instruction
-      : MOCK_OBS.instruction;
+  const hasRealContent = kids.exploreContent?.missions?.[1]?.type === "observation";
+  const instruction = hasRealContent
+    ? kids.exploreContent!.missions[1].instruction
+    : __DEV__ ? MOCK_OBS.instruction : null;
+
+  if (!hasRealContent && !__DEV__) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+        <Text style={{ marginTop: 16, fontSize: 15, color: "#78716C", fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
+  }
 
   async function handleSubmit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -58,6 +68,7 @@ export default function Mission2() {
       }
     } catch {
     }
+    kids.addSessionXp(hasRealContent ? (kids.exploreContent?.missions?.[1]?.xp ?? MOCK_OBS.xp) : MOCK_OBS.xp);
     setSubmitting(false);
     router.push("/kids/mission-3");
   }
