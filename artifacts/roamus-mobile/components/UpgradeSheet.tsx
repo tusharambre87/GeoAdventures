@@ -69,6 +69,21 @@ const SHEET_PLANS = [
   },
 ];
 
+const BUNDLE_PLAN = {
+  id: 'bundle',
+  badge: undefined as string | undefined,
+  name: 'Bundle of Trips',
+  tagline: 'One-time \u00b7 Any 3 trips',
+  features: [
+    'Full guided experience on 3 trips',
+    'All stops unlocked on each trip',
+    'Kids missions included',
+    'Trip memory auto-generated',
+    'No subscription \u2014 one payment',
+  ],
+  cta: 'Unlock 3 Trips for $22.99 \u2192',
+};
+
 export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheetProps) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(false);
@@ -128,20 +143,26 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
   const passMonthly    = pricing ? `${sym}${pricing.geopass}` : '$4.99';
   const passAnnual     = '$39.99';
   const tripPrice      = pricing ? `${sym}${pricing.trippack}` : '$9.99';
+  const bundlePrice    = '$22.99';
   const annualSavePct  = pricing
     ? Math.round((1 - 39.99 / (parseFloat(pricing.geopass) * 12)) * 100)
     : 33;
 
+  const visiblePlans = [SHEET_PLANS[0], annual ? BUNDLE_PLAN : SHEET_PLANS[1]];
+
   function planPrice(id: string): string {
     if (id === 'roamus') return annual ? `${passAnnual}/yr` : `${passMonthly}/mo`;
+    if (id === 'bundle') return bundlePrice;
     return tripPrice;
   }
   function planPeriod(id: string): string {
     if (id === 'roamus') return annual ? 'billed yearly \u00b7 whole family' : 'whole family';
+    if (id === 'bundle') return 'one-time \u00b7 3 trips';
     return 'one-time';
   }
 
-  const plan     = SHEET_PLANS.find(p => p.id === selected) ?? SHEET_PLANS[0];
+  const allPlans = [...SHEET_PLANS, BUNDLE_PLAN];
+  const plan     = allPlans.find(p => p.id === selected) ?? SHEET_PLANS[0];
   const ctaLabel = plan.cta.replace('{price}', selected === 'trippack' ? tripPrice : '');
 
   function handleCta() {
@@ -183,10 +204,10 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
 
           {/* Monthly / Annual toggle */}
           <View style={s.toggleRow}>
-            <Pressable onPress={() => setAnnual(false)} style={[s.toggleBtn, !annual && s.toggleBtnActive]}>
+            <Pressable onPress={() => { setAnnual(false); if (selected === 'bundle') setSelected('trippack'); }} style={[s.toggleBtn, !annual && s.toggleBtnActive]}>
               <Text style={[s.toggleBtnText, !annual && s.toggleBtnTextActive]}>Monthly</Text>
             </Pressable>
-            <Pressable onPress={() => setAnnual(true)} style={[s.toggleBtn, annual && s.toggleBtnActive]}>
+            <Pressable onPress={() => { setAnnual(true); if (selected === 'trippack') setSelected('bundle'); }} style={[s.toggleBtn, annual && s.toggleBtnActive]}>
               <Text style={[s.toggleBtnText, annual && s.toggleBtnTextActive]}>Annual</Text>
               <View style={s.saveBadge}>
                 <Text style={s.saveBadgeText}>Save {annualSavePct}%</Text>
@@ -205,7 +226,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
 
           {/* Plan cards */}
           <View style={s.plans}>
-            {SHEET_PLANS.map(p => {
+            {visiblePlans.map(p => {
               const isSelected = selected === p.id;
               return (
                 <View key={p.id}>
