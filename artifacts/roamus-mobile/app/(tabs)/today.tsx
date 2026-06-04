@@ -465,6 +465,7 @@ export default function TodayScreen() {
   const [submittingRating, setSubmittingRating] = useState(false);
   const [visitedPhotos, setVisitedPhotos]       = useState<(string | null)[]>([null, null, null]);
   const [wrapPhotos, setWrapPhotos]             = useState<(string | null)[]>([null, null, null, null, null, null]);
+  const [isWrapping, setIsWrapping]             = useState(false);
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
   const [showMenu, setShowMenu]                 = useState(false);
@@ -1965,68 +1966,81 @@ export default function TodayScreen() {
           </View>
 
           <TouchableOpacity
-            style={dc.wrapBtn} activeOpacity={0.85}
+            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }]} activeOpacity={0.85}
+            disabled={isWrapping}
             onPress={async () => {
+              setIsWrapping(true);
               try {
-                await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
-              } catch { /* best-effort */ }
+                try {
+                  await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
+                } catch { /* best-effort */ }
 
-              if (trip?.id) {
-                const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
-                const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
+                if (trip?.id) {
+                  const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
+                  const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
 
-                // Upload each photo to cloud storage; fall back to local URI on error
-                let cloudPhotoUrls: string[] = filledPhotos;
-                if (filledPhotos.length > 0) {
-                  try {
-                    const token = await AsyncStorage.getItem('auth_token');
-                    cloudPhotoUrls = await Promise.all(
-                      filledPhotos.map(async (localUri) => {
-                        try {
-                          const uploadRes = await FileSystem.uploadAsync(
-                            `${API_BASE}/api/travel/upload-photo`,
-                            localUri,
-                            {
-                              httpMethod: 'POST',
-                              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-                              fieldName: 'photo',
-                              headers: token ? { Authorization: `Bearer ${token}` } : {},
-                            },
-                          );
-                          if (uploadRes.status === 200 || uploadRes.status === 201) {
-                            const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
-                            return body.photoUrl ?? localUri;
-                          }
-                        } catch { /* keep local URI on any error */ }
-                        return localUri;
-                      }),
-                    );
-                  } catch { /* keep local URIs if upload setup fails */ }
-                  try {
-                    await memoriesAPI.createMoment({
-                      tripId: trip.id,
-                      photoUrls: cloudPhotoUrls,
-                    });
-                  } catch { /* best-effort */ }
+                  // Upload each photo to cloud storage; fall back to local URI on error
+                  let cloudPhotoUrls: string[] = filledPhotos;
+                  if (filledPhotos.length > 0) {
+                    try {
+                      const token = await AsyncStorage.getItem('auth_token');
+                      cloudPhotoUrls = await Promise.all(
+                        filledPhotos.map(async (localUri) => {
+                          try {
+                            const uploadRes = await FileSystem.uploadAsync(
+                              `${API_BASE}/api/travel/upload-photo`,
+                              localUri,
+                              {
+                                httpMethod: 'POST',
+                                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                                fieldName: 'photo',
+                                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                              },
+                            );
+                            if (uploadRes.status === 200 || uploadRes.status === 201) {
+                              const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+                              return body.photoUrl ?? localUri;
+                            }
+                          } catch { /* keep local URI on any error */ }
+                          return localUri;
+                        }),
+                      );
+                    } catch { /* keep local URIs if upload setup fails */ }
+                    try {
+                      await memoriesAPI.createMoment({
+                        tripId: trip.id,
+                        photoUrls: cloudPhotoUrls,
+                      });
+                    } catch { /* best-effort */ }
+                  }
+
+                  for (const [key, quote] of filledQuotes) {
+                    try {
+                      const childName = key.startsWith('dw-') ? key.slice(3) : null;
+                      await memoriesAPI.createMoment({
+                        tripId: trip.id,
+                        kidPromptResponse: childName
+                          ? `${childName}|${quote.trim()}`
+                          : quote.trim(),
+                      });
+                    } catch { /* best-effort */ }
+                  }
                 }
 
-                for (const [key, quote] of filledQuotes) {
-                  try {
-                    const childName = key.startsWith('dw-') ? key.slice(3) : null;
-                    await memoriesAPI.createMoment({
-                      tripId: trip.id,
-                      kidPromptResponse: childName
-                        ? `${childName}|${quote.trim()}`
-                        : quote.trim(),
-                    });
-                  } catch { /* best-effort */ }
-                }
+                router.push('/(tabs)/memories' as never);
+              } finally {
+                setIsWrapping(false);
               }
-
-              router.push('/(tabs)/memories' as never);
             }}
           >
-            <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
+            {isWrapping ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={dc.wrapBtnText}>Saving photos…</Text>
+              </View>
+            ) : (
+              <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
+            )}
           </TouchableOpacity>
 
           {/* Tomorrow prep card with stops + ticket alerts */}
