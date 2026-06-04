@@ -17,14 +17,17 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "RoamUs uses your camera to capture trip memories.",
-        "NSPhotoLibraryUsageDescription": "RoamUs accesses your photos to add them to your trip memories."
+        "NSPhotoLibraryUsageDescription": "RoamUs accesses your photos to add them to your trip memories.",
+        "NSMicrophoneUsageDescription": "RoamUs uses the microphone to record kid quotes during your trip.",
+        "NSSpeechRecognitionUsageDescription": "RoamUs transcribes what kids say so you can save memorable quotes hands-free."
       }
     },
     "android": {
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
+        "READ_MEDIA_IMAGES",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -44,6 +47,13 @@
         {
           "photosPermission": "RoamUs accesses your photos to add them to your trip memories.",
           "cameraPermission": "RoamUs uses your camera to capture trip memories."
+        }
+      ],
+      [
+        "@react-native-voice/voice",
+        {
+          "microphonePermission": "RoamUs uses the microphone to record kid quotes during your trip.",
+          "speechRecognitionPermission": "RoamUs transcribes what kids say so you can save memorable quotes hands-free."
         }
       ]
     ],

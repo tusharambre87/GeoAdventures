@@ -31,6 +31,7 @@ import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fo
 import * as Haptics from "expo-haptics";
 
 import { API_BASE, kidsAPI } from "@/lib/apiClient";
+import { SpeechTextInput } from "@/components/SpeechTextInput";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
@@ -767,6 +768,12 @@ export default function TodayScreen() {
               const uri = result.assets[0].uri;
               if (source === 'visited') {
                 setVisitedPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
+                setWrapPhotos(prev => {
+                  if (prev.includes(uri)) return prev;
+                  const slot = prev.findIndex(s => s === null);
+                  if (slot === -1) return prev;
+                  const n = [...prev]; n[slot] = uri; return n;
+                });
               } else {
                 setWrapPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
               }
@@ -788,6 +795,12 @@ export default function TodayScreen() {
               const uri = result.assets[0].uri;
               if (source === 'visited') {
                 setVisitedPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
+                setWrapPhotos(prev => {
+                  if (prev.includes(uri)) return prev;
+                  const slot = prev.findIndex(s => s === null);
+                  if (slot === -1) return prev;
+                  const n = [...prev]; n[slot] = uri; return n;
+                });
               } else {
                 setWrapPhotos(prev => { const n = [...prev]; n[idx] = uri; return n; });
               }
@@ -797,6 +810,21 @@ export default function TodayScreen() {
         { text: 'Cancel', style: 'cancel' },
       ]
     );
+  }
+
+  function mergeVisitedIntoWrap(
+    visited: (string | null)[],
+    wrap: (string | null)[]
+  ): (string | null)[] {
+    const result = [...wrap];
+    for (const uri of visited) {
+      if (!uri) continue;
+      if (result.includes(uri)) continue;
+      const slot = result.findIndex(s => s === null);
+      if (slot === -1) break;
+      result[slot] = uri;
+    }
+    return result;
   }
 
   // ── Derived ──
@@ -1751,7 +1779,7 @@ export default function TodayScreen() {
 
           <View style={sc.card}>
             <Text style={sc.cardLabel}>WHAT DID THE KIDS SAY?</Text>
-            <TextInput
+            <SpeechTextInput
               style={sc.quoteInput}
               value={kidQuotes[quoteKey] ?? ''}
               onChangeText={text => setKidQuotes(prev => ({ ...prev, [quoteKey]: text }))}
@@ -1781,7 +1809,10 @@ export default function TodayScreen() {
           {isLastStop ? (
             <View style={sc.card}>
               <Text style={sc.celebText}>That's all for today!</Text>
-              <TouchableOpacity style={sc.wrapBtn} activeOpacity={0.85} onPress={() => setTodayState('day_complete')}>
+              <TouchableOpacity style={sc.wrapBtn} activeOpacity={0.85} onPress={() => {
+                setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
+                setTodayState('day_complete');
+              }}>
                 <Text style={sc.wrapBtnText}>Wrap up Day {resolvedDayIndex + 1} →</Text>
               </TouchableOpacity>
             </View>
@@ -1799,6 +1830,8 @@ export default function TodayScreen() {
                 style={sc.headThereBtn} activeOpacity={0.85}
                 onPress={() => {
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
+                  setVisitedPhotos([null, null, null]);
                   setTodayState('en_route');
                 }}
               >
@@ -1893,7 +1926,7 @@ export default function TodayScreen() {
                     <Text style={dc.quoteWho}>
                       {kid.name.toUpperCase()}{kid.age ? ` (AGE ${kid.age})` : ''} SAID
                     </Text>
-                    <TextInput
+                    <SpeechTextInput
                       style={dc.quoteInput}
                       value={kidQuotes[key] ?? ''}
                       onChangeText={text => setKidQuotes(prev => ({ ...prev, [key]: text }))}
