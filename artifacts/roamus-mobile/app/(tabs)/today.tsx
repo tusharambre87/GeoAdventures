@@ -5,7 +5,7 @@
  *   day_history · day_history_empty
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -437,12 +437,20 @@ export default function TodayScreen() {
   const [starting, setStarting]                 = useState(false);
   const [error, setError]                       = useState<string | null>(null);
   const [resolvedTripId, setResolvedTripId]     = useState<string | null>(params.tripId ?? null);
-  const [resolvedDayIndex, setResolvedDayIndex] = useState<number>(
-    params.dayIndex != null ? parseInt(params.dayIndex, 10) : 0
-  );
-  const [viewingDay, setViewingDay]             = useState<number>(
-    params.dayIndex != null ? parseInt(params.dayIndex, 10) : 0
-  );
+  // Always auto-advance to today's day — no user override
+  const todayDayIndex = useMemo(() => {
+    if (!trip?.startDate) return 0;
+    const start = new Date(trip.startDate);
+    const today = new Date();
+    start.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.floor(
+      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return Math.max(0, Math.min(diff, (trip.tripDays ?? 1) - 1));
+  }, [trip?.startDate, trip?.tripDays]);
+  const resolvedDayIndex = todayDayIndex;
+  const [viewingDay, setViewingDay]             = useState<number>(0);
   const [activeSheet, setActiveSheet]           = useState<'none' | 'rescue'>('none');
   const [rescueType, setRescueType]             = useState<'behind' | 'tired' | 'skip' | 'fun'>('behind');
   const [atStopStartTime, setAtStopStartTime]   = useState<number | null>(null);
@@ -810,42 +818,6 @@ export default function TodayScreen() {
 
   // ── Day strip pill shared component ──
   const currentDayIndex = resolvedDayIndex;
-  const dayStripEl = totalDays > 1 ? (
-    <ScrollView
-      horizontal showsHorizontalScrollIndicator={false}
-      style={ds.strip} contentContainerStyle={ds.stripContent}
-    >
-      {Array.from({ length: totalDays }, (_, i) => {
-        const isPast    = i < currentDayIndex;
-        const isCurrent = i === currentDayIndex;
-        const isViewing = i === viewingDay;
-        return (
-          <Pressable
-            key={i}
-            style={[
-              ds.pill,
-              isCurrent && ds.pillCurrent,
-              isPast    && ds.pillPast,
-              isViewing && ds.pillViewing,
-              isViewing && isCurrent && ds.pillViewingCurrent,
-            ]}
-            onPress={() => {
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setViewingDay(i);
-            }}
-          >
-            <Text style={[
-              ds.pillText,
-              isCurrent && ds.pillTextCurrent,
-              isPast    && ds.pillTextPast,
-            ]}>
-              {isPast ? '✓ ' : ''}Day {i + 1}{isCurrent ? ' · Today' : ''}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  ) : null;
 
   const isPaidUser = user?.subscriptionTier !== 'free';
   const offlineBannerEl = (isOffline && isPaidUser) ? (
@@ -1191,10 +1163,7 @@ export default function TodayScreen() {
       return (
         <View style={{ flex: 1, backgroundColor: C.bg }}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-            <View style={[ds.stripWrap, { paddingTop: insets.top + 8, backgroundColor: '#fff' }]}>
-              {offlineBannerEl}
-              {dayStripEl}
-            </View>
+            {offlineBannerEl}
             {isPast ? (
               <View style={alt.card}>
                 <View style={alt.doneRow}>
@@ -1297,8 +1266,6 @@ export default function TodayScreen() {
           </LinearGradient>
 
           {offlineBannerEl}
-          {totalDays > 1 && <View style={ds.stripWrap}>{dayStripEl}</View>}
-
           <View style={mo.paceSection}>
             <Text style={mo.paceLabel}>TODAY'S PACE</Text>
             <View style={mo.paceRow}>
@@ -1418,6 +1385,16 @@ export default function TodayScreen() {
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 1 }}>Medical, lost, need help fast</Text>
             </View>
             <Text style={{ color: '#E8433A', fontSize: 18 }}>{'›'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => trip && router.push(`/trip/${trip.id}` as never)}
+            style={{ padding: 16, alignItems: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A' }}>
+              {'View full trip plan →'}
+            </Text>
           </TouchableOpacity>
 
           <Pressable style={[mo.startBtn, starting && { opacity: 0.7 }]} onPress={handleStartDay} disabled={starting}>
