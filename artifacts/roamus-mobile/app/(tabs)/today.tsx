@@ -2125,39 +2125,44 @@ export default function TodayScreen() {
                   const filledPhotos = wrapPhotos.filter((p): p is string => p !== null);
                   const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
 
-                  // Upload each photo to cloud storage; fall back to local URI on error
-                  let cloudPhotoUrls: string[] = filledPhotos;
+                  // Upload each filled photo; any failure stops the wrap and alerts the user
                   if (filledPhotos.length > 0) {
+                    let cloudPhotoUrls: string[];
                     try {
                       const token = await AsyncStorage.getItem('auth_token');
                       cloudPhotoUrls = await Promise.all(
                         filledPhotos.map(async (localUri) => {
-                          try {
-                            const uploadRes = await FileSystem.uploadAsync(
-                              `${API_BASE}/api/travel/upload-photo`,
-                              localUri,
-                              {
-                                httpMethod: 'POST',
-                                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-                                fieldName: 'photo',
-                                headers: token ? { Authorization: `Bearer ${token}` } : {},
-                              },
-                            );
-                            if (uploadRes.status === 200 || uploadRes.status === 201) {
-                              const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
-                              if (body.photoUrl) return body.photoUrl;
-                            }
-                          } catch { /* skip photo on upload error */ }
-                          return null;
+                          const uploadRes = await FileSystem.uploadAsync(
+                            `${API_BASE}/api/travel/upload-photo`,
+                            localUri,
+                            {
+                              httpMethod: 'POST',
+                              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                              fieldName: 'photo',
+                              headers: token ? { Authorization: `Bearer ${token}` } : {},
+                            },
+                          );
+                          if (uploadRes.status !== 200 && uploadRes.status !== 201) {
+                            throw new Error(`Upload failed: ${uploadRes.status}`);
+                          }
+                          const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+                          if (!body.photoUrl) throw new Error('No URL in upload response');
+                          return body.photoUrl;
                         }),
-                      ).then(urls => urls.filter((u): u is string => u !== null));
-                    } catch { /* upload setup failed — proceed without cloud photos */ }
-                    try {
-                      await memoriesAPI.createMoment({
-                        tripId: trip.id,
-                        photoUrls: cloudPhotoUrls,
-                      });
-                    } catch { /* best-effort */ }
+                      );
+                    } catch (uploadErr) {
+                      Alert.alert(
+                        'Photo upload failed',
+                        'One or more photos couldn’t be saved. Please check your connection and try again.',
+                        [{ text: 'OK' }],
+                      );
+                      setIsWrapping(false);
+                      return;
+                    }
+                    await memoriesAPI.createMoment({
+                      tripId: trip.id,
+                      photoUrls: cloudPhotoUrls,
+                    });
                   }
 
                   for (const [key, quote] of filledQuotes) {

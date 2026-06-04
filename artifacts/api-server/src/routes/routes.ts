@@ -9888,7 +9888,8 @@ Return ONLY valid JSON in this exact format:
       // Return absolute URL so React Native Image components can render it on any device
       const domain = process.env.EXPO_PUBLIC_DOMAIN ?? req.get('host') ?? '';
       const baseUrl = domain ? `https://${domain}` : '';
-      const photoUrl = `${baseUrl}/api/travel/photo/${encodeURIComponent(objectName)}`;
+      const sig = signPhotoSig(objectName);
+      const photoUrl = `${baseUrl}/api/travel/photo/${encodeURIComponent(objectName)}?sig=${sig}`;
       res.json({ photoUrl });
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -9896,8 +9897,15 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
-  // Public photo proxy — object names are opaque (timestamp+random) so unguessable.
-  // No auth required so ExpoImage / browser <img> can render photos without Bearer headers.
+  // HMAC-signed photo proxy — each URL carries a ?sig= token generated at upload time.
+  // React Native Image / browser <img> renders without auth headers; the signature proves
+  // the URL was issued by this server (not guessed) and ties to the specific object path.
+  function signPhotoSig(objectName: string): string {
+    const { createHmac } = require('crypto') as typeof import('crypto');
+    const secret = process.env.JWT_SECRET ?? 'roamus-photo-sig';
+    return createHmac('sha256', secret).update(objectName).digest('hex').slice(0, 32);
+  }
+
   app.get('/api/travel/photo/:objectName', async (req: any, res) => {
     try {
       const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
@@ -9905,6 +9913,11 @@ Return ONLY valid JSON in this exact format:
       const objectName = decodeURIComponent(req.params.objectName as string);
       // Guard: only serve objects from the trip-photos/ prefix — never expose arbitrary GCS objects
       if (!objectName.startsWith('trip-photos/')) return res.status(403).json({ message: 'Forbidden' });
+      // Verify HMAC signature — ensures URL was issued by this server, not constructed externally
+      const providedSig = req.query.sig as string | undefined;
+      if (!providedSig || providedSig !== signPhotoSig(objectName)) {
+        return res.status(403).json({ message: 'Invalid or missing signature' });
+      }
       const { Storage } = await import('@google-cloud/storage');
       const SIDECAR = 'http://127.0.0.1:1106';
       const gcs = new Storage({
