@@ -1387,12 +1387,14 @@ export default function TodayScreen() {
       );
     }
 
+    const moHeroUrl = CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
+    console.log('hero image url:', moHeroUrl);
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
           <ImageBackground
-            source={{ uri: CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
+            source={{ uri: moHeroUrl }}
             style={[mo.hero, { paddingTop: insets.top + 20 }]}
             resizeMode="cover"
           >
@@ -1417,11 +1419,12 @@ export default function TodayScreen() {
                 {dayStops.length > 0 ? ` · ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}` : ''}
               </Text>
             </View>
-            <View style={mo.metaRow}>
-              <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDCCD'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
-              <View style={mo.metaPill}><Text style={mo.metaText}>{'⏱'} {estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
-            </View>
           </ImageBackground>
+          {/* Stop count + time pills — below hero in white content area (R2 fix) */}
+          <View style={mo.metaRow}>
+            <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDCCD'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
+            <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDD50'}{' ~'}{estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
+          </View>
 
           {offlineBannerEl}
           <View style={mo.paceSection}>
@@ -1471,8 +1474,19 @@ export default function TodayScreen() {
               return (
                 <React.Fragment key={stop.id}>
                   <View style={[mo.stopCard, isRemoved && mo.stopRowRemoved]}>
-                    <View style={[mo.stopBanner, { backgroundColor: MO_STOP_BG[stop.stopType ?? ''] ?? MO_STOP_BG.default }]}>
-                      <Text style={mo.stopBannerEmoji}>{MO_STOP_EMOJI[stop.stopType ?? ''] ?? MO_STOP_EMOJI.default}</Text>
+                    <View style={mo.stopBanner}>
+                      <Image
+                        source={{ uri: (stop.metadata as Record<string, unknown> | null)?.imageUrl as string ||
+                          CITY_IMGS[(stop as { cityGroup?: string | null }).cityGroup ?? ''] ||
+                          CITY_IMGS[city] ||
+                          'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
+                        style={StyleSheet.absoluteFill}
+                        resizeMode="cover"
+                      />
+                      <LinearGradient
+                        colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.62)']}
+                        style={StyleSheet.absoluteFill}
+                      />
                       <Text style={[mo.stopBannerName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
                       <View style={mo.stopNumBadge}><Text style={mo.stopNumBadgeText}>{i + 1}</Text></View>
                     </View>
@@ -1525,6 +1539,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
             activeOpacity={0.85}
+            onPress={() => setShowHotelSheet(true)}
           >
             <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
@@ -2657,7 +2672,7 @@ const ptt = StyleSheet.create({
 
 // MORNING (renamed from pd)
 const mo = StyleSheet.create({
-  hero:           { paddingHorizontal: 24, paddingBottom: 28 },
+  hero:           { paddingHorizontal: 24, paddingBottom: 28, height: 240 },
   activePill:     { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.orange,
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, alignSelf: 'flex-start', marginBottom: 16 },
   activeDot:      { width: 6, height: 6, backgroundColor: '#fff', borderRadius: 3 },
@@ -2672,9 +2687,9 @@ const mo = StyleSheet.create({
   greeting:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 5 },
   heroHeadline:   { fontFamily: F.serif, fontSize: 28, color: '#fff', lineHeight: 32, marginBottom: 4 },
   heroMeta:       { fontFamily: F.semibold, fontSize: 13, color: 'rgba(255,255,255,0.5)' },
-  metaRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  metaPill:       { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  metaText:       { fontFamily: F.semibold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  metaRow:        { flexDirection: 'row', gap: 8, flexWrap: 'wrap', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: C.card },
+  metaPill:       { backgroundColor: C.orangeLt, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  metaText:       { fontFamily: F.semibold, fontSize: 12, color: C.orange },
   paceSection:    { backgroundColor: C.card, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 },
   paceLabel:      { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 10 },
   paceRow:        { flexDirection: 'row', gap: 8 },
@@ -2696,9 +2711,9 @@ const mo = StyleSheet.create({
   stopRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card,
     borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: C.border },
   stopCard:       { backgroundColor: '#fff', borderRadius: 14, marginHorizontal: 16, marginBottom: 4, overflow: 'hidden', shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  stopBanner:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, gap: 10 },
+  stopBanner:     { height: 120, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 10, gap: 10 },
   stopBannerEmoji:{ fontSize: 24 },
-  stopBannerName: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#1A2030', letterSpacing: -0.2 },
+  stopBannerName: { flex: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#fff', letterSpacing: -0.2, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   stopNumBadge:   { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.10)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   stopNumBadgeText:{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: 'rgba(0,0,0,0.50)' },
   stopBody:       { paddingHorizontal: 12, paddingBottom: 10 },
