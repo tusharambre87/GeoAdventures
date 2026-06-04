@@ -105,9 +105,11 @@ export default function AccountScreen() {
     // doesn't redirect the newly-registered user away from the upgrade screen.
     set({ onboardingInProgress: true });
 
-    const players = data.travelers.map(t => ({
+    const rawPlayers = data.travelers.map(t => ({
       name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
     }));
+    // API requires at least 1 player — add a default adult if the traveler list is empty
+    const players = rawPlayers.length > 0 ? rawPlayers : [{ name: name.trim() || 'Traveler', isParent: true, age: '35' }];
 
     const result = await register(name.trim(), email.trim().toLowerCase(), pw, players);
 

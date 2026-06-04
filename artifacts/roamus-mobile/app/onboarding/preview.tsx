@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
@@ -288,16 +288,55 @@ export default function PreviewScreen() {
   const { data, set, completeOnboarding } = useOnboarding();
   const { token, user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [previewSpots, setPreviewSpots] = useState<DisplayDay[]>([]);
 
   const primaryCity = data.cities[0] ?? "Your City";
   const isMulti = data.cities.length > 1;
+
+  // Fetch real city stops from builder-preview when no generated trip exists yet
+  const CITY_CANONICAL: Record<string, string> = { "Saint Louis": "St. Louis", "Saint Paul": "St. Paul" };
+  useEffect(() => {
+    if (data.generatedTrip?.days?.length) return;
+    const cities = data.cities;
+    if (!cities.length) return;
+    const TIMES = ["9:30 AM", "11:30 AM", "2:00 PM", "3:30 PM"];
+    Promise.all(
+      cities.map(city => {
+        const apiCity = CITY_CANONICAL[city] ?? city;
+        return fetch(`${API_BASE}/api/travel/builder-preview?city=${encodeURIComponent(apiCity)}&childAges=5,8`)
+          .then(r => r.ok ? r.json() : { spots: [] })
+          .then((body: { spots: any[] }) => ({ city, spots: body.spots ?? [] }))
+          .catch(() => ({ city, spots: [] as any[] }));
+      })
+    ).then(results => {
+      const days: DisplayDay[] = results
+        .filter(r => r.spots.length > 0)
+        .map(({ city, spots }) => ({
+          label: 'Day 1',
+          city,
+          stops: spots.map((spot: any, i: number) => {
+            const typeKey = Object.keys(STOP_TAG).find(k => (spot.type ?? '').toLowerCase().includes(k));
+            const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: `${spot.emoji ?? '\u2b50'} Stop`, color: G.muted };
+            return {
+              time: TIMES[i] ?? '3:00 PM',
+              name: spot.name,
+              desc: spot.reason ?? 'A great stop for families',
+              tag: tagInfo.label,
+              tagColor: tagInfo.color,
+              img: stopImg(spot.type, i),
+            };
+          }),
+        }));
+      if (days.length > 0) setPreviewSpots(days);
+    });
+  }, [data.cities, data.generatedTrip]);
 
   const apiDays = useMemo<DisplayDay[]>(() => {
     if (data.generatedTrip?.days && data.generatedTrip.days.length > 0) {
       return toDisplayDays(data.generatedTrip.days, data.cities);
     }
-    return [];
-  }, [data.generatedTrip, data.cities]);
+    return previewSpots;
+  }, [data.generatedTrip, data.cities, previewSpots]);
 
   const allDays = useMemo<DisplayDay[]>(() => {
     return buildAllDays(apiDays, data.startDate, data.endDate, data.cities, data.cityDates);
