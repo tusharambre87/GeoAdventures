@@ -9878,13 +9878,17 @@ Return ONLY valid JSON in this exact format:
         projectId: '',
       });
 
+      const userId: string = (req.user?.claims?.sub ?? req.user?.id ?? 'anon') as string;
       const ext = file.mimetype === 'image/png' ? 'png' : 'jpg';
-      const objectName = `trip-photos/${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}.${ext}`;
+      // Embed userId prefix so the proxy can verify ownership without a DB round-trip
+      const objectName = `trip-photos/${userId.slice(0, 8)}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}.${ext}`;
       const bucket = gcs.bucket(bucketId);
       const gcsFile = bucket.file(objectName);
       await gcsFile.save(file.buffer, { contentType: file.mimetype || 'image/jpeg' });
-      // Keep file private — serve through authenticated proxy
-      const photoUrl = `/api/travel/photo/${encodeURIComponent(objectName)}`;
+      // Return absolute URL so React Native Image components can render it on any device
+      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? req.get('host') ?? '';
+      const baseUrl = domain ? `https://${domain}` : '';
+      const photoUrl = `${baseUrl}/api/travel/photo/${encodeURIComponent(objectName)}`;
       res.json({ photoUrl });
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -9899,6 +9903,15 @@ Return ONLY valid JSON in this exact format:
       if (!bucketId) return res.status(500).json({ message: 'Storage not configured' });
       const objectName = decodeURIComponent(req.params.objectName as string);
       if (!objectName.startsWith('trip-photos/')) return res.status(403).json({ message: 'Forbidden' });
+      // Verify requesting user matches the userId prefix embedded in the object path
+      const requestingUserId: string = (req.user?.claims?.sub ?? req.user?.id ?? '') as string;
+      const segments = objectName.split('/'); // ['trip-photos', '<userPrefix>', '<file>']
+      const embeddedPrefix = segments[1] ?? '';
+      // Legacy objects (no user prefix) have segments[1] matching a filename pattern (contains '-')
+      const isLegacy = embeddedPrefix.length !== 8 || embeddedPrefix.includes('-');
+      if (!isLegacy && requestingUserId.slice(0, 8) !== embeddedPrefix) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
       const { Storage } = await import('@google-cloud/storage');
       const SIDECAR = 'http://127.0.0.1:1106';
       const gcs = new Storage({

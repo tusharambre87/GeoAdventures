@@ -16,9 +16,16 @@ import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
+import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+
 import StopPickerSheet from '@/components/StopPickerSheet';
+
+/** Normalise stored photo URIs — older records may have relative paths */
+function absPhotoUrl(uri: string): string {
+  if (!uri || uri.startsWith('http')) return uri;
+  return `${API_BASE}${uri.startsWith('/') ? '' : '/'}${uri}`;
+}
 
 const { width: SW } = Dimensions.get('window');
 const PHOTO_SIZE = (SW - 40 - 12) / 3;
@@ -154,7 +161,7 @@ export default function TripMemoryIndex() {
                 {photos.map((uri: string, i: number) => (
                   <View key={i} style={styles.photoCell}>
                     <ExpoImage
-                      source={{ uri }}
+                      source={{ uri: absPhotoUrl(uri) }}
                       style={StyleSheet.absoluteFill}
                       contentFit="cover"
                     />
@@ -180,7 +187,7 @@ export default function TripMemoryIndex() {
               {allPhotos.map((uri: string, i: number) => (
                 <View key={i} style={styles.photoCell}>
                   <ExpoImage
-                    source={{ uri }}
+                    source={{ uri: absPhotoUrl(uri) }}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
                   />
