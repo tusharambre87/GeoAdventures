@@ -447,6 +447,14 @@ export default function AtStopScreen() {
   const [foodPlaces, setFoodPlaces]     = useState<FoodPlace[]>([]);
   const { user, isLoading: authLoading } = useAuth();
   const isUserFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const tripNotStarted = !!trip?.startDate && (() => {
+    const s = new Date(trip!.startDate!); s.setHours(0, 0, 0, 0);
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return s > t;
+  })();
+  const tripStartLabel = trip?.startDate
+    ? new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '';
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   useEffect(() => {
     if (isUserFree && dayIndex > 0) setUpgradeVisible(true);
@@ -831,7 +839,20 @@ export default function AtStopScreen() {
                 <Text style={dt.heroPillText}>⇄ Change Stop</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[dt.heroPill, dt.heroPillDanger]} activeOpacity={0.85}
-                onPress={() => openSheet('didnt')}>
+                onPress={() => {
+              if (tripNotStarted) {
+                Alert.alert(
+                  "Your trip hasn't started yet",
+                  `This trip starts on ${tripStartLabel}. Marking this stop as visited now will count toward your trip progress. Do you want to continue?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Continue', onPress: () => openSheet('didnt') },
+                  ]
+                );
+                return;
+              }
+              openSheet('didnt');
+            }}>
                 <Text style={[dt.heroPillText, { color: C.red }]}>{'\uD83D\uDEAB'} Didn’t visit</Text>
               </TouchableOpacity>
             </View>
@@ -1073,11 +1094,37 @@ export default function AtStopScreen() {
         {/* ── CTA: We visited + Didn’t make it ───────────────────────────────────────────────── */}
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
           <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-            onPress={() => openSheet('feedback')}>
+            onPress={() => {
+              if (tripNotStarted) {
+                Alert.alert(
+                  "Your trip hasn't started yet",
+                  `This trip starts on ${tripStartLabel}. Marking this stop as visited now will count toward your trip progress. Do you want to continue?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Continue', onPress: () => openSheet('feedback') },
+                  ]
+                );
+                return;
+              }
+              openSheet('feedback');
+            }}>
             <Text style={dt.ctaPrimaryText}>{'\u2713'} We visited — mark complete</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.7}
-            onPress={() => openSheet('didnt')}
+            onPress={() => {
+              if (tripNotStarted) {
+                Alert.alert(
+                  "Your trip hasn't started yet",
+                  `This trip starts on ${tripStartLabel}. Marking this stop as visited now will count toward your trip progress. Do you want to continue?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Continue', onPress: () => openSheet('didnt') },
+                  ]
+                );
+                return;
+              }
+              openSheet('didnt');
+            }}
             style={{ alignItems: 'center', paddingVertical: 10 }}>
             <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
               Didn’t make it → didn’t visit
@@ -1089,7 +1136,13 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Change Stop ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'change'} onClose={() => setActiveSheet('none')}>
-        <Text style={sh.title}>Where to next?</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Text style={sh.title}>Where to next?</Text>
+          <TouchableOpacity onPress={() => setActiveSheet('none')} activeOpacity={0.7}
+            style={{ backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 }}>
+            <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>Close</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={sh.sub}>Follow your planned route or pick any stop from the trip.</Text>
 
         {/* Follow planned route — highlighted */}
@@ -1133,7 +1186,7 @@ export default function AtStopScreen() {
                             (isCurrent || isVisited) && { opacity: 0.45 }]}
                           onPress={() => {
                             if (isCurrent || isVisited) return;
-                            if (isUserFree && di > 0) { setUpgradeVisible(true); return; }
+                            if (isUserFree && di > 0) { setActiveSheet('none'); setUpgradeVisible(true); return; }
                             setCurrentStop(stop);
                             if (di !== dayIndex) {
                               setDayIndex(di);
