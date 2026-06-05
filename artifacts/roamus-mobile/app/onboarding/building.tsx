@@ -140,6 +140,7 @@ export default function BuildingScreen() {
             adventureStyle,
             pace: PACE_MAP[data.pace ?? ''] ?? 'balanced',
             startDate: data.startDate, endDate: data.endDate,
+            tripDays: data.tripDays || undefined,
             travelers: players,
             tailoring: { transport: data.transport, stroller: data.stroller, interests: data.interests },
           }),

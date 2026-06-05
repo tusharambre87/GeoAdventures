@@ -197,7 +197,7 @@ type StopOption = {
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
 const MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery']);
-const TICKET_TYPES = new Set(['museum', 'zoo', 'aquarium', 'palace', 'castle', 'theater', 'theatre', 'observatory']);
+const TICKET_TYPES = new Set(['museum', 'zoo', 'aquarium', 'palace', 'castle', 'theater', 'theatre', 'observatory', 'observation_deck', 'theme_park', 'science_museum', 'childrens_museum', 'art_museum', 'history_museum', 'planetarium', 'water_park', 'amusement_park']);
 
 function isMealStop(stopType?: string | null): boolean {
   if (!stopType) return false;
@@ -251,7 +251,7 @@ function dayTheme(stops: Stop[]): string {
   if (museums >= 2) return 'Museums & Culture';
   if (outdoor >= 2) return 'Outdoor Day';
   if (shopping) return 'Big Experiences';
-  return `Day ${(stops[0]?.dayIndex ?? 0) + 1}`;
+  return 'Adventure';
 }
 
 function getDaySessionBars(
@@ -2567,7 +2567,7 @@ function CompareDaysSheet({
                 <View style={[cds.dayNum, st === 'today' && { backgroundColor: C.orange }]}>
                   <Text style={[cds.dayNumText, st === 'today' && { color: '#fff' }]}>{dayNum}</Text>
                 </View>
-                <Text style={cds.dayTheme} numberOfLines={1}>Day {dayNum} — {theme}</Text>
+                <Text style={cds.dayTheme} numberOfLines={1}>{theme.startsWith('Day') ? `Day ${dayNum}` : `Day ${dayNum} — ${theme}`}</Text>
                 <View style={cds.dayBadge}>
                   <Text style={cds.dayBadgeText}>{st === 'past' ? 'Done' : st === 'today' ? 'Today' : `${ds.length} stops`}</Text>
                 </View>

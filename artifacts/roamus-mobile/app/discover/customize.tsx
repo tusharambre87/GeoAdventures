@@ -121,7 +121,7 @@ export default function DiscoverCustomizeScreen() {
     templateDays: string;
   }>();
   const insets = useSafeAreaInsets();
-  const { set: setOnboarding } = useOnboarding();
+  const { set: setOnboarding, reset, data: onboardingData } = useOnboarding();
 
   const destination = destParam ? decodeURIComponent(destParam) : slug.replace(/^ai-/, "").replace(/-/g, " ");
   const templateDays = tdParam ? parseInt(tdParam, 10) || DEFAULT_TEMPLATE_DAYS : DEFAULT_TEMPLATE_DAYS;
@@ -175,7 +175,10 @@ export default function DiscoverCustomizeScreen() {
     const startIso = start ? toISO(start) : null;
     const endIso = end ? toISO(end) : null;
     const isAi = isAiPick === "true";
+    const savedTravelers = onboardingData.travelers;
+    reset();
     setOnboarding({
+      travelers: savedTravelers,
       cities: [destination],
       cityMode: "one",
       startDate: startIso,
