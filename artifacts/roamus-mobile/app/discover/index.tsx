@@ -174,6 +174,11 @@ function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
       </View>
       <View style={s.heroBody}>
         <Text style={s.heroTitle}>{item.title}</Text>
+        {item.description ? (
+          <Text numberOfLines={2} style={{ fontSize: 12, color: '#8A8FA8', marginTop: 3, lineHeight: 17 }}>
+            {item.description}
+          </Text>
+        ) : null}
         <Text style={s.heroMeta}>
           {item.durationDays} days{item.stopCount > 0 ? ` · ${item.stopCount} stops` : ""}
           {item.familyCount ? ` · ${item.familyCount} families` : " · AI curated"}
@@ -211,6 +216,11 @@ function GridCard({ item, onPress, isUpvoted, onUpvote }: {
       </View>
       <View style={s.gridBody}>
         <Text style={s.gridTitle} numberOfLines={2}>{item.title}</Text>
+        {item.description ? (
+          <Text numberOfLines={2} style={{ fontSize: 12, color: '#8A8FA8', marginTop: 3, lineHeight: 17 }}>
+            {item.description}
+          </Text>
+        ) : null}
         <Text style={s.gridMeta}>
           {item.stopCount > 0 ? `${item.stopCount} stops` : item.durationDays + " days"}
           {" · "}{item.familyCount ? `${item.familyCount} families` : "AI curated"}
