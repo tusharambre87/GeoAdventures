@@ -5993,29 +5993,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     adventureStyle: string | undefined,
     cityName: string,
     country: string,
+    preloadedStops?: Array<{ name: string; stopType: string; isOptional: boolean }>,
   ) {
     try {
-      const share = await storage.getItineraryShareBySlug(templateSlug);
-      if (!share || !share.stops || share.stops.length === 0) {
-        console.log(`[Travel][template] No share for slug "${templateSlug}" — falling back to AI`);
-        generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, 'balanced');
-        return;
+      let rawStops: Array<{ name: string; stopType?: string; locationType?: string; isOptional?: boolean; wonderPrompt?: string; listenSummary?: string; address?: string; description?: string; latitude?: number | null; longitude?: number | null; displayOrder?: number }> = [];
+      let templateDays: number;
+
+      if (preloadedStops && preloadedStops.length > 0) {
+        // AI pick: stops provided directly by the client — use them as the seed pool
+        rawStops = preloadedStops.map((s, i) => ({ ...s, displayOrder: i }));
+        templateDays = requestedDays ?? 3;
+      } else {
+        const share = await storage.getItineraryShareBySlug(templateSlug);
+        if (!share || !share.stops || (share.stops as any[]).length === 0) {
+          console.log(`[Travel][template] No share for slug "${templateSlug}" — falling back to AI`);
+          generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, 'balanced');
+          return;
+        }
+        rawStops = [...(share.stops as any[])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        templateDays = share.durationDays ?? 3;
       }
 
-      const templateDays = share.durationDays ?? 3;
       const targetDays = requestedDays ?? templateDays;
-      let templateStops: any[] = [...(share.stops as any[])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      let templateStops = rawStops;
 
       if (targetDays < templateDays && templateDays > 0) {
         const targetCount = Math.max(2, Math.round(templateStops.length * targetDays / templateDays));
-        const enriched = templateStops.filter(s => s.wonderPrompt || s.listenSummary);
-        const plain = templateStops.filter(s => !s.wonderPrompt && !s.listenSummary);
-        templateStops = [...enriched, ...plain].slice(0, targetCount);
+        if (templateStops.length > targetCount) {
+          const toRemove = templateStops.length - targetCount;
+          // Remove optional stops from end-of-sequence first (explicit flag or proxy: no enrichment markers)
+          const removalCandidates: number[] = [];
+          for (let i = templateStops.length - 1; i >= 0 && removalCandidates.length < toRemove; i--) {
+            const s = templateStops[i];
+            if (s.isOptional || (!s.wonderPrompt && !s.listenSummary)) {
+              removalCandidates.push(i);
+            }
+          }
+          // Fall back to trimming from the end if optional pool is insufficient
+          for (let i = templateStops.length - 1; i >= 0 && removalCandidates.length < toRemove; i--) {
+            if (!removalCandidates.includes(i)) removalCandidates.push(i);
+          }
+          const removeSet = new Set(removalCandidates);
+          templateStops = templateStops.filter((_, i) => !removeSet.has(i));
+        }
       } else if (targetDays > templateDays) {
         const extraCount = (targetDays - templateDays) * 3;
         const libraryStops = await storage.getStopLibraryByCity(cityName, country);
         const usedNames = new Set(templateStops.map(s => s.name.toLowerCase().trim()));
-        const extras = libraryStops.filter(s => !usedNames.has(s.name.toLowerCase().trim())).slice(0, extraCount);
+        const extras = libraryStops.filter((s: any) => !usedNames.has(s.name.toLowerCase().trim())).slice(0, extraCount);
         templateStops = [...templateStops, ...(extras as any[])];
       }
 
@@ -6041,7 +6066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stopMissions: null,
         });
       }
-      console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" for trip ${tripId}`);
+      console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" (preloaded=${!!preloadedStops}) for trip ${tripId}`);
     } catch (err) {
       console.error('[Travel][template] generateStopsFromTemplate failed:', err);
       try {
@@ -6054,7 +6079,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/travel/trips', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug } = req.body;
+      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug, templateStops: rawTemplateStops } = req.body;
+      const templateStops: Array<{ name: string; stopType: string; isOptional: boolean }> | undefined =
+        Array.isArray(rawTemplateStops) && rawTemplateStops.length > 0 ? rawTemplateStops : undefined;
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
@@ -6152,7 +6179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (templateSlug && typeof templateSlug === 'string') {
           generateStopsFromTemplate(
             trip.id, templateSlug, computedTripDays || null,
-            adventureStyle, city || destination, country ?? ''
+            adventureStyle, city || destination, country ?? '', templateStops
           );
         } else {
           generateStopsInBackground(

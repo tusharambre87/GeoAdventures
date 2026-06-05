@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { getAiPickTemplateStops } from "@/lib/discoverData";
 
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
@@ -157,6 +158,7 @@ export default function DiscoverCustomizeScreen() {
   function handleBuild() {
     const startIso = start ? toISO(start) : null;
     const endIso = end ? toISO(end) : null;
+    const isAi = isAiPick === "true";
     setOnboarding({
       cities: [destination],
       cityMode: "one",
@@ -167,6 +169,7 @@ export default function DiscoverCustomizeScreen() {
       templateSlug: slug,
       isTemplate: true,
       tripDays: days,
+      templateStops: isAi ? getAiPickTemplateStops(slug) : null,
     });
     router.push("/onboarding/building" as any);
   }

@@ -497,6 +497,7 @@ export default function PreviewScreen() {
                   autoGenerateStops: true,
                   templateSlug: data.templateSlug || undefined,
                   tripDays: data.tripDays || undefined,
+                  templateStops: data.templateStops || undefined,
                   tailoring: {
                     transport: data.transport,
                     stroller: data.stroller,
