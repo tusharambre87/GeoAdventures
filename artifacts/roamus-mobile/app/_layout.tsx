@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import * as Linking from "expo-linking";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -44,6 +45,18 @@ const persistOptions = {
   maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
 
+function handleDeepLink(url: string) {
+  const itineraryMatch = url.match(/\/itinerary\/([^/?#]+)/);
+  if (itineraryMatch) {
+    router.push(`/memories/shared/${itineraryMatch[1]}`);
+    return;
+  }
+  const storyMatch = url.match(/\/s\/([^/?#]+)/);
+  if (storyMatch) {
+    router.push(`/memories/shared/${storyMatch[1]}`);
+  }
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { token, isLoading, user } = useAuth();
   const { data } = useOnboarding();
@@ -65,10 +78,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const inOnboarding = segments[0] === "onboarding";
     const inLegacyLogin = segments[0] === "login";
-
     const inAuth      = segments[0] === "auth";
     const inTabPreview = __DEV__ && (segments[1] === 'today' || segments[1] === 'atstop');
-    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview) {
+    // Shared itinerary is public — no auth required
+    const inSharedItinerary = segments[0] === 'memories' && segments[1] === 'shared';
+
+    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview && !inSharedItinerary) {
       router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
       if (inLegacyLogin || inAuth) router.replace("/(tabs)");
@@ -89,6 +104,7 @@ function RootLayoutNav() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
       <Stack.Screen name="memories/[tripId]" options={{ headerShown: false }} />
+      <Stack.Screen name="memories/shared/[slug]" options={{ headerShown: false }} />
       <Stack.Screen
         name="kids"
         options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
@@ -112,6 +128,17 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Deep link: cold start (app not running) + warm start (app in background)
+  useEffect(() => {
+    Linking.getInitialURL().then(url => {
+      if (url) handleDeepLink(url);
+    });
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      handleDeepLink(url);
+    });
+    return () => subscription.remove();
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
