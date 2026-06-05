@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "backfill:intelligence": "tsx src/planner/backfillIntelligence.ts",
     "backfill:logistics": "tsx src/planner/backfillLogistics.ts",
-    "backfill:missions": "tsx src/planner/backfillMissions.ts"
+    "backfill:missions": "tsx src/planner/backfillMissions.ts",
+    "backfill:explore": "tsx src/planner/backfillExploreContent.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
