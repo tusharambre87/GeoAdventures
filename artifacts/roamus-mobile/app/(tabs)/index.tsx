@@ -3,10 +3,12 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Dimensions,
   Platform,
   Pressable,
   RefreshControl,
@@ -186,6 +188,14 @@ export default function TripsScreen() {
   const { user, token, logout } = useAuth();
   const [cacheStatus, setCacheStatus] = useState<"idle" | "ready">("idle");
   const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [overrideHeroId, setOverrideHeroId] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('heroTripOverride').then(id => {
+      if (id) setOverrideHeroId(id);
+    });
+  }, []);
   const { reset: resetOnboarding, set: setOnboarding } = useOnboarding();
 
   function startNewTrip() {
@@ -259,8 +269,16 @@ export default function TripsScreen() {
   const completedTrips = trips.filter(t => t.status === "completed" || t.status === "archived");
   const inProgressTrips = currentTrips.filter(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
   const upcomingTrips = currentTrips.filter(t => !inProgressTrips.some(ip => ip.id === t.id));
-  // Hero: prefer date-active trip, fall back to first current trip
-  const heroTrip = activeTrip ?? (currentTrips.length > 0 ? currentTrips[0] : null);
+  function switchHeroTrip(tripId: string) {
+    setOverrideHeroId(tripId);
+    AsyncStorage.setItem('heroTripOverride', tripId);
+    setShowSwitcher(false);
+  }
+
+  // Hero: respect override, then date-active trip, then first current trip
+  const heroTrip = overrideHeroId
+    ? (currentTrips.find(t => t.id === overrideHeroId) ?? activeTrip ?? currentTrips[0] ?? null)
+    : (activeTrip ?? currentTrips[0] ?? null);
 
   const displayName = user?.firstName || user?.username || user?.email?.split("@")[0] || "";
 
@@ -310,7 +328,7 @@ export default function TripsScreen() {
           <>
             <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} user={user} onUpgradePress={() => setUpgradeVisible(true)} />
             {currentTrips.length > 1 && (
-              <Pressable style={s.switchRow}>
+              <Pressable style={s.switchRow} onPress={() => setShowSwitcher(true)}>
                 <Text style={s.switchText}>Switch trip →</Text>
               </Pressable>
             )}
@@ -398,9 +416,120 @@ export default function TripsScreen() {
         onClose={() => setUpgradeVisible(false)}
         context="at_stop"
       />
+
+      <SwitchTripSheet
+        visible={showSwitcher}
+        trips={currentTrips}
+        heroTripId={heroTrip?.id ?? null}
+        insets={insets}
+        onSelect={switchHeroTrip}
+        onClose={() => setShowSwitcher(false)}
+      />
     </View>
   );
 }
+
+// ─── SwitchTripSheet ──────────────────────────────────────────────────────────
+
+const SCREEN_H = Dimensions.get('window').height;
+
+function SwitchTripSheet({
+  visible, trips, heroTripId, insets, onSelect, onClose,
+}: {
+  visible: boolean;
+  trips: Trip[];
+  heroTripId: string | null;
+  insets: { bottom: number };
+  onSelect: (tripId: string) => void;
+  onClose: () => void;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: visible ? 1 : 0,
+      useNativeDriver: true,
+      damping: 22,
+      stiffness: 180,
+    }).start();
+  }, [visible]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_H, 0],
+  });
+
+  if (!visible && (anim as any)._value === 0) return null;
+
+  return (
+    <View style={sw.outer} pointerEvents="box-none">
+      <Animated.View style={[StyleSheet.absoluteFill, sw.backdrop, { opacity: anim }]} pointerEvents="auto">
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
+
+      <Animated.View style={[sw.sheet, { transform: [{ translateY }] }]}>
+        <View style={sw.handle} />
+        <Text style={sw.title}>Your trips</Text>
+
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {trips.map(trip => {
+            const isActive = trip.id === heroTripId;
+            const days = trip.tripDays
+              ?? (trip.startDate && trip.endDate
+                ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1
+                : null);
+            return (
+              <Pressable
+                key={trip.id}
+                style={({ pressed }) => [sw.row, { opacity: pressed ? 0.7 : 1 }]}
+                onPress={() => onSelect(trip.id)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={sw.rowName}>{trip.name}</Text>
+                  <Text style={sw.rowSub}>
+                    {[trip.destination, days ? `${days} days` : null].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                {isActive && (
+                  <View style={sw.activePill}>
+                    <Text style={sw.activePillText}>Active</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+          <View style={{ height: Math.max(insets.bottom, 16) }} />
+        </ScrollView>
+      </Animated.View>
+    </View>
+  );
+}
+
+const sw = StyleSheet.create({
+  outer:       { ...StyleSheet.absoluteFillObject, zIndex: 400 },
+  backdrop:    { backgroundColor: 'rgba(15,18,30,0.48)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingTop: 12,
+    maxHeight: SCREEN_H * 0.75,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 20,
+  },
+  handle:      { width: 36, height: 4, backgroundColor: '#D1D5E0', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  title:       { fontFamily: F.bold, fontSize: 16, fontWeight: '600', color: '#1A1F2E', marginBottom: 8, paddingHorizontal: 20 },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0EDE8',
+  },
+  rowName:     { fontFamily: F.semibold, fontSize: 15, fontWeight: '600', color: '#1A1F2E' },
+  rowSub:      { fontFamily: F.regular, fontSize: 13, color: '#8A8FA8', marginTop: 2 },
+  activePill:  { backgroundColor: '#FDF0E9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  activePillText: { fontFamily: F.semibold, fontSize: 11, fontWeight: '600', color: '#E8692A' },
+});
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: { flex: 1 },
