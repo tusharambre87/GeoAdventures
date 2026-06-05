@@ -44,6 +44,7 @@ import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
 import TripPreferencesSheet from "@/components/TripPreferencesSheet";
+import CommunityShareSheet from "@/components/CommunityShareSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 
 const TAB_BAR_H = 49;
@@ -2288,6 +2289,7 @@ function TripOptionsSheet({
   onCompare,
   onOpenChecklist,
   onOpenPreferences,
+  onCommunityShare,
   queryClient,
 }: {
   trip: TripData;
@@ -2297,6 +2299,7 @@ function TripOptionsSheet({
   onCompare: () => void;
   onOpenChecklist: () => void;
   onOpenPreferences: () => void;
+  onCommunityShare?: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const insets = useSafeAreaInsets();
@@ -2393,42 +2396,7 @@ function TripOptionsSheet({
         {
           icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family',
           sub: 'Send the itinerary to your travel partners',
-          onPress: async () => {
-            try {
-              let shareUrl: string | undefined;
-              try {
-                const existing = await apiFetch<{ slug: string; url?: string } | null>(
-                  `/api/travel/trips/${trip.id}/share`
-                );
-                if (existing?.slug) {
-                  shareUrl = existing.url ?? `https://roamus.app/itinerary/${existing.slug}`;
-                }
-              } catch {}
-              if (!shareUrl) {
-                const tripDays = (trip as any).plannerTripDays ?? (trip as any).tripDays ?? 1;
-                const data = await apiFetch<{ slug: string; url?: string }>(
-                  `/api/travel/trips/${trip.id}/share`,
-                  {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      title: trip.name,
-                      description: `${trip.destination} \u00b7 ${trip.stops?.length ?? 0} stops`,
-                      durationDays: tripDays,
-                      status: 'published',
-                    }),
-                  }
-                );
-                shareUrl = data.url ?? `https://roamus.app/itinerary/${data.slug}`;
-              }
-              await Share.share({
-                title: trip.name,
-                message: `Check out our ${trip.destination} family adventure!\n\n${shareUrl}`,
-                url: shareUrl,
-              });
-            } catch {
-              await Share.share({ message: `Check out our trip: ${trip.name}` });
-            }
-          },
+          onPress: () => { onClose(); onCommunityShare?.(); },
         },
         { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => { onClose(); setTimeout(() => onOpenChecklist(), 350); } },
         { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
@@ -3358,6 +3326,7 @@ export default function TripPlanScreen() {
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
+  const [showCommunityShare, setShowCommunityShare] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   const [localStops, setLocalStops]     = useState<Stop[]>([]);
@@ -3631,9 +3600,18 @@ export default function TripPlanScreen() {
             onCompare={() => setActiveSheet('compare')}
             onOpenChecklist={() => { setChecklistOpen(true); }}
             onOpenPreferences={() => setActiveSheet('preferences')}
+            onCommunityShare={() => { closeSheet(); setShowCommunityShare(true); }}
             queryClient={queryClient}
           />
         </SheetModal>
+      )}
+
+      {trip && (
+        <CommunityShareSheet
+          visible={showCommunityShare}
+          onClose={() => setShowCommunityShare(false)}
+          trip={trip}
+        />
       )}
 
       <TripPreferencesSheet

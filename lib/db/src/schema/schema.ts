@@ -1605,6 +1605,8 @@ export const itineraryShares = pgTable("itinerary_shares", {
   
   // Creator info (for display, privacy-safe)
   creatorDisplayName: varchar("creator_display_name"), // Optional: "The Smith Family"
+  authorLabel: text("author_label").default("A RoamUs family"), // e.g. "A RoamUs family" or "Sam's family"
+  includePhotos: boolean("include_photos").default(false), // Whether to attach family photos to the share
   
   // Verification
   isVerifiedVisit: boolean("is_verified_visit").default(false), // Creator actually visited

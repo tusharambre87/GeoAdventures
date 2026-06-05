@@ -9414,18 +9414,25 @@ Return ONLY valid JSON in this exact format:
     try {
       const { tripId } = req.params;
       const userId = req.user.claims.sub;
-      const { title, description, durationDays, partySize, styleTags, bestTimeToVisit } = req.body;
+      const { title, description, durationDays: rawDurationDays, partySize, styleTags, bestTimeToVisit, status: rawStatus, includePhotos, authorLabel } = req.body;
       
-      if (!durationDays) {
-        return res.status(400).json({ message: "Trip duration is required" });
-      }
-      
+      const validStatuses = ['published', 'private', 'draft', 'unpublished'];
+      const shareStatus = validStatuses.includes(rawStatus) ? rawStatus : 'published';
+
       // Get the trip and its stops
       const trip = await storage.getTripById(tripId);
       if (!trip) {
         return res.status(404).json({ message: "Trip not found" });
       }
-      
+
+      // Derive duration if not provided
+      const durationDays = rawDurationDays ?? (() => {
+        if (trip.startDate && trip.endDate) {
+          return Math.max(1, Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86400000));
+        }
+        return 1;
+      })();
+
       // Get stops for the trip
       const stops = await storage.getStopsByTripId(tripId);
       
@@ -9470,6 +9477,10 @@ Return ONLY valid JSON in this exact format:
           partySize: partySize || null,
           styleTags: styleTags || [],
           bestTimeToVisit,
+          status: shareStatus,
+          authorLabel: authorLabel || 'A RoamUs family',
+          includePhotos: includePhotos ?? false,
+          creatorDisplayName: authorLabel || existingShare.creatorDisplayName || null,
         }, shareStops);
         
         console.log(`🌍 [Travel] Itinerary updated:`, { tripId, slug: existingShare.slug, stopCount: shareStops.length });
@@ -9512,8 +9523,11 @@ Return ONLY valid JSON in this exact format:
         partySize: partySize || null,
         styleTags: styleTags || [],
         bestTimeToVisit,
-        status: 'published',
-        publishedAt: new Date(),
+        status: shareStatus,
+        publishedAt: shareStatus === 'published' ? new Date() : null,
+        authorLabel: authorLabel || 'A RoamUs family',
+        includePhotos: includePhotos ?? false,
+        creatorDisplayName: authorLabel || null,
       }, shareStops);
       
       console.log(`🌍 [Travel] Itinerary shared:`, { tripId, slug, stopCount: shareStops.length });

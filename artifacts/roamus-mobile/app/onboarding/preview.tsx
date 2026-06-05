@@ -517,6 +517,7 @@ export default function PreviewScreen() {
               }
               const trip = await res.json();
               set({ createdTripId: trip.id });
+              set({ templateSlug: null, isTemplate: false, tripDays: null, templateStops: null });
               fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },

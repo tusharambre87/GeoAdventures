@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -29,6 +31,7 @@ interface ShareStop {
 }
 
 interface ShareDetail {
+  id: string;
   slug: string;
   title?: string;
   destination: string;
@@ -37,7 +40,15 @@ interface ShareDetail {
   durationDays?: number;
   partySize?: number;
   totalViews?: number;
+  totalUpvotes?: number;
   stops: ShareStop[];
+}
+
+interface CommentItem {
+  id: string;
+  authorName?: string | null;
+  content: string;
+  createdAt: string;
 }
 
 interface AiPickStop {
@@ -299,7 +310,94 @@ export default function DiscoverDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [showLoginGate, setShowLoginGate] = useState(false);
 
+  // Upvote
+  const [upvoteCount, setUpvoteCount] = useState(0);
+  const [hasUpvoted, setHasUpvoted] = useState(false);
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+  // Comments
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+
   const isAi = isAiPick === "true";
+
+  // Init upvote count from itinerary
+  useEffect(() => {
+    if (itinerary?.totalUpvotes != null) {
+      setUpvoteCount(itinerary.totalUpvotes);
+    }
+  }, [itinerary?.totalUpvotes]);
+
+  // Init visitor ID + check prior upvote
+  useEffect(() => {
+    if (isAi || !itinerary?.id) return;
+    const shareId = itinerary.id;
+    (async () => {
+      try {
+        let vid = await AsyncStorage.getItem("roamus_visitor_id");
+        if (!vid || !/^v_[a-z0-9]{10,20}$/.test(vid)) {
+          vid = "v_" + Math.random().toString(36).slice(2, 14);
+          await AsyncStorage.setItem("roamus_visitor_id", vid);
+        }
+        const r = await fetch(`${API_BASE}/api/travel/shares/${shareId}/upvote/${vid}`);
+        if (r.ok) {
+          const data = await r.json();
+          setHasUpvoted(data.hasUpvoted ?? false);
+        }
+      } catch {}
+    })();
+  }, [itinerary?.id, isAi]);
+
+  // Load comments
+  useEffect(() => {
+    if (isAi || !itinerary?.id) return;
+    fetch(`${API_BASE}/api/travel/shares/${itinerary.id}/comments`)
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any) => setComments(Array.isArray(data.comments ?? data) ? (data.comments ?? data) : []))
+      .catch(() => {});
+  }, [itinerary?.id, isAi]);
+
+  async function handleUpvote() {
+    if (isAi || !itinerary?.id || upvoteLoading) return;
+    setUpvoteLoading(true);
+    try {
+      const vid = await AsyncStorage.getItem("roamus_visitor_id") ?? "v_" + Math.random().toString(36).slice(2, 14);
+      const r = await fetch(`${API_BASE}/api/travel/shares/${itinerary.id}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorId: vid }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setUpvoteCount(data.totalUpvotes ?? upvoteCount);
+        setHasUpvoted(data.hasUpvoted ?? !hasUpvoted);
+      }
+    } catch {} finally {
+      setUpvoteLoading(false);
+    }
+  }
+
+  async function handleAddComment() {
+    if (!newComment.trim() || commentLoading || isAi || !itinerary?.id) return;
+    setCommentLoading(true);
+    const text = newComment.trim();
+    setNewComment("");
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const r = await fetch(`${API_BASE}/api/travel/shares/${itinerary.id}/comments`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ content: text }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setComments(prev => [data.comment ?? data, ...prev]);
+      }
+    } catch {} finally {
+      setCommentLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (isAi) {
@@ -435,10 +533,19 @@ export default function DiscoverDetailScreen() {
             <Text style={s.statN}>{isAi ? (aiDetail?.ageRange ?? "All") : "All"}</Text>
             <Text style={s.statL}>Ages</Text>
           </View>
-          <View style={[s.stat, { borderRightWidth: 0 }]}>
-            <Text style={s.statN}>{totalFamilies ?? (isAi ? "AI" : "\u2014")}</Text>
-            <Text style={s.statL}>Families</Text>
-          </View>
+          <TouchableOpacity
+            style={[s.stat, { borderRightWidth: 0 }]}
+            onPress={handleUpvote}
+            disabled={upvoteLoading || isAi}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.statN, !isAi && hasUpvoted ? { color: G.orange } : null]}>
+              {isAi ? (aiDetail?.ageRange ?? "All") : (upvoteCount > 0 ? upvoteCount : "\u2014")}
+            </Text>
+            <Text style={[s.statL, !isAi && hasUpvoted ? { color: G.orange } : null]}>
+              {isAi ? "AI" : (hasUpvoted ? "\u2665 Helpful" : "\u2661 Helpful")}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Stop list */}
@@ -475,6 +582,54 @@ export default function DiscoverDetailScreen() {
               ))}
             </View>
           ))
+        )}
+
+        {/* Comments section — community trips only */}
+        {!isAi && itinerary?.id && (
+          <View style={s.commentsSection}>
+            <Text style={s.commentsTitle}>What families say</Text>
+
+            {/* Add a comment */}
+            <View style={s.commentInput}>
+              <TextInput
+                style={s.commentBox}
+                placeholder="Share a tip or ask a question\u2026"
+                placeholderTextColor={G.muted}
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+                maxLength={280}
+                returnKeyType="send"
+                onSubmitEditing={handleAddComment}
+              />
+              <TouchableOpacity
+                style={[s.commentSend, (!newComment.trim() || commentLoading) && s.commentSendDisabled]}
+                onPress={handleAddComment}
+                disabled={!newComment.trim() || commentLoading}
+                activeOpacity={0.8}
+              >
+                {commentLoading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={s.commentSendTxt}>Post</Text>
+                }
+              </TouchableOpacity>
+            </View>
+
+            {comments.length === 0 && (
+              <Text style={s.noCommentsTxt}>No comments yet \u2014 be the first to share a tip!</Text>
+            )}
+            {comments.map((c, i) => (
+              <View key={c.id ?? i} style={s.commentRow}>
+                <View style={s.commentAvatar}>
+                  <Text style={s.commentAvatarTxt}>{(c.authorName ?? "F")[0].toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.commentAuthor}>{c.authorName ?? "A family"}</Text>
+                  <Text style={s.commentContent}>{c.content}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -558,6 +713,36 @@ const s = StyleSheet.create({
     paddingHorizontal: 7, paddingVertical: 2,
   },
   tagOptTxt: { fontFamily: F.bold, fontSize: 10, color: "#D97706" },
+
+  // Comments section
+  commentsSection: {
+    paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24,
+    backgroundColor: G.card,
+    borderTopWidth: 1, borderTopColor: "rgba(26,31,46,0.07)",
+  },
+  commentsTitle: { fontFamily: F.bold, fontSize: 15, color: G.deep, marginBottom: 12 },
+  commentInput: { flexDirection: "row", gap: 8, marginBottom: 16, alignItems: "flex-end" },
+  commentBox: {
+    flex: 1, backgroundColor: G.bg, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    fontFamily: F.regular, fontSize: 13, color: G.deep,
+    minHeight: 44, maxHeight: 90,
+  },
+  commentSend: {
+    backgroundColor: G.orange, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12, justifyContent: "center",
+  },
+  commentSendDisabled: { backgroundColor: "rgba(26,31,46,0.15)" },
+  commentSendTxt: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
+  noCommentsTxt: { fontFamily: F.regular, fontSize: 13, color: G.muted, textAlign: "center", paddingVertical: 12 },
+  commentRow: { flexDirection: "row", gap: 10, marginBottom: 12, alignItems: "flex-start" },
+  commentAvatar: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: G.orange, alignItems: "center", justifyContent: "center",
+  },
+  commentAvatarTxt: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
+  commentAuthor: { fontFamily: F.bold, fontSize: 12, color: G.deep, marginBottom: 2 },
+  commentContent: { fontFamily: F.regular, fontSize: 13, color: G.deep, lineHeight: 19 },
 
   // Sticky CTA bar
   ctaBar: {
