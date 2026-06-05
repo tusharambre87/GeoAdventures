@@ -1240,6 +1240,34 @@ function DayDetail({
   const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
   useEffect(() => { setLocalContentStops(contentStops); }, [contentKey]);
 
+  const [weatherWarning, setWeatherWarning] = useState<{
+    precipProb: number;
+    impactedStops: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    const checkWeather = async () => {
+      try {
+        const data = await apiFetch<{
+          isRainy: boolean;
+          precipProb: number;
+          impactedStops: Array<{ name: string } | string>;
+        }>(`/api/travel/trips/${trip.id}/weather-check?dayIndex=${selectedDay}`);
+        if (data.isRainy && data.impactedStops?.length > 0) {
+          setWeatherWarning({
+            precipProb: data.precipProb,
+            impactedStops: data.impactedStops.map(s =>
+              typeof s === 'string' ? s : s.name
+            ),
+          });
+        } else {
+          setWeatherWarning(null);
+        }
+      } catch {}
+    };
+    checkWeather();
+  }, [selectedDay, trip.id]);
+
   async function handleDragEnd({ data }: { data: Stop[] }) {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const prev = localContentStops;
@@ -1349,6 +1377,26 @@ function DayDetail({
                 <Text style={dd.bfgAct}>Add</Text>
               </View>
             )}
+          </View>
+        )}
+
+        {/* Weather warning banner */}
+        {weatherWarning && (
+          <View style={ww.banner}>
+            <Text style={ww.icon}>{'\uD83C\uDF27'}</Text>
+            <View style={ww.body}>
+              <Text style={ww.title}>
+                {'Rain expected \u2014 '}{weatherWarning.precipProb}{'% chance'}
+              </Text>
+              <Text style={ww.sub}>
+                {weatherWarning.impactedStops.length}{' outdoor stop'}
+                {weatherWarning.impactedStops.length !== 1 ? 's' : ''}{' may be affected: '}
+                {weatherWarning.impactedStops.slice(0, 2).join(', ')}
+                {weatherWarning.impactedStops.length > 2
+                  ? (' +' + (weatherWarning.impactedStops.length - 2) + ' more')
+                  : ''}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -2325,7 +2373,46 @@ function TripOptionsSheet({
       label: 'TRIP TOOLS',
       items: [
         { icon: <IconDownload />, bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: downloadOffline },
-        { icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family', sub: 'Send the itinerary to your travel partners', onPress: () => Share.share({ message: `Check out our trip plan: ${trip.name}` }) },
+        {
+          icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family',
+          sub: 'Send the itinerary to your travel partners',
+          onPress: async () => {
+            try {
+              let shareUrl: string | undefined;
+              try {
+                const existing = await apiFetch<{ slug: string; url?: string } | null>(
+                  `/api/travel/trips/${trip.id}/share`
+                );
+                if (existing?.slug) {
+                  shareUrl = existing.url ?? `https://roamus.app/itinerary/${existing.slug}`;
+                }
+              } catch {}
+              if (!shareUrl) {
+                const tripDays = (trip as any).plannerTripDays ?? (trip as any).tripDays ?? 1;
+                const data = await apiFetch<{ slug: string; url?: string }>(
+                  `/api/travel/trips/${trip.id}/share`,
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      title: trip.name,
+                      description: `${trip.destination} \u00b7 ${trip.stops?.length ?? 0} stops`,
+                      durationDays: tripDays,
+                      status: 'published',
+                    }),
+                  }
+                );
+                shareUrl = data.url ?? `https://roamus.app/itinerary/${data.slug}`;
+              }
+              await Share.share({
+                title: trip.name,
+                message: `Check out our ${trip.destination} family adventure! ${shareUrl}`,
+                url: shareUrl,
+              });
+            } catch {
+              await Share.share({ message: `Check out our trip: ${trip.name}` });
+            }
+          },
+        },
         { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => { onClose(); setTimeout(() => onOpenChecklist(), 350); } },
         { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
       ],
@@ -4086,6 +4173,30 @@ const root = StyleSheet.create({
   errorSub:   { fontFamily: F.regular, fontSize: 14, color: C.muted, textAlign: 'center', marginBottom: 24 },
   retryBtn:   { backgroundColor: C.orange, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   retryText:  { fontFamily: F.bold, fontSize: 14, color: '#fff' },
+});
+
+const ww = StyleSheet.create({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  icon: { fontSize: 20, flexShrink: 0 },
+  body: { flex: 1 },
+  title: {
+    fontSize: 14, fontWeight: '700',
+    color: '#1E40AF', marginBottom: 3,
+  },
+  sub: {
+    fontSize: 12, color: '#3B82F6', lineHeight: 17,
+  },
 });
 
 const sp = StyleSheet.create({
