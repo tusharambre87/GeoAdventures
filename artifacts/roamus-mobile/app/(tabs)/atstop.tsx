@@ -1115,7 +1115,7 @@ export default function AtStopScreen() {
               if (tripNotStarted) {
                 Alert.alert(
                   "Your trip hasn't started yet",
-                  `This trip starts on ${tripStartLabel}. Marking this stop as visited now will count toward your trip progress. Do you want to continue?`,
+                  `This trip starts on ${tripStartLabel}. Skipping this stop now will remove it from your itinerary before your trip begins. Do you want to continue?`,
                   [
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Continue', onPress: () => openSheet('didnt') },
