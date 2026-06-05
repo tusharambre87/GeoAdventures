@@ -439,7 +439,7 @@ export default function MeScreen() {
             <View style={{ flex: 1 }}>
               <View style={s.kidsZoneTitleRow}>
                 <Text style={[s.kidsZoneTitle, !activeTrip && { color: G.muted }]}>
-                  Kids Explorer Zone
+                  Kids Zone
                 </Text>
                 {activeTrip && (
                   <View style={s.newStopBadge}>

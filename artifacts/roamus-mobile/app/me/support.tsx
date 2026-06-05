@@ -25,7 +25,7 @@ const FAQS = [
   },
   {
     q: "Does RoamUs work offline?",
-    a: "Yes — your trip plan, stop details, and Kids Explorer content are cached when you open your trip while connected. You'll have full access during your adventure even without signal.",
+    a: "Yes — your trip plan, stop details, and Kids Zone content are cached when you open your trip while connected. You'll have full access during your adventure even without signal.",
   },
   {
     q: "Can my partner use the same trip?",
@@ -36,8 +36,8 @@ const FAQS = [
     a: 'On iOS, go to Settings → Apple ID → Subscriptions → RoamUs and tap Cancel. On Android, open the Play Store → Subscriptions → RoamUs → Cancel. Your access continues until the end of the billing period.',
   },
   {
-    q: "What ages is Kids Explorer designed for?",
-    a: "Kids Explorer Zone is built for ages 5–12. Stories, missions, and Wonder Time prompts adapt to the child's age you set during trip setup. Younger kids get simpler questions; older kids get more challenging content.",
+    q: "What ages is Kids Zone designed for?",
+    a: "Kids Zone is built for ages 5–12. Stories, missions, and Wonder Time prompts adapt to the child's age you set during trip setup. Younger kids get simpler questions; older kids get more challenging content.",
   },
   {
     q: "Why is my trip showing the wrong photo?",

@@ -29,7 +29,7 @@ type UserData = {
 
 const FEATURES = [
   { icon: "\uD83D\uDDFA\uFE0F", title: "Full trip plans", sub: "Day-by-day itineraries for every city" },
-  { icon: "\uD83E\uDDED", title: "Kids Explorer Zone", sub: "Stories, missions, and games" },
+  { icon: "\uD83E\uDDED", title: "Kids Zone", sub: "Stories, missions, and games" },
   { icon: "\uD83D\uDCF8", title: "Memories & stories", sub: "Auto-generated photo journals" },
   { icon: "\u2708\uFE0F", title: "Unlimited trips", sub: "Plan as many adventures as you like" },
   { icon: "\uD83D\uDCF6", title: "Offline mode", sub: "Access your trip without signal" },
