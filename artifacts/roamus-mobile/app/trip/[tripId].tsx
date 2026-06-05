@@ -2235,6 +2235,7 @@ function RunDaySheet({
 function TripOptionsSheet({
   trip,
   tripId,
+  activeTripDay,
   onClose,
   onCompare,
   onOpenChecklist,
@@ -2243,6 +2244,7 @@ function TripOptionsSheet({
 }: {
   trip: TripData;
   tripId: string;
+  activeTripDay: number;
   onClose: () => void;
   onCompare: () => void;
   onOpenChecklist: () => void;
@@ -2333,7 +2335,42 @@ function TripOptionsSheet({
       items: [
         { icon: <IconEdit />, bg: '#FDF0E9', name: 'Rename trip', sub: 'Change the name shown at the top', onPress: renameTrip },
         { icon: <IconGear />, bg: C.bg, name: 'Edit trip preferences', sub: 'Adjust pace, interests & auto-optimize', onPress: () => { onClose(); setTimeout(() => onOpenPreferences(), 350); } },
-        { icon: <IconRefresh />, bg: '#EEF5F2', name: 'Reset today', sub: 'Un-skip all stops for today', onPress: () => showToast('Coming soon') },
+        {
+          icon: <IconRefresh />, bg: '#EEF5F2', name: 'Reset today', sub: 'Un-skip all stops for today',
+          onPress: () => {
+            const todayDayIndex = activeTripDay - 1;
+            const visitedToday = trip.stops?.filter(
+              s => s.dayIndex === todayDayIndex && s.isVisited
+            ) ?? [];
+            Alert.alert(
+              'Reset today?',
+              "This will mark all of today's stops as unvisited and restart your day.",
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Reset',
+                  onPress: async () => {
+                    try {
+                      await Promise.all(
+                        visitedToday.map(s =>
+                          apiFetch(`/api/travel/stops/${s.id}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ isVisited: false }),
+                          })
+                        )
+                      );
+                      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                      showToast('Today reset \u2014 all stops marked unvisited');
+                      onClose();
+                    } catch {
+                      Alert.alert('Error', 'Could not reset today. Please try again.');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
       ],
     },
     {
@@ -3482,6 +3519,7 @@ export default function TripPlanScreen() {
           <TripOptionsSheet
             trip={trip}
             tripId={tripId ?? ''}
+            activeTripDay={activeTripDay}
             onClose={closeSheet}
             onCompare={() => setActiveSheet('compare')}
             onOpenChecklist={() => { setChecklistOpen(true); }}
