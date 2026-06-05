@@ -2299,6 +2299,15 @@ function TripOptionsSheet({
   onOpenPreferences: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
+  const insets = useSafeAreaInsets();
+  const [isOfflineCached, setIsOfflineCached] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(`roamus_cache_status_${tripId}`)
+      .then(val => setIsOfflineCached(val === 'complete'))
+      .catch(() => {});
+  }, [tripId]);
+
   function renameTrip() {
     Alert.prompt(
       'Rename Trip',
@@ -2361,6 +2370,8 @@ function TripOptionsSheet({
       if (!token) { showToast('Sign in to download for offline'); return; }
       showToast('Downloading for offline\u2026');
       await preCacheTrip(tripId, token);
+      await AsyncStorage.setItem(`roamus_cache_status_${tripId}`, 'complete');
+      setIsOfflineCached(true);
       showToast('\u2713 Trip saved for offline use');
     } catch {
       showToast('Download failed — try again');
@@ -2372,7 +2383,13 @@ function TripOptionsSheet({
     {
       label: 'TRIP TOOLS',
       items: [
-        { icon: <IconDownload />, bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: downloadOffline },
+        {
+          icon: isOfflineCached ? <IconCheck /> : <IconDownload />,
+          bg: '#EEF5F2',
+          name: isOfflineCached ? 'Available offline' : 'Download for offline',
+          sub: isOfflineCached ? 'Trip saved \u2014 works without signal' : 'Save stops and stories for no-WiFi use',
+          onPress: isOfflineCached ? () => showToast('Already saved for offline') : downloadOffline,
+        },
         {
           icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family',
           sub: 'Send the itinerary to your travel partners',
@@ -2482,7 +2499,10 @@ function TripOptionsSheet({
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={opts.body}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[opts.body, { paddingBottom: insets.bottom + 24 }]}
+      >
         {sections.map(sec => (
           <View key={sec.label}>
             <Text style={opts.secLabel}>{sec.label}</Text>
