@@ -33,8 +33,10 @@ function greeting() {
   return "Good evening";
 }
 
-function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boolean }) {
-  const city = trip.destination ?? trip.name ?? "";
+function ActiveHeroCard({ trip, offlineReady, user }: { trip: Trip; offlineReady?: boolean; user?: ReturnType<typeof useAuth>['user'] }) {
+  const isFree = !user?.subscriptionTier || user.subscriptionTier === "free";
+  const rawCity = trip.destination ?? "";
+  const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
   const bg   = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
 
   // ── Active day computation ──────────────────────────────────────────────────
@@ -94,9 +96,17 @@ function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boo
         {nextStop ? ` · Next: ${nextStop.name}` : ''}
       </Text>
 
-      {offlineReady && (
+      {isFree ? (
+        <View style={s.offlinePillLocked}>
+          <Text style={s.offlinePillLockedTxt}>{"\uD83D\uDCF5 Offline available with Pass"}</Text>
+        </View>
+      ) : offlineReady ? (
         <View style={s.offlinePill}>
           <Text style={s.offlinePillText}>{"\u2713 Available offline"}</Text>
+        </View>
+      ) : (
+        <View style={s.offlinePillEmpty}>
+          <Text style={s.offlinePillEmptyTxt}>{"Download for offline \u2192"}</Text>
         </View>
       )}
 
@@ -105,7 +115,11 @@ function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boo
         style={({ pressed }) => [s.continueBtn, { opacity: pressed ? 0.88 : 1 }]}
         onPress={handleContinue}>
         <Text style={s.continueBtnText}>
-          {isActiveNow ? `\u25B6 Continue Day ${activeDay}` : 'View plan \u2192'}
+          {trip.status === 'completed'
+            ? 'View memories \u2192'
+            : isActiveNow && dayStops.some(s => s.isVisited || s.visited)
+              ? `\u25B6 Continue Day ${activeDay}`
+              : `\u25B6 Start Day 1`}
         </Text>
       </Pressable>
 
@@ -122,7 +136,8 @@ function ActiveHeroCard({ trip, offlineReady }: { trip: Trip; offlineReady?: boo
 }
 
 function TripCard({ trip }: { trip: Trip }) {
-  const city = trip.destination ?? trip.name ?? "";
+  const rawCity = trip.destination ?? "";
+  const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
   const bg = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
   const isCompleted = trip.status === "completed";
 
@@ -282,7 +297,7 @@ export default function TripsScreen() {
           </View>
         ) : heroTrip ? (
           <>
-            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} />
+            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} user={user} />
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow}>
                 <Text style={s.switchText}>Switch trip →</Text>
@@ -453,6 +468,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
   },
   offlinePillText: { fontFamily: F.semibold, fontSize: 12, fontWeight: "600", color: "#6EE7B7" },
+  offlinePillLocked: {
+    alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5, marginBottom: 10,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
+  },
+  offlinePillLockedTxt: { fontFamily: F.semibold, fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.55)" },
+  offlinePillEmpty: {
+    alignSelf: "flex-start", backgroundColor: "rgba(232,105,42,0.2)", borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5, marginBottom: 10,
+  },
+  offlinePillEmptyTxt: { fontFamily: F.semibold, fontSize: 12, fontWeight: "700", color: "#E8692A" },
 
   discoverBtn: {
     flexDirection: "row", alignItems: "center", gap: 12,
