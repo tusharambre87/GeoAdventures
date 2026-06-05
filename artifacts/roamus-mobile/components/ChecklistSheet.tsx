@@ -349,13 +349,15 @@ export default function ChecklistSheet({
   if (!mounted) return null;
 
   return (
-    <Animated.View
-      style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
-      pointerEvents="auto"
-    >
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
+    <View style={[StyleSheet.absoluteFill, { zIndex: 300 }]} pointerEvents="box-none">
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,30,0.48)', opacity: anim }]}
+        pointerEvents="auto"
+      >
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
+      </Animated.View>
 
-      <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View style={[s.sheet, { position: 'absolute', bottom: 0, left: 0, right: 0, transform: [{ translateY }] }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -449,7 +451,7 @@ export default function ChecklistSheet({
         </ScrollView>
       </KeyboardAvoidingView>
       </Animated.View>
-    </Animated.View>
+    </View>
   );
 }
 

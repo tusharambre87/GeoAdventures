@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Linking,
   Platform,
@@ -267,19 +268,22 @@ export default function TripPlanStopSheet({
           </View>
 
           {/* What to expect */}
-          <Text style={s.sectionLabel}>WHAT TO EXPECT</Text>
-          <Text style={s.storyText}>
-            {storyText != null && storyText !== ''
-              ? storyText
-              : 'We\u2019re still learning about this stop. Check back soon.'}
-          </Text>
+          {storyText != null && storyText !== '' && (
+            <>
+              <Text style={s.sectionLabel}>WHAT TO EXPECT</Text>
+              <Text style={s.storyText}>{storyText}</Text>
+            </>
+          )}
 
           {/* Ticket status */}
           {ticket ? (
             <View style={s.ticketRow}>
-              <View style={s.ticketPill}>
+              <Pressable
+                style={s.ticketPill}
+                onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stop.name + ' tickets')}`).catch(() => {})}
+              >
                 <Text style={s.ticketPillText}>Ticket</Text>
-              </View>
+              </Pressable>
               <Text style={s.ticketNote}>Book in advance recommended</Text>
             </View>
           ) : (
@@ -336,7 +340,16 @@ export default function TripPlanStopSheet({
 
         <Pressable
           style={s.removeBtn}
-          onPress={() => { onDelete(stop.id); onClose(); }}
+          onPress={() => {
+            Alert.alert(
+              'Remove this stop?',
+              `"${stop.name}" will be removed from your trip.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Remove', style: 'destructive', onPress: () => { onDelete(stop.id); onClose(); } },
+              ],
+            );
+          }}
         >
           <Text style={s.removeBtnText}>Remove this stop</Text>
         </Pressable>

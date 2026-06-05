@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   RefreshControl,
@@ -112,7 +113,7 @@ function ActiveHeroCard({ trip, offlineReady, user, onUpgradePress }: { trip: Tr
       ) : (
         <Pressable
           style={({ pressed }) => [s.offlinePillEmpty, { opacity: pressed ? 0.75 : 1 }]}
-          onPress={onUpgradePress}
+          onPress={() => Alert.alert('Offline Mode', 'Your trip is being prepared for offline use. This may take a few minutes.')}
           hitSlop={8}
         >
           <Text style={s.offlinePillEmptyTxt}>{"Download for offline \u2192"}</Text>
