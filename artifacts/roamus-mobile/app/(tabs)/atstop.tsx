@@ -1136,8 +1136,24 @@ export default function AtStopScreen() {
 
       {/* ── SHEET: Change Stop ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'change'} onClose={() => setActiveSheet('none')}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={sh.title}>Where to next?</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <View>
+            <Text style={sh.title}>Where to next?</Text>
+            {(() => {
+              const leftToday = (trip?.stops ?? []).filter(
+                s => (s.dayIndex ?? 0) === dayIndex && !isStopVisited(s)
+              ).length;
+              return leftToday > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <View style={{ backgroundColor: C.orange, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontFamily: F.semibold, fontSize: 12, color: '#fff' }}>
+                      {leftToday} stop{leftToday !== 1 ? 's' : ''} left today
+                    </Text>
+                  </View>
+                </View>
+              ) : null;
+            })()}
+          </View>
           <TouchableOpacity onPress={() => setActiveSheet('none')} activeOpacity={0.7}
             style={{ backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 }}>
             <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>Close</Text>
