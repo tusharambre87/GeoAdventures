@@ -146,7 +146,11 @@ export default function MoveToDaySheet({
         }),
       });
       onMove(stop.id, targetDay.dayIndex, realAfterStopId);
-      onClose();
+      Alert.alert(
+        'Stop moved!',
+        `"${stop.name}" is now on Day ${targetDay.dayNum}.`,
+        [{ text: 'Done', onPress: onClose }],
+      );
     } catch {
       Alert.alert('Something went wrong', 'Could not move this stop. Try again.');
       setMoving(false);
@@ -174,18 +178,19 @@ export default function MoveToDaySheet({
             contentContainerStyle={s.pillRow}
           >
             {otherDays.map(day => {
-              const sel = day.dayIndex === targetDayIdx;
+              const sel   = day.dayIndex === targetDayIdx;
+              const heavy = day.stops.length >= 4;
               return (
                 <TouchableOpacity
                   key={day.dayIndex}
-                  style={[s.pill, sel && s.pillSel]}
+                  style={[s.pill, sel && s.pillSel, heavy && s.pillHeavy]}
                   onPress={() => setTargetDayIdx(day.dayIndex)}
                   activeOpacity={0.7}
                 >
                   <Text style={[s.pillDn, sel && s.pillDnSel]}>Day {day.dayNum}</Text>
                   {day.date ? <Text style={s.pillDd}>{day.date}</Text> : null}
-                  <Text style={s.pillSc}>
-                    {day.stops.length} {day.stops.length === 1 ? 'stop' : 'stops'}
+                  <Text style={[s.pillSc, heavy && s.pillScHeavy]}>
+                    {day.stops.length} {day.stops.length === 1 ? 'stop' : 'stops'}{heavy ? ' · Busy' : ''}
                   </Text>
                 </TouchableOpacity>
               );
@@ -195,7 +200,22 @@ export default function MoveToDaySheet({
           <View style={[s.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 8 }]}>
             <Pressable
               style={[s.ctaBtn, targetDayIdx === null && s.ctaBtnDisabled]}
-              onPress={() => targetDayIdx !== null && setStep(2)}
+              onPress={() => {
+                if (targetDayIdx === null) return;
+                const td = tripDays.find(d => d.dayIndex === targetDayIdx);
+                if (td && td.stops.length >= 4) {
+                  Alert.alert(
+                    `Day ${td.dayNum} is quite full`,
+                    `This day already has ${td.stops.length} stops, which may make it a long day. Consider swapping a stop instead of adding another.`,
+                    [
+                      { text: 'Add anyway', onPress: () => setStep(2) },
+                      { text: 'Cancel', style: 'cancel' },
+                    ],
+                  );
+                } else {
+                  setStep(2);
+                }
+              }}
               disabled={targetDayIdx === null}
             >
               <Text style={s.ctaBtnText}>Next — pick position →</Text>
@@ -365,10 +385,12 @@ const s = StyleSheet.create({
     minWidth: 72,
   },
   pillSel:   { borderColor: C.orange, backgroundColor: C.orangeLt },
-  pillDn:    { fontFamily: F.semibold, fontSize: 12, color: C.deep },
-  pillDnSel: { color: C.orange },
-  pillDd:    { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
-  pillSc:    { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
+  pillDn:     { fontFamily: F.semibold, fontSize: 12, color: C.deep },
+  pillDnSel:  { color: C.orange },
+  pillDd:     { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
+  pillSc:     { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
+  pillHeavy:  { borderColor: '#D97706' },
+  pillScHeavy:{ color: '#D97706' },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
