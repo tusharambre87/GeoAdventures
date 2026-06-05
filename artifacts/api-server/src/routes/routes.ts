@@ -108,7 +108,7 @@ function isSocialCrawler(userAgent: string): boolean {
 }
 
 function generateOgHtml(share: any, baseUrl: string): string {
-  const title = `${share.title} - GeoQuest Travel Itinerary`;
+  const title = `${share.title} - RoamUs Family Itinerary`;
   const description = share.description || 
     `Explore ${share.destination} with this ${share.durationDays}-day family travel itinerary. ${share.stops?.length || 0} stops to discover!`;
   const url = `${baseUrl}/itinerary/${share.slug}`;
@@ -126,7 +126,7 @@ function generateOgHtml(share: any, baseUrl: string): string {
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
   <meta property="og:image" content="${escapeHtml(imageUrl)}" />
-  <meta property="og:site_name" content="GeoQuest" />
+  <meta property="og:site_name" content="RoamUs" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@replit" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
@@ -9384,7 +9384,22 @@ Return ONLY valid JSON in this exact format:
         .replace(/[^a-z0-9]+/g, '-')
         .substring(0, 50);
       const slug = `${baseSlug}-${Date.now().toString(36)}`;
-      
+
+      // Fetch Wikipedia thumbnail for the destination city as the OG hero image
+      let heroImageUrl: string | null = null;
+      if (trip.destination) {
+        try {
+          const wikiRes = await fetch(
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(trip.destination.replace(/\s+/g, '_'))}`,
+            { signal: AbortSignal.timeout(4000) }
+          );
+          if (wikiRes.ok) {
+            const wikiData = await wikiRes.json() as { thumbnail?: { source: string } };
+            heroImageUrl = wikiData.thumbnail?.source ?? null;
+          }
+        } catch {}
+      }
+
       // Create the share
       const share = await storage.createItineraryShare({
         tripId,
@@ -9393,7 +9408,7 @@ Return ONLY valid JSON in this exact format:
         title: title || trip.name || `${trip.destination} Trip`,
         destination: trip.destination,
         description,
-        heroImageUrl: null, // Could add destination image later
+        heroImageUrl,
         durationDays,
         partySize: partySize || null,
         styleTags: styleTags || [],

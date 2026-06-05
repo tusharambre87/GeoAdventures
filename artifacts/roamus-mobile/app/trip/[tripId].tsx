@@ -2422,7 +2422,7 @@ function TripOptionsSheet({
               }
               await Share.share({
                 title: trip.name,
-                message: `Check out our ${trip.destination} family adventure! ${shareUrl}`,
+                message: `Check out our ${trip.destination} family adventure!\n\n${shareUrl}`,
                 url: shareUrl,
               });
             } catch {
