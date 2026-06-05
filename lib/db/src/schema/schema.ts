@@ -3760,6 +3760,25 @@ export const insertStopLibrarySchema = createInsertSchema(stopLibrary).omit({
 export type InsertStopLibrary = z.infer<typeof insertStopLibrarySchema>;
 export type StopLibrary = typeof stopLibrary.$inferSelect;
 
+// ── EXPLORE CACHE ─────────────────────────────────────────────────────────────
+// Canonical per-stop explore content keyed on (normalizedName, cityGroup).
+// One row per real-world stop identity — reused across all trips containing
+// that stop, so content is generated once regardless of how many trip
+// instances reference the same place.
+export const exploreCache = pgTable("explore_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  normalizedName: text("normalized_name").notNull(),
+  cityGroup: text("city_group").notNull(),
+  stopType: text("stop_type"),
+  exploreData: jsonb("explore_data").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("explore_cache_name_city_idx").on(table.normalizedName, table.cityGroup),
+]);
+export type ExploreCache = typeof exploreCache.$inferSelect;
+export type InsertExploreCache = typeof exploreCache.$inferInsert;
+
 // ── ROAMUS WAITLIST SIGNUPS ───────────────────────────────────────────────────
 export const waitlistSignups = pgTable("waitlist_signups", {
   id: serial("id").primaryKey(),

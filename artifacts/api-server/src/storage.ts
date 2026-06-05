@@ -5,7 +5,7 @@ import { promoCodes, promoRedemptions, type PromoCode, type InsertPromoCode, typ
 import { storyEmailSchedules, type StoryEmailSchedule } from "@workspace/db";
 import { stopQualitySignals, type StopQualitySignal, type InsertStopQualitySignal } from "@workspace/db";
 import { guideSubscribers, type GuideSubscriber, guideEmailSchedules, type GuideEmailSchedule } from "@workspace/db";
-import { stopLibrary, type StopLibrary, type InsertStopLibrary } from "@workspace/db";
+import { stopLibrary, type StopLibrary, type InsertStopLibrary, exploreCache, type ExploreCache } from "@workspace/db";
 import { db } from "./db";
 import { eq, desc, sql, and, gte, lte, isNull, isNotNull, ne, inArray, or, asc } from "drizzle-orm";
 
@@ -6163,6 +6163,68 @@ export class DatabaseStorage implements IStorage {
       .returning({ id: guideEmailSchedules.id });
     return { cleaned: result.length, subscribers: emails.length };
   }
+}
+
+// ── Explore cache helpers ──────────────────────────────────────────────────────
+// Canonical per-stop explore content keyed on (normalizedName, cityGroup).
+// Used by the backfill script and by the explore-content route to avoid
+// regenerating identical content for the same real-world stop across trips.
+
+function normalizeStopName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export async function getExploreCacheByStop(
+  stopName: string,
+  cityGroup: string,
+): Promise<ExploreCache | null> {
+  const normalized = normalizeStopName(stopName);
+  const city = cityGroup.toLowerCase().trim();
+
+  const results = await db
+    .select()
+    .from(exploreCache)
+    .where(
+      and(
+        eq(exploreCache.normalizedName, normalized),
+        eq(exploreCache.cityGroup, city),
+      ),
+    )
+    .limit(1);
+
+  return results[0] ?? null;
+}
+
+export async function upsertExploreCache(
+  stopName: string,
+  cityGroup: string,
+  stopType: string,
+  data: unknown,
+): Promise<void> {
+  const normalized = normalizeStopName(stopName);
+  const city = cityGroup.toLowerCase().trim();
+
+  await db
+    .insert(exploreCache)
+    .values({
+      normalizedName: normalized,
+      cityGroup:      city,
+      stopType,
+      exploreData:    data as any,
+      generatedAt:    new Date(),
+      updatedAt:      new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [exploreCache.normalizedName, exploreCache.cityGroup],
+      set: {
+        exploreData: data as any,
+        updatedAt:   new Date(),
+      },
+    });
 }
 
 export const storage = new DatabaseStorage();
