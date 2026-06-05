@@ -121,14 +121,16 @@ export default function TripPreferencesSheet({
   async function handleApply() {
     if (applying) return;
     setApplying(true);
+    console.log('Applying preferences:', { pace: selectedPace, meals: selectedMeals });
     try {
       const body: Record<string, string> = {};
       if (selectedPace  !== 'balanced')  body.pace  = selectedPace;
       if (selectedMeals !== 'keep')      body.meals = selectedMeals;
-      await apiFetch(`/api/travel/trips/${tripId}/apply-preferences`, {
+      const result = await apiFetch(`/api/travel/trips/${tripId}/apply-preferences`, {
         method:  'POST',
         body:    JSON.stringify(body),
       });
+      console.log('apply-preferences result:', result);
       showToast('Trip updated');
       onRefresh();
       onClose();
@@ -141,9 +143,9 @@ export default function TripPreferencesSheet({
 
   return (
     <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
-      <Animated.View style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]} pointerEvents="auto">
+      <Animated.View style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]} pointerEvents="box-none">
         <TouchableOpacity
-          style={StyleSheet.absoluteFill}
+          style={{ flex: 1 }}
           activeOpacity={1}
           onPress={dismissable ? onClose : undefined}
         />
