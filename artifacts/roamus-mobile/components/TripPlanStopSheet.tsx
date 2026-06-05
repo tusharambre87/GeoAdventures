@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from '@/lib/authContext';
 import { formatOpenStatus } from '@/lib/formatOpenStatus';
 import { F } from '@/lib/tokens';
+import MoveToDaySheet, { type DayInfo } from './MoveToDaySheet';
 
 const C = {
   orange:    '#E8692A',
@@ -154,13 +155,22 @@ export default function TripPlanStopSheet({
   onClose,
   onReplace,
   onDelete,
+  tripId,
+  tripDays,
+  currentDayIndex,
+  onMove,
 }: {
   stop: TripPlanStop | null;
   onClose: () => void;
   onReplace: (s: TripPlanStop) => void;
   onDelete: (id: string) => Promise<void>;
+  tripId?: string;
+  tripDays?: DayInfo[];
+  currentDayIndex?: number;
+  onMove?: (stopId: string, targetDayIndex: number, afterStopId: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
   const rotAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
   const heroImg = useStopHeroImage(stop?.id ?? null);
@@ -315,7 +325,14 @@ export default function TripPlanStopSheet({
           <Text style={s.replaceBtnText}>Replace this stop</Text>
         </Pressable>
 
-        {/* TODO: Move to different day */}
+        {tripDays && tripDays.length > 1 && tripId && onMove && (
+          <Pressable
+            style={s.moveBtn}
+            onPress={() => setShowMoveSheet(true)}
+          >
+            <Text style={s.moveBtnText}>Move to a different day</Text>
+          </Pressable>
+        )}
 
         <Pressable
           style={s.removeBtn}
@@ -324,6 +341,17 @@ export default function TripPlanStopSheet({
           <Text style={s.removeBtnText}>Remove this stop</Text>
         </Pressable>
       </View>
+
+      {showMoveSheet && tripDays && tripId && onMove && (
+        <MoveToDaySheet
+          stop={stop}
+          tripDays={tripDays}
+          currentDayIndex={currentDayIndex ?? 0}
+          tripId={tripId}
+          onMove={onMove}
+          onClose={() => setShowMoveSheet(false)}
+        />
+      )}
     </View>
   );
 }
@@ -466,6 +494,16 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   replaceBtnText: { fontFamily: F.semibold, fontSize: 14, color: '#1A1F2E' },
+  moveBtn: {
+    borderWidth: 1,
+    borderColor: 'rgba(26,31,46,0.16)',
+    borderRadius: 13,
+    padding: 13,
+    alignItems: 'center',
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  moveBtnText: { fontFamily: F.semibold, fontSize: 14, color: '#1A1F2E' },
   removeBtn: {
     paddingVertical: 14,
     alignItems: 'center',

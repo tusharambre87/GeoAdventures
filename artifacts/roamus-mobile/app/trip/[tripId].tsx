@@ -3389,6 +3389,13 @@ export default function TripPlanScreen() {
     }
   }
 
+  function handleMoveStop(stopId: string, targetDayIndex: number, _afterStopId: string | null) {
+    setLocalStops(prev => prev.map(s =>
+      s.id === stopId ? { ...s, dayIndex: targetDayIndex } : s
+    ));
+    queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+  }
+
   function moveStop(stopId: string, dir: 'up' | 'down') {
     const snapshot = [...localStops];
     const stop = snapshot.find(s => s.id === stopId);
@@ -3519,6 +3526,15 @@ export default function TripPlanScreen() {
             onClose={closeSheet}
             onReplace={(s) => { closeSheet(); openReplaceSheet(s as any); }}
             onDelete={deleteStop}
+            tripId={tripId ?? ''}
+            currentDayIndex={selectedStop?.dayIndex ?? 0}
+            tripDays={Array.from({ length: totalDays }, (_, i) => ({
+              dayIndex: i,
+              dayNum: i + 1,
+              date: trip.startDate ? formatDate(trip.startDate, i) : null,
+              stops: getStopsForDay(i + 1),
+            }))}
+            onMove={handleMoveStop}
           />
         </SheetModal>
       )}
