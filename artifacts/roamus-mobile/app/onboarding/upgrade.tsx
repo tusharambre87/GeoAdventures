@@ -81,7 +81,7 @@ export default function UpgradeScreen() {
   const sym = pricing?.symbol ?? "$";
   const passMonthly = pricing ? `${sym}${pricing.geopass}` : "$4.99";
   const passAnnual = "$39.99";
-  const tripPrice = pricing ? `${sym}${pricing.trippack}` : "$9.99";
+  const tripPrice = pricing ? `${sym}${pricing.trippack}` : "$22.99";
   const cadence = pricing?.cadence ?? "month";
   const annualSavingsPct = pricing
     ? Math.round((1 - 39.99 / (parseFloat(pricing.geopass) * 12)) * 100)

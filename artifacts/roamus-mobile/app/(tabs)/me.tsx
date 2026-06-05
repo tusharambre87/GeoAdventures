@@ -357,9 +357,13 @@ export default function MeScreen() {
                   </Text>
                   <Pressable
                     style={s.sharePill}
-                    onPress={() =>
-                      Share.share({ message: `Check out our ${heroTrip.name} trip on RoamUs!` }).catch(() => {})
-                    }
+                    onPress={() => {
+                      const tripUrl = `https://roamus.app/s/${heroTrip.id}`;
+                      Share.share({
+                        message: `Check out our ${heroTrip.name} trip on RoamUs!\n\n${tripUrl}`,
+                        url: tripUrl,
+                      }).catch(() => {});
+                    }}
                   >
                     <Text style={s.sharePillText}>{"↗ Share"}</Text>
                   </Pressable>
