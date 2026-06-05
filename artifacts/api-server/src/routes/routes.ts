@@ -9895,6 +9895,30 @@ Return ONLY valid JSON in this exact format:
       const file = req.file as Express.Multer.File | undefined;
       if (!file) return res.status(400).json({ message: 'No photo provided' });
 
+      // Strict MIME allowlist — reject anything that isn't an image before touching storage
+      const ALLOWED_MIME: Record<string, { ext: string; canonical: string }> = {
+        'image/jpeg':  { ext: 'jpg',  canonical: 'image/jpeg' },
+        'image/jpg':   { ext: 'jpg',  canonical: 'image/jpeg' },
+        'image/png':   { ext: 'png',  canonical: 'image/png'  },
+        'image/webp':  { ext: 'webp', canonical: 'image/webp' },
+        'image/heic':  { ext: 'heic', canonical: 'image/heic' },
+        'image/heif':  { ext: 'heif', canonical: 'image/heif' },
+      };
+      const mimeEntry = ALLOWED_MIME[file.mimetype?.toLowerCase() ?? ''];
+      if (!mimeEntry) {
+        return res.status(400).json({ message: 'Unsupported file type. Please upload a JPEG, PNG, WebP, or HEIC image.' });
+      }
+      // Magic-byte sanity check for JPEG (FF D8) and PNG (89 50 4E 47)
+      if (mimeEntry.canonical === 'image/jpeg' && !(file.buffer[0] === 0xFF && file.buffer[1] === 0xD8)) {
+        return res.status(400).json({ message: 'File content does not match declared type.' });
+      }
+      if (mimeEntry.canonical === 'image/png' && !(
+        file.buffer[0] === 0x89 && file.buffer[1] === 0x50 &&
+        file.buffer[2] === 0x4E && file.buffer[3] === 0x47
+      )) {
+        return res.status(400).json({ message: 'File content does not match declared type.' });
+      }
+
       const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
       if (!bucketId) return res.status(500).json({ message: 'Storage not configured' });
 
@@ -9916,12 +9940,12 @@ Return ONLY valid JSON in this exact format:
       });
 
       const userId: string = (req.user?.claims?.sub ?? req.user?.id ?? 'anon') as string;
-      const ext = file.mimetype === 'image/png' ? 'png' : 'jpg';
       // Embed userId prefix so the proxy can verify ownership without a DB round-trip
-      const objectName = `trip-photos/${userId.slice(0, 8)}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const objectName = `trip-photos/${userId.slice(0, 8)}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}.${mimeEntry.ext}`;
       const bucket = gcs.bucket(bucketId);
       const gcsFile = bucket.file(objectName);
-      await gcsFile.save(file.buffer, { contentType: file.mimetype || 'image/jpeg' });
+      // Always store with the canonical (server-validated) content type — never the raw client header
+      await gcsFile.save(file.buffer, { contentType: mimeEntry.canonical });
       // Return absolute URL so React Native Image components can render it on any device
       const domain = process.env.EXPO_PUBLIC_DOMAIN ?? req.get('host') ?? '';
       const baseUrl = domain ? `https://${domain}` : '';
@@ -9973,8 +9997,18 @@ Return ONLY valid JSON in this exact format:
       });
       const bucket = gcs.bucket(bucketId);
       const gcsFile = bucket.file(objectName);
-      const [metadata] = await gcsFile.getMetadata();
-      res.setHeader('Content-Type', (metadata.contentType as string) || 'image/jpeg');
+      // Derive content-type from the server-controlled file extension — never trust GCS metadata
+      // (which was set by us, but defence-in-depth: don't reflect attacker-influenced values)
+      const EXT_TO_MIME: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        png: 'image/png', webp: 'image/webp',
+        heic: 'image/heic', heif: 'image/heif',
+      };
+      const extMatch = objectName.match(/\.([a-z0-9]+)$/i);
+      const safeContentType = extMatch ? (EXT_TO_MIME[extMatch[1].toLowerCase()] ?? 'image/jpeg') : 'image/jpeg';
+      res.setHeader('Content-Type', safeContentType);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', 'inline');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       gcsFile.createReadStream()
         .on('error', () => res.status(404).end())

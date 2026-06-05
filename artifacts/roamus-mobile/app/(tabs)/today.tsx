@@ -2199,10 +2199,6 @@ export default function TodayScreen() {
             onPress={async () => {
               setIsWrapping(true);
               try {
-                try {
-                  await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
-                } catch { /* best-effort */ }
-
                 if (trip?.id) {
                   const filledPhotos = [...wrapPhotos];
                   const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
@@ -2259,6 +2255,11 @@ export default function TodayScreen() {
                     } catch { /* best-effort */ }
                   }
                 }
+
+                // Mark day complete only after all memories are saved successfully
+                try {
+                  await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
+                } catch { /* best-effort */ }
 
                 router.push('/(tabs)/memories' as never);
               } finally {
