@@ -985,7 +985,7 @@ export default function AtStopScreen() {
               }});
             }}>
             <Text style={dt.gridIcon}>{'\uD83E\uDDED'}</Text>
-            <Text style={dt.gridTitle}>Kids explorer</Text>
+            <Text style={dt.gridTitle}>Kids Zone</Text>
             <Text style={dt.gridSub}>Missions and stories</Text>
           </TouchableOpacity>
 
@@ -1105,7 +1105,7 @@ export default function AtStopScreen() {
                 enrichment.parkingNotes ? ['Parking', enrichment.parkingNotes] : null,
                 meta.restroomConfidence ? ['Restrooms', meta.restroomConfidence] : null,
                 address ? ['Address', address] : null,
-              ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x)).map(([k, v]) => (
+              ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x) && x[1] !== '—' && x[1] !== '').map(([k, v]) => (
                 <View key={k} style={dt.exploreRow}>
                   <Text style={dt.exploreKey}>{k}</Text>
                   <Text style={dt.exploreVal}>{v}</Text>

@@ -44,6 +44,7 @@ import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
 import TripPreferencesSheet from "@/components/TripPreferencesSheet";
+import TripPlanStopSheet from "@/components/TripPlanStopSheet";
 import CommunityShareSheet from "@/components/CommunityShareSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 
@@ -3513,14 +3514,11 @@ export default function TripPlanScreen() {
       {/* ── Sheets — only ONE ever in the tree at a time ── */}
       {activeSheet === 'stopDetail' && (
         <SheetModal visible onClose={closeSheet}>
-          <StopDetailSheet
+          <TripPlanStopSheet
             stop={selectedStop}
-            isEditable={isSelectedDayEditable}
-            tripCity={trip.city ?? trip.destination}
             onClose={closeSheet}
-            onReplace={(s) => { closeSheet(); openReplaceSheet(s); }}
+            onReplace={(s) => { closeSheet(); openReplaceSheet(s as any); }}
             onDelete={deleteStop}
-            onOpenRunDay={() => { closeSheet(); openRunDay('easier'); }}
           />
         </SheetModal>
       )}
