@@ -304,7 +304,7 @@ function StopRow({ name, type, isKidFriendly, isOptional }: {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function DiscoverDetailScreen() {
-  const { slug, isAiPick } = useLocalSearchParams<{ slug: string; isAiPick: string }>();
+  const { slug, isAiPick, heroImageUrl: paramHeroImg } = useLocalSearchParams<{ slug: string; isAiPick: string; heroImageUrl?: string }>();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
 
@@ -481,7 +481,7 @@ export default function DiscoverDetailScreen() {
   const durationDays = isAi ? (aiDetail?.durationDays ?? 3) : (itinerary?.durationDays ?? 3);
   const heroImg = (!isAi && itinerary?.heroImageUrl)
     ? itinerary.heroImageUrl
-    : CITY_IMGS[destination] ?? null;
+    : CITY_IMGS[destination] ?? (paramHeroImg || null);
 
   const totalStops = isAi
     ? (aiDetail?.days.reduce((s, d) => s + d.stops.length, 0) ?? 0)

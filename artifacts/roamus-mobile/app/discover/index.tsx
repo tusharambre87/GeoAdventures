@@ -337,7 +337,11 @@ export default function DiscoverScreen() {
   function handlePress(item: DiscoverItem) {
     router.push({
       pathname: "/discover/[slug]" as any,
-      params: { slug: item.slug, isAiPick: item.isAiPick ? "true" : "false" },
+      params: {
+        slug: item.slug,
+        isAiPick: item.isAiPick ? "true" : "false",
+        heroImageUrl: item.heroImageUrl || CITY_IMGS[item.destination] || "",
+      },
     });
   }
 
