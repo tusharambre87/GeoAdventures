@@ -12,6 +12,7 @@
 
 import { db } from '../db.js';
 import { stopLibrary } from '@workspace/db';
+import { eq, or } from 'drizzle-orm';
 import { getExploreContent } from '../exploreContentService.js';
 import { getExploreCacheByStop, upsertExploreCache } from '../storage.js';
 
@@ -31,7 +32,15 @@ async function backfillExploreContent() {
       stopType: stopLibrary.stopType,
       city:     stopLibrary.city,
     })
-    .from(stopLibrary);
+    .from(stopLibrary)
+    .where(
+      or(
+        eq(stopLibrary.country, 'USA'),
+        eq(stopLibrary.country, 'United States'),
+        eq(stopLibrary.country, 'united states'),
+        eq(stopLibrary.country, 'us'),
+      ),
+    );
 
   console.log(`Total stops: ${stops.length}`);
 
