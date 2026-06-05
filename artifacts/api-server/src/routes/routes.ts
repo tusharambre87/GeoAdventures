@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "../storage";
+import { storage, getExploreCacheByStop, upsertExploreCache } from "../storage";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
@@ -8909,34 +8909,47 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/stops/:stopId/explore', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+
+      // 1. Resolve travel stop
       const stop = await storage.getStopById(stopId);
       if (!stop) {
         return res.status(404).json({ message: "Stop not found" });
       }
-      
-      // Check if journey pack already has explore data cached.
-      // Require a properly generated main story of at least 7 minutes (420s).
-      // Invalidate stale entries that contain narrator cues or generic fallback text.
-      const journeyPack = await storage.getJourneyPackByStopId(stopId);
-      const cached = journeyPack?.exploreData as any;
-      const hasRichStories = (cached?.stories?.main?.durationSeconds ?? 0) >= 420;
-      const isStale = isStaleExploreContent(cached);
-      if (cached && cached.reviews !== undefined && hasRichStories && !isStale) {
-        return res.json({ ...cached, stopId });
-      }
-      // If stale, fall through to regeneration — the updated data will overwrite the old entry.
-      
-      // Get trip for destination context
+
+      // Get trip for destination context (used as explore_cache city fallback)
       const trip = await storage.getTripById(stop.tripId);
-      const destination = trip?.destination || '';
-      
-      // Generate explore content using OpenAI
+      const destination = stop.cityGroup ?? trip?.destination ?? '';
+      const stopType = stop.stopType ?? 'landmark';
+
+      // 2. Check explore_cache first (canonical, cross-trip cache)
+      const cachedExplore = await getExploreCacheByStop(stop.name, destination);
+      if (cachedExplore) {
+        return res.json({ ...cachedExplore.exploreData as any, stopId });
+      }
+
+      // 3. Check journey_pack fallback (per-trip legacy cache)
+      //    Require a properly generated main story of at least 7 minutes (420s).
+      //    Invalidate stale entries that contain narrator cues or generic fallback text.
+      const journeyPack = await storage.getJourneyPackByStopId(stopId);
+      const legacyCached = journeyPack?.exploreData as any;
+      const hasRichStories = (legacyCached?.stories?.main?.durationSeconds ?? 0) >= 420;
+      const isStale = isStaleExploreContent(legacyCached);
+      if (legacyCached && legacyCached.reviews !== undefined && hasRichStories && !isStale) {
+        // Promote warm legacy entry into explore_cache for future cross-trip reuse
+        await upsertExploreCache(stop.name, destination, stopType, legacyCached).catch(() => {});
+        return res.json({ ...legacyCached, stopId });
+      }
+
+      // 4. Cache miss — generate
       const { getExploreContent } = await import('../exploreContentService');
-      const exploreData = await getExploreContent(stop.name, stop.stopType || 'landmark', destination);
-      
-      // Only cache if the story is properly long (>= 7 min). Don't persist fallback content.
-      const generatedDuration = (exploreData as any)?.stories?.main?.durationSeconds ?? 0;
+      const exploreData = await getExploreContent(stop.name, stopType, destination);
       const exploreDataWithStop = { ...exploreData, stopId };
+
+      // 5. Write to explore_cache (canonical)
+      await upsertExploreCache(stop.name, destination, stopType, exploreDataWithStop);
+
+      // 6. Keep existing journey_pack write (per-trip; only when story is rich enough)
+      const generatedDuration = (exploreData as any)?.stories?.main?.durationSeconds ?? 0;
       if (journeyPack && generatedDuration >= 420) {
         await storage.updateJourneyPack(journeyPack.id, { exploreData: exploreDataWithStop });
       } else if (!journeyPack && generatedDuration >= 420) {

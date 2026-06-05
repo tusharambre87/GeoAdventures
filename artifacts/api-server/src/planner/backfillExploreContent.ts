@@ -1,27 +1,19 @@
 /**
- * Backfill journey_packs.explore_data for all travel_stops missing it.
+ * Backfill explore_cache from stop_library.
  *
- * NOTE — schema constraint:
- *   journey_packs.stop_id is a FK to travel_stops.id (NOT stop_library.id).
- *   Source is therefore travel_stops (joined to travel_trips for destination).
- *
- * getExploreContent() is a pure function — does NOT write to DB.
- * This script does the explicit upsert via storage functions.
- *
- * Storage functions used (confirmed names in storage.ts):
- *   storage.getJourneyPackByStopId(stopId)
- *   storage.createJourneyPack(packData)
- *   storage.updateJourneyPack(packId, updates)
+ * Canonical cache keyed on (normalizedName, cityGroup) — one row per real-world
+ * stop identity, reused across all trips. Run once; idempotent thereafter.
  *
  * Usage:
  *   pnpm --filter @workspace/api-server run backfill:explore
+ *
+ * Remove the `if (generated >= 5) break` line after the 5-stop test passes.
  */
 
 import { db } from '../db.js';
-import { travelStops, travelTrips } from '@workspace/db';
-import { eq } from 'drizzle-orm';
+import { stopLibrary } from '@workspace/db';
 import { getExploreContent } from '../exploreContentService.js';
-import { storage } from '../storage.js';
+import { getExploreCacheByStop, upsertExploreCache } from '../storage.js';
 
 const PAUSE_MS = 2500;
 
@@ -30,78 +22,80 @@ async function sleep(ms: number) {
 }
 
 async function backfillExploreContent() {
-  console.log('🚀 Starting explore content backfill...');
+  console.log('Starting explore_cache backfill from stop_library...');
 
   const stops = await db
     .select({
-      id:          travelStops.id,
-      name:        travelStops.name,
-      stopType:    travelStops.stopType,
-      cityGroup:   travelStops.cityGroup,
-      destination: travelTrips.destination,
+      id:       stopLibrary.id,
+      name:     stopLibrary.name,
+      stopType: stopLibrary.stopType,
+      city:     stopLibrary.city,
     })
-    .from(travelStops)
-    .innerJoin(travelTrips, eq(travelStops.tripId, travelTrips.id));
+    .from(stopLibrary);
 
-  console.log(`📊 Total travel_stops: ${stops.length}`);
+  console.log(`Total stops: ${stops.length}`);
 
-  let skipped = 0;
+  let skipped   = 0;
   let generated = 0;
-  let failed = 0;
+  let failed    = 0;
   const failedStops: string[] = [];
 
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i];
 
     try {
-      const existing = await storage.getJourneyPackByStopId(stop.id);
+      // Skip if already in explore_cache
+      const existing = await getExploreCacheByStop(
+        stop.name,
+        stop.city ?? '',
+      );
 
-      if (existing?.exploreData) {
+      if (existing) {
         skipped++;
-        if (i % 50 === 0) {
-          console.log(`[${i + 1}/${stops.length}] Skipped (cached): ${stop.name}`);
-        }
         continue;
       }
 
-      if (generated + failed >= 5) break; // REMOVE AFTER TEST
-
       if (i % 10 === 0) {
-        console.log(`[${i + 1}/${stops.length}] Generating: ${stop.name} (${stop.cityGroup ?? stop.destination ?? ''})`);
+        console.log(
+          `[${i + 1}/${stops.length}] Generating: ${stop.name} (${stop.city ?? ''}) — ${generated} done, ${skipped} skipped, ${failed} failed`,
+        );
       }
 
       const content = await getExploreContent(
         stop.name,
         stop.stopType ?? 'attraction',
-        stop.cityGroup ?? stop.destination ?? '',
+        stop.city ?? '',
       );
 
-      if (existing) {
-        await storage.updateJourneyPack(existing.id, { exploreData: content as any });
-      } else {
-        await storage.createJourneyPack({
-          stopId:      stop.id,
-          exploreData: content as any,
-        });
-      }
+      await upsertExploreCache(
+        stop.name,
+        stop.city ?? '',
+        stop.stopType ?? '',
+        content,
+      );
 
       generated++;
 
+      // REMOVE THIS LINE after 5-stop test passes:
+      if (generated >= 5) break;
+
     } catch (err) {
       failed++;
-      failedStops.push(`${stop.name} (${stop.cityGroup ?? stop.destination ?? ''})`);
-      console.error(`❌ Failed: ${stop.name} — ${err}`);
+      failedStops.push(`${stop.name} (${stop.city ?? ''})`);
+      console.error(`Failed: ${stop.name} — ${err}`);
     }
 
-    await sleep(PAUSE_MS);
+    if (i < stops.length - 1) {
+      await sleep(PAUSE_MS);
+    }
   }
 
-  console.log('\n✅ Backfill complete');
-  console.log(`   Generated : ${generated}`);
-  console.log(`   Skipped   : ${skipped}`);
-  console.log(`   Failed    : ${failed}`);
+  console.log('\nBackfill complete');
+  console.log(`Generated : ${generated}`);
+  console.log(`Skipped   : ${skipped}`);
+  console.log(`Failed    : ${failed}`);
   if (failedStops.length > 0) {
-    console.log('   Failed stops (first 20):', failedStops.slice(0, 20).join(', '));
+    console.log('Failed stops:', failedStops.slice(0, 20).join(', '));
   }
 }
 
