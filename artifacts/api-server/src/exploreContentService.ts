@@ -401,14 +401,20 @@ export async function generateStopHeroImage(
   }
 
   try {
-    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(stopName)}&prop=pageimages&format=json&pithumbsize=800&redirects=1`;
+    const wikipediaTitle = stopName;
+    const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(wikipediaTitle)}&prop=pageimages&format=json&pithumbsize=800&redirects=1`;
     const res = await fetch(url, { headers: { "User-Agent": "RoamUs/1.0 (family travel app)" } });
     if (res.ok) {
       const data = await res.json() as any;
       const pages = data?.query?.pages ?? {};
       const page = Object.values(pages)[0] as any;
-      const thumb = page?.thumbnail?.source as string | undefined;
-      if (thumb) return thumb;
+      const imageUrl = page?.thumbnail?.source as string | undefined;
+      console.log('WIKI_IMAGE_DEBUG', {
+        stopName,
+        requestedTitle: wikipediaTitle,
+        returnedUrl: imageUrl ?? 'NO_IMAGE_RETURNED'
+      });
+      if (imageUrl) return imageUrl;
     }
   } catch (err) {
     console.error("Stop hero image (Wikipedia) failed:", err);
