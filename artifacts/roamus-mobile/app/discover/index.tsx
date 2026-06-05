@@ -415,7 +415,7 @@ export default function DiscoverScreen() {
           <View style={s.aiBanner}>
             <Text style={s.aiBannerIco}>&#x2728;</Text>
             <View style={{ flex: 1 }}>
-              <Text style={s.aiBannerTitle}>Personalised for your family</Text>
+              <Text style={s.aiBannerTitle}>Curated trips for families</Text>
               <Text style={s.aiBannerSub}>Pick a trip template — AI adapts stops for your kids' ages and your pace.</Text>
             </View>
           </View>
