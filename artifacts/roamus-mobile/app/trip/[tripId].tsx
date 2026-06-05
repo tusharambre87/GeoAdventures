@@ -1073,11 +1073,6 @@ function TripOverview({
         )}
 
         {Array.from({ length: totalDays }, (_, i) => i + 1)
-          .filter(dayNum => {
-            const status = getDayStatus(dayNum);
-            if (status === 'past' || status === 'today') return true;
-            return getStopsForDay(dayNum).length > 0;
-          })
           .map(dayNum => {
             const dayStops = getStopsForDay(dayNum);
             const status   = getDayStatus(dayNum);

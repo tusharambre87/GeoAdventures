@@ -134,7 +134,15 @@ export default function ChecklistSheet({
 
   const [items,       setItems]       = useState<ChecklistItem[]>([]);
   const [addingCustom, setAddingCustom] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
   const [customDraft,  setCustomDraft]  = useState('');
+
+  useEffect(() => {
+    if (addingCustom) {
+      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 320);
+      return () => clearTimeout(t);
+    }
+  }, [addingCustom]);
   const [loaded,       setLoaded]       = useState(false);
   const checkAnimRefs = useRef<Map<string, Animated.Value>>(new Map());
 
@@ -400,6 +408,7 @@ export default function ChecklistSheet({
 
         {/* Items list */}
         <ScrollView
+          ref={scrollRef}
           style={s.scroll}
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
