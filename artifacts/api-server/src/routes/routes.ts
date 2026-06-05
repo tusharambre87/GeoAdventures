@@ -9925,8 +9925,8 @@ Return ONLY valid JSON in this exact format:
   // React Native Image / browser <img> renders without auth headers; the signature proves
   // the URL was issued by this server (not guessed) and ties to the specific object path.
   function signPhotoSig(objectName: string): string {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) throw new Error('JWT_SECRET env var is required for photo URL signing');
+    const secret = process.env.JWT_SECRET ?? process.env.SESSION_SECRET;
+    if (!secret) throw new Error('SESSION_SECRET env var is required for photo URL signing');
     return crypto.createHmac('sha256', secret).update(objectName).digest('hex').slice(0, 32);
   }
 

@@ -88,9 +88,7 @@ function RootLayoutNav() {
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
-      <Stack.Screen name="memories/[tripId]/index" options={{ headerShown: false }} />
-      <Stack.Screen name="memories/[tripId]/recap" options={{ headerShown: false }} />
-      <Stack.Screen name="memories/[tripId]/story" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="memories/[tripId]" options={{ headerShown: false }} />
       <Stack.Screen
         name="kids"
         options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
