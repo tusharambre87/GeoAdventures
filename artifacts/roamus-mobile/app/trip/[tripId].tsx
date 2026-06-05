@@ -953,9 +953,7 @@ function TripOverview({
   onSelectDay,
   onRunToday,
   onOpenOptions,
-  checklistOpen,
   onOpenChecklist,
-  onChecklistClose,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -967,9 +965,7 @@ function TripOverview({
   onSelectDay: (d: number) => void;
   onRunToday: () => void;
   onOpenOptions: () => void;
-  checklistOpen: boolean;
   onOpenChecklist: () => void;
-  onChecklistClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const totalTickets  = stops.filter(s => needsTicket(s)).length;
@@ -1116,13 +1112,6 @@ function TripOverview({
         </View>
       )}
 
-      {/* Before you go — checklist bottom sheet */}
-      <ChecklistSheet
-        visible={checklistOpen}
-        onClose={onChecklistClose}
-        tripId={trip.id}
-        stops={stops}
-      />
     </View>
   );
 }
@@ -3490,9 +3479,7 @@ export default function TripPlanScreen() {
           onSelectDay={(d) => goToDay(d)}
           onRunToday={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
-          checklistOpen={checklistOpen}
           onOpenChecklist={() => setChecklistOpen(true)}
-          onChecklistClose={handleChecklistClose}
         />
       ) : (
         <DayDetail
@@ -3577,7 +3564,7 @@ export default function TripPlanScreen() {
             activeTripDay={activeTripDay}
             onClose={closeSheet}
             onCompare={() => setActiveSheet('compare')}
-            onOpenChecklist={() => { setChecklistOpen(true); }}
+            onOpenChecklist={() => { closeSheet(); setTimeout(() => setChecklistOpen(true), 300); }}
             onOpenPreferences={() => setActiveSheet('preferences')}
             onCommunityShare={() => { closeSheet(); setShowCommunityShare(true); }}
             queryClient={queryClient}
@@ -3629,6 +3616,12 @@ export default function TripPlanScreen() {
           />
         </SheetModal>
       )}
+      <ChecklistSheet
+        visible={checklistOpen}
+        onClose={handleChecklistClose}
+        tripId={tripId ?? ''}
+        stops={localStops}
+      />
       <UpgradeSheet
         visible={upgradeVisible}
         onClose={() => setUpgradeVisible(false)}

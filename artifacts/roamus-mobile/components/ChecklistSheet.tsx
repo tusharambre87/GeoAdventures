@@ -4,7 +4,6 @@ import {
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   PanResponder,
   Platform,
   ScrollView,
@@ -347,110 +346,110 @@ export default function ChecklistSheet({
     );
   }
 
+  if (!mounted) return null;
+
   return (
-    <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
-      <Animated.View
-        style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
-        pointerEvents="auto"
+    <Animated.View
+      style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]}
+      pointerEvents="auto"
+    >
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
+
+      <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
+        {/* Drag handle */}
+        <View {...pan.panHandlers} style={s.handleWrap}>
+          <View style={s.handle} />
+        </View>
 
-        <Animated.View style={[s.sheet, { transform: [{ translateY }] }]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
+        {/* Header */}
+        <View style={s.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title}>Before you go</Text>
+            <Text style={s.sub}>
+              {allDone
+                ? 'All done \u2713 — you\'re ready to roll'
+                : `${checkedCount} of ${totalCount} done`}
+            </Text>
+          </View>
+          <TouchableOpacity style={s.closeBtn} onPress={onClose} hitSlop={8} activeOpacity={0.7}>
+            <Text style={s.closeBtnText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progress bar */}
+        <View style={s.progressTrack}>
+          <Animated.View
+            style={[
+              s.progressFill,
+              {
+                width: progressA.interpolate({
+                  inputRange:  [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+                backgroundColor: allDone ? C.green : C.orange,
+              },
+            ]}
+          />
+        </View>
+
+        {/* Items list */}
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Drag handle */}
-          <View {...pan.panHandlers} style={s.handleWrap}>
-            <View style={s.handle} />
-          </View>
+          {loaded && items.length === 0 && (
+            <Text style={s.emptyText}>Nothing to check off yet.</Text>
+          )}
 
-          {/* Header */}
-          <View style={s.header}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.title}>Before you go</Text>
-              <Text style={s.sub}>
-                {allDone
-                  ? 'All done \u2713 — you\'re ready to roll'
-                  : `${checkedCount} of ${totalCount} done`}
-              </Text>
-            </View>
-            <TouchableOpacity style={s.closeBtn} onPress={onClose} hitSlop={8} activeOpacity={0.7}>
-              <Text style={s.closeBtnText}>Done</Text>
-            </TouchableOpacity>
-          </View>
+          {items.map(item => renderItem(item))}
 
-          {/* Progress bar */}
-          <View style={s.progressTrack}>
-            <Animated.View
-              style={[
-                s.progressFill,
-                {
-                  width: progressA.interpolate({
-                    inputRange:  [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                  backgroundColor: allDone ? C.green : C.orange,
-                },
-              ]}
-            />
-          </View>
-
-          {/* Items list */}
-          <ScrollView
-            style={s.scroll}
-            contentContainerStyle={s.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {loaded && items.length === 0 && (
-              <Text style={s.emptyText}>Nothing to check off yet.</Text>
-            )}
-
-            {items.map(item => renderItem(item))}
-
-            {/* Add custom item */}
-            {addingCustom ? (
-              <View style={s.addInputRow}>
-                <TextInput
-                  style={s.addInput}
-                  value={customDraft}
-                  onChangeText={setCustomDraft}
-                  placeholder="e.g. Print hotel confirmation"
-                  placeholderTextColor={C.muted}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={submitCustom}
-                  blurOnSubmit={false}
-                />
-                <TouchableOpacity
-                  style={[s.addConfirmBtn, !customDraft.trim() && { opacity: 0.4 }]}
-                  onPress={submitCustom}
-                  disabled={!customDraft.trim()}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.addConfirmText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
+          {/* Add custom item */}
+          {addingCustom ? (
+            <View style={s.addInputRow}>
+              <TextInput
+                style={s.addInput}
+                value={customDraft}
+                onChangeText={setCustomDraft}
+                placeholder="e.g. Print hotel confirmation"
+                placeholderTextColor={C.muted}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={submitCustom}
+                blurOnSubmit={false}
+              />
               <TouchableOpacity
-                style={s.addRow}
-                activeOpacity={0.7}
-                onPress={() => setAddingCustom(true)}
+                style={[s.addConfirmBtn, !customDraft.trim() && { opacity: 0.4 }]}
+                onPress={submitCustom}
+                disabled={!customDraft.trim()}
+                activeOpacity={0.8}
               >
-                <View style={s.addCircle}>
-                  <Text style={s.addCircleText}>+</Text>
-                </View>
-                <Text style={s.addRowText}>Add your own item</Text>
+                <Text style={s.addConfirmText}>Add</Text>
               </TouchableOpacity>
-            )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={s.addRow}
+              activeOpacity={0.7}
+              onPress={() => setAddingCustom(true)}
+            >
+              <View style={s.addCircle}>
+                <Text style={s.addCircleText}>+</Text>
+              </View>
+              <Text style={s.addRowText}>Add your own item</Text>
+            </TouchableOpacity>
+          )}
 
-            <View style={{ height: 24 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-        </Animated.View>
+          <View style={{ height: 24 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
       </Animated.View>
-    </Modal>
+    </Animated.View>
   );
 }
 

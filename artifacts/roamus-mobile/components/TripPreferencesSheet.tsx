@@ -142,6 +142,7 @@ export default function TripPreferencesSheet({
   }
 
   return (
+    // TODO: convert to SheetModal pattern (same bug as ChecklistSheet)
     <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
       <Animated.View style={[StyleSheet.absoluteFill, s.overlay, { opacity: anim }]} pointerEvents="box-none">
         <TouchableOpacity
