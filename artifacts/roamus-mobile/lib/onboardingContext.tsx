@@ -54,6 +54,8 @@ export type OnboardingData = {
   templateSlug: string | null;
   /** true when the trip is being built from a Discover template */
   isTemplate: boolean;
+  /** Explicit trip-day count selected in the Discover customize screen */
+  tripDays: number | null;
 };
 
 const DEFAULT: OnboardingData = {
@@ -81,6 +83,7 @@ const DEFAULT: OnboardingData = {
   cityTransitions: {},
   templateSlug: null,
   isTemplate: false,
+  tripDays: null,
 };
 
 type Ctx = {

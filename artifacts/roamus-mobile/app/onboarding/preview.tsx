@@ -496,6 +496,7 @@ export default function PreviewScreen() {
                   adventureContext: "travel",
                   autoGenerateStops: true,
                   templateSlug: data.templateSlug || undefined,
+                  tripDays: data.tripDays || undefined,
                   tailoring: {
                     transport: data.transport,
                     stroller: data.stroller,

@@ -327,7 +327,12 @@ export default function DiscoverDetailScreen() {
     }
     router.push({
       pathname: "/discover/customize" as any,
-      params: { slug, isAiPick: isAiPick ?? "false" },
+      params: {
+        slug,
+        isAiPick: isAiPick ?? "false",
+        destination: encodeURIComponent(destination),
+        templateDays: String(durationDays),
+      },
     });
   }
 

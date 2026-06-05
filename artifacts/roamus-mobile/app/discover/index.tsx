@@ -231,6 +231,12 @@ export default function DiscoverScreen() {
       if (activeCity !== "All" && !item.destination?.toLowerCase().includes(activeCity.toLowerCase())) return false;
       if (activeDuration === "weekend" && item.durationDays > 2) return false;
       if (activeDuration === "3-5" && (item.durationDays < 3 || item.durationDays > 5)) return false;
+      if (activeAge && item.ageRange) {
+        const ar = item.ageRange.toLowerCase();
+        if (activeAge === "toddlers" && !ar.includes("1") && !ar.includes("2") && !ar.includes("3") && !ar.includes("toddler")) return false;
+        if (activeAge === "6-10" && !ar.includes("6") && !ar.includes("7") && !ar.includes("8") && !ar.includes("9") && !ar.includes("10") && ar !== "all ages") return false;
+        if (activeAge === "teens" && !ar.includes("12") && !ar.includes("teen") && !ar.includes("13") && ar !== "all ages") return false;
+      }
       return true;
     });
   }, [rawItems, activeCity, activeDuration, activeAge]);

@@ -65,6 +65,7 @@ export default function AccountScreen() {
           adventureContext: "travel",
           autoGenerateStops: true,
           templateSlug: data.templateSlug || undefined,
+          tripDays: data.tripDays || undefined,
           tailoring: {
             transport: data.transport,
             stroller: data.stroller,

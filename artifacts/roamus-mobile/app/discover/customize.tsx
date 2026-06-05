@@ -125,25 +125,17 @@ function getDayNote(requested: number, templateDays: number, destination: string
 const DEFAULT_TEMPLATE_DAYS = 3;
 
 export default function DiscoverCustomizeScreen() {
-  const { slug, isAiPick } = useLocalSearchParams<{ slug: string; isAiPick: string }>();
+  const { slug, isAiPick, destination: destParam, templateDays: tdParam } = useLocalSearchParams<{
+    slug: string;
+    isAiPick: string;
+    destination: string;
+    templateDays: string;
+  }>();
   const insets = useSafeAreaInsets();
-  const { set: setOnboarding, data: onboardingData } = useOnboarding();
+  const { set: setOnboarding } = useOnboarding();
 
-  // Determine destination from slug (ai-dc -> "Washington DC", ai-nashville -> "Nashville", etc.)
-  const isAi = isAiPick === "true";
-  const destinationMap: Record<string, string> = {
-    "ai-dc": "Washington DC",
-    "ai-nashville": "Nashville",
-    "ai-denver": "Denver",
-    "ai-austin": "Austin",
-    "ai-seattle": "Seattle",
-    "ai-sandiego": "San Diego",
-  };
-  const destination = isAi
-    ? (destinationMap[slug] ?? slug.replace("ai-","").replace(/-/g," "))
-    : onboardingData.cities[0] ?? "";
-
-  const templateDays = DEFAULT_TEMPLATE_DAYS;
+  const destination = destParam ? decodeURIComponent(destParam) : slug.replace(/^ai-/, "").replace(/-/g, " ");
+  const templateDays = tdParam ? parseInt(tdParam, 10) || DEFAULT_TEMPLATE_DAYS : DEFAULT_TEMPLATE_DAYS;
 
   const today = useMemo(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; },[]);
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -174,6 +166,7 @@ export default function DiscoverCustomizeScreen() {
       onboardingInProgress: true,
       templateSlug: slug,
       isTemplate: true,
+      tripDays: days,
     });
     router.push("/onboarding/building" as any);
   }
