@@ -6002,7 +6002,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (preloadedStops && preloadedStops.length > 0) {
         // AI pick: stops provided directly by the client — use them as the seed pool
         rawStops = preloadedStops.map((s, i) => ({ ...s, displayOrder: i }));
-        templateDays = requestedDays ?? 3;
+        // Infer original template length from stop count (templates use ~3 stops/day).
+        // Do NOT use requestedDays here — that is the *target*, not the template's original
+        // length. Setting templateDays = requestedDays makes targetDays === templateDays and
+        // the trim/expand branches below never fire.
+        templateDays = Math.max(1, Math.ceil(preloadedStops.length / 3));
       } else {
         const share = await storage.getItineraryShareBySlug(templateSlug);
         if (!share || !share.stops || (share.stops as any[]).length === 0) {
