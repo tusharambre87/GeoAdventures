@@ -58,9 +58,10 @@ export default function BuildingScreen() {
   ];
 
   // ─ State ─
-  const [msgIdx,   setMsgIdx]   = useState(0);
-  const [animDone, setAnimDone] = useState(false);
-  const [apiDone,  setApiDone]  = useState(false);
+  const [msgIdx,     setMsgIdx]     = useState(0);
+  const [animDone,   setAnimDone]   = useState(false);
+  const [apiDone,    setApiDone]    = useState(false);
+  const [showFinish, setShowFinish] = useState(false);
   const navigated = useRef(false);
 
   // ─ Progress bar (RN core Animated — width cannot use native driver) ─
@@ -70,11 +71,9 @@ export default function BuildingScreen() {
   const msgOpacity = useSharedValue(1);
   const msgStyle   = useAnimatedStyle(() => ({ opacity: msgOpacity.value }));
 
-  // ─ Heading / finish opacity (Reanimated) ─
-  const headingOpacity = useSharedValue(1);
-  const finishOpacity  = useSharedValue(0);
-  const headingStyle   = useAnimatedStyle(() => ({ opacity: headingOpacity.value }));
-  const finishStyle    = useAnimatedStyle(() => ({ opacity: finishOpacity.value }));
+  // ─ Finish fade-in (Reanimated) ─
+  const finishOpacity = useSharedValue(0);
+  const finishStyle   = useAnimatedStyle(() => ({ opacity: finishOpacity.value }));
 
   // ─ Drive progress bar on mount ─
   useEffect(() => {
@@ -103,9 +102,10 @@ export default function BuildingScreen() {
     if (animDone && apiDone && !navigated.current) {
       navigated.current = true;
       if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      headingOpacity.value = withTiming(0.3, { duration: 400 }, () => {
+      setTimeout(() => {
+        setShowFinish(true);
         finishOpacity.value = withTiming(1, { duration: 400 });
-      });
+      }, 300);
       setTimeout(() => router.replace('/onboarding/preview'), 1800);
     }
   }, [animDone, apiDone]);
@@ -195,41 +195,43 @@ export default function BuildingScreen() {
       {/* Center block */}
       <View style={styles.center}>
 
-        {/* Heading — fades to 0.3 on finish */}
-        <Reanimated.View style={headingStyle}>
-          <Text style={styles.heading}>
-            {'Building your\n'}
-            <Text style={styles.headingCity}>{heroCity} adventure</Text>
-          </Text>
-          {isMulti && (
-            <View style={styles.cityDots}>
-              {cities.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.cityDot, i === imgIdx % cities.length && styles.cityDotActive]}
-                />
-              ))}
+        {!showFinish ? (
+          <>
+            {/* Heading */}
+            <Text style={styles.heading}>
+              {'Building your\n'}
+              <Text style={styles.headingCity}>{heroCity} adventure</Text>
+            </Text>
+            {isMulti && (
+              <View style={styles.cityDots}>
+                {cities.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.cityDot, i === imgIdx % cities.length && styles.cityDotActive]}
+                  />
+                ))}
+              </View>
+            )}
+
+            {/* Progress track */}
+            <View style={styles.progressTrack}>
+              <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
             </View>
-          )}
-        </Reanimated.View>
 
-        {/* Progress track */}
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-        </View>
-
-        {/* Cycling message */}
-        <Reanimated.View style={msgStyle}>
-          <Text style={styles.message}>{MESSAGES[msgIdx]}</Text>
-        </Reanimated.View>
-
-        {/* Finish overlay — fades in when done */}
-        <Reanimated.View style={[StyleSheet.absoluteFill, styles.finishWrap, finishStyle]} pointerEvents="none">
-          <Text style={styles.finishTitle}>Your adventure is ready</Text>
-          <Text style={styles.finishSub}>
-            {city}{tripDays > 0 ? ` \u00b7 ${tripDays} days` : ''}{totalStops > 0 ? ` \u00b7 ${totalStops} stops` : ''}
-          </Text>
-        </Reanimated.View>
+            {/* Cycling message */}
+            <Reanimated.View style={msgStyle}>
+              <Text style={styles.message}>{MESSAGES[msgIdx]}</Text>
+            </Reanimated.View>
+          </>
+        ) : (
+          /* Finish state — fades in */
+          <Reanimated.View style={[styles.finishWrap, finishStyle]}>
+            <Text style={styles.finishTitle}>Your adventure is ready</Text>
+            <Text style={styles.finishSub}>
+              {city}{tripDays > 0 ? ` \u00b7 ${tripDays} days` : ''}{totalStops > 0 ? ` \u00b7 ${totalStops} stops` : ''}
+            </Text>
+          </Reanimated.View>
+        )}
 
       </View>
 

@@ -131,6 +131,7 @@ type StopMetadata = {
   durationMinutes?: number | null;
   durationClass?: string | null;
   foodNearby?: Array<{ name: string; distance: string; type: string }>;
+  imageUrl?: string | null;
 };
 
 type StopEnrichment = {
@@ -1667,7 +1668,7 @@ export default function TodayScreen() {
           {/* Photo hero with gradient overlay */}
           <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
             <Image
-              source={{ uri: (stop.metadata as Record<string, unknown> | null)?.imageUrl as string ||
+              source={{ uri: meta.imageUrl as string ||
                 CITY_IMGS[(stop as { cityGroup?: string | null }).cityGroup ?? ''] ||
                 CITY_IMGS[city] ||
                 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
@@ -1787,21 +1788,16 @@ export default function TodayScreen() {
             <View style={er.afterSection}>
               <Text style={er.afterLabel}>AFTER THIS</Text>
               {afterStops.map((s, idx) => {
-                const imgUrl = (s.metadata as Record<string, unknown> | null)?.imageUrl as string | undefined;
+                const sMeta  = parseMetadata(s.metadata);
+                const imgUrl = (sMeta.imageUrl as string | undefined)
+                  ?? CITY_IMGS[(s as { cityGroup?: string | null }).cityGroup ?? '']
+                  ?? CITY_IMGS[city]
+                  ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
                 const stopNum = currentStopIndex + 2 + idx;
-                const typeKey = s.stopType ?? 'other';
-                const typeEmoji = STOP_TYPE_EMOJI[typeKey] ?? '\uD83D\uDCCD';
-                const typeBg   = STOP_TYPE_COLOR[typeKey] ?? C.orange;
                 return (
                   <View key={s.id} style={er.afterRow}>
                     <View style={er.afterThumb}>
-                      {imgUrl ? (
-                        <Image source={{ uri: imgUrl }} style={er.afterThumbImg} />
-                      ) : (
-                        <View style={[er.afterThumbPlaceholder, { backgroundColor: typeBg }]}>
-                          <Text style={er.afterThumbEmoji}>{typeEmoji}</Text>
-                        </View>
-                      )}
+                      <Image source={{ uri: imgUrl }} style={er.afterThumbImg} />
                       <View style={er.afterThumbBadge}>
                         <Text style={er.afterThumbBadgeText}>{stopNum}</Text>
                       </View>

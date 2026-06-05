@@ -80,6 +80,7 @@ type StopMetadata = {
   dropPriority?: number;
   sessionFit?: string;
   parkingSignal?: string;
+  imageUrl?: string | null;
 };
 
 type StopEnrichment = {
@@ -466,8 +467,13 @@ export default function AtStopScreen() {
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
     if (!currentStop) return;
-    setHeroImageUrl(null);
-    setStopImages([null, null, null]);
+    // Set immediate fallback so the hero is never blank while wiki fetch is in flight
+    const immediateFallback =
+      (parseMetadata(currentStop.metadata).imageUrl as string | undefined) ??
+      CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
+      'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80';
+    setHeroImageUrl(immediateFallback);
+    setStopImages([immediateFallback, null, null]);
     fetchWikiImages(currentStop.name).then(urls => {
       const fallback = CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
         'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
