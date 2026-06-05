@@ -25,6 +25,15 @@ import { CITY_IMGS, F, G } from "@/lib/tokens";
 
 const EXPLORER_COLORS = ["#7C3AED", "#E8692A", "#1A1F2E", "#DC2626", "#16A34A"];
 
+function getExplorerRank(xp: number): string {
+  if (xp >= 5000) return "\uD83C\uDFC6 Legend";
+  if (xp >= 2000) return "\u2B50 Expert";
+  if (xp >= 1000) return "\uD83D\uDD25 Adventurer";
+  if (xp >= 500)  return "\uD83D\uDDFA Explorer";
+  if (xp >= 100)  return "\uD83C\uDF31 Rookie";
+  return "\uD83D\uDC23 Beginner";
+}
+
 type Trip = {
   id: string;
   name: string;
@@ -47,6 +56,8 @@ type Explorer = {
   isParent?: boolean;
   age?: string | null;
   totalXp?: number;
+  unlockedAchievementIds?: string[];
+  unlockedStreakBadgeIds?: string[];
 };
 
 function Divider() {
@@ -222,6 +233,7 @@ export default function MeScreen() {
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.visitedStops ?? 0), 0);
   const explorerCount = explorers.length;
+  const totalFamilyXp = explorers.reduce((sum, e) => sum + (e.totalXp ?? 0), 0);
 
   const user = fetchedUser ?? cachedUser;
   const firstLetter = (user?.firstName ?? user?.username ?? user?.email ?? "U")[0];
@@ -292,6 +304,11 @@ export default function MeScreen() {
               </View>
             ))}
           </View>
+          {totalFamilyXp > 0 && (
+            <Text style={s.familyXpText}>
+              {"\u26A1"} {totalFamilyXp.toLocaleString()} family XP{"  \u00B7  "}{getExplorerRank(totalFamilyXp)}
+            </Text>
+          )}
         </View>
 
         {/* ── 2. My Travel Journal ── */}
@@ -415,6 +432,19 @@ export default function MeScreen() {
                     <View>
                       <Text style={s.explorerName}>{exp.name}</Text>
                       <Text style={s.explorerXp}>{"\u26A1"} {exp.totalXp ?? 0} XP</Text>
+                      <Text style={s.explorerRank}>{getExplorerRank(exp.totalXp ?? 0)}</Text>
+                      {(exp.unlockedAchievementIds?.length ?? 0) > 0 && (
+                        <View style={s.explorerBadges}>
+                          {exp.unlockedAchievementIds!.slice(0, 3).map(id => (
+                            <View key={id} style={s.explorerBadge}>
+                              <Text style={s.explorerBadgeIcon}>{"\uD83C\uDFC5"}</Text>
+                            </View>
+                          ))}
+                          {exp.unlockedAchievementIds!.length > 3 && (
+                            <Text style={s.explorerBadgeMore}>+{exp.unlockedAchievementIds!.length - 3}</Text>
+                          )}
+                        </View>
+                      )}
                     </View>
                   </View>
                 ))}
@@ -726,11 +756,11 @@ const s = StyleSheet.create({
   },
   explorerChip: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     backgroundColor: G.bg,
-    borderRadius: 20,
+    borderRadius: 16,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     gap: 8,
   },
   explorerCircle: {
@@ -743,6 +773,25 @@ const s = StyleSheet.create({
   explorerInitial: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
   explorerName: { fontFamily: F.bold, fontSize: 13, color: "#1C1917" },
   explorerXp: { fontFamily: F.semibold, fontSize: 11, color: "#D97706" },
+  explorerRank: { fontFamily: F.medium, fontSize: 11, color: G.muted, marginTop: 1 },
+  explorerBadges: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 },
+  explorerBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(232,105,42,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  explorerBadgeIcon: { fontSize: 11 },
+  explorerBadgeMore: { fontFamily: F.bold, fontSize: 10, color: G.muted, marginLeft: 2 },
+  familyXpText: {
+    fontFamily: F.semibold,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+    marginTop: 12,
+    textAlign: "center",
+  },
   kidsZoneRow: {
     flexDirection: "row",
     alignItems: "center",
