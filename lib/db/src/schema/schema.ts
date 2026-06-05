@@ -3792,3 +3792,13 @@ export const waitlistSignups = pgTable("waitlist_signups", {
 export const insertWaitlistSignupSchema = createInsertSchema(waitlistSignups).omit({ id: true, createdAt: true });
 export type InsertWaitlistSignup = z.infer<typeof insertWaitlistSignupSchema>;
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+
+// ── SHARE REPORTS ─────────────────────────────────────────────────────────────
+export const shareReports = pgTable('share_reports', {
+  id: serial('id').primaryKey(),
+  shareId: text('share_id').notNull(),
+  reportedBy: text('reported_by'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+export type ShareReport = typeof shareReports.$inferSelect;
+export type InsertShareReport = typeof shareReports.$inferInsert;

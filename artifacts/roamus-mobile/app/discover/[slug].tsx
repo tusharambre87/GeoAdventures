@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -320,6 +321,7 @@ export default function DiscoverDetailScreen() {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
+  const [reported, setReported] = useState(false);
 
   const isAi = isAiPick === "true";
 
@@ -398,6 +400,21 @@ export default function DiscoverDetailScreen() {
       }
     } catch {} finally {
       setCommentLoading(false);
+    }
+  }
+
+  async function handleReport() {
+    if (reported || isAi || !itinerary?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/travel/shares/${itinerary.id}/report`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error();
+      setReported(true);
+      Alert.alert('Thanks for letting us know', "We'll review this trip and take action if needed.");
+    } catch {
+      Alert.alert('Something went wrong', 'Please try again.');
     }
   }
 
@@ -637,6 +654,17 @@ export default function DiscoverDetailScreen() {
               </View>
             ))}
           </View>
+        )}
+
+        {!isAi && (
+          <TouchableOpacity
+            onPress={handleReport}
+            style={{ paddingVertical: 20, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 13, color: '#8A8FA8' }}>
+              {reported ? 'Trip reported' : 'Report this trip'}
+            </Text>
+          </TouchableOpacity>
         )}
       </ScrollView>
 

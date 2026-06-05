@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { API_BASE } from "@/lib/authContext";
+import { useOnboarding } from "@/lib/onboardingContext";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ interface DiscoverItem {
   badge?: string;
   isAiPick?: boolean;
   totalUpvotes?: number;
+  tripId?: string;
 }
 
 interface CommunityShare {
@@ -194,9 +196,10 @@ function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
 
 // ─── Grid card ────────────────────────────────────────────────────────────────
 
-function GridCard({ item, onPress, isUpvoted, onUpvote }: {
+function GridCard({ item, onPress, isUpvoted, onUpvote, currentActiveTripId }: {
   item: DiscoverItem; onPress: () => void;
   isUpvoted?: boolean; onUpvote?: () => void;
+  currentActiveTripId?: string | null;
 }) {
   const imgSrc = item.heroImageUrl || CITY_IMGS[item.destination] || null;
   const upvotes = (item.totalUpvotes ?? 0) + (isUpvoted ? 1 : 0);
@@ -213,6 +216,11 @@ function GridCard({ item, onPress, isUpvoted, onUpvote }: {
           style={StyleSheet.absoluteFill}
         />
         <Text style={s.gridCity}>{item.destination}</Text>
+        {item.tripId && item.tripId === currentActiveTripId && (
+          <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#E8692A', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#fff' }}>Active trip</Text>
+          </View>
+        )}
       </View>
       <View style={s.gridBody}>
         <Text style={s.gridTitle} numberOfLines={2}>{item.title}</Text>
@@ -262,6 +270,8 @@ const AGE_FILTERS: { id: string; label: string }[] = [
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
+  const { data: onboardingData } = useOnboarding();
+  const activeTripId = onboardingData.createdTripId;
   const [tab, setTab] = useState<"community" | "ai">("community");
   const [communityItems, setCommunityItems] = useState<DiscoverItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -449,6 +459,7 @@ export default function DiscoverScreen() {
                 onPress={() => handlePress(item)}
                 isUpvoted={!!quickUpvoted[item.id]}
                 onUpvote={item.isAiPick ? undefined : () => handleQuickUpvote(item.id)}
+                currentActiveTripId={activeTripId}
               />
             ))}
           </View>

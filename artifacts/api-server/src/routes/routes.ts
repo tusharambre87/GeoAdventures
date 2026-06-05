@@ -4,7 +4,7 @@ import { storage, getExploreCacheByStop, upsertExploreCache } from "../storage";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
-import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary } from "@workspace/db";
+import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
@@ -9646,6 +9646,7 @@ Return ONLY valid JSON in this exact format:
         totalUpvotes: share.totalUpvotes,
         totalViews: share.totalViews,
         publishedAt: share.publishedAt,
+        tripId: share.tripId,
       }));
       
       res.json(publicShares);
@@ -9853,6 +9854,23 @@ Return ONLY valid JSON in this exact format:
   });
   
   // Update comment (owner only)
+  // Report a shared trip
+  app.post('/api/travel/shares/:id/report', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const reporterId = req.user?.id ?? null;
+      await db.insert(shareReports).values({
+        shareId: id,
+        reportedBy: reporterId,
+        createdAt: new Date(),
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      req.log.error({ err }, 'Failed to save share report');
+      res.status(500).json({ message: 'Failed to submit report' });
+    }
+  });
+
   app.patch('/api/travel/comments/:commentId', isAuthenticated, async (req: any, res) => {
     try {
       const { commentId } = req.params;
