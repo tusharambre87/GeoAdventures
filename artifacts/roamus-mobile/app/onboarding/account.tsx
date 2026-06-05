@@ -11,18 +11,51 @@ import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP } from "@/lib/tokens";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useOnboarding } from "@/lib/onboardingContext";
 
+// ─── Validation helpers ───────────────────────────────────────────────────────
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  return emailRegex.test(email.trim());
+}
+
+function getPasswordStrength(password: string): {
+  score: number;
+  label: string;
+  color: string;
+  message: string;
+} {
+  if (password.length === 0) return { score: 0, label: "", color: "", message: "" };
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^a-zA-Z0-9]/.test(password) || /[A-Z]/.test(password)) score++;
+  if (score === 1) return { score: 1, label: "Weak",   color: "#DC2626", message: "Add numbers or symbols" };
+  if (score === 2) return { score: 2, label: "Fair",   color: "#D97706", message: "Good — add uppercase or symbols" };
+  return              { score: 3, label: "Strong", color: "#3DAA6E", message: "Great password" };
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { register, token } = useAuth();
   const { data, set } = useOnboarding();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const emailRef = useRef<TextInput>(null);
-  const pwRef = useRef<TextInput>(null);
+  const [name,            setName]            = useState("");
+  const [email,           setEmail]           = useState("");
+  const [pw,              setPw]              = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [emailError,      setEmailError]      = useState("");
+  const [passwordError,   setPasswordError]   = useState("");
+  const [confirmError,    setConfirmError]    = useState("");
+
+  const emailRef   = useRef<TextInput>(null);
+  const pwRef      = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+
+  const strength = getPasswordStrength(pw);
 
   // If already logged in, skip registration — just create the trip and advance
   useEffect(() => {
@@ -85,8 +118,6 @@ export default function AccountScreen() {
         const trip = await res.json();
         set({ createdTripId: trip.id });
         set({ templateSlug: null, isTemplate: false, tripDays: null, templateStops: null });
-        // Fire-and-forget: warm up Kids Explore stories for all stops in the
-        // background so users never wait when they first open Kids Mode.
         fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}` },
@@ -97,23 +128,63 @@ export default function AccountScreen() {
     }
   }
 
+  // ─── Blur handlers ──────────────────────────────────────────────────────────
+
+  function handleEmailBlur() {
+    if (email && !isValidEmail(email)) {
+      setEmailError("Please enter a valid email address");
+    } else {
+      setEmailError("");
+    }
+  }
+
+  function handleConfirmBlur() {
+    if (confirmPassword && confirmPassword !== pw) {
+      setConfirmError("Passwords do not match");
+    } else {
+      setConfirmError("");
+    }
+  }
+
+  // ─── Submit ─────────────────────────────────────────────────────────────────
+
   async function handleCreate() {
-    if (!name.trim()) { setError("Please enter your name."); return; }
-    if (!email.trim()) { setError("Please enter your email address."); return; }
-    if (pw.length < 6) { setError("Password must be at least 6 characters."); return; }
-
+    // Clear all field errors; keep only the first failing one
+    setEmailError("");
+    setPasswordError("");
+    setConfirmError("");
     setError(null);
-    setLoading(true);
 
-    // Mark onboarding in progress BEFORE registration so AuthGate
-    // doesn't redirect the newly-registered user away from the upgrade screen.
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (!email.trim() || !isValidEmail(email)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+    if (pw.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      return;
+    }
+    if (strength.score < 2) {
+      setPasswordError("Password is too weak — add numbers or symbols");
+      return;
+    }
+    if (pw !== confirmPassword) {
+      setConfirmError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
     set({ onboardingInProgress: true });
 
     const rawPlayers = data.travelers.map(t => ({
       name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
     }));
-    // API requires at least 1 player — add a default adult if the traveler list is empty
-    const players = rawPlayers.length > 0 ? rawPlayers : [{ name: name.trim() || 'Traveler', isParent: true, age: '35' }];
+    const players = rawPlayers.length > 0
+      ? rawPlayers
+      : [{ name: name.trim() || "Traveler", isParent: true, age: "35" }];
 
     const result = await register(name.trim(), email.trim().toLowerCase(), pw, players);
 
@@ -124,8 +195,6 @@ export default function AccountScreen() {
       return;
     }
 
-    // Retrieve the fresh JWT from auth context (register stores it)
-    // and create the real trip in the background (best-effort).
     const jwt = await import("@react-native-async-storage/async-storage")
       .then(m => m.default.getItem("auth_token"));
     if (jwt) await createTripWithJwt(jwt);
@@ -133,6 +202,12 @@ export default function AccountScreen() {
     setLoading(false);
     router.replace("/onboarding/upgrade");
   }
+
+  // ─── Derived ────────────────────────────────────────────────────────────────
+
+  const canSubmit = !loading && !!name && !!email && pw.length >= 8 && !!confirmPassword;
+
+  // ─── JSX ────────────────────────────────────────────────────────────────────
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
@@ -165,11 +240,12 @@ export default function AccountScreen() {
               <Text style={s.tripCardCity}>{data.cities.join(" + ")}</Text>
               <Text style={s.tripCardMeta}>
                 {data.travelers.length} traveler{data.travelers.length !== 1 ? "s" : ""}
-                {data.tripStyle ? `  ·  ${data.tripStyle} vibe` : ""}
+                {data.tripStyle ? `  \u00b7  ${data.tripStyle} vibe` : ""}
               </Text>
             </View>
           )}
 
+          {/* Name */}
           <View style={[s.field, { borderColor: name ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
             <TextInput
               style={[s.input, { color: G.deep }]}
@@ -183,43 +259,74 @@ export default function AccountScreen() {
             />
           </View>
 
-          <View style={[s.field, { borderColor: email ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
+          {/* Email */}
+          <View style={[s.field, emailError ? s.fieldError : { borderColor: email ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
             <TextInput
               ref={emailRef}
               style={[s.input, { color: G.deep }]}
               placeholder="Email address"
               placeholderTextColor={G.muted}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={v => { setEmail(v); if (emailError) setEmailError(""); }}
+              onBlur={handleEmailBlur}
               keyboardType="email-address"
               autoCapitalize="none"
               returnKeyType="next"
               onSubmitEditing={() => pwRef.current?.focus()}
             />
           </View>
+          {emailError ? <Text style={s.inlineError}>{emailError}</Text> : null}
 
-          <View style={[s.field, { borderColor: pw ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
+          {/* Password */}
+          <View style={[s.field, passwordError ? s.fieldError : { borderColor: pw ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
             <TextInput
               ref={pwRef}
               style={[s.input, { color: G.deep }]}
-              placeholder="Password (min 6 characters)"
+              placeholder="Password (min 8 characters)"
               placeholderTextColor={G.muted}
               value={pw}
-              onChangeText={setPw}
+              onChangeText={v => { setPw(v); if (passwordError) setPasswordError(""); }}
               secureTextEntry
+              returnKeyType="next"
+              onSubmitEditing={() => confirmRef.current?.focus()}
+            />
+          </View>
+          {pw.length > 0 && (
+            <View style={s.strengthWrap}>
+              <View style={s.strengthBar}>
+                <View style={[s.strengthFill, { width: `${(strength.score / 3) * 100}%` as any, backgroundColor: strength.color }]} />
+              </View>
+              <Text style={[s.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+            </View>
+          )}
+          {passwordError ? <Text style={s.inlineError}>{passwordError}</Text> : null}
+
+          {/* Confirm password */}
+          <View style={[s.field, confirmError ? s.fieldError : { borderColor: confirmPassword ? "rgba(232,105,42,0.35)" : "rgba(26,31,46,0.1)" }]}>
+            <TextInput
+              ref={confirmRef}
+              style={[s.input, { color: G.deep }]}
+              placeholder="Confirm password"
+              placeholderTextColor={G.muted}
+              value={confirmPassword}
+              onChangeText={v => { setConfirmPassword(v); if (confirmError) setConfirmError(""); }}
+              onBlur={handleConfirmBlur}
+              secureTextEntry
+              autoCapitalize="none"
               returnKeyType="go"
               onSubmitEditing={handleCreate}
             />
           </View>
+          {confirmError ? <Text style={s.inlineError}>{confirmError}</Text> : null}
 
           <Pressable
-            style={({ pressed }) => [s.btn, { opacity: pressed || loading || !name || !email || pw.length < 6 ? 0.7 : 1 }]}
+            style={({ pressed }) => [s.btn, { opacity: pressed || !canSubmit ? 0.7 : 1 }]}
             onPress={handleCreate}
-            disabled={loading || !name || !email || pw.length < 6}
+            disabled={!canSubmit}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={s.btnText}>Create free account →</Text>}
+              : <Text style={s.btnText}>Create free account {"\u2192"}</Text>}
           </Pressable>
 
           <Text style={s.termsNote}>
@@ -246,6 +353,8 @@ export default function AccountScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   root: { flex: 1 },
   scroll: { paddingHorizontal: 24, flexGrow: 1 },
@@ -262,12 +371,17 @@ const s = StyleSheet.create({
   tripCardMeta: { fontFamily: F.regular, fontSize: 13, color: G.deep },
   field: {
     backgroundColor: G.card, borderRadius: 14, borderWidth: 1.5,
-    height: 52, justifyContent: "center", paddingHorizontal: 16, marginBottom: 12,
+    height: 52, justifyContent: "center", paddingHorizontal: 16, marginBottom: 4,
   },
+  fieldError: { borderColor: "#DC2626", borderWidth: 1.5, marginBottom: 4 },
   input: { fontFamily: F.regular, fontSize: 15 },
-  terms: { fontFamily: F.regular, fontSize: 12, color: G.muted, marginBottom: 20, textAlign: "center" },
-  termsNote: { fontSize: 11, color: '#8A8FA8', textAlign: 'center', lineHeight: 17, paddingHorizontal: 24, marginTop: 10, marginBottom: 4 },
-  termsLink: { color: G.orange, fontWeight: '700', textDecorationLine: "underline" },
-  btn: { height: 56, borderRadius: 28, backgroundColor: G.orange, alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  inlineError: { fontSize: 12, color: "#DC2626", fontWeight: "600", marginTop: 2, marginBottom: 8, marginLeft: 4 },
+  strengthWrap: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, marginBottom: 2 },
+  strengthBar: { flex: 1, height: 4, backgroundColor: "rgba(26,31,46,0.1)", borderRadius: 2, overflow: "hidden" },
+  strengthFill: { height: "100%", borderRadius: 2 },
+  strengthLabel: { fontSize: 12, fontWeight: "700", width: 50, fontFamily: F.bold },
+  termsNote: { fontSize: 11, color: "#8A8FA8", textAlign: "center", lineHeight: 17, paddingHorizontal: 24, marginTop: 10, marginBottom: 4 },
+  termsLink: { color: G.orange, fontWeight: "700", textDecorationLine: "underline" },
+  btn: { height: 56, borderRadius: 28, backgroundColor: G.orange, alignItems: "center", justifyContent: "center", marginBottom: 10, marginTop: 8 },
   btnText: { fontFamily: F.bold, fontSize: 16, fontWeight: "700", color: "#fff" },
 });
