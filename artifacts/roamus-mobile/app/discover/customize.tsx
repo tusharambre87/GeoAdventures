@@ -14,7 +14,7 @@ import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { getAiPickTemplateStops } from "@/lib/discoverData";
 
-// ─── Calendar helpers ─────────────────────────────────────────────────────────
+// ─ Calendar helpers ─────────────────────────────────────────────
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -109,19 +109,7 @@ function MiniCalendar({
   );
 }
 
-// ─── AI notes by days count ───────────────────────────────────────────────────
-
-function getDayNote(requested: number, templateDays: number, destination: string): string {
-  if (requested < templateDays) {
-    return `Fewer than template — AI keeps the top ${requested * 3} stops and removes the rest`;
-  }
-  if (requested === templateDays) {
-    return `Same as template — all stops included, timing personalised for your kids`;
-  }
-  return `More than template — AI adds ${(requested - templateDays) * 3} new ${destination} stops your kids will love`;
-}
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
+// ─ Main screen ──────────────────────────────────────────────────────
 
 const DEFAULT_TEMPLATE_DAYS = 3;
 
@@ -138,22 +126,50 @@ export default function DiscoverCustomizeScreen() {
   const destination = destParam ? decodeURIComponent(destParam) : slug.replace(/^ai-/, "").replace(/-/g, " ");
   const templateDays = tdParam ? parseInt(tdParam, 10) || DEFAULT_TEMPLATE_DAYS : DEFAULT_TEMPLATE_DAYS;
 
-  const today = useMemo(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; },[]);
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [start, setStart] = useState<Date|null>(null);
-  const [end, setEnd] = useState<Date|null>(null);
-  const [days, setDays] = useState(templateDays);
+  const todayBase = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
+  const [viewYear, setViewYear] = useState(todayBase.getFullYear());
+  const [viewMonth, setViewMonth] = useState(todayBase.getMonth());
 
-  const canPrev = viewYear > today.getFullYear() || (viewYear===today.getFullYear() && viewMonth>today.getMonth());
+  const [start, setStart] = useState<Date|null>(() => {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  });
+  const [end, setEnd] = useState<Date|null>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + (templateDays ?? 3));
+    d.setHours(0,0,0,0);
+    return d;
+  });
+
+  const canPrev = viewYear > todayBase.getFullYear() || (viewYear===todayBase.getFullYear() && viewMonth>todayBase.getMonth());
 
   function onDay(day: number) {
     const tapped = new Date(viewYear, viewMonth, day);
-    if (tapped < today) return;
+    if (tapped < todayBase) return;
     if (!start || (start && end)) { setStart(tapped); setEnd(null); }
     else if (tapped < start) { setEnd(start); setStart(tapped); }
     else setEnd(tapped);
   }
+
+  const tripDays = useMemo(() => {
+    if (!start || !end) return templateDays;
+    const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(1, diff);
+  }, [start, end, templateDays]);
+
+  const adaptNote = useMemo(() => {
+    if (!start || !end) {
+      return `Select your dates — AI will adapt the ${templateDays}-day template for your family.`;
+    }
+    if (tripDays < templateDays) {
+      return `${tripDays} days selected — AI will keep the top ${tripDays * 3} stops and mark the rest optional.`;
+    }
+    if (tripDays === templateDays) {
+      return `${tripDays} days — same as the template. AI personalises timing for your kids’ ages and pace.`;
+    }
+    return `${tripDays} days selected — AI will add ${(tripDays - templateDays) * 2} new stops to fill the extra days.`;
+  }, [tripDays, templateDays, start, end]);
 
   function handleBuild() {
     const startIso = start ? toISO(start) : null;
@@ -168,14 +184,11 @@ export default function DiscoverCustomizeScreen() {
       onboardingInProgress: true,
       templateSlug: slug,
       isTemplate: true,
-      tripDays: days,
+      tripDays,
       templateStops: isAi ? getAiPickTemplateStops(slug) : null,
     });
     router.push("/onboarding/building" as any);
   }
-
-  const dayNote = getDayNote(days, templateDays, destination);
-  const canBuild = true; // date is optional — we allow proceeding without dates
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
@@ -190,11 +203,11 @@ export default function DiscoverCustomizeScreen() {
           </TouchableOpacity>
           <Text style={s.title}>Make it yours</Text>
           <Text style={s.sub}>
-            Tell us when and how long — AI adapts the {destination} template for your family.
+            Pick your dates — AI adapts the {destination} template for your family.
           </Text>
           <View style={s.tmplPill}>
             <Text style={s.tmplPillTxt}>
-              {"📋"} Template: {templateDays} Days in {destination} · {templateDays * 3} stops
+              {"📋"} Template: {templateDays} days in {destination}
             </Text>
           </View>
         </View>
@@ -220,48 +233,12 @@ export default function DiscoverCustomizeScreen() {
               }}
               canPrev={canPrev}
             />
-          </View>
-        </View>
-
-        {/* Days card */}
-        <View style={s.card}>
-          <View style={s.cardHdr}>
-            <Text style={s.cardIco}>{"🗓"}</Text>
-            <Text style={s.cardTitle}>How many days?</Text>
-          </View>
-          <View style={s.cardBody}>
-            <View style={s.dayBtns}>
-              {[1, 2, 3, 4, 5].map(n => (
-                <TouchableOpacity
-                  key={n}
-                  style={[s.dayBtn, days === n && s.dayBtnOn]}
-                  onPress={() => setDays(n)}
-                >
-                  <Text style={[s.dayBtnN, days === n && s.dayBtnNOn]}>{n}</Text>
-                  <Text style={[s.dayBtnLbl, days === n && s.dayBtnLblOn]}>day{n !== 1 ? "s" : ""}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={s.dayNote}>{dayNote}</Text>
-          </View>
-        </View>
-
-        {/* AI adaptation card */}
-        <View style={s.card}>
-          <View style={s.cardHdr}>
-            <Text style={s.cardIco}>{"✨"}</Text>
-            <Text style={s.cardTitle}>How AI adapts this trip</Text>
-          </View>
-          <View style={s.cardBody}>
-            <Text style={s.adaptNote}>
-              AI adjusts stop order, travel time estimates, and kid-friendly pacing to match your family.
-              {days < templateDays
-                ? `\nFewer days: keeps the highest-rated ${destination} stops.`
-                : days > templateDays
-                ? `\nExtra days: adds more ${destination} stops your kids will love.`
-                : `\nSame length as the template — personalised timing for your travelers.`
-              }
-            </Text>
+            {start && end && (
+              <View style={s.adaptNoteRow}>
+                <Text style={s.adaptNoteIco}>{"✨"}</Text>
+                <Text style={s.adaptNoteTxt}>{adaptNote}</Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -269,8 +246,8 @@ export default function DiscoverCustomizeScreen() {
       {/* Sticky build CTA */}
       <View style={[s.ctaBar, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
-          style={[s.ctaBtn, !canBuild && s.ctaBtnDisabled]}
-          onPress={canBuild ? handleBuild : undefined}
+          style={s.ctaBtn}
+          onPress={handleBuild}
           activeOpacity={0.88}
         >
           <Text style={s.ctaBtnTxt}>Build my {destination} trip →</Text>
@@ -281,7 +258,7 @@ export default function DiscoverCustomizeScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─ Styles ───────────────────────────────────────────────────────────────
 
 const c = StyleSheet.create({
   cal: { backgroundColor: G.card, borderRadius: 14 },
@@ -333,21 +310,13 @@ const s = StyleSheet.create({
   cardTitle: { fontFamily: F.bold, fontSize: 15, color: G.deep },
   cardBody: { padding: 14 },
 
-  dayBtns: { flexDirection: "row", gap: 8, justifyContent: "center", marginBottom: 12 },
-  dayBtn: {
-    width: 52, height: 56, borderRadius: 14,
-    borderWidth: 2, borderColor: "rgba(26,31,46,0.08)",
-    backgroundColor: G.card,
-    alignItems: "center", justifyContent: "center", gap: 2,
+  adaptNoteRow: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    marginTop: 14, backgroundColor: "rgba(232,105,42,0.06)",
+    borderRadius: 12, padding: 12,
   },
-  dayBtnOn: { borderColor: G.orange, backgroundColor: G.oLt },
-  dayBtnN: { fontFamily: F.bold, fontSize: 15, color: G.muted },
-  dayBtnNOn: { color: G.orange },
-  dayBtnLbl: { fontFamily: F.bold, fontSize: 9, color: G.muted },
-  dayBtnLblOn: { color: G.orange },
-  dayNote: { fontFamily: F.regular, fontSize: 13, color: G.muted, textAlign: "center", lineHeight: 20 },
-
-  adaptNote: { fontFamily: F.regular, fontSize: 13, color: G.muted, lineHeight: 20 },
+  adaptNoteIco: { fontSize: 14 },
+  adaptNoteTxt: { flex: 1, fontFamily: F.regular, fontSize: 13, color: G.deep, lineHeight: 20 },
 
   ctaBar: {
     position: "absolute", bottom: 0, left: 0, right: 0,
@@ -362,7 +331,6 @@ const s = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
     marginBottom: 5,
   },
-  ctaBtnDisabled: { backgroundColor: "rgba(232,105,42,0.35)" },
   ctaBtnTxt: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
   ctaNote: { fontFamily: F.regular, fontSize: 12, color: G.muted, textAlign: "center" },
 });
