@@ -176,8 +176,8 @@ function RouteCard({ route, selected, onSelect }: { route: PopularRoute; selecte
 }
 
 // ─── Stop thumbnail: Wikipedia photo of the actual stop, type-based fallback ─
-function StopImage({ name, type, idx = 0 }: { name?: string; type?: string; idx?: number }) {
-  const src = useWikiPhoto(name ?? "", stopImg({ type }, idx));
+function StopImage({ name, type, idx = 0, city }: { name?: string; type?: string; idx?: number; city?: string }) {
+  const src = useWikiPhoto(name ?? "", stopImg({ type }, idx), city);
   return <Image source={{ uri: src }} style={d.stopImg} contentFit="cover" />;
 }
 
@@ -186,7 +186,7 @@ function StopRow({ spot, time, idx = 0 }: { spot: any; time: string; idx?: numbe
   return (
     <View style={d.stopRow}>
       <Text style={d.stopTime}>{time}</Text>
-      <StopImage name={spot.name} type={spot.type} idx={idx} />
+      <StopImage name={spot.name} type={spot.type} idx={idx} city={spot.cityGroup ?? spot.city} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={d.stopName} numberOfLines={1}>{spot.name}</Text>
         <Text style={d.stopDesc} numberOfLines={2}>{spot.reason || `Great ${spot.type || "stop"} for families`}</Text>

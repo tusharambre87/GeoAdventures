@@ -279,9 +279,21 @@ function buildStopTimes(stops: Stop[], startHour = 9): string[] {
   });
 }
 
-async function fetchWikiImages(name: string): Promise<string[]> {
+const WIKI_AMBIGUOUS = ['bridge','zoo','park','museum','garden','library','center','centre','aquarium','monument','memorial','falls'];
+function buildWikiTitle(stopName: string, city?: string): string {
+  const base = stopName.replace(/\s+/g, '_');
+  if (!city) return base;
+  const isAmbiguous = WIKI_AMBIGUOUS.some(t => stopName.toLowerCase().includes(t));
+  return isAmbiguous ? `${base},_${city.replace(/\s+/g, '_')}` : base;
+}
+
+async function fetchWikiImages(name: string, city?: string): Promise<string[]> {
   try {
-    const q = encodeURIComponent(name);
+    const titleWithCity = buildWikiTitle(name, city);
+    const titleOnly = name.replace(/\s+/g, '_');
+    console.log('[fetchWikiImages] trying:', decodeURIComponent(titleWithCity));
+    const q = encodeURIComponent(titleWithCity);
+    const qFallback = encodeURIComponent(titleOnly);
     const [sumRes, mediaRes] = await Promise.all([
       fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${q}`),
       fetch(`https://en.wikipedia.org/api/rest_v1/page/media-list/${q}`),
@@ -289,7 +301,21 @@ async function fetchWikiImages(name: string): Promise<string[]> {
     const results: string[] = [];
     if (sumRes.ok) {
       const d = (await sumRes.json()) as { thumbnail?: { source: string } };
-      if (d.thumbnail?.source) results.push(d.thumbnail.source);
+      if (d.thumbnail?.source) {
+        console.log('[fetchWikiImages] hero hit:', d.thumbnail.source);
+        results.push(d.thumbnail.source);
+      } else if (city && titleWithCity !== titleOnly) {
+        // Fallback: try plain stop name without city suffix
+        console.log('[fetchWikiImages] fallback without city:', titleOnly);
+        const r2 = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${qFallback}`);
+        if (r2.ok) {
+          const d2 = (await r2.json()) as { thumbnail?: { source: string } };
+          if (d2.thumbnail?.source) {
+            console.log('[fetchWikiImages] hit without city:', d2.thumbnail.source);
+            results.push(d2.thumbnail.source);
+          }
+        }
+      }
     }
     if (mediaRes.ok) {
       type MI = { type: string; srcset?: { src: string }[]; src?: string };
@@ -482,7 +508,7 @@ export default function AtStopScreen() {
       'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80';
     setHeroImageUrl(immediateFallback);
     setStopImages([immediateFallback, null, null]);
-    fetchWikiImages(currentStop.name).then(urls => {
+    fetchWikiImages(currentStop.name, (currentStop as any).cityGroup ?? trip?.destination).then(urls => {
       const fallback = CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
         'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
       const hero = urls[0] ?? fallback;
