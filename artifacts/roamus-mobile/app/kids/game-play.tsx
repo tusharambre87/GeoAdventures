@@ -23,6 +23,84 @@ import { F } from "@/lib/tokens";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type GameType = "think-fast" | "scavenger" | "geoguess" | "geospy" | "bag";
+// ─── Stop-type theme mapping for GeoGuess ────────────────────────────────────
+
+const STOP_TYPE_THEMES: Record<string, string[]> = {
+  aquarium:         ["The Ocean", "A Shark", "A Coral Reef", "A Sea Turtle"],
+  planetarium:      ["The Solar System", "A Black Hole", "The Moon", "A Comet"],
+  zoo:              ["A Lion", "The Jungle", "A Penguin", "An Elephant"],
+  museum:           ["A Painting", "Ancient Egypt", "A Fossil", "A Knight"],
+  childrens_museum: ["A Robot", "A Volcano", "A Rocket Ship", "A Bubble"],
+  science_museum:   ["Electricity", "A Tornado", "DNA", "The Human Body"],
+  art_museum:       ["A Painting", "A Sculpture", "A Mural", "A Portrait"],
+  history_museum:   ["Ancient Rome", "A Pharaoh", "A Pirate Ship", "A Viking"],
+  nature_center:    ["A Waterfall", "A Bear", "A Mushroom", "A Beehive"],
+  park:             ["A Tree", "A Picnic", "A Butterfly", "A Squirrel"],
+  landmark:         ["A Tower", "A Bridge", "A Statue", "A Clock"],
+  observation_deck: ["The Clouds", "A City", "A Bird's Eye View", "The Wind"],
+  beach:            ["A Wave", "Sand", "A Crab", "A Lighthouse"],
+  botanical_garden: ["A Rose", "A Bee", "A Rainforest", "A Seed"],
+  theater:          ["A Play", "A Stage", "A Costume", "Applause"],
+  sports:           ["A Trophy", "A Scoreboard", "A Stadium", "A Crowd"],
+  market:           ["A Fruit", "A Chef", "A Recipe", "A Spice"],
+};
+
+function guessStopTypeFromName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("aquarium")) return "aquarium";
+  if (n.includes("planetarium") || n.includes("space center")) return "planetarium";
+  if (n.includes("zoo") || n.includes("safari")) return "zoo";
+  if (n.includes("children") || n.includes("kids")) return "childrens_museum";
+  if (n.includes("science") || n.includes("tech")) return "science_museum";
+  if (n.includes("art") || n.includes("gallery")) return "art_museum";
+  if (n.includes("history") || n.includes("natural") || n.includes("museum")) return "museum";
+  if (n.includes("botanical") || n.includes("garden")) return "botanical_garden";
+  if (n.includes("nature") || n.includes("wildlife")) return "nature_center";
+  if (n.includes("beach") || n.includes("shore") || n.includes("bay")) return "beach";
+  if (n.includes("theater") || n.includes("theatre")) return "theater";
+  if (n.includes("market") || n.includes("bazaar")) return "market";
+  if (n.includes("observation") || n.includes("skydeck") || n.includes("deck")) return "observation_deck";
+  if (n.includes("sports") || n.includes("stadium") || n.includes("arena")) return "sports";
+  if (n.includes("park") || n.includes("garden")) return "park";
+  return "landmark";
+}
+
+function getGeoGuessTarget(stopType: string, stopName: string): string {
+  const themes = STOP_TYPE_THEMES[stopType] ?? ["A Mystery Place"];
+  const idx = stopName.length % themes.length;
+  return themes[idx];
+}
+
+// ─── XP award helper ─────────────────────────────────────────────────────────
+
+async function awardXpForGame(
+  stopId: string,
+  gameType: string,
+  explorerId: string,
+  addXp: (xp: number) => void,
+): Promise<void> {
+  try {
+    const token = await AsyncStorage.getItem("authToken");
+    const res = await fetch(`${API_BASE}/api/travel/stops/${stopId}/complete-mission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ missionType: "game", gameType, explorerId }),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addXp(data.missionXpAwarded ?? 5);
+    } else {
+      addXp(5);
+    }
+  } catch {
+    addXp(5);
+  }
+}
+
+
 
 // ─── Think Fast — verbatim from PlayTogether.tsx ──────────────────────────────
 
@@ -747,7 +825,7 @@ function Confetti() {
 
 // ─── Think Fast! ─────────────────────────────────────────────────────────────
 
-function ThinkFast({ stopName }: { stopName: string }) {
+function ThinkFast({ stopName, stopId, addSessionXp, explorerId }: { stopName: string; stopId?: string; addSessionXp?: (xp: number) => void; explorerId?: string; gameContent?: Record<string, any> | null }) {
   const insets = useSafeAreaInsets();
   type Phase = "intro" | "playing" | "reveal" | "complete";
   const [phase, setPhase] = useState<Phase>("intro");
@@ -861,7 +939,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const next = tapCount + 1;
             setTapCount(next);
-            if (next >= 10) { clearTimer(); setPhase("complete"); }
+            if (next >= 10) { clearTimer(); setPhase("complete"); awardXpForGame(stopId ?? "", "think-fast", explorerId ?? "", (xp) => { if (addSessionXp) addSessionXp(xp); }); }
           }}
           disabled={tapCount >= 10}
         >
@@ -950,7 +1028,7 @@ function ThinkFast({ stopName }: { stopName: string }) {
 
 // ─── Scavenger Hunt ───────────────────────────────────────────────────────────
 
-function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string }) {
+function ScavengerHunt({ stopName, tripId, stopId, addSessionXp, explorerId, gameContent }: { stopName: string; tripId: string; stopId?: string; addSessionXp?: (xp: number) => void; explorerId?: string; gameContent?: Record<string, any> | null }) {
   type Phase = "hunting" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("hunting");
@@ -974,6 +1052,7 @@ function ScavengerHunt({ stopName, tripId }: { stopName: string; tripId: string 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setUsedTexts((prev) => [...prev, ...items.map((i) => i.text)]);
         setPhase("complete");
+        awardXpForGame(stopId ?? "", "scavenger", explorerId ?? "", (xp) => { if (addSessionXp) addSessionXp(xp); });
       }, 450);
       return () => clearTimeout(t);
     }
@@ -1142,7 +1221,7 @@ function answerColor(a: string): string {
   return "#F59E0B";
 }
 
-function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: string; tripId: string }) {
+function GeoGuess({ stopName, stopId, tripId, stopType, gameContent, addSessionXp, explorerId }: { stopName: string; stopId: string; tripId: string; stopType?: string; gameContent?: Record<string, any> | null; addSessionXp?: (xp: number) => void; explorerId?: string }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
@@ -1156,7 +1235,14 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
   const [wrongMsg, setWrongMsg] = useState<string | null>(null);
   const [isGuessing, setIsGuessing] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  const [xpEarned, setXpEarned] = useState(0);
   const wrongMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stop-specific question chips from API
+  const apiChips: string[] = (() => {
+    const qs = gameContent?.guess ?? [];
+    return qs.map((q: { question: string }) => q.question).filter(Boolean);
+  })();
 
   // Fetch other stops in this trip so we can use real city places as targets
   useEffect(() => {
@@ -1201,11 +1287,14 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
   }, []);
 
   const startGame = useCallback(() => {
-    const t = pickTarget();
-    const initial = pickCards([]);
+    // Use a thematic concept as the target — never the stop name itself
+    const t = getGeoGuessTarget(stopType || "", stopName);
+    // If API chips exist, use them; otherwise use classic question cards
+    const initial = apiChips.length > 0
+      ? apiChips.slice(0, VISIBLE_QUESTIONS).map((text) => ({ text, answer: null, loading: false }))
+      : pickCards([]);
     const seen = initial.map((c) => c.text);
     setTarget(t);
-    setUsedTargets((prev) => [...prev, t]);
     setCards(initial);
     setSeenQuestions(seen);
     setQuestionsAsked(0);
@@ -1213,7 +1302,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
     setWrongMsg(null);
     setIsCorrect(false);
     setPhase("playing");
-  }, [pickTarget, pickCards]);
+  }, [pickCards, stopType, stopName, apiChips]);
 
   const refreshCards = () => {
     const fresh = pickCards(seenQuestions);
@@ -1253,7 +1342,14 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
     if (correct) {
       setIsCorrect(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTimeout(() => { setPhase("complete"); setIsGuessing(false); }, 600);
+      setTimeout(() => {
+        setPhase("complete");
+        setIsGuessing(false);
+        awardXpForGame(stopId, "geoguess", explorerId ?? "", (xp) => {
+          setXpEarned(xp);
+          if (addSessionXp) addSessionXp(xp);
+        });
+      }, 600);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (wrongMsgTimer.current) clearTimeout(wrongMsgTimer.current);
@@ -1270,8 +1366,8 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
     return (
       <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
         <Text style={{ fontSize: 64, marginBottom: 12 }}>{'\uD83C\uDF0D'}</Text>
-        <Text style={[gg.introTitle, { color: "#fff" }]}>I'm thinking of a place...</Text>
-        <Text style={[gg.introSub, { color: "rgba(255,255,255,0.6)" }]}>Ask yes/no questions to figure it out</Text>
+        <Text style={[gg.introTitle, { color: "#fff" }]}>I'm thinking of something you might find here...</Text>
+        <Text style={[gg.introSub, { color: "rgba(255,255,255,0.6)" }]}>Ask yes or no questions to guess what it is!</Text>
         <View style={[gg.introCountBadge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
           <Text style={[gg.introCountText, { color: "rgba(255,255,255,0.8)" }]}>Questions asked: 0 / 20</Text>
         </View>
@@ -1306,7 +1402,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <Text style={gg.title}>{'\uD83C\uDF0D'} I'm thinking of a place...</Text>
+          <Text style={gg.title}>{'\uD83C\uDF0D'} I'm thinking of something...</Text>
           <Text style={gg.asked}>Questions asked: {questionsAsked} / 20</Text>
 
           {/* Question cards */}
@@ -1390,8 +1486,13 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
     <View style={[sh.centered, { backgroundColor: "#152D4A" }]}>
       <Text style={{ fontSize: 72, marginBottom: 12 }}>{'\uD83C\uDF0D'}</Text>
       <Text style={[sh.doneTitle, { color: "#fff" }]}>You got it!</Text>
+      {xpEarned > 0 && (
+        <View style={{ backgroundColor: "#F59E0B", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 8 }}>
+          <Text style={{ fontFamily: F.bold, fontSize: 14, color: "#fff" }}>+{xpEarned} XP earned!</Text>
+        </View>
+      )}
       <View style={gg.revealBox}>
-        <Text style={gg.revealLabel}>The place was</Text>
+        <Text style={gg.revealLabel}>The answer was</Text>
         <Text style={gg.revealPlace}>{target}</Text>
       </View>
       <Pressable
@@ -1412,7 +1513,7 @@ function GeoGuess({ stopName, stopId, tripId }: { stopName: string; stopId: stri
 
 // ─── What's In My Bag ─────────────────────────────────────────────────────────
 
-function WhatsInMyBag({ stopName }: { stopName: string }) {
+function WhatsInMyBag({ stopName, stopId, addSessionXp, explorerId }: { stopName: string; stopId?: string; addSessionXp?: (xp: number) => void; explorerId?: string; gameContent?: Record<string, any> | null }) {
   type Phase = "intro" | "playing" | "complete";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
@@ -1503,7 +1604,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
               style={[sh.btn, { backgroundColor: "#7C3AED", flex: 1 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                if (isLast) { setPhase("complete"); } else { setIndex((n) => n + 1); }
+                if (isLast) { setPhase("complete"); awardXpForGame(stopId ?? "", "bag", explorerId ?? "", (xp) => { if (addSessionXp) addSessionXp(xp); }); } else { setIndex((n) => n + 1); }
               }}
             >
               <Text style={sh.btnText}>{isLast ? "Finish! \uD83C\uDF92" : "Next Item →"}</Text>
@@ -1543,7 +1644,7 @@ function WhatsInMyBag({ stopName }: { stopName: string }) {
 
 // ─── GeoSpy ───────────────────────────────────────────────────────────────────
 
-function GeoSpy() {
+function GeoSpy({ stopId, addSessionXp, explorerId }: { stopId?: string; addSessionXp?: (xp: number) => void; explorerId?: string; gameContent?: Record<string, any> | null }) {
   type Phase = "intro" | "playing";
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>("intro");
@@ -1650,7 +1751,7 @@ function GeoSpy() {
 
         <Pressable
           style={spy.doneBtn}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); awardXpForGame(stopId ?? "", "geospy", explorerId ?? "", (xp) => { if (addSessionXp) addSessionXp(xp); }); router.back(); }}
         >
           <Text style={spy.doneBtnText}>Done</Text>
         </Pressable>
@@ -1662,22 +1763,30 @@ function GeoSpy() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function GamePlay() {
-  const { type } = useLocalSearchParams<{ type: string }>();
+  const { type, gameContentJson } = useLocalSearchParams<{ type: string; gameContentJson?: string }>();
   const kids = useKids();
   const stopName = kids.stopName || "your stop";
   const stopId = kids.stopId || "";
   const tripId = kids.tripId || "";
+  const { addSessionXp, explorerId } = kids;
+
+  const gameContent: Record<string, any> | null = (() => {
+    try { return gameContentJson ? JSON.parse(gameContentJson as string) : null; }
+    catch { return null; }
+  })();
+
+  const stopType = guessStopTypeFromName(stopName);
 
   const gameType: GameType =
     (["think-fast", "scavenger", "geoguess", "geospy", "bag"] as GameType[]).includes(type as GameType)
       ? (type as GameType)
       : "think-fast";
 
-  if (gameType === "scavenger") return <ScavengerHunt stopName={stopName} tripId={tripId} />;
-  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} stopId={stopId} tripId={tripId} />;
-  if (gameType === "geospy")    return <GeoSpy />;
-  if (gameType === "bag")       return <WhatsInMyBag stopName={stopName} />;
-  return <ThinkFast stopName={stopName} />;
+  if (gameType === "scavenger") return <ScavengerHunt stopName={stopName} tripId={tripId} stopId={stopId} gameContent={gameContent} addSessionXp={addSessionXp} explorerId={explorerId} />;
+  if (gameType === "geoguess")  return <GeoGuess stopName={stopName} stopId={stopId} tripId={tripId} stopType={stopType} gameContent={gameContent} addSessionXp={addSessionXp} explorerId={explorerId} />;
+  if (gameType === "geospy")    return <GeoSpy stopId={stopId} gameContent={gameContent} addSessionXp={addSessionXp} explorerId={explorerId} />;
+  if (gameType === "bag")       return <WhatsInMyBag stopName={stopName} stopId={stopId} gameContent={gameContent} addSessionXp={addSessionXp} explorerId={explorerId} />;
+  return <ThinkFast stopName={stopName} stopId={stopId} gameContent={gameContent} addSessionXp={addSessionXp} explorerId={explorerId} />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────

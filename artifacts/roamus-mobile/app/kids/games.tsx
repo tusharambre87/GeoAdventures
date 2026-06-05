@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -8,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { API_BASE } from "@/lib/apiClient";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -69,6 +71,29 @@ export default function GameHub() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
   const stopName = kids.stopName || "your stop";
+  const stopId = kids.stopId || "";
+
+  const [gameContent, setGameContent] = useState<Record<string, any> | null>(null);
+
+  useEffect(() => {
+    if (!stopId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("authToken");
+        const res = await fetch(`${API_BASE}/api/travel/stops/${stopId}/games`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setGameContent(data);
+        }
+      } catch {
+        // fail silently — games work with hardcoded content
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [stopId]);
 
   return (
     <View style={s.root}>
@@ -100,7 +125,7 @@ export default function GameHub() {
             style={({ pressed }) => [s.heroCard, pressed && { transform: [{ scale: 0.98 }] }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push("/kids/game-play?type=think-fast" as never);
+              router.push({ pathname: "/kids/game-play", params: { type: "think-fast", stopId, stopName: kids.stopName, gameContentJson: JSON.stringify(gameContent ?? {}) } } as never);
             }}
           >
             <LinearGradient
@@ -132,7 +157,7 @@ export default function GameHub() {
                 ]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(`/kids/game-play?type=${game.type}` as never);
+                  router.push({ pathname: "/kids/game-play", params: { type: game.type, stopId, stopName: kids.stopName, gameContentJson: JSON.stringify(gameContent ?? {}) } } as never);
                 }}
               >
                 <Text style={s.gridIcon}>{game.icon}</Text>

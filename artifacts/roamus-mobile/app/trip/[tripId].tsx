@@ -2252,7 +2252,30 @@ function TripOptionsSheet({
     );
   }
 
-  type OptionItem = { icon: React.ReactNode; bg: string; name: string; sub: string; onPress: () => void };
+  async function deleteTrip() {
+    Alert.alert(
+      'Delete trip?',
+      `This will permanently delete "${trip.name}" and all its data. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiFetch(`/api/travel/trips/${tripId}`, { method: 'DELETE' });
+              onClose();
+              router.replace('/(tabs)/' as any);
+            } catch {
+              Alert.alert('Error', 'Could not delete trip. Try again.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  type OptionItem = { icon: React.ReactNode; bg: string; name: string; sub: string; destructive?: boolean; onPress: () => void };
   const sections: Array<{ label: string; items: OptionItem[] }> = [
     {
       label: 'TRIP TOOLS',
@@ -2275,6 +2298,7 @@ function TripOptionsSheet({
       label: 'UTILITIES',
       items: [
         { icon: <IconCopy />, bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => showToast('Coming soon') },
+        { icon: <IconTrash color='#DC2626' />, bg: '#FFF0F0', name: 'Delete trip', sub: 'Permanently remove this trip and all data', destructive: true, onPress: deleteTrip },
       ],
     },
   ];
@@ -2301,7 +2325,7 @@ function TripOptionsSheet({
                   {item.icon}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={opts.itemName}>{item.name}</Text>
+                  <Text style={[opts.itemName, item.destructive && opts.itemNameDestructive]}>{item.name}</Text>
                   <Text style={opts.itemSub}>{item.sub}</Text>
                 </View>
               </Pressable>
@@ -3926,6 +3950,7 @@ const opts = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: C.border },
   ico:  { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   itemName: { fontFamily: F.bold, fontSize: 13, color: C.deep },
+  itemNameDestructive: { color: '#DC2626' },
   itemSub:  { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
 });
 
