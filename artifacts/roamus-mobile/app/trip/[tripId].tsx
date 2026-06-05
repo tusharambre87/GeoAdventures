@@ -2740,23 +2740,40 @@ function AddStopSheet({
 
   async function handleInsertAt(opt: StopOption, afterStopId: string) {
     setAdding(true);
+    const isTimeSlot = afterStopId === '__MORNING__' || afterStopId === '__AFTERNOON__' || afterStopId === '__EVENING__';
     try {
-      await apiFetch<{ canInsert?: boolean; success?: boolean; stop?: Stop }>(
-        `/api/travel/trips/${tripId}/insert-stop`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            insertAfterStopId: afterStopId,
-            confirmed: true,
-            place: {
+      if (isTimeSlot) {
+        await apiFetch(
+          `/api/travel/trips/${tripId}/stops`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
               name: opt.name,
+              stopType: opt.stopType ?? categoryToType(category),
               address: opt.address ?? `${opt.name}, ${city}`,
-              type: opt.stopType ?? categoryToType(category),
-              estimatedDurationMinutes: parseDurationMins(opt, category),
-            },
-          }),
-        }
-      );
+              durationMinutes: parseDurationMins(opt, category),
+              dayIndex: selectedDay - 1,
+            }),
+          }
+        );
+      } else {
+        await apiFetch<{ canInsert?: boolean; success?: boolean; stop?: Stop }>(
+          `/api/travel/trips/${tripId}/insert-stop`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              insertAfterStopId: afterStopId,
+              confirmed: true,
+              place: {
+                name: opt.name,
+                address: opt.address ?? `${opt.name}, ${city}`,
+                type: opt.stopType ?? categoryToType(category),
+                estimatedDurationMinutes: parseDurationMins(opt, category),
+              },
+            }),
+          }
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
       setPositionOpt(null);
       setDetailOpt(null);
@@ -3233,9 +3250,35 @@ function PositionPickerSheet({
         ))}
 
         {rows.length === 0 && (
-          <View style={as.emptyWrap}>
-            <Text style={as.emptyText}>No stops on this day yet.</Text>
-          </View>
+          <>
+            {[
+              { label: 'Morning',   sub: '8\u201311am',  sentinel: '__MORNING__' },
+              { label: 'Afternoon', sub: '12\u20133pm',  sentinel: '__AFTERNOON__' },
+              { label: 'Evening',   sub: '4\u20137pm',   sentinel: '__EVENING__' },
+            ].map((slot, i) => (
+              <View key={slot.sentinel}>
+                {i > 0 && <View style={pps.slotDivider} />}
+                <Pressable
+                  style={pps.row}
+                  onPress={() => !adding && onInsertAt(slot.sentinel)}
+                  disabled={adding}
+                >
+                  <View style={pps.rowPlus}>
+                    <Text style={pps.rowPlusTxt}>+</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={pps.rowLabel}>{slot.label}</Text>
+                    <Text style={pps.rowSub}>{slot.sub}</Text>
+                  </View>
+                  {adding ? (
+                    <ActivityIndicator color={C.orange} size="small" />
+                  ) : (
+                    <Text style={pps.rowChev}>{'›'}</Text>
+                  )}
+                </Pressable>
+              </View>
+            ))}
+          </>
         )}
       </ScrollView>
 
@@ -3253,6 +3296,7 @@ const pps = StyleSheet.create({
   list:        { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20 },
   divider:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
   divLine:     { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(26,31,46,0.09)' },
+  slotDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(26,31,46,0.09)', marginHorizontal: 20 },
   divPill:     { backgroundColor: '#F5F2EE', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10 },
   divPillText: { fontSize: 11, color: '#8A8FA8', fontFamily: F.bold },
   row:         { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)', marginBottom: 2, shadowColor: '#1A1F2E', shadowRadius: 6, shadowOpacity: 0.06, elevation: 1 },
