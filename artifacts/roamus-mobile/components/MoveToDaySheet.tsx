@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE } from '@/lib/authContext';
+import { apiFetch } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -136,21 +137,18 @@ export default function MoveToDaySheet({
     setMoving(true);
     try {
       const newDisplayOrder = computeDisplayOrder(targetDay.stops, realAfterStopId);
-      const token = await AsyncStorage.getItem('auth_token');
-      const res = await fetch(`${API_BASE}/api/travel/trips/${tripId}/reorder-stops`, {
+      console.log('MOVE_STOP_DEBUG', { stopId: stop.id, tripId, targetDayIdx: targetDay.dayIndex, realAfterStopId });
+      console.log('MOVE_STOP_PAYLOAD', { stopOrders: [{ stopId: stop.id, displayOrder: newDisplayOrder, dayIndex: targetDay.dayIndex }] });
+      await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           stopOrders: [{ stopId: stop.id, displayOrder: newDisplayOrder, dayIndex: targetDay.dayIndex }],
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onMove(stop.id, targetDay.dayIndex, realAfterStopId);
       onClose();
     } catch {
+      Alert.alert('Something went wrong', 'Could not move this stop. Try again.');
       setMoving(false);
     }
   }
@@ -178,17 +176,18 @@ export default function MoveToDaySheet({
             {otherDays.map(day => {
               const sel = day.dayIndex === targetDayIdx;
               return (
-                <Pressable
+                <TouchableOpacity
                   key={day.dayIndex}
                   style={[s.pill, sel && s.pillSel]}
                   onPress={() => setTargetDayIdx(day.dayIndex)}
+                  activeOpacity={0.7}
                 >
                   <Text style={[s.pillDn, sel && s.pillDnSel]}>Day {day.dayNum}</Text>
                   {day.date ? <Text style={s.pillDd}>{day.date}</Text> : null}
                   <Text style={s.pillSc}>
                     {day.stops.length} {day.stops.length === 1 ? 'stop' : 'stops'}
                   </Text>
-                </Pressable>
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -199,7 +198,7 @@ export default function MoveToDaySheet({
               onPress={() => targetDayIdx !== null && setStep(2)}
               disabled={targetDayIdx === null}
             >
-              <Text style={s.ctaBtnText}>Next \u2014 pick position \u2192</Text>
+              <Text style={s.ctaBtnText}>Next — pick position →</Text>
             </Pressable>
             <Pressable style={s.secBtn} onPress={onClose}>
               <Text style={s.secBtnText}>Cancel</Text>
@@ -213,7 +212,7 @@ export default function MoveToDaySheet({
         <View style={{ flex: 1 }}>
           <View style={s.navRow}>
             <Pressable onPress={() => setStep(1)} hitSlop={8}>
-              <Text style={s.navBack}>{'\u2190'} Day {targetDay.dayNum}</Text>
+              <Text style={s.navBack}>← Day {targetDay.dayNum}</Text>
             </Pressable>
             <Text style={s.navTitle}>Where in the day?</Text>
           </View>
@@ -248,7 +247,7 @@ export default function MoveToDaySheet({
               const sel = afterStopId === ts.id;
               const dur = getDurationMins(ts);
               const next = targetStopsSorted[i + 1];
-              const sub  = next ? `${dur} min \u00b7 then ${next.name}` : `${dur} min \u00b7 last stop`;
+              const sub  = next ? `${dur} min · then ${next.name}` : `${dur} min · last stop`;
               return (
                 <Pressable
                   key={ts.id}
@@ -274,7 +273,7 @@ export default function MoveToDaySheet({
               onPress={() => posSelected && setStep(3)}
               disabled={!posSelected}
             >
-              <Text style={s.ctaBtnText}>Next \u2014 confirm \u2192</Text>
+              <Text style={s.ctaBtnText}>Next — confirm →</Text>
             </Pressable>
             <Pressable style={s.secBtn} onPress={() => setStep(1)}>
               <Text style={s.secBtnText}>Back</Text>
@@ -288,7 +287,7 @@ export default function MoveToDaySheet({
         <View style={{ flex: 1 }}>
           <View style={s.navRow}>
             <Pressable onPress={() => setStep(2)} hitSlop={8}>
-              <Text style={s.navBack}>{'\u2190'} Position</Text>
+              <Text style={s.navBack}>← Position</Text>
             </Pressable>
             <Text style={s.navTitle}>Confirm move</Text>
           </View>
@@ -305,12 +304,12 @@ export default function MoveToDaySheet({
               </View>
               <View style={[s.confirmRow, { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 8, marginTop: 4 }]}>
                 <Text style={s.confirmLabel}>From</Text>
-                <Text style={s.confirmVal}>Day {currentDayIndex + 1} \u00b7 Stop {stopPosInDay}</Text>
+                <Text style={s.confirmVal}>Day {currentDayIndex + 1} · Stop {stopPosInDay}</Text>
               </View>
               <View style={[s.confirmRow, { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 8, marginTop: 4 }]}>
                 <Text style={s.confirmLabel}>To</Text>
                 <Text style={[s.confirmVal, { color: C.orange }]}>
-                  Day {targetDay.dayNum} \u00b7 {positionLabel()}
+                  Day {targetDay.dayNum} · {positionLabel()}
                 </Text>
               </View>
             </View>
@@ -353,23 +352,23 @@ const s = StyleSheet.create({
   movingCaption: { fontFamily: F.bold, fontSize: 9, color: C.muted, letterSpacing: 0.09, textTransform: 'uppercase', marginBottom: 4 },
   movingName:    { fontFamily: F.bold, fontSize: 18, color: C.deep, letterSpacing: -0.02, textDecorationLine: 'line-through', textDecorationColor: C.orange },
   sectionLabel:  { fontFamily: F.bold, fontSize: 9, color: C.muted, letterSpacing: 0.09, textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 10 },
-  pillRow: { paddingHorizontal: 20, paddingBottom: 4, gap: 8 },
+  pillRow: { paddingHorizontal: 20, paddingBottom: 4, gap: 8, alignItems: 'center' },
   pill: {
     flexShrink: 0,
     borderWidth: 1.5,
     borderColor: '#E0DDD8',
     borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
     backgroundColor: '#fff',
-    minWidth: 76,
+    minWidth: 72,
   },
   pillSel:   { borderColor: C.orange, backgroundColor: C.orangeLt },
-  pillDn:    { fontFamily: F.semibold, fontSize: 11, color: C.deep },
+  pillDn:    { fontFamily: F.semibold, fontSize: 12, color: C.deep },
   pillDnSel: { color: C.orange },
-  pillDd:    { fontFamily: F.regular, fontSize: 10, color: C.muted, marginTop: 1 },
-  pillSc:    { fontFamily: F.regular, fontSize: 10, color: C.muted, marginTop: 1 },
+  pillDd:    { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
+  pillSc:    { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 1 },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',

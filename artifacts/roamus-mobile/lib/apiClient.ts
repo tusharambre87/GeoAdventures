@@ -6,7 +6,7 @@ async function getToken(): Promise<string | null> {
   return AsyncStorage.getItem("auth_token");
 }
 
-async function apiFetch<T = unknown>(
+export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
