@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   PanResponder,
@@ -167,17 +168,28 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
   const ctaLabel = plan.cta.replace('{price}', selected === 'trippack' ? tripPrice : '');
 
   async function handleCta() {
-    if (token) {
-      try {
-        await fetch(`${API_BASE}/api/auth/user/subscription`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ plan: selected, annual }),
-        });
-        await refreshUser();
-      } catch {}
-    }
-    onClose();
+    Alert.alert(
+      'Thank you!',
+      'Thank you for subscribing to the plan, we hope you will enjoy your trip with RoamUs by your side.',
+      [
+        {
+          text: 'OK',
+          onPress: async () => {
+            if (token) {
+              try {
+                await fetch(`${API_BASE}/api/auth/user/subscription`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ plan: selected, annual }),
+                });
+                await refreshUser();
+              } catch {}
+            }
+            onClose();
+          },
+        },
+      ],
+    );
   }
 
   const overlayOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });
@@ -225,14 +237,6 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
             </Pressable>
           </View>
 
-          {!pricing && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <ActivityIndicator size="small" color={G.orange} />
-              <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted }}>
-                Loading prices{'\u2026'}
-              </Text>
-            </View>
-          )}
 
           {/* Plan cards */}
           <View style={s.plans}>

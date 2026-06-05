@@ -155,12 +155,6 @@ export default function UpgradeScreen() {
           </Pressable>
         </View>
 
-        {!pricing && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <ActivityIndicator size="small" color={G.orange} />
-            <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted }}>Loading prices…</Text>
-          </View>
-        )}
 
         {/* Plan cards */}
         <View style={s.plans}>
