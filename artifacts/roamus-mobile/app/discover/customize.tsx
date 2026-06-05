@@ -155,7 +155,7 @@ export default function DiscoverCustomizeScreen() {
   const tripDays = useMemo(() => {
     if (!start || !end) return templateDays;
     const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(1, diff);
+    return Math.max(1, diff + 1);
   }, [start, end, templateDays]);
 
   const adaptNote = useMemo(() => {

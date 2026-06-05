@@ -23,7 +23,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { useFonts as useFrauncesFonts, Fraunces_900Black } from "@expo-google-fonts/fraunces";
-import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
+import { TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
@@ -642,8 +642,6 @@ function KidFitTag({ bias }: { bias: string | null | undefined }) {
   );
 }
 
-let _openSwipeable: Swipeable | null = null;
-
 function StopCard({
   stop,
   isEditable,
@@ -665,34 +663,12 @@ function StopCard({
   drag?: () => void;
   isActive?: boolean;
 }) {
-  const swipeRef = useRef<Swipeable>(null);
   const heroImg  = useStopHeroImage(stop.id);
   const heroBg   = stopHeroBg(stop.stopType);
   const ticket   = needsTicket(stop);
   const duration = getStopDuration(stop);
 
-  function handleRemove() {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    swipeRef.current?.close();
-    onDelete(stop.id);
-  }
-
-  function renderRightActions() {
-    return (
-      <View style={sc.revealRow}>
-        <Pressable style={[sc.revBtn, sc.revReplace]} onPress={() => { swipeRef.current?.close(); onReplace(stop); }}>
-          <IconRefresh />
-          <Text style={[sc.revLabel, { color: C.sage }]}>Replace</Text>
-        </Pressable>
-        <Pressable style={[sc.revBtn, sc.revRemove]} onPress={handleRemove}>
-          <IconTrash />
-          <Text style={[sc.revLabel, { color: C.red }]}>Remove</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  // actionRow lives OUTSIDE Swipeable so the PanGestureHandler never blocks its taps
+  // actionRow lives outside the card so long-press drag is never blocked
   const actionRow = (
     <View style={sc.actionRow}>
       <Pressable
@@ -704,14 +680,7 @@ function StopCard({
       >
         <Text style={sc.detailsBtnText}>Details →</Text>
       </Pressable>
-      {isEditable ? (
-        <View style={sc.swipeHint}>
-          <Text style={sc.swipeHintText}>swipe </Text>
-          <IconChevronRight size={11} />
-        </View>
-      ) : (
-        <Text style={sc.viewOnlyText}>View only</Text>
-      )}
+      {!isEditable && <Text style={sc.viewOnlyText}>View only</Text>}
     </View>
   );
 
@@ -743,7 +712,7 @@ function StopCard({
         )}
       </View>
 
-      {/* Body — tags only; actionRow is rendered outside Swipeable */}
+      {/* Body */}
       <View style={sc.body}>
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
         <View style={sc.tagsRow}>
@@ -775,19 +744,7 @@ function StopCard({
 
   return (
     <View style={sc.wrap}>
-      <Swipeable
-        ref={swipeRef}
-        renderRightActions={renderRightActions}
-        rightThreshold={40}
-        onSwipeableOpen={() => {
-          if (_openSwipeable && _openSwipeable !== swipeRef.current) {
-            _openSwipeable.close();
-          }
-          _openSwipeable = swipeRef.current;
-        }}
-      >
-        {card}
-      </Swipeable>
+      {card}
       {actionRow}
     </View>
   );
@@ -1783,14 +1740,22 @@ function StopDetailSheet({
           </Text>
         </Pressable>
         {isEditable && (
-          <View style={sds.footerRow}>
-            <Pressable style={sds.footerSecBtn} onPress={() => { onClose(); onReplace(stop); }}>
-              <Text style={sds.footerSecText}>Replace</Text>
+          <>
+            <View style={sds.footerRow}>
+              <Pressable style={sds.footerSecBtn} onPress={() => { onClose(); onReplace(stop); }}>
+                <Text style={sds.footerSecText}>Replace</Text>
+              </Pressable>
+              <Pressable style={sds.footerSecBtn} onPress={openMaps}>
+                <Text style={sds.footerSecText}>Open in Maps</Text>
+              </Pressable>
+            </View>
+            <Pressable
+              style={sds.removeBtn}
+              onPress={() => { onDelete(stop.id); onClose(); }}
+            >
+              <Text style={sds.removeBtnText}>Remove this stop</Text>
             </Pressable>
-            <Pressable style={sds.footerSecBtn} onPress={openMaps}>
-              <Text style={sds.footerSecText}>Open in Maps</Text>
-            </Pressable>
-          </View>
+          </>
         )}
       </View>
     </View>
@@ -4041,6 +4006,8 @@ const sds = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: 8 },
   footerSecBtn: { flex: 1, borderWidth: 1, borderColor: C.borderMed, borderRadius: 12, padding: 11, alignItems: 'center' },
   footerSecText: { fontFamily: F.semibold, fontSize: 13, color: C.deep },
+  removeBtn: { paddingVertical: 16, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F0EDE8', marginTop: 4 },
+  removeBtnText: { fontFamily: F.medium, fontSize: 15, color: '#E53E3E' },
 });
 
 const rep = StyleSheet.create({
