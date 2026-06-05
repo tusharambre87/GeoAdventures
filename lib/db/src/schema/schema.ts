@@ -1121,7 +1121,7 @@ export const journeyPacks = pgTable("journey_packs", {
 
 export const ttsAudioCache = pgTable("tts_audio_cache", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  cacheKey: varchar("cache_key").notNull().unique(),
+  cacheKey: varchar("cache_key").notNull().unique("tts_audio_cache_cache_key_key"),
   audioData: text("audio_data").notNull(),
   voice: varchar("voice").notNull(),
   textLength: integer("text_length").notNull(),
@@ -2751,7 +2751,7 @@ export type GeneratedAdventureImage = typeof generatedAdventureImages.$inferSele
 
 export const cityAdventureTemplates = pgTable("city_adventure_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  citySlug: varchar("city_slug").notNull().unique(),
+  citySlug: varchar("city_slug").notNull().unique("city_adventure_templates_city_slug_key"),
   cityName: varchar("city_name").notNull(),
   country: varchar("country").notNull(),
   continent: varchar("continent"),
@@ -2775,7 +2775,7 @@ export type InsertCityAdventureTemplate = z.infer<typeof insertCityAdventureTemp
 
 export const compassLandmarkImages = pgTable("compass_landmark_images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  svgKey: varchar("svg_key", { length: 100 }).notNull().unique(),
+  svgKey: varchar("svg_key", { length: 100 }).notNull().unique("compass_landmark_images_svg_key_key"),
   imagePath: varchar("image_path", { length: 500 }).notNull(),
   imageData: text("image_data"),
   prompt: text("prompt"),
@@ -2867,7 +2867,7 @@ export type CompassAttempt = typeof compassAttempts.$inferSelect;
 
 export const compassChallenges = pgTable("compass_challenges", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  shareCode: varchar("share_code").notNull().unique(),
+  shareCode: varchar("share_code").notNull().unique("compass_challenges_share_code_key"),
   questId: varchar("quest_id").references(() => compassQuests.id).notNull(),
   creatorAttemptId: varchar("creator_attempt_id").references(() => compassAttempts.id).notNull(),
   isActive: boolean("is_active").default(true),
@@ -3158,7 +3158,7 @@ export type PlannerPass = typeof plannerPasses.$inferSelect;
 
 export const plannerStopIntelligence = pgTable("planner_stop_intelligence", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  placeId: varchar("place_id").references(() => plannerPlaces.id).notNull().unique(),
+  placeId: varchar("place_id").references(() => plannerPlaces.id).unique("planner_stop_intelligence_place_id_key"),
   restroomConfidence: integer("restroom_confidence"),
   foodConfidence: integer("food_confidence"),
   entryFrictionScore: integer("entry_friction_score"),
@@ -3278,7 +3278,7 @@ export interface AIColdStartSignal {
 
 export const placeFamilySignals = pgTable("place_family_signals", {
   id: serial("id").primaryKey(),
-  placeKey: varchar("place_key", { length: 600 }).notNull().unique(), // "city:country:normalized_stop_name"
+  placeKey: varchar("place_key", { length: 600 }).notNull().unique("place_family_signals_place_key_key"), // "city:country:normalized_stop_name"
   city: varchar("city", { length: 200 }).notNull(),
   country: varchar("country", { length: 200 }).notNull(),
   stopName: varchar("stop_name", { length: 500 }).notNull(),
@@ -3456,7 +3456,7 @@ export const cityStopPoolCache = pgTable("city_stop_pool_cache", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   city: varchar("city", { length: 200 }).notNull(),
   country: varchar("country", { length: 200 }).notNull(),
-  normalizedKey: varchar("normalized_key", { length: 450 }).notNull().unique(), // lowercase city+country
+  normalizedKey: varchar("normalized_key", { length: 450 }).notNull().unique("city_stop_pool_cache_normalized_key_key"), // lowercase city+country
   stopPool: jsonb("stop_pool").$type<CachedStopCandidate[]>().notNull().default([]),
   cachedAt: timestamp("cached_at").defaultNow(),
 }, (table) => [
@@ -3480,7 +3480,7 @@ export const tripUnlocks = pgTable("trip_unlocks", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tripId: varchar("trip_id", { length: 200 }),
   destination: varchar("destination", { length: 300 }).notNull(),
-  stripeSessionId: varchar("stripe_session_id", { length: 300 }).notNull().unique(),
+  stripeSessionId: varchar("stripe_session_id", { length: 300 }).notNull().unique("trip_unlocks_stripe_session_id_key"),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
   pricingBand: varchar("pricing_band", { length: 5 }),
   amountPaid: integer("amount_paid"),
@@ -3508,7 +3508,7 @@ export type TripUnlock = typeof tripUnlocks.$inferSelect;
 
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  code: varchar("code", { length: 50 }).notNull().unique(),
+  code: varchar("code", { length: 50 }).notNull().unique("promo_codes_code_key"),
   label: varchar("label", { length: 200 }),
   accessType: varchar("access_type", { length: 50 }).notNull().default("full_free"),
   // 'full_free' | 'discounted' | (future: 'gift_trip' | 'city_pack')
@@ -3711,7 +3711,7 @@ export type GuideEmailSchedule = typeof guideEmailSchedules.$inferSelect;
 // ── FREE GUIDE SUBSCRIBERS ────────────────────────────────────────────────────
 export const guideSubscribers = pgTable("guide_subscribers", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull().unique("guide_subscribers_email_key"),
   subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
   source: text("source").default("free-guide"),
   emailSent: boolean("email_sent").default(false),
@@ -3783,7 +3783,7 @@ export type InsertExploreCache = typeof exploreCache.$inferInsert;
 export const waitlistSignups = pgTable("waitlist_signups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull().unique("waitlist_signups_email_key"),
   source: text("source").default("landing_page"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
