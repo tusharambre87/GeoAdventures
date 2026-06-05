@@ -25,6 +25,7 @@ import { travelAPI, type Trip } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { preCacheTrip } from "@/lib/tripCache";
+import UpgradeSheet from "@/components/UpgradeSheet";
 
 function greeting() {
   const h = new Date().getHours();
@@ -33,7 +34,7 @@ function greeting() {
   return "Good evening";
 }
 
-function ActiveHeroCard({ trip, offlineReady, user }: { trip: Trip; offlineReady?: boolean; user?: ReturnType<typeof useAuth>['user'] }) {
+function ActiveHeroCard({ trip, offlineReady, user, onUpgradePress }: { trip: Trip; offlineReady?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void }) {
   const isFree = !user?.subscriptionTier || user.subscriptionTier === "free";
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
@@ -97,17 +98,25 @@ function ActiveHeroCard({ trip, offlineReady, user }: { trip: Trip; offlineReady
       </Text>
 
       {isFree ? (
-        <View style={s.offlinePillLocked}>
+        <Pressable
+          style={({ pressed }) => [s.offlinePillLocked, { opacity: pressed ? 0.75 : 1 }]}
+          onPress={onUpgradePress}
+          hitSlop={8}
+        >
           <Text style={s.offlinePillLockedTxt}>{"\uD83D\uDCF5 Offline available with Pass"}</Text>
-        </View>
+        </Pressable>
       ) : offlineReady ? (
         <View style={s.offlinePill}>
           <Text style={s.offlinePillText}>{"\u2713 Available offline"}</Text>
         </View>
       ) : (
-        <View style={s.offlinePillEmpty}>
+        <Pressable
+          style={({ pressed }) => [s.offlinePillEmpty, { opacity: pressed ? 0.75 : 1 }]}
+          onPress={onUpgradePress}
+          hitSlop={8}
+        >
           <Text style={s.offlinePillEmptyTxt}>{"Download for offline \u2192"}</Text>
-        </View>
+        </Pressable>
       )}
 
       {/* Primary CTA */}
@@ -175,6 +184,7 @@ export default function TripsScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const [cacheStatus, setCacheStatus] = useState<"idle" | "ready">("idle");
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
   const { reset: resetOnboarding, set: setOnboarding } = useOnboarding();
 
   function startNewTrip() {
@@ -297,7 +307,7 @@ export default function TripsScreen() {
           </View>
         ) : heroTrip ? (
           <>
-            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} user={user} />
+            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} user={user} onUpgradePress={() => setUpgradeVisible(true)} />
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow}>
                 <Text style={s.switchText}>Switch trip →</Text>
@@ -381,6 +391,12 @@ export default function TripsScreen() {
       >
         <Text style={s.planTripFabText}>＋ Plan a trip</Text>
       </TouchableOpacity>
+
+      <UpgradeSheet
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        context="at_stop"
+      />
     </View>
   );
 }
