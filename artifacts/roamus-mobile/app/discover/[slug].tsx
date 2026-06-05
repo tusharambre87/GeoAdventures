@@ -6,6 +6,8 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -79,18 +81,18 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "Washington DC Explorer", destination: "Washington DC",
     durationDays: 3, ageRange: "6-9", description: "Free-entry museums + monuments",
     days: [
-      { label: "Day 1 \u2014 The Mall", stops: [
+      { label: "Day 1 — The Mall", stops: [
         { name: "National Air and Space Museum", type: "Museum", isKidFriendly: true },
         { name: "National Museum of Natural History", type: "Museum", isKidFriendly: true },
         { name: "Lincoln Memorial", type: "Monument" },
         { name: "Washington Monument", type: "Monument", isOptional: true },
       ]},
-      { label: "Day 2 \u2014 Zoo & Gardens", stops: [
+      { label: "Day 2 — Zoo & Gardens", stops: [
         { name: "National Zoo", type: "Zoo", isKidFriendly: true },
         { name: "National Botanic Garden", type: "Garden", isOptional: true },
         { name: "National Archives", type: "Museum", isKidFriendly: true },
       ]},
-      { label: "Day 3 \u2014 Capitol Hill", stops: [
+      { label: "Day 3 — Capitol Hill", stops: [
         { name: "US Capitol Visitor Center", type: "Landmark", isKidFriendly: true },
         { name: "Library of Congress", type: "Landmark", isOptional: true },
       ]},
@@ -100,12 +102,12 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "Nashville Family Intro", destination: "Nashville",
     durationDays: 2, ageRange: "5-12", description: "Music & outdoors",
     days: [
-      { label: "Day 1 \u2014 Music Row", stops: [
+      { label: "Day 1 — Music Row", stops: [
         { name: "Country Music Hall of Fame", type: "Museum", isKidFriendly: true },
         { name: "Ryman Auditorium", type: "Music Venue" },
         { name: "Printers Alley", type: "Neighborhood", isOptional: true },
       ]},
-      { label: "Day 2 \u2014 Outdoors", stops: [
+      { label: "Day 2 — Outdoors", stops: [
         { name: "Centennial Park & Parthenon", type: "Park", isKidFriendly: true },
         { name: "Adventure Science Center", type: "Science Center", isKidFriendly: true },
         { name: "Nashville Zoo", type: "Zoo", isKidFriendly: true, isOptional: true },
@@ -116,16 +118,16 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "Denver Outdoors + Science", destination: "Denver",
     durationDays: 3, ageRange: "6-10", description: "Science & nature",
     days: [
-      { label: "Day 1 \u2014 Denver Downtown", stops: [
+      { label: "Day 1 — Denver Downtown", stops: [
         { name: "Denver Museum of Nature & Science", type: "Museum", isKidFriendly: true },
         { name: "Denver Art Museum", type: "Museum", isOptional: true },
         { name: "16th Street Mall", type: "Neighborhood" },
       ]},
-      { label: "Day 2 \u2014 Mountains", stops: [
+      { label: "Day 2 — Mountains", stops: [
         { name: "Red Rocks Amphitheatre", type: "Landmark", isKidFriendly: true },
         { name: "Denver Botanic Gardens", type: "Garden", isKidFriendly: true, isOptional: true },
       ]},
-      { label: "Day 3 \u2014 Zoo & Park", stops: [
+      { label: "Day 3 — Zoo & Park", stops: [
         { name: "Denver Zoo", type: "Zoo", isKidFriendly: true },
         { name: "City Park", type: "Park", isKidFriendly: true },
         { name: "Meow Wolf Denver", type: "Experience", isKidFriendly: true, isOptional: true },
@@ -136,12 +138,12 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "Austin Explorer Kids", destination: "Austin",
     durationDays: 2, ageRange: "5-10", description: "Culture & food",
     days: [
-      { label: "Day 1 \u2014 Downtown & Culture", stops: [
+      { label: "Day 1 — Downtown & Culture", stops: [
         { name: "Texas State Capitol", type: "Landmark", isKidFriendly: true },
         { name: "Blanton Museum of Art", type: "Museum", isOptional: true },
         { name: "South Congress Avenue", type: "Neighborhood" },
       ]},
-      { label: "Day 2 \u2014 Parks & Nature", stops: [
+      { label: "Day 2 — Parks & Nature", stops: [
         { name: "Barton Springs Pool", type: "Park", isKidFriendly: true },
         { name: "Zilker Park", type: "Park", isKidFriendly: true },
         { name: "Natural Bridge Caverns", type: "Nature", isKidFriendly: true, isOptional: true },
@@ -152,17 +154,17 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "Seattle Science + Nature", destination: "Seattle",
     durationDays: 3, ageRange: "6+", description: "Museums & outdoors",
     days: [
-      { label: "Day 1 \u2014 Pike Place & Downtown", stops: [
+      { label: "Day 1 — Pike Place & Downtown", stops: [
         { name: "Pike Place Market", type: "Market", isKidFriendly: true },
         { name: "Seattle Great Wheel", type: "Attraction", isKidFriendly: true },
         { name: "Seattle Aquarium", type: "Aquarium", isKidFriendly: true },
       ]},
-      { label: "Day 2 \u2014 Space Needle Area", stops: [
+      { label: "Day 2 — Space Needle Area", stops: [
         { name: "Space Needle", type: "Landmark", isKidFriendly: true },
         { name: "Museum of Pop Culture", type: "Museum", isKidFriendly: true },
         { name: "Pacific Science Center", type: "Science Center", isKidFriendly: true },
       ]},
-      { label: "Day 3 \u2014 Waterfront & Parks", stops: [
+      { label: "Day 3 — Waterfront & Parks", stops: [
         { name: "Chihuly Garden and Glass", type: "Art", isOptional: true },
         { name: "Woodland Park Zoo", type: "Zoo", isKidFriendly: true },
         { name: "Discovery Park", type: "Park", isKidFriendly: true, isOptional: true },
@@ -173,17 +175,17 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
     title: "San Diego Family Beach + Zoo", destination: "San Diego",
     durationDays: 3, ageRange: "All ages", description: "Beach & wildlife",
     days: [
-      { label: "Day 1 \u2014 Balboa Park", stops: [
+      { label: "Day 1 — Balboa Park", stops: [
         { name: "San Diego Zoo", type: "Zoo", isKidFriendly: true },
         { name: "Fleet Science Center", type: "Science Center", isKidFriendly: true },
         { name: "Balboa Park Gardens", type: "Park", isOptional: true },
       ]},
-      { label: "Day 2 \u2014 Beach Day", stops: [
+      { label: "Day 2 — Beach Day", stops: [
         { name: "Mission Beach", type: "Beach", isKidFriendly: true },
         { name: "Pacific Beach Boardwalk", type: "Boardwalk", isKidFriendly: true },
         { name: "Ocean Beach Pier", type: "Landmark", isOptional: true },
       ]},
-      { label: "Day 3 \u2014 Old Town & Harbor", stops: [
+      { label: "Day 3 — Old Town & Harbor", stops: [
         { name: "Old Town San Diego", type: "Historic Site", isKidFriendly: true },
         { name: "USS Midway Museum", type: "Museum", isKidFriendly: true },
         { name: "Seaport Village", type: "Shopping", isOptional: true },
@@ -195,17 +197,17 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
 // ─── Stop icon by type ────────────────────────────────────────────────────────
 
 const STOP_ICON: Record<string, string> = {
-  museum: "\uD83C\uDFDB",
-  zoo: "\uD83E\uDD81",
-  aquarium: "\uD83D\uDC1F",
-  park: "\uD83C\uDF33",
-  beach: "\uD83C\uDFD6",
-  monument: "\uD83C\uDFFB",
-  landmark: "\uD83D\uDCCD",
-  science: "\uD83D\uDD2D",
-  art: "\uD83C\uDFA8",
-  market: "\uD83D\uDED2",
-  default: "\uD83D\uDCCD",
+  museum: "🏛",
+  zoo: "🦁",
+  aquarium: "🐟",
+  park: "🌳",
+  beach: "🏖",
+  monument: "🏻",
+  landmark: "📍",
+  science: "🔭",
+  art: "🎨",
+  market: "🛒",
+  default: "📍",
 };
 
 function stopIcon(type?: string | null): string {
@@ -262,7 +264,7 @@ function LoginGate({ visible, onClose }: { visible: boolean; onClose: () => void
           style={s.lgRegister}
           onPress={() => { onClose(); router.push("/onboarding/splash" as any); }}
         >
-          <Text style={s.lgRegisterTxt}>Create free account \u2192</Text>
+          <Text style={s.lgRegisterTxt}>Create free account →</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onClose} style={s.lgCancel}>
           <Text style={s.lgCancelTxt}>Not now</Text>
@@ -438,7 +440,7 @@ export default function DiscoverDetailScreen() {
     return (
       <View style={[s.center, { paddingTop: insets.top + 60 }]}>
         <ActivityIndicator color={G.orange} size="large" />
-        <Text style={s.loadingTxt}>Loading itinerary\u2026</Text>
+        <Text style={s.loadingTxt}>Loading itinerary…</Text>
       </View>
     );
   }
@@ -446,7 +448,7 @@ export default function DiscoverDetailScreen() {
   if (!isAi && !itinerary) {
     return (
       <View style={[s.center, { paddingTop: insets.top + 60 }]}>
-        <Text style={s.errorTxt}>This itinerary isn\u2019t available.</Text>
+        <Text style={s.errorTxt}>This itinerary isn’t available.</Text>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={s.errorBack}>Go back</Text>
         </TouchableOpacity>
@@ -486,10 +488,15 @@ export default function DiscoverDetailScreen() {
   }
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={83}
+    >
     <View style={[s.root]}>
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: 180 }}
+        contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
@@ -510,12 +517,12 @@ export default function DiscoverDetailScreen() {
             onPress={() => router.back()}
             activeOpacity={0.8}
           >
-            <Text style={s.detailBackTxt}>\u2039 Discover</Text>
+            <Text style={s.detailBackTxt}>‹ Discover</Text>
           </TouchableOpacity>
           {/* Title overlay */}
           <View style={s.detailHeroBody}>
             <Text style={s.detailTitle}>{title}</Text>
-            <Text style={s.detailMeta}>{destination} \u00b7 {durationDays} days</Text>
+            <Text style={s.detailMeta}>{destination} · {durationDays} days</Text>
           </View>
         </View>
 
@@ -540,10 +547,10 @@ export default function DiscoverDetailScreen() {
             activeOpacity={0.7}
           >
             <Text style={[s.statN, !isAi && hasUpvoted ? { color: G.orange } : null]}>
-              {isAi ? (aiDetail?.ageRange ?? "All") : (upvoteCount > 0 ? upvoteCount : "\u2014")}
+              {isAi ? (aiDetail?.ageRange ?? "All") : (upvoteCount > 0 ? upvoteCount : "—")}
             </Text>
             <Text style={[s.statL, !isAi && hasUpvoted ? { color: G.orange } : null]}>
-              {isAi ? "AI" : (hasUpvoted ? "\u2665 Helpful" : "\u2661 Helpful")}
+              {isAi ? "AI" : (hasUpvoted ? "♥ Helpful" : "♡ Helpful")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -593,7 +600,7 @@ export default function DiscoverDetailScreen() {
             <View style={s.commentInput}>
               <TextInput
                 style={s.commentBox}
-                placeholder="Share a tip or ask a question\u2026"
+                placeholder="Share a tip or ask a question…"
                 placeholderTextColor={G.muted}
                 value={newComment}
                 onChangeText={setNewComment}
@@ -616,7 +623,7 @@ export default function DiscoverDetailScreen() {
             </View>
 
             {comments.length === 0 && (
-              <Text style={s.noCommentsTxt}>No comments yet \u2014 be the first to share a tip!</Text>
+              <Text style={s.noCommentsTxt}>No comments yet — be the first to share a tip!</Text>
             )}
             {comments.map((c, i) => (
               <View key={c.id ?? i} style={s.commentRow}>
@@ -634,16 +641,17 @@ export default function DiscoverDetailScreen() {
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[s.ctaBar, { bottom: insets.bottom + 83 }]}>
+      <View style={[s.ctaBar, { bottom: 83 }]}>
         <TouchableOpacity style={s.ctaBtn} onPress={handleUseTrip} activeOpacity={0.88}>
-          <Text style={s.ctaBtnTxt}>Use this trip for my family \u2192</Text>
+          <Text style={s.ctaBtnTxt}>Use this trip for my family →</Text>
         </TouchableOpacity>
-        <Text style={s.ctaNote}>AI personalises stops for your kids\u2019 ages and pace</Text>
+        <Text style={s.ctaNote}>AI personalises stops for your kids’ ages and pace</Text>
       </View>
 
       {/* Login gate */}
       <LoginGate visible={showLoginGate} onClose={() => setShowLoginGate(false)} />
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

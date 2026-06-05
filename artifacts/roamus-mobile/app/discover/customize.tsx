@@ -63,11 +63,11 @@ function MiniCalendar({
     <View style={c.cal}>
       <View style={c.monthRow}>
         <Pressable onPress={canPrev?onPrev:undefined} style={{opacity:canPrev?1:0.3}} hitSlop={12}>
-          <Text style={c.navTxt}>\u2039</Text>
+          <Text style={c.navTxt}>‹</Text>
         </Pressable>
         <Text style={c.monthTxt}>{MONTHS[viewMonth]} {viewYear}</Text>
         <Pressable onPress={onNext} hitSlop={12}>
-          <Text style={c.navTxt}>\u203A</Text>
+          <Text style={c.navTxt}>›</Text>
         </Pressable>
       </View>
       <View style={c.dowRow}>
@@ -100,8 +100,8 @@ function MiniCalendar({
       {start && (
         <View style={c.summary}>
           <Text style={c.summaryTxt}>
-            {fmt(start)}{end?` \u2013 ${fmt(end)}`:" \u2192 tap end date"}
-            {end&&nights>0?`  \u00b7  ${nights} night${nights>1?"s":""}` : ""}
+            {fmt(start)}{end?` – ${fmt(end)}`:" → tap end date"}
+            {end&&nights>0?`  ·  ${nights} night${nights>1?"s":""}` : ""}
           </Text>
         </View>
       )}
@@ -113,12 +113,12 @@ function MiniCalendar({
 
 function getDayNote(requested: number, templateDays: number, destination: string): string {
   if (requested < templateDays) {
-    return `Fewer than template \u2014 AI keeps the top ${requested * 3} stops and removes the rest`;
+    return `Fewer than template — AI keeps the top ${requested * 3} stops and removes the rest`;
   }
   if (requested === templateDays) {
-    return `Same as template \u2014 all stops included, timing personalised for your kids`;
+    return `Same as template — all stops included, timing personalised for your kids`;
   }
-  return `More than template \u2014 AI adds ${(requested - templateDays) * 3} new ${destination} stops your kids will love`;
+  return `More than template — AI adds ${(requested - templateDays) * 3} new ${destination} stops your kids will love`;
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -186,15 +186,15 @@ export default function DiscoverCustomizeScreen() {
         {/* Header */}
         <View style={[s.hdr, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Text style={s.backTxt}>\u2039 Back</Text>
+            <Text style={s.backTxt}>‹ Back</Text>
           </TouchableOpacity>
           <Text style={s.title}>Make it yours</Text>
           <Text style={s.sub}>
-            Tell us when and how long \u2014 AI adapts the {destination} template for your family.
+            Tell us when and how long — AI adapts the {destination} template for your family.
           </Text>
           <View style={s.tmplPill}>
             <Text style={s.tmplPillTxt}>
-              {"\uD83D\uDCCB"} Template: {templateDays} Days in {destination} \u00b7 {templateDays * 3} stops
+              {"📋"} Template: {templateDays} Days in {destination} · {templateDays * 3} stops
             </Text>
           </View>
         </View>
@@ -202,7 +202,7 @@ export default function DiscoverCustomizeScreen() {
         {/* Calendar card */}
         <View style={s.card}>
           <View style={s.cardHdr}>
-            <Text style={s.cardIco}>{"\uD83D\uDCC5"}</Text>
+            <Text style={s.cardIco}>{"📅"}</Text>
             <Text style={s.cardTitle}>When are you going?</Text>
           </View>
           <View style={s.cardBody}>
@@ -226,7 +226,7 @@ export default function DiscoverCustomizeScreen() {
         {/* Days card */}
         <View style={s.card}>
           <View style={s.cardHdr}>
-            <Text style={s.cardIco}>{"\uD83D\uDDD3"}</Text>
+            <Text style={s.cardIco}>{"🗓"}</Text>
             <Text style={s.cardTitle}>How many days?</Text>
           </View>
           <View style={s.cardBody}>
@@ -249,7 +249,7 @@ export default function DiscoverCustomizeScreen() {
         {/* AI adaptation card */}
         <View style={s.card}>
           <View style={s.cardHdr}>
-            <Text style={s.cardIco}>{"\u2728"}</Text>
+            <Text style={s.cardIco}>{"✨"}</Text>
             <Text style={s.cardTitle}>How AI adapts this trip</Text>
           </View>
           <View style={s.cardBody}>
@@ -259,7 +259,7 @@ export default function DiscoverCustomizeScreen() {
                 ? `\nFewer days: keeps the highest-rated ${destination} stops.`
                 : days > templateDays
                 ? `\nExtra days: adds more ${destination} stops your kids will love.`
-                : `\nSame length as the template \u2014 personalised timing for your travelers.`
+                : `\nSame length as the template — personalised timing for your travelers.`
               }
             </Text>
           </View>
@@ -273,9 +273,9 @@ export default function DiscoverCustomizeScreen() {
           onPress={canBuild ? handleBuild : undefined}
           activeOpacity={0.88}
         >
-          <Text style={s.ctaBtnTxt}>Build my {destination} trip \u2192</Text>
+          <Text style={s.ctaBtnTxt}>Build my {destination} trip →</Text>
         </TouchableOpacity>
-        <Text style={s.ctaNote}>Takes about 10 seconds \u00b7 Personalised for your family</Text>
+        <Text style={s.ctaNote}>Takes about 10 seconds · Personalised for your family</Text>
       </View>
     </View>
   );

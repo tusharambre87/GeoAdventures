@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { API_BASE } from "@/lib/authContext";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 
@@ -32,6 +34,7 @@ interface DiscoverItem {
   focus?: string;
   badge?: string;
   isAiPick?: boolean;
+  totalUpvotes?: number;
 }
 
 interface CommunityShare {
@@ -95,6 +98,34 @@ const AI_PICKS: DiscoverItem[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+async function getDestinationImage(destination: string): Promise<string | null> {
+  try {
+    const query = destination.replace(/\s+/g, '_');
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`
+    );
+    const data = await res.json();
+    return data.thumbnail?.source ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const DEST_COLORS: Record<string, string> = {
+  default: '#1A2A3A',
+  chicago: '#1A2A4A',
+  'new york': '#2A1A3A',
+  paris: '#1A3A2A',
+  hawaii: '#1A3A3A',
+  orlando: '#2A2A1A',
+  boston: '#2A1A1A',
+};
+
+function getDestColor(destination: string): string {
+  const key = destination.toLowerCase().split(',')[0].trim();
+  return DEST_COLORS[key] ?? DEST_COLORS.default;
+}
+
 function normalizeShare(s: CommunityShare): DiscoverItem {
   const stopMatch = s.description?.match(/(\d+)\s+stops?/);
   const stopCount = stopMatch ? parseInt(stopMatch[1]) : 0;
@@ -107,21 +138,26 @@ function normalizeShare(s: CommunityShare): DiscoverItem {
     durationDays: s.durationDays || 3,
     stopCount,
     familyCount: s.totalViews ? Math.max(1, Math.floor(s.totalViews / 3)) : undefined,
+    totalUpvotes: s.totalUpvotes,
     isAiPick: false,
   };
 }
 
 // ─── Hero card ────────────────────────────────────────────────────────────────
 
-function HeroCard({ item, onPress }: { item: DiscoverItem; onPress: () => void }) {
+function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
+  item: DiscoverItem; onPress: () => void;
+  isUpvoted?: boolean; onUpvote?: () => void;
+}) {
   const imgSrc = item.heroImageUrl || CITY_IMGS[item.destination] || null;
+  const upvotes = (item.totalUpvotes ?? 0) + (isUpvoted ? 1 : 0);
   return (
     <TouchableOpacity style={s.heroCard} onPress={onPress} activeOpacity={0.92}>
       <View style={s.heroImgWrap}>
         {imgSrc ? (
           <Image source={{ uri: imgSrc }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1A2A3A" }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: getDestColor(item.destination) }]} />
         )}
         <LinearGradient
           colors={["transparent", "rgba(26,31,46,0.88)"]}
@@ -139,11 +175,12 @@ function HeroCard({ item, onPress }: { item: DiscoverItem; onPress: () => void }
       <View style={s.heroBody}>
         <Text style={s.heroTitle}>{item.title}</Text>
         <Text style={s.heroMeta}>
-          {item.durationDays} days{item.stopCount > 0 ? ` \u00b7 ${item.stopCount} stops` : ""}
-          {" \u00b7 "}{item.familyCount ? `${item.familyCount} families used this` : "AI curated"}
+          {item.durationDays} days{item.stopCount > 0 ? ` · ${item.stopCount} stops` : ""}
+          {item.familyCount ? ` · ${item.familyCount} families` : " · AI curated"}
+          {upvotes > 0 ? ` · ♡ ${upvotes}` : ""}
         </Text>
         <TouchableOpacity style={s.heroCta} onPress={onPress} activeOpacity={0.88}>
-          <Text style={s.heroCtaTxt}>Preview & use this trip \u2192</Text>
+          <Text style={s.heroCtaTxt}>Preview & use this trip →</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -152,15 +189,19 @@ function HeroCard({ item, onPress }: { item: DiscoverItem; onPress: () => void }
 
 // ─── Grid card ────────────────────────────────────────────────────────────────
 
-function GridCard({ item, onPress }: { item: DiscoverItem; onPress: () => void }) {
+function GridCard({ item, onPress, isUpvoted, onUpvote }: {
+  item: DiscoverItem; onPress: () => void;
+  isUpvoted?: boolean; onUpvote?: () => void;
+}) {
   const imgSrc = item.heroImageUrl || CITY_IMGS[item.destination] || null;
+  const upvotes = (item.totalUpvotes ?? 0) + (isUpvoted ? 1 : 0);
   return (
     <TouchableOpacity style={s.gridCard} onPress={onPress} activeOpacity={0.92}>
       <View style={s.gridImg}>
         {imgSrc ? (
           <Image source={{ uri: imgSrc }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1A2A3A" }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: getDestColor(item.destination) }]} />
         )}
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.65)"]}
@@ -172,14 +213,21 @@ function GridCard({ item, onPress }: { item: DiscoverItem; onPress: () => void }
         <Text style={s.gridTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={s.gridMeta}>
           {item.stopCount > 0 ? `${item.stopCount} stops` : item.durationDays + " days"}
-          {" \u00b7 "}{item.familyCount ? `${item.familyCount} families` : "AI curated"}
+          {" · "}{item.familyCount ? `${item.familyCount} families` : "AI curated"}
         </Text>
-        <View style={s.gridTags}>
-          {item.ageRange && (
-            <View style={s.tagAge}><Text style={s.tagAgeTxt}>Ages {item.ageRange}</Text></View>
-          )}
-          {item.durationDays > 0 && (
-            <View style={s.tagDays}><Text style={s.tagDaysTxt}>{item.durationDays}d</Text></View>
+        <View style={s.gridFooter}>
+          <View style={s.gridTags}>
+            {item.ageRange && (
+              <View style={s.tagAge}><Text style={s.tagAgeTxt}>Ages {item.ageRange}</Text></View>
+            )}
+            {item.durationDays > 0 && (
+              <View style={s.tagDays}><Text style={s.tagDaysTxt}>{item.durationDays}d</Text></View>
+            )}
+          </View>
+          {onUpvote && (
+            <TouchableOpacity style={s.cardHeart} onPress={onUpvote} activeOpacity={0.7}>
+              <Text style={s.cardHeartTxt}>{isUpvoted ? '♥' : '♡'} {upvotes > 0 ? upvotes : ''}</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -208,6 +256,24 @@ export default function DiscoverScreen() {
   const [communityItems, setCommunityItems] = useState<DiscoverItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [quickUpvoted, setQuickUpvoted] = useState<Record<string, boolean>>({});
+
+  async function handleQuickUpvote(itemId: string) {
+    setQuickUpvoted(prev => ({ ...prev, [itemId]: !prev[itemId] }));
+    try {
+      let vid = await AsyncStorage.getItem("roamus_visitor_id");
+      if (!vid || !/^v_[a-z0-9]{10,20}$/.test(vid)) {
+        vid = "v_" + Math.random().toString(36).slice(2, 14);
+        await AsyncStorage.setItem("roamus_visitor_id", vid);
+      }
+      await fetch(`${API_BASE}/api/travel/shares/${itemId}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visitorId: vid }),
+      });
+    } catch {}
+  }
+
   const [activeCity, setActiveCity] = useState("All");
   const [activeDuration, setActiveDuration] = useState<string | null>(null);
   const [activeAge, setActiveAge] = useState<string | null>(null);
@@ -215,10 +281,17 @@ export default function DiscoverScreen() {
   useEffect(() => {
     fetch(`${API_BASE}/api/travel/shares?limit=30`)
       .then(r => r.json())
-      .then((data: CommunityShare[]) => {
-        if (Array.isArray(data)) {
-          setCommunityItems(data.map(normalizeShare));
-        }
+      .then(async (data: CommunityShare[]) => {
+        if (!Array.isArray(data)) return;
+        const normalized = data.map(normalizeShare);
+        const enriched = await Promise.all(
+          normalized.map(async (item) => {
+            if (item.heroImageUrl) return item;
+            const wikiImg = await getDestinationImage(item.destination);
+            return { ...item, heroImageUrl: wikiImg };
+          })
+        );
+        setCommunityItems(enriched);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -260,7 +333,7 @@ export default function DiscoverScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Text style={s.backPillTxt}>\u2039 Back</Text>
+          <Text style={s.backPillTxt}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={s.navTitle}>Discover</Text>
       </View>
@@ -332,7 +405,7 @@ export default function DiscoverScreen() {
         {tab === "community" && loading && (
           <View style={s.center}>
             <ActivityIndicator color={G.orange} />
-            <Text style={s.loadingTxt}>Finding community trips\u2026</Text>
+            <Text style={s.loadingTxt}>Finding community trips…</Text>
           </View>
         )}
 
@@ -347,13 +420,26 @@ export default function DiscoverScreen() {
         )}
 
         {/* Hero card */}
-        {heroItem && <HeroCard item={heroItem} onPress={() => handlePress(heroItem)} />}
+        {heroItem && (
+          <HeroCard
+            item={heroItem}
+            onPress={() => handlePress(heroItem)}
+            isUpvoted={!!quickUpvoted[heroItem.id]}
+            onUpvote={heroItem.isAiPick ? undefined : () => handleQuickUpvote(heroItem.id)}
+          />
+        )}
 
         {/* Grid */}
         {gridItems.length > 0 && (
           <View style={s.grid}>
             {gridItems.map(item => (
-              <GridCard key={item.id} item={item} onPress={() => handlePress(item)} />
+              <GridCard
+                key={item.id}
+                item={item}
+                onPress={() => handlePress(item)}
+                isUpvoted={!!quickUpvoted[item.id]}
+                onUpvote={item.isAiPick ? undefined : () => handleQuickUpvote(item.id)}
+              />
             ))}
           </View>
         )}
@@ -463,9 +549,12 @@ const s = StyleSheet.create({
   gridBody: { padding: 10 },
   gridTitle: { fontFamily: F.bold, fontSize: 13, color: G.deep, marginBottom: 3, lineHeight: 18 },
   gridMeta: { fontFamily: F.regular, fontSize: 11, color: G.muted, marginBottom: 6 },
-  gridTags: { flexDirection: "row", gap: 4, flexWrap: "wrap" },
+  gridFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
+  gridTags: { flexDirection: "row", gap: 4, flexWrap: "wrap", flex: 1 },
   tagAge: { backgroundColor: "#F5F3FF", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   tagAgeTxt: { fontFamily: F.bold, fontSize: 10, color: "#7C3AED" },
   tagDays: { backgroundColor: G.oLt, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   tagDaysTxt: { fontFamily: F.bold, fontSize: 10, color: G.orange },
+  cardHeart: { paddingHorizontal: 4, paddingVertical: 2 },
+  cardHeartTxt: { fontFamily: F.bold, fontSize: 11, color: G.muted },
 });
