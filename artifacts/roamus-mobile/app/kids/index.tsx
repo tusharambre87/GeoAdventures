@@ -88,7 +88,7 @@ export default function ExplorerHome() {
 
     if (tripId) {
       kidsAPI.getProgress(tripId, kids.explorerId || "explorer")
-        .then((prog) => kids.setXpToday(prog.xp))
+        .then((prog) => kids.setXpToday(Number(prog?.xp) || 0))
         .catch(() => {});
     }
   }, [stopId]);

@@ -922,11 +922,18 @@ function ThinkFast({ stopName, stopId, addSessionXp, explorerId }: { stopName: s
           <Text style={tf.promptText}>{prompt.prompt.replace("Name 10 things ", "")}</Text>
         </View>
 
-        {/* 10 progress dots */}
+        {/* 10 progress dots — 2 rows of 5 */}
         <View style={tf.dots}>
-          {Array.from({ length: 10 }).map((_, i) => (
-            <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#fff" : "rgba(255,255,255,0.35)" }]}>
-              {i < tapCount && <Text style={tf.dotCheck}>{'\u2713'}</Text>}
+          {[0, 1].map((row) => (
+            <View key={row} style={{ flexDirection: "row", gap: 8 }}>
+              {Array.from({ length: 5 }).map((_, col) => {
+                const i = row * 5 + col;
+                return (
+                  <View key={i} style={[tf.dot, { backgroundColor: i < tapCount ? "#fff" : "rgba(255,255,255,0.35)" }]}>
+                    {i < tapCount && <Text style={tf.dotCheck}>{'\u2713'}</Text>}
+                  </View>
+                );
+              })}
             </View>
           ))}
         </View>
@@ -1650,6 +1657,7 @@ function GeoSpy({ stopId, addSessionXp, explorerId }: { stopId?: string; addSess
   const [phase, setPhase] = useState<Phase>("intro");
   const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
   const [usedPrompts, setUsedPrompts] = useState<string[]>([]);
+  const [muted, setMuted] = useState(false);
 
   const selectPrompt = useCallback((exclude?: string): string => {
     const available = ALL_GEOSPY_PROMPTS.filter((p) => !usedPrompts.includes(p) && p !== exclude);
@@ -1668,17 +1676,13 @@ function GeoSpy({ stopId, addSessionXp, explorerId }: { stopId?: string; addSess
     setPhase("playing");
   };
 
-  // Auto-speak each prompt as soon as it appears
+  // Auto-speak each prompt (unless muted)
   useEffect(() => {
-    if (!currentPrompt) return;
+    if (!currentPrompt || muted) return;
     Speech.stop();
-    Speech.speak(currentPrompt, {
-      language: "en-US",
-      pitch: 1.0,
-      rate: 0.9,
-    });
+    Speech.speak(currentPrompt, { language: "en-US", pitch: 1.0, rate: 0.9 });
     return () => { Speech.stop(); };
-  }, [currentPrompt]);
+  }, [currentPrompt, muted]);
 
   const nextPrompt = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1736,7 +1740,20 @@ function GeoSpy({ stopId, addSessionXp, explorerId }: { stopId?: string; addSess
         }}
       >
         <View style={spy.promptCard}>
-          <Text style={spy.promptIcon}>{'\uD83D\uDD0A'}</Text>
+          <Pressable
+            onPress={() => {
+              if (muted) {
+                setMuted(false);
+                if (currentPrompt) Speech.speak(currentPrompt, { language: "en-US", pitch: 1.0, rate: 0.9 });
+              } else {
+                Speech.stop();
+                setMuted(true);
+              }
+            }}
+            style={{ alignItems: "center", marginBottom: 4 }}
+          >
+            <Text style={spy.promptIcon}>{muted ? '\uD83D\uDD07' : '\uD83D\uDD0A'}</Text>
+          </Pressable>
           <Text style={spy.promptText}>{currentPrompt}</Text>
         </View>
 
@@ -1830,7 +1847,7 @@ const tf = StyleSheet.create({
   },
   promptLabel: { fontFamily: F.bold, fontSize: 12, color: "rgba(255,255,255,0.8)", letterSpacing: 0.8, marginBottom: 6 },
   promptText: { fontFamily: F.bold, fontSize: 28, color: "#fff", lineHeight: 36 },
-  dots: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
+  dots: { gap: 8, marginBottom: 24 },
   dot: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: "center", justifyContent: "center",

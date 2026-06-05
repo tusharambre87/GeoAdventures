@@ -81,7 +81,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, exploreError })),
     setKidName: (kidName) => setState((s) => ({ ...s, kidName })),
     setXpToday: (xpToday) => setState((s) => ({ ...s, xpToday })),
-    addSessionXp: (xp) => setState((s) => ({ ...s, sessionXpEarned: s.sessionXpEarned + xp, xpToday: s.xpToday + xp })),
+    addSessionXp: (xp) => setState((s) => ({ ...s, sessionXpEarned: (s.sessionXpEarned || 0) + (Number(xp) || 0), xpToday: (s.xpToday || 0) + (Number(xp) || 0) })),
     resetSessionXp: () => setState((s) => ({ ...s, sessionXpEarned: 0 })),
     setExplorerId: (explorerId) => setState((s) => ({ ...s, explorerId })),
   };

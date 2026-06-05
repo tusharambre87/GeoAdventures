@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
+import { useSpeechToText } from "@/lib/useSpeechToText";
 import { F } from "@/lib/tokens";
 
 const K = {
@@ -39,6 +40,7 @@ export default function Mission2() {
   const [obs, setObs] = useState("");
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { isListening, start, stop } = useSpeechToText();
 
   const hasRealContent = kids.exploreContent?.missions?.[1]?.type === "observation";
   const instruction = hasRealContent
@@ -57,7 +59,7 @@ export default function Mission2() {
   if (kids.exploreError) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0", justifyContent: "center", alignItems: "center", paddingBottom: 40, paddingHorizontal: 32 }}>
-        <Text style={{ fontSize: 32, marginBottom: 16 }}>{"\U0001f615"}</Text>
+        <Text style={{ fontSize: 32, marginBottom: 16 }}>{'\uD83D\uDE15'}</Text>
         <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 18, color: "#1C1917", marginBottom: 8, textAlign: "center" }}>{"Couldn't load this mission"}</Text>
         <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 14, color: "#78716C", marginBottom: 24, textAlign: "center" }}>{"Head back and try again"}</Text>
         <Pressable
@@ -153,7 +155,14 @@ export default function Mission2() {
                 {submitting ? "Saving…" : "Save memory"}
               </Text>
             </Pressable>
-            <Pressable style={s.micBtn}>
+            <Pressable
+              style={[s.micBtn, isListening && { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }]}
+              onPress={() => {
+                if (isListening) { stop(); } else {
+                  start((t) => { setObs((prev) => prev ? prev + " " + t : t); });
+                }
+              }}
+            >
               <Text style={{ fontSize: 24 }}>{"\uD83C\uDFA4"}</Text>
             </Pressable>
           </View>
