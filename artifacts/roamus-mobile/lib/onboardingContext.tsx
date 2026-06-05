@@ -50,6 +50,10 @@ export type OnboardingData = {
   lastDay: string | null;
   /** Record of "CityA→CityB" → "morning"|"midday"|"evening" transition timing */
   cityTransitions: Record<string, string>;
+  /** Slug of a community/AI-pick template to seed stop generation from */
+  templateSlug: string | null;
+  /** true when the trip is being built from a Discover template */
+  isTemplate: boolean;
 };
 
 const DEFAULT: OnboardingData = {
@@ -75,6 +79,8 @@ const DEFAULT: OnboardingData = {
   returningUser: false,
   lastDay: null,
   cityTransitions: {},
+  templateSlug: null,
+  isTemplate: false,
 };
 
 type Ctx = {

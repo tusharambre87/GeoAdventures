@@ -495,6 +495,7 @@ export default function PreviewScreen() {
                   pace: PACE_MAP[data.pace ?? ""] ?? "balanced",
                   adventureContext: "travel",
                   autoGenerateStops: true,
+                  templateSlug: data.templateSlug || undefined,
                   tailoring: {
                     transport: data.transport,
                     stroller: data.stroller,

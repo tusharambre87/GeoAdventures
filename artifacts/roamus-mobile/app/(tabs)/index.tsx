@@ -289,6 +289,21 @@ export default function TripsScreen() {
               </Pressable>
             )}
 
+            <TouchableOpacity
+              style={s.discoverBtn}
+              onPress={() => router.push('/discover' as any)}
+              activeOpacity={0.85}
+            >
+              <View style={s.discoverBtnIco}>
+                <Text style={{ fontSize: 18 }}>🌍</Text>
+              </View>
+              <View style={s.discoverBtnBody}>
+                <Text style={s.discoverBtnTitle}>Discover trips</Text>
+                <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
+              </View>
+              <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
+            </TouchableOpacity>
+
             {currentTrips.length > 0 && (
               <View style={s.section}>
                 <View style={s.sectionHeader}>
@@ -438,4 +453,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4, marginBottom: 10,
   },
   offlinePillText: { fontFamily: F.semibold, fontSize: 12, fontWeight: "600", color: "#6EE7B7" },
+
+  discoverBtn: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "#fff", borderRadius: 16,
+    borderWidth: 1, borderColor: "rgba(26,31,46,0.08)",
+    padding: 14, marginBottom: 14,
+  },
+  discoverBtnIco: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: "#FDF0E9",
+    alignItems: "center", justifyContent: "center",
+  },
+  discoverBtnBody: { flex: 1 },
+  discoverBtnTitle: { fontFamily: F.bold, fontSize: 14, fontWeight: "800", color: "#1A1F2E", marginBottom: 1 },
+  discoverBtnSub: { fontFamily: F.regular, fontSize: 12, color: "#8A8FA8" },
 });

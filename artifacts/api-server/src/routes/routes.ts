@@ -5985,11 +5985,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed stops from a shared itinerary template, scaling to the requested trip length
+  async function generateStopsFromTemplate(
+    tripId: string,
+    templateSlug: string,
+    requestedDays: number | null,
+    adventureStyle: string | undefined,
+    cityName: string,
+    country: string,
+  ) {
+    try {
+      const share = await storage.getItineraryShareBySlug(templateSlug);
+      if (!share || !share.stops || share.stops.length === 0) {
+        console.log(`[Travel][template] No share for slug "${templateSlug}" — falling back to AI`);
+        generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, 'balanced');
+        return;
+      }
+
+      const templateDays = share.durationDays ?? 3;
+      const targetDays = requestedDays ?? templateDays;
+      let templateStops: any[] = [...(share.stops as any[])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+      if (targetDays < templateDays && templateDays > 0) {
+        const targetCount = Math.max(2, Math.round(templateStops.length * targetDays / templateDays));
+        const enriched = templateStops.filter(s => s.wonderPrompt || s.listenSummary);
+        const plain = templateStops.filter(s => !s.wonderPrompt && !s.listenSummary);
+        templateStops = [...enriched, ...plain].slice(0, targetCount);
+      } else if (targetDays > templateDays) {
+        const extraCount = (targetDays - templateDays) * 3;
+        const libraryStops = await storage.getStopLibraryByCity(cityName, country);
+        const usedNames = new Set(templateStops.map(s => s.name.toLowerCase().trim()));
+        const extras = libraryStops.filter(s => !usedNames.has(s.name.toLowerCase().trim())).slice(0, extraCount);
+        templateStops = [...templateStops, ...(extras as any[])];
+      }
+
+      const stopsPerDay = Math.max(1, Math.ceil(templateStops.length / targetDays));
+      for (let i = 0; i < templateStops.length; i++) {
+        const s = templateStops[i];
+        await storage.createStop({
+          tripId,
+          name: s.name,
+          stopType: s.locationType || s.stopType || 'landmark',
+          displayOrder: i,
+          dayIndex: Math.floor(i / stopsPerDay),
+          address: s.address || null,
+          description: s.description || s.listenSummary || null,
+          latitude: s.latitude || null,
+          longitude: s.longitude || null,
+          missionType: null,
+          missionQuestion: null,
+          missionHint: null,
+          missionAnswer: null,
+          missionDifficulty: 'normal',
+          missionKeepsakeReward: false,
+          stopMissions: null,
+        });
+      }
+      console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" for trip ${tripId}`);
+    } catch (err) {
+      console.error('[Travel][template] generateStopsFromTemplate failed:', err);
+      try {
+        generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, 'balanced');
+      } catch {}
+    }
+  }
+
   // Create a new trip (with automatic stop generation for any city)
   app.post('/api/travel/trips', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring } = req.body;
+      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug } = req.body;
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
@@ -6084,11 +6149,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Auto-generate stops in the background — trip is already returned to client
       if (autoGenerateStops !== false && (city || destination)) {
-        generateStopsInBackground(
-          trip.id, city || destination, isHomeAdventure, country,
-          state, stopCount, adventureStyle, destination, city,
-          meals || null, computedTripDays || null, pace || 'balanced'
-        );
+        if (templateSlug && typeof templateSlug === 'string') {
+          generateStopsFromTemplate(
+            trip.id, templateSlug, computedTripDays || null,
+            adventureStyle, city || destination, country ?? ''
+          );
+        } else {
+          generateStopsInBackground(
+            trip.id, city || destination, isHomeAdventure, country,
+            state, stopCount, adventureStyle, destination, city,
+            meals || null, computedTripDays || null, pace || 'balanced'
+          );
+        }
       }
 
       // Multi-city: generate stops for remaining cities server-side so they are reliable
