@@ -111,6 +111,7 @@ function RootLayoutNav() {
       />
       <Stack.Screen name="atstop" options={{ headerShown: false }} />
       <Stack.Screen name="me" options={{ headerShown: false }} />
+      <Stack.Screen name="discover" options={{ headerShown: false }} />
     </Stack>
   );
 }

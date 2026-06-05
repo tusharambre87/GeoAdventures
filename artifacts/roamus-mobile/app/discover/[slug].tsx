@@ -496,7 +496,7 @@ export default function DiscoverDetailScreen() {
     <View style={[s.root]}>
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: 160 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
@@ -641,7 +641,7 @@ export default function DiscoverDetailScreen() {
       </ScrollView>
 
       {/* Sticky CTA */}
-      <View style={[s.ctaBar, { bottom: 83 }]}>
+      <View style={[s.ctaBar, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity style={s.ctaBtn} onPress={handleUseTrip} activeOpacity={0.88}>
           <Text style={s.ctaBtnTxt}>Use this trip for my family →</Text>
         </TouchableOpacity>
@@ -754,7 +754,6 @@ const s = StyleSheet.create({
 
   // Sticky CTA bar
   ctaBar: {
-    position: "absolute", left: 0, right: 0,
     backgroundColor: G.bg,
     borderTopWidth: 1, borderTopColor: "rgba(26,31,46,0.08)",
     padding: 14,
