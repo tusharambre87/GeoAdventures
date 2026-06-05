@@ -24,6 +24,8 @@ import {
 } from "react-native";
 import { useFonts as useFrauncesFonts, Fraunces_900Black } from "@expo-google-fonts/fraunces";
 import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
+import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
@@ -637,7 +639,8 @@ function StopCard({
   onDetails,
   onReplace,
   onDelete,
-  onMoveStop,
+  drag,
+  isActive,
 }: {
   stop: Stop;
   isEditable: boolean;
@@ -646,25 +649,14 @@ function StopCard({
   onDetails: (s: Stop) => void;
   onReplace: (s: Stop) => void;
   onDelete: (stopId: string) => Promise<void>;
-  onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
+  drag?: () => void;
+  isActive?: boolean;
 }) {
   const swipeRef = useRef<Swipeable>(null);
   const heroImg  = useStopHeroImage(stop.id);
   const heroBg   = stopHeroBg(stop.stopType);
   const ticket   = needsTicket(stop);
   const duration = getStopDuration(stop);
-  const [reorderActive, setReorderActive] = useState(false);
-  const reorderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function activateReorder() {
-    if (!isEditable) return;
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setReorderActive(true);
-    if (reorderTimerRef.current) clearTimeout(reorderTimerRef.current);
-    reorderTimerRef.current = setTimeout(() => setReorderActive(false), 3000);
-  }
-
-  useEffect(() => () => { if (reorderTimerRef.current) clearTimeout(reorderTimerRef.current); }, []);
 
   function handleRemove() {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -729,31 +721,12 @@ function StopCard({
           style={StyleSheet.absoluteFillObject}
         />
         <Text style={sc.heroName} numberOfLines={2}>{stop.name}</Text>
-        {isEditable && (
-          reorderActive ? (
-            <View style={sc.reorderBtns}>
-              <GHTouchable
-                style={sc.reorderBtn}
-                onPress={() => { onMoveStop(stop.id, 'up'); setReorderActive(false); }}
-                hitSlop={6}
-              >
-                <Text style={sc.reorderArrow}>▲</Text>
-              </GHTouchable>
-              <GHTouchable
-                style={sc.reorderBtn}
-                onPress={() => { onMoveStop(stop.id, 'down'); setReorderActive(false); }}
-                hitSlop={6}
-              >
-                <Text style={sc.reorderArrow}>▼</Text>
-              </GHTouchable>
-            </View>
-          ) : (
-            <GHTouchable style={sc.dragHandle} onLongPress={activateReorder} delayLongPress={350}>
-              <View style={sc.dragLine} />
-              <View style={sc.dragLine} />
-              <View style={sc.dragLine} />
-            </GHTouchable>
-          )
+        {isEditable && drag && (
+          <GHTouchable style={sc.dragHandle} onLongPress={drag} delayLongPress={200}>
+            <View style={sc.dragLine} />
+            <View style={sc.dragLine} />
+            <View style={sc.dragLine} />
+          </GHTouchable>
         )}
       </View>
 
@@ -1202,7 +1175,6 @@ function DayDetail({
   onRunDay,
   onOpenOptions,
   onDelete,
-  onMoveStop,
   onAddStop,
   isFree,
   onShowUpgrade,
@@ -1223,7 +1195,6 @@ function DayDetail({
   onRunDay: () => void;
   onOpenOptions: () => void;
   onDelete: (stopId: string) => Promise<void>;
-  onMoveStop: (stopId: string, dir: 'up' | 'down') => void;
   onAddStop: () => void;
   isFree?: boolean;
   onShowUpgrade?: () => void;
@@ -1252,6 +1223,26 @@ function DayDetail({
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
+  const queryClient  = useQueryClient();
+  const contentKey   = contentStops.map(s => s.id + (s.displayOrder ?? 0)).join(',');
+  const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
+  useEffect(() => { setLocalContentStops(contentStops); }, [contentKey]);
+
+  async function handleDragEnd({ data }: { data: Stop[] }) {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const prev = localContentStops;
+    setLocalContentStops(data);
+    const stopOrders = data.map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex ?? 0 }));
+    try {
+      await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stopOrders }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    } catch {
+      setLocalContentStops(prev);
+    }
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1391,29 +1382,40 @@ function DayDetail({
           );
         })()}
 
-        {/* Stop cards — meal cards splice in after first content stop */}
-        {contentStops.map((stop, i) => (
-          <React.Fragment key={stop.id}>
-            <StopCard
-              stop={stop}
-              isEditable={isEditable}
-              isAnchor={anchor?.id === stop.id}
-              tripId={tripId}
-              onDetails={onStopDetails}
-              onReplace={onReplaceStop}
-              onDelete={onDelete}
-              onMoveStop={onMoveStop}
-            />
-            {i < contentStops.length - 1 && (
-              <TravelConnector travelMins={contentStops[i + 1].travelMinsFromPrevious} />
-            )}
-            {i === 0 && mealStops.map(ms => (
-              <MealCard key={ms.id} stop={ms} />
-            ))}
-          </React.Fragment>
-        ))}
+        {/* Stop cards — draggable; meal cards splice in after first content stop */}
+        <DraggableFlatList
+          data={localContentStops}
+          keyExtractor={s => s.id}
+          scrollEnabled={false}
+          onDragEnd={handleDragEnd}
+          renderItem={({ item: stop, drag, isActive, getIndex }: RenderItemParams<Stop>) => {
+            const i      = getIndex() ?? 0;
+            const isLast = i === localContentStops.length - 1;
+            return (
+              <ScaleDecorator activeScale={0.97}>
+                <StopCard
+                  stop={stop}
+                  isEditable={isEditable}
+                  isAnchor={anchor?.id === stop.id}
+                  tripId={tripId}
+                  onDetails={onStopDetails}
+                  onReplace={onReplaceStop}
+                  onDelete={onDelete}
+                  drag={isEditable ? drag : undefined}
+                  isActive={isActive}
+                />
+                {i === 0 && mealStops.map(ms => (
+                  <MealCard key={ms.id} stop={ms} />
+                ))}
+                {!isLast && (
+                  <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
+                )}
+              </ScaleDecorator>
+            );
+          }}
+        />
         {/* Meal cards for days with no content stops */}
-        {contentStops.length === 0 && mealStops.map(stop => (
+        {localContentStops.length === 0 && mealStops.map(stop => (
           <MealCard key={stop.id} stop={stop} />
         ))}
 
@@ -3349,7 +3351,6 @@ export default function TripPlanScreen() {
           onRunDay={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
           onDelete={deleteStop}
-          onMoveStop={moveStop}
           onAddStop={() => setActiveSheet('addStop')}
           isFree={isFree}
           onShowUpgrade={() => { setUpgradeContext('locked_day'); setUpgradeVisible(true); }}
