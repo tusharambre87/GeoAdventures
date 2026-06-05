@@ -43,6 +43,7 @@ import { isFreePlan } from "@/lib/subscription";
 import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
+import { preCacheTrip } from "@/lib/tripCache";
 
 const TAB_BAR_H = 49;
 
@@ -539,6 +540,16 @@ function IconCopy({ size = 17, color = C.muted }: { size?: number; color?: strin
   );
 }
 
+function IconArchive({ size = 17, color = C.muted }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="3" width="20" height="5" rx="1" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M10 12h4" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 // ─── Grip bar ─────────────────────────────────────────────────────────────────
 
 function Grip() {
@@ -982,6 +993,9 @@ function TripOverview({
   onSelectDay,
   onRunToday,
   onOpenOptions,
+  checklistOpen,
+  onOpenChecklist,
+  onChecklistClose,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -993,6 +1007,9 @@ function TripOverview({
   onSelectDay: (d: number) => void;
   onRunToday: () => void;
   onOpenOptions: () => void;
+  checklistOpen: boolean;
+  onOpenChecklist: () => void;
+  onChecklistClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const totalTickets  = stops.filter(s => needsTicket(s)).length;
@@ -1000,17 +1017,11 @@ function TripOverview({
   const travelerCount = trip.travelers?.length ?? 0;
   const dateRange     = formatDateRange(trip.startDate, trip.endDate);
 
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [clCounts, setClCounts]           = useState<{ checked: number; total: number } | null>(null);
+  const [clCounts, setClCounts] = useState<{ checked: number; total: number } | null>(null);
 
   useEffect(() => {
     loadChecklistCounts(trip.id, stops).then(setClCounts);
   }, [trip.id]);
-
-  function handleChecklistClose() {
-    setChecklistOpen(false);
-    loadChecklistCounts(trip.id, stops).then(setClCounts);
-  }
 
   const firstStop = [...stops]
     .sort((a, b) => {
@@ -1070,10 +1081,10 @@ function TripOverview({
         showsVerticalScrollIndicator={false}
       >
         {/* Before you go — checklist entry row */}
-        {!hideChecklist && clCounts !== null && (
+        {clCounts !== null && (
           <Pressable
             style={cl.row}
-            onPress={() => setChecklistOpen(true)}
+            onPress={onOpenChecklist}
           >
             <View style={cl.rowLeft}>
               <Text style={cl.rowTitle}>Before you go</Text>
@@ -1148,7 +1159,7 @@ function TripOverview({
       {/* Before you go — checklist bottom sheet */}
       <ChecklistSheet
         visible={checklistOpen}
-        onClose={handleChecklistClose}
+        onClose={onChecklistClose}
         tripId={trip.id}
         stops={stops}
       />
@@ -2225,12 +2236,14 @@ function TripOptionsSheet({
   tripId,
   onClose,
   onCompare,
+  onOpenChecklist,
   queryClient,
 }: {
   trip: TripData;
   tripId: string;
   onClose: () => void;
   onCompare: () => void;
+  onOpenChecklist: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   function renameTrip() {
@@ -2275,14 +2288,40 @@ function TripOptionsSheet({
     );
   }
 
+  async function archiveTrip() {
+    try {
+      await apiFetch(`/api/travel/trips/${tripId}/archive`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isArchived: true }),
+      });
+      showToast('Trip archived — find it in your past adventures');
+      onClose();
+      router.replace('/(tabs)/' as any);
+    } catch {
+      Alert.alert('Error', 'Could not archive trip. Try again.');
+    }
+  }
+
+  async function downloadOffline() {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) { showToast('Sign in to download for offline'); return; }
+      showToast('Downloading for offline\u2026');
+      await preCacheTrip(tripId, token);
+      showToast('\u2713 Trip saved for offline use');
+    } catch {
+      showToast('Download failed — try again');
+    }
+  }
+
   type OptionItem = { icon: React.ReactNode; bg: string; name: string; sub: string; destructive?: boolean; onPress: () => void };
   const sections: Array<{ label: string; items: OptionItem[] }> = [
     {
       label: 'TRIP TOOLS',
       items: [
-        { icon: <IconDownload />, bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: () => showToast('Coming soon') },
+        { icon: <IconDownload />, bg: '#EEF5F2', name: 'Download for offline', sub: 'Save stops and stories for no-WiFi use', onPress: downloadOffline },
         { icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family', sub: 'Send the itinerary to your travel partners', onPress: () => Share.share({ message: `Check out our trip plan: ${trip.name}` }) },
-        { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => showToast('Coming soon') },
+        { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => { onClose(); setTimeout(() => onOpenChecklist(), 350); } },
         { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
       ],
     },
@@ -2298,6 +2337,7 @@ function TripOptionsSheet({
       label: 'UTILITIES',
       items: [
         { icon: <IconCopy />, bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => showToast('Coming soon') },
+        { icon: <IconArchive />, bg: C.bg, name: 'Archive trip', sub: 'Move this trip to your past adventures', onPress: archiveTrip },
         { icon: <IconTrash color='#DC2626' />, bg: '#FFF0F0', name: 'Delete trip', sub: 'Permanently remove this trip and all data', destructive: true, onPress: deleteTrip },
       ],
     },
@@ -3174,10 +3214,15 @@ export default function TripPlanScreen() {
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   const [localStops, setLocalStops]     = useState<Stop[]>([]);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [upgradeContext, setUpgradeContext] = useState<UpgradeContext>('run_day');
+
+  function handleChecklistClose() {
+    setChecklistOpen(false);
+  }
 
   // ── Data ──
   const { data: rawTrip, isLoading, isError, refetch } = useQuery({
@@ -3356,6 +3401,9 @@ export default function TripPlanScreen() {
           onSelectDay={(d) => goToDay(d)}
           onRunToday={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
+          checklistOpen={checklistOpen}
+          onOpenChecklist={() => setChecklistOpen(true)}
+          onChecklistClose={handleChecklistClose}
         />
       ) : (
         <DayDetail
@@ -3433,6 +3481,7 @@ export default function TripPlanScreen() {
             tripId={tripId ?? ''}
             onClose={closeSheet}
             onCompare={() => setActiveSheet('compare')}
+            onOpenChecklist={() => { setChecklistOpen(true); }}
             queryClient={queryClient}
           />
         </SheetModal>
