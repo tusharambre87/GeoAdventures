@@ -17,7 +17,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
@@ -324,6 +324,7 @@ export default function StoryScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: '#000' }]} {...panResponder.panHandlers}>
+      <Stack.Screen options={{ headerShown: false }} />
       {/* Slide content */}
       {slideContent[slide]}
 
