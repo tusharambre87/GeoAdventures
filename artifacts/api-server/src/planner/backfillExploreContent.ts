@@ -85,9 +85,6 @@ async function backfillExploreContent() {
 
       generated++;
 
-      // REMOVE THIS LINE after 5-stop test passes:
-      if (generated >= 5) break;
-
     } catch (err) {
       failed++;
       failedStops.push(`${stop.name} (${stop.city ?? ''})`);
