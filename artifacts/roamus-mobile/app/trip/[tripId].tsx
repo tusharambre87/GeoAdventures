@@ -43,6 +43,7 @@ import { isFreePlan } from "@/lib/subscription";
 import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
+import TripPreferencesSheet from "@/components/TripPreferencesSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 
 const TAB_BAR_H = 49;
@@ -173,7 +174,7 @@ type TripData = {
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
-type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop';
+type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop' | 'preferences';
 type DayStatus = 'past' | 'today' | 'future';
 
 type StopOption = {
@@ -2237,6 +2238,7 @@ function TripOptionsSheet({
   onClose,
   onCompare,
   onOpenChecklist,
+  onOpenPreferences,
   queryClient,
 }: {
   trip: TripData;
@@ -2244,6 +2246,7 @@ function TripOptionsSheet({
   onClose: () => void;
   onCompare: () => void;
   onOpenChecklist: () => void;
+  onOpenPreferences: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   function renameTrip() {
@@ -2329,7 +2332,7 @@ function TripOptionsSheet({
       label: 'PLAN SETTINGS',
       items: [
         { icon: <IconEdit />, bg: '#FDF0E9', name: 'Rename trip', sub: 'Change the name shown at the top', onPress: renameTrip },
-        { icon: <IconGear />, bg: C.bg, name: 'Edit trip preferences', sub: 'Adjust pace, interests & auto-optimize', onPress: () => showToast('Coming soon') },
+        { icon: <IconGear />, bg: C.bg, name: 'Edit trip preferences', sub: 'Adjust pace, interests & auto-optimize', onPress: () => { onClose(); setTimeout(() => onOpenPreferences(), 350); } },
         { icon: <IconRefresh />, bg: '#EEF5F2', name: 'Reset today', sub: 'Un-skip all stops for today', onPress: () => showToast('Coming soon') },
       ],
     },
@@ -3482,10 +3485,21 @@ export default function TripPlanScreen() {
             onClose={closeSheet}
             onCompare={() => setActiveSheet('compare')}
             onOpenChecklist={() => { setChecklistOpen(true); }}
+            onOpenPreferences={() => setActiveSheet('preferences')}
             queryClient={queryClient}
           />
         </SheetModal>
       )}
+
+      <TripPreferencesSheet
+        visible={activeSheet === 'preferences'}
+        tripId={tripId ?? ''}
+        currentPace={trip?.pace}
+        onClose={closeSheet}
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+        showToast={showToast}
+        apiFetch={apiFetch}
+      />
 
       {activeSheet === 'compare' && (
         <SheetModal visible onClose={closeSheet}>
