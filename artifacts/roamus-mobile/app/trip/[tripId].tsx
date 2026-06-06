@@ -1261,11 +1261,6 @@ function DayDetail({
         {/* Day tabs */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={dd.tabsRow}>
           {Array.from({ length: totalDays }, (_, i) => i + 1)
-            .filter(d => {
-              const s = getDayStatus(d);
-              if (s === 'past' || s === 'today') return true;
-              return getStopsForDay(d).length > 0;
-            })
             .map(d => {
             const s    = getDayStatus(d);
             const isOn = d === selectedDay;
@@ -3403,14 +3398,16 @@ export default function TripPlanScreen() {
   // ── Derived ──
   const totalDays = (() => {
     if (!trip) return 0;
-    // Explicit date range always wins — covers both AI-created trips and user-edited dates
+    // Collect all available signals and take the maximum so extending a trip
+    // always wins over a stale plannerTripDays value from the original AI generation.
+    const candidates: number[] = [];
     if (trip.startDate && trip.endDate) {
-      return Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1;
+      candidates.push(Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1);
     }
-    if (trip.plannerTripDays) return trip.plannerTripDays;
-    if (trip.tripDays) return trip.tripDays;
-    if (localStops.length > 0) return Math.max(...localStops.map(s => (s.dayIndex ?? 0) + 1));
-    return 0;
+    if (trip.tripDays)        candidates.push(trip.tripDays);
+    if (trip.plannerTripDays) candidates.push(trip.plannerTripDays);
+    if (localStops.length > 0) candidates.push(Math.max(...localStops.map(s => (s.dayIndex ?? 0) + 1)));
+    return candidates.length > 0 ? Math.max(...candidates) : 0;
   })();
 
   const tripStartDate = trip?.startDate ? new Date(trip.startDate) : null;
