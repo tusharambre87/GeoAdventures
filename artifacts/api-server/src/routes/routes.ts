@@ -8516,17 +8516,66 @@ Return ONLY valid JSON in this exact format:
 
       let enriched: any = { ...stop, storyPack: null, audioUrl: null, keepsake: null, enrichment: null };
       try {
-        if (stop.name && stop.cityGroup) {
-          const libRows = await storage.getStopLibraryByNames([{ city: stop.cityGroup, name: stop.name }]);
-          const lib = libRows[0] ?? null;
-          enriched = {
-            ...stop,
-            storyPack: lib?.storyPack ?? null,
-            audioUrl: lib?.audioUrl ?? null,
-            keepsake: lib?.keepsake ?? null,
-            enrichment: lib?.enrichment ?? null,
-          };
+        const destination = stop.cityGroup ?? stopTrip?.destination ?? '';
+        const [libRows, cachedExplore, psiRows] = await Promise.all([
+          stop.name && stop.cityGroup
+            ? storage.getStopLibraryByNames([{ city: stop.cityGroup, name: stop.name }])
+            : Promise.resolve([]),
+          stop.name && destination
+            ? getExploreCacheByStop(stop.name, destination).catch(() => null)
+            : Promise.resolve(null),
+          stop.name
+            ? db.select({
+                restroomConfidence: plannerStopIntelligence.restroomConfidence,
+                strollerEaseScore:  plannerStopIntelligence.strollerEaseScore,
+              })
+              .from(plannerStopIntelligence)
+              .innerJoin(plannerPlaces, eq(plannerPlaces.id, plannerStopIntelligence.placeId))
+              .where(and(
+                eq(drizzleSql`lower(${plannerPlaces.name})`, stop.name.toLowerCase()),
+                eq(drizzleSql`lower(${plannerPlaces.city})`, (stop.cityGroup ?? '').toLowerCase()),
+              ))
+              .limit(1)
+              .catch(() => [])
+            : Promise.resolve([]),
+        ]);
+
+        const lib = libRows[0] ?? null;
+        const psi = psiRows[0] ?? null;
+        const exploreData = cachedExplore?.exploreData as any ?? null;
+
+        // Fix 1: map explore_cache.parkingInfo → enrichment.parkingNotes
+        const baseEnrichment: any = lib?.enrichment ?? {};
+        if (exploreData?.parkingInfo && !baseEnrichment.parkingNotes) {
+          baseEnrichment.parkingNotes = exploreData.parkingInfo;
         }
+
+        // Fix 2: planner_stop_intelligence.restroom_confidence → meta.restroomConfidence label
+        const restroomScore = psi?.restroomConfidence ?? null;
+        const restroomLabel = restroomScore === null ? null
+          : restroomScore >= 80 ? 'Usually available'
+          : restroomScore >= 60 ? 'Likely available'
+          : restroomScore >= 40 ? 'May be limited'
+          : 'Not confirmed';
+
+        // Fix 3: planner_stop_intelligence.stroller_ease_score → enrichment.strollerFriendly boolean
+        const strollerScore = psi?.strollerEaseScore ?? null;
+        const strollerFriendly = strollerScore !== null ? strollerScore >= 60 : null;
+        if (strollerFriendly !== null && baseEnrichment.strollerFriendly == null) {
+          baseEnrichment.strollerFriendly = strollerFriendly;
+        }
+
+        enriched = {
+          ...stop,
+          storyPack:  lib?.storyPack ?? null,
+          audioUrl:   lib?.audioUrl  ?? null,
+          keepsake:   lib?.keepsake  ?? null,
+          enrichment: Object.keys(baseEnrichment).length > 0 ? baseEnrichment : null,
+          metadata: {
+            ...(stop.metadata as any ?? {}),
+            ...(restroomLabel !== null ? { restroomConfidence: restroomLabel } : {}),
+          },
+        };
       } catch (enrichErr) {
         req.log?.warn({ err: enrichErr }, '[Stop] stop_library enrichment join failed');
       }
