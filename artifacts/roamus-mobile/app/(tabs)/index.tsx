@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -480,49 +481,55 @@ function SwitchTripSheet({
     outputRange: [SCREEN_H, 0],
   });
 
-  if (!visible && (anim as any)._value === 0) return null;
-
   return (
-    <View style={sw.outer} pointerEvents="box-none">
-      <Animated.View style={[StyleSheet.absoluteFill, sw.backdrop, { opacity: anim }]} pointerEvents="auto">
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={sw.outer} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, sw.backdrop, { opacity: anim }]} pointerEvents="auto">
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
 
-      <Animated.View style={[sw.sheet, { transform: [{ translateY }] }]}>
-        <View style={sw.handle} />
-        <Text style={sw.title}>Your trips</Text>
+        <Animated.View style={[sw.sheet, { transform: [{ translateY }] }]}>
+          <View style={sw.handle} />
+          <Text style={sw.title}>Your trips</Text>
 
-        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-          {trips.map(trip => {
-            const isActive = trip.id === heroTripId;
-            const days = trip.tripDays
-              ?? (trip.startDate && trip.endDate
-                ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1
-                : null);
-            return (
-              <Pressable
-                key={trip.id}
-                style={({ pressed }) => [sw.row, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => onSelect(trip.id)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={sw.rowName}>{trip.name}</Text>
-                  <Text style={sw.rowSub}>
-                    {[trip.destination, days ? `${days} days` : null].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
-                {isActive && (
-                  <View style={sw.activePill}>
-                    <Text style={sw.activePillText}>Active</Text>
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {trips.map(trip => {
+              const isActive = trip.id === heroTripId;
+              const days = trip.tripDays
+                ?? (trip.startDate && trip.endDate
+                  ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1
+                  : null);
+              return (
+                <Pressable
+                  key={trip.id}
+                  style={({ pressed }) => [sw.row, { opacity: pressed ? 0.7 : 1 }]}
+                  onPress={() => onSelect(trip.id)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={sw.rowName}>{trip.name}</Text>
+                    <Text style={sw.rowSub}>
+                      {[trip.destination, days ? `${days} days` : null].filter(Boolean).join(' · ')}
+                    </Text>
                   </View>
-                )}
-              </Pressable>
-            );
-          })}
-          <View style={{ height: Math.max(insets.bottom, 16) }} />
-        </ScrollView>
-      </Animated.View>
-    </View>
+                  {isActive && (
+                    <View style={sw.activePill}>
+                      <Text style={sw.activePillText}>Active</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+            <View style={{ height: Math.max(insets.bottom, 16) }} />
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
