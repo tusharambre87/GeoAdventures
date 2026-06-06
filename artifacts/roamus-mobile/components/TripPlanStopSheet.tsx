@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Animated,
   Linking,
   Platform,
   Pressable,
@@ -170,19 +169,9 @@ export default function TripPlanStopSheet({
   currentDayIndex?: number;
   onMove?: (stopId: string, targetDayIndex: number, afterStopId: string | null) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
-  const rotAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
   const heroImg = useStopHeroImage(stop?.id ?? null);
-
-  useEffect(() => {
-    Animated.timing(rotAnim, {
-      toValue: expanded ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [expanded, rotAnim]);
 
   if (!stop) return null;
 
@@ -205,14 +194,12 @@ export default function TripPlanStopSheet({
     ? enrichment.practicalTips.split('.')[0] + '.'
     : 'Great pick for families of all ages.';
 
-  const practicalRows = [
-    { label: 'Parking',   value: enrichment?.parkingNotes ?? null },
-    { label: 'Restrooms', value: meta?.restroomConfidence ?? null },
-    { label: 'Best time', value: enrichment?.bestTimeOfDay ?? null },
-    { label: 'Wait time', value: waitTimeForType(stop.stopType) },
-  ].filter((r): r is { label: string; value: string } => isReal(r.value));
-
-  const arrowRotate = rotAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+  const bestFor: string | null =
+    meta?.sessionFit === 'morning' ? 'morning'
+    : meta?.sessionFit === 'afternoon' ? 'afternoon'
+    : meta?.sessionFit === 'evening' ? 'evening'
+    : null;
+  const crowdLevel: string | null = enrichment?.bestTimeOfDay ?? null;
 
   function openMaps() {
     const addr = stop?.address;
@@ -290,33 +277,51 @@ export default function TripPlanStopSheet({
             <Text style={s.noTicket}>No ticket needed</Text>
           )}
 
-          {/* Practical info accordion — hidden entirely when all rows are empty */}
-          {practicalRows.length > 0 && (
-            <>
-              <Pressable style={s.expToggle} onPress={() => setExpanded(v => !v)}>
-                <Text style={s.expToggleText}>Practical info</Text>
-                <Animated.Text style={[s.expArrow, { transform: [{ rotate: arrowRotate }] }]}>
-                  {'\u25be'}
-                </Animated.Text>
-              </Pressable>
+          {/* Timing, access & logistics */}
+          <View style={s.logisticsSection}>
+            <Text style={s.logisticsHeader}>{'\uD83D\uDCA1'} Timing, access & logistics</Text>
 
-              {expanded && (
-                <View style={s.expContent}>
-                  {practicalRows.map(row => (
-                    <View key={row.label} style={s.expRow}>
-                      <Text style={s.expRl}>{row.label}</Text>
-                      <Text style={s.expRv}>{row.value}</Text>
-                    </View>
-                  ))}
-                  {stop.address ? (
-                    <Pressable style={s.mapsBtn} onPress={openMaps}>
-                      <Text style={s.mapsBtnText}>Open in Maps</Text>
-                    </Pressable>
-                  ) : null}
+            <Text style={s.logisticsSubLabel}>TIMING & LOGISTICS</Text>
+            <View style={s.logisticsTable}>
+              <View style={s.logisticsRow}>
+                <Text style={s.logisticsRowLabel}>Recommended duration</Text>
+                <Text style={s.logisticsRowValue}>{duration} min</Text>
+              </View>
+              {bestFor ? (
+                <View style={s.logisticsRow}>
+                  <Text style={s.logisticsRowLabel}>Best for</Text>
+                  <Text style={s.logisticsRowValue}>{bestFor}</Text>
                 </View>
-              )}
-            </>
-          )}
+              ) : null}
+              {crowdLevel ? (
+                <View style={s.logisticsRow}>
+                  <Text style={s.logisticsRowLabel}>Crowd level now</Text>
+                  <Text style={[s.logisticsRowValue, { color: C.green }]}>{crowdLevel}</Text>
+                </View>
+              ) : null}
+              {enrichment?.parkingNotes ? (
+                <View style={s.logisticsRow}>
+                  <Text style={s.logisticsRowLabel}>Parking</Text>
+                  <Text style={s.logisticsRowValue}>{enrichment.parkingNotes}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {stop.address ? (
+              <>
+                <Text style={[s.logisticsSubLabel, { marginTop: 14 }]}>PARKING & ACCESS</Text>
+                <View style={s.logisticsTable}>
+                  <View style={[s.logisticsRow, { alignItems: 'flex-start' }]}>
+                    <Text style={s.logisticsRowLabel}>Address</Text>
+                    <Text style={[s.logisticsRowValue, { flex: 1, textAlign: 'right', marginLeft: 16 }]}>{stop.address}</Text>
+                  </View>
+                </View>
+                <Pressable style={s.mapsBtn} onPress={openMaps}>
+                  <Text style={s.mapsBtnText}>Open in Maps</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
         </View>
       </ScrollView>
 
@@ -462,26 +467,44 @@ const s = StyleSheet.create({
   ticketPillText: { fontFamily: F.bold, fontSize: 11, color: '#E8692A' },
   ticketNote: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' },
   noTicket: { fontFamily: F.regular, fontSize: 13, color: '#8A8FA8', marginBottom: 16 },
-  expToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
+  logisticsSection: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(26,31,46,0.09)',
+    paddingTop: 14,
+    marginTop: 4,
   },
-  expToggleText: { fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' },
-  expArrow: { fontFamily: F.regular, fontSize: 11, color: '#8A8FA8' },
-  expContent: { marginBottom: 14 },
-  expRow: {
+  logisticsHeader: {
+    fontFamily: F.semibold,
+    fontSize: 13,
+    color: '#1A1F2E',
+    marginBottom: 12,
+  },
+  logisticsSubLabel: {
+    fontFamily: F.bold,
+    fontSize: 9,
+    color: '#8A8FA8',
+    letterSpacing: 0.09,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  logisticsTable: {
+    borderWidth: 1,
+    borderColor: 'rgba(26,31,46,0.09)',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  logisticsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 5,
+    alignItems: 'center',
+    paddingHorizontal: 13,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(26,31,46,0.09)',
+    borderBottomColor: 'rgba(26,31,46,0.06)',
   },
-  expRl: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' },
-  expRv: { fontFamily: F.semibold, fontSize: 12, color: '#1A1F2E', flexShrink: 1, textAlign: 'right', marginLeft: 12 },
+  logisticsRowLabel: { fontFamily: F.regular, fontSize: 13, color: '#8A8FA8' },
+  logisticsRowValue: { fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' },
   mapsBtn: {
     marginTop: 10,
     borderWidth: 1,
