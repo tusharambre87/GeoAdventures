@@ -13661,9 +13661,13 @@ Do not add any explanation or additional text. Just the single word answer.`
   // PHYSICAL CARD GAME EARLY ACCESS
   // ============================================================================
 
-  app.get('/api/physical-game/eligibility/:userId', async (req, res) => {
+  app.get('/api/physical-game/eligibility/:userId', isAuthenticated, async (req, res) => {
     try {
       const { userId } = req.params;
+      const authedUser = req.user as any;
+      if (userId !== authedUser.id) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
       const eligibility = await storage.getPhysicalGameEligibility(userId);
       res.json(eligibility);
     } catch (error: any) {
@@ -13673,9 +13677,10 @@ Do not add any explanation or additional text. Just the single word answer.`
   });
 
   // Public waitlist endpoint - no auth required, just collects email
+  // userId is never trusted from the request body; it is derived from the authenticated session only.
   app.post('/api/physical-game/join', async (req, res) => {
     try {
-      const { userId, name, email } = req.body;
+      const { name, email } = req.body;
       
       if (!name || !email) {
         return res.status(400).json({ message: 'Name and email are required' });
@@ -13686,19 +13691,23 @@ Do not add any explanation or additional text. Just the single word answer.`
         return res.status(400).json({ message: 'Please enter a valid email address' });
       }
       
-      // If userId provided, try to update the user record
-      // Otherwise, just add to waitlist by email
+      // Derive userId from the authenticated session only — never from the request body.
+      const authedUser = req.isAuthenticated?.() ? (req.user as any) : null;
+      const sessionUserId: string | null = authedUser?.id ?? null;
+
+      // If an authenticated user is present, update their record.
+      // Otherwise, just add to waitlist by email.
       let waitlistNumber: number;
       
-      if (userId) {
-        const result = await storage.joinPhysicalGameEarlyAccess(userId, name, email);
+      if (sessionUserId) {
+        const result = await storage.joinPhysicalGameEarlyAccess(sessionUserId, name, email);
         waitlistNumber = result.waitlistNumber;
       } else {
         // Get waitlist count for number assignment
         waitlistNumber = await storage.getPhysicalGameWaitlistCount() + 1;
       }
       
-      console.log('[PhysicalGame] Waitlist signup:', { name, email, waitlistNumber, hasUserId: !!userId });
+      console.log('[PhysicalGame] Waitlist signup:', { name, email, waitlistNumber, hasUserId: !!sessionUserId });
       
       // Send emails asynchronously (don't block response)
       (async () => {
