@@ -5,7 +5,7 @@ import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
-import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks } from "@workspace/db";
+import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
@@ -6639,6 +6639,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('[Trip v2] stop_library enrichment join failed:', (enrichErr as Error).message);
       }
 
+      // Bulk-enrich parking / restroom / stroller from explore_cache + planner_stop_intelligence
+      try {
+        const stopsForEnrich = stopsWithPackStatus.filter(s => s.name);
+        if (stopsForEnrich.length > 0) {
+          const normName = (n: string) =>
+            n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+          const uniqueNormNames = [...new Set(stopsForEnrich.map(s => normName(s.name ?? '')))];
+          const uniqueCities    = [...new Set(stopsForEnrich.map(s => (s.cityGroup ?? trip.destination ?? '').toLowerCase()).filter(Boolean))];
+          const uniqueStopNames = [...new Set(stopsForEnrich.map(s => s.name ?? ''))];
+
+          const [exploreCacheRows, psiRows] = await Promise.all([
+            uniqueNormNames.length > 0 && uniqueCities.length > 0
+              ? db.select({
+                  normalizedName: exploreCache.normalizedName,
+                  cityGroup:      exploreCache.cityGroup,
+                  exploreData:    exploreCache.exploreData,
+                })
+                .from(exploreCache)
+                .where(and(
+                  inArray(exploreCache.normalizedName, uniqueNormNames),
+                  inArray(exploreCache.cityGroup, uniqueCities),
+                ))
+              : Promise.resolve([]),
+            uniqueStopNames.length > 0
+              ? db.select({
+                  ppName: plannerPlaces.name,
+                  ppCity: plannerPlaces.city,
+                  restroomConfidence: plannerStopIntelligence.restroomConfidence,
+                  strollerEaseScore:  plannerStopIntelligence.strollerEaseScore,
+                })
+                .from(plannerStopIntelligence)
+                .innerJoin(plannerPlaces, eq(plannerPlaces.id, plannerStopIntelligence.placeId))
+                .where(inArray(plannerPlaces.name, uniqueStopNames))
+              : Promise.resolve([]),
+          ]);
+
+          const ecByKey  = new Map(exploreCacheRows.map(r => [`${r.cityGroup}:${r.normalizedName}`, r.exploreData as any]));
+          const psiByKey = new Map(psiRows.map(r => [`${(r.ppCity ?? '').toLowerCase()}:${(r.ppName ?? '').toLowerCase()}`, r]));
+
+          for (const stop of stopsWithPackStatus) {
+            const city    = (stop.cityGroup ?? trip.destination ?? '').toLowerCase();
+            const norm    = normName(stop.name ?? '');
+            const nameLow = (stop.name ?? '').toLowerCase();
+
+            const exploreData = ecByKey.get(`${city}:${norm}`) ?? null;
+            const psi         = psiByKey.get(`${city}:${nameLow}`) ?? null;
+
+            const enrich: any = (stop as any).enrichment ?? {};
+
+            if (exploreData?.parkingInfo && !enrich.parkingNotes) {
+              enrich.parkingNotes = exploreData.parkingInfo;
+            }
+            if (psi?.strollerEaseScore != null && enrich.strollerFriendly == null) {
+              enrich.strollerFriendly = psi.strollerEaseScore >= 60;
+            }
+            if (Object.keys(enrich).length > 0) (stop as any).enrichment = enrich;
+
+            if (psi?.restroomConfidence != null) {
+              const sc    = psi.restroomConfidence;
+              const label = sc >= 80 ? 'Usually available'
+                          : sc >= 60 ? 'Likely available'
+                          : sc >= 40 ? 'May be limited'
+                          : 'Not confirmed';
+              (stop as any).metadata = { ...(stop.metadata as any ?? {}), restroomConfidence: label };
+            }
+          }
+        }
+      } catch (extraEnrichErr) {
+        console.warn('[Trip v2] parking/restroom/stroller enrichment failed:', (extraEnrichErr as Error).message);
+      }
+
       // Inject placeProfileData from plannerTripPlanStops for each stop that has a plannerStopId
       // in its metadata. This bridges the planner intelligence (nearbyStops, foodOptions, etc.)
       // into the execution layer without requiring a travelStops schema change.
@@ -8580,6 +8652,15 @@ Return ONLY valid JSON in this exact format:
         req.log?.warn({ err: enrichErr }, '[Stop] stop_library enrichment join failed');
       }
 
+      req.log?.info({
+        stopId,
+        stopName: enriched.name,
+        cityGroup: enriched.cityGroup,
+        enrichmentKeys: enriched.enrichment ? Object.keys(enriched.enrichment) : null,
+        parkingNotes: (enriched.enrichment as any)?.parkingNotes ?? null,
+        strollerFriendly: (enriched.enrichment as any)?.strollerFriendly ?? null,
+        restroomConfidence: (enriched.metadata as any)?.restroomConfidence ?? null,
+      }, 'STOP_DETAIL_RESPONSE');
       res.json(enriched);
     } catch (error: any) {
       req.log?.error({ err: error }, '[Stop] Error fetching stop');
