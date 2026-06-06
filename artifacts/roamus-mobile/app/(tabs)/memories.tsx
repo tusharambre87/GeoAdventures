@@ -115,7 +115,8 @@ function groupMomentsByDay(moments: Moment[], trip: Trip): DayGroup[] {
 // ─── Photo Journal section ─────────────────────────────────────────────────────
 
 function PhotoJournalSection({ trip, moments }: { trip: Trip; moments: Moment[] }) {
-  const groups = groupMomentsByDay(moments, trip);
+  const groups = groupMomentsByDay(moments, trip)
+    .filter(g => g.photos.length > 0 || g.quotes.length > 0);
   if (groups.length === 0) return null;
 
   return (

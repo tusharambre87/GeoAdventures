@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -91,6 +92,14 @@ export default function TripMemoryIndex() {
   }, [trip, moments]);
 
   function openPhotoSheet() { setShowPhotoSheet(true); }
+
+  async function shareTrip() {
+    const url = `https://roamus.app/s/${tripId}`;
+    const name = trip?.name ?? 'our family trip';
+    try {
+      await Share.share({ message: `Check out ${name}! ${url}`, url });
+    } catch (_) {}
+  }
 
   function handleStopSelect(stopId: string | null, stopName: string, stopIcon: string) {
     setShowPhotoSheet(false);
@@ -220,6 +229,15 @@ export default function TripMemoryIndex() {
             </View>
           </View>
         )}
+
+        {/* Share CTA */}
+        {(allPhotos.length > 0 || visitedStops.length > 0) && (
+          <View style={styles.shareSection}>
+            <Pressable style={styles.shareBtn} onPress={shareTrip}>
+              <Text style={styles.shareBtnText}>Share Trip</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
       {showPhotoSheet && (
         <StopPickerSheet
@@ -329,5 +347,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     paddingHorizontal: 20,
     marginBottom: 10,
+  },
+
+  shareSection: {
+    marginTop: 32,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  shareBtn: {
+    backgroundColor: '#E8692A',
+    borderRadius: 28,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    width: '100%',
+    alignItems: 'center',
+  },
+  shareBtnText: {
+    fontFamily: F.bold,
+    fontSize: 16,
+    color: '#fff',
+    letterSpacing: 0.2,
   },
 });
