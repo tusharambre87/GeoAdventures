@@ -448,12 +448,20 @@ export default function PreviewScreen() {
           </View>
         ))}
 
-        {/* Lock teaser */}
-        <View style={s.blurCard}>
-          <Text style={s.blurIcon}>{'\uD83D\uDD12'}</Text>
-          <Text style={s.blurTitle}>Your full {allDays.length}-day plan is ready</Text>
-          <Text style={s.blurSub}>Create a free account to unlock all stops, offline access, and photo journals</Text>
-        </View>
+        {/* Lock teaser — only for unauthenticated users */}
+        {!token ? (
+          <View style={s.blurCard}>
+            <Text style={s.blurIcon}>{'\uD83D\uDD12'}</Text>
+            <Text style={s.blurTitle}>Your full {allDays.length}-day plan is ready</Text>
+            <Text style={s.blurSub}>Create a free account to unlock all stops, offline access, and photo journals</Text>
+          </View>
+        ) : curDay?.stops.length === 0 ? (
+          <View style={s.blurCard}>
+            <Text style={s.blurIcon}>{'\uD83D\uDDFA\uFE0F'}</Text>
+            <Text style={s.blurTitle}>Full itinerary ready after saving</Text>
+            <Text style={s.blurSub}>Tap Save below — your complete day-by-day plan will appear in your journal</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* ── CTA ── */}
