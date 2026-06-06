@@ -2719,6 +2719,7 @@ function AddStopSheet({
   getStopsForDay,
   allStops,
   defaultFilter,
+  onOpenStopDetail,
   queryClient,
   onClose,
 }: {
@@ -2728,6 +2729,7 @@ function AddStopSheet({
   getStopsForDay: (d: number) => Stop[];
   allStops: Stop[];
   defaultFilter?: 'food' | 'kids' | 'landmarks';
+  onOpenStopDetail: (stop: Stop) => void;
   queryClient: ReturnType<typeof useQueryClient>;
   onClose: () => void;
 }) {
@@ -2909,16 +2911,7 @@ function AddStopSheet({
                   <Pressable
                     key={s.id}
                     style={rep.otherDayRow}
-                    onPress={async () => {
-                      try {
-                        await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
-                          method: 'PATCH',
-                          body: JSON.stringify({ stopId: s.id, newDayIndex: selectedDay - 1 }),
-                        });
-                        await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                        onClose();
-                      } catch { /* ignore */ }
-                    }}
+                    onPress={() => onOpenStopDetail(s)}
                   >
                     <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
                     <View style={{ flex: 1 }}>
@@ -3746,6 +3739,7 @@ export default function TripPlanScreen() {
             getStopsForDay={getStopsForDay}
             allStops={localStops}
             defaultFilter={addStopFilter}
+            onOpenStopDetail={(stop) => { closeSheet(); openStopDetails(stop); }}
             queryClient={queryClient}
             onClose={closeSheet}
           />
