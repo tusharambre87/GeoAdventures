@@ -550,8 +550,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { secret } = req.body;
       
-      // Simple secret check for cron job security
-      if (secret !== process.env.CRON_SECRET && secret !== 'manual-trigger') {
+      // Require CRON_SECRET — no hardcoded bypass allowed
+      if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
@@ -565,10 +565,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.getFoundingFamiliesNeedingPriceLockEmails();
       
       const results = {
-        sent30Day: [] as string[],
-        sent7Day: [] as string[],
-        sentExpired: [] as string[],
-        errors: [] as string[],
+        sent30Day: 0,
+        sent7Day: 0,
+        sentExpired: 0,
+        errors: 0,
       };
       
       // Process 30-day warning emails
@@ -583,11 +583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             if (success) {
               await storage.markPriceLock30DayEmailSent(family.id);
-              results.sent30Day.push(family.email);
+              results.sent30Day++;
             }
           }
         } catch (error) {
-          results.errors.push(`30-day email failed for ${family.email}: ${error}`);
+          results.errors++;
         }
       }
       
@@ -603,11 +603,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             if (success) {
               await storage.markPriceLock7DayEmailSent(family.id);
-              results.sent7Day.push(family.email);
+              results.sent7Day++;
             }
           }
         } catch (error) {
-          results.errors.push(`7-day email failed for ${family.email}: ${error}`);
+          results.errors++;
         }
       }
       
@@ -622,26 +622,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             if (success) {
               await storage.markPriceLockExpiredEmailSent(family.id);
-              results.sentExpired.push(family.email);
+              results.sentExpired++;
             }
           }
         } catch (error) {
-          results.errors.push(`Expired email failed for ${family.email}: ${error}`);
+          results.errors++;
         }
       }
       
-      console.log(`📧 Price lock emails processed:`, results);
       res.json({
         success: true,
-        results,
         summary: {
           total30Day: need30DayEmail.length,
           total7Day: need7DayEmail.length,
           totalExpired: needExpiredEmail.length,
-          sent30Day: results.sent30Day.length,
-          sent7Day: results.sent7Day.length,
-          sentExpired: results.sentExpired.length,
-          errors: results.errors.length,
+          sent30Day: results.sent30Day,
+          sent7Day: results.sent7Day,
+          sentExpired: results.sentExpired,
+          errors: results.errors,
         }
       });
     } catch (error) {
@@ -655,7 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { secret } = req.body;
       
-      if (secret !== process.env.CRON_SECRET && secret !== 'manual-trigger') {
+      if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
@@ -663,8 +661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const usersNeedingEmail = await storage.getUsersForPhysicalGameEmail();
       
       const results = {
-        sent: [] as string[],
-        errors: [] as string[],
+        sent: 0,
+        errors: 0,
       };
       
       for (const user of usersNeedingEmail) {
@@ -676,22 +674,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
             if (success) {
               await storage.markPhysicalGameEmailSent(user.id);
-              results.sent.push(user.email);
+              results.sent++;
             }
           }
         } catch (error) {
-          results.errors.push(`Follow-up email failed for ${user.email}: ${error}`);
+          results.errors++;
         }
       }
       
-      console.log(`📧 Physical game follow-up emails processed:`, results);
       res.json({
         success: true,
-        results,
         summary: {
           totalEligible: usersNeedingEmail.length,
-          sent: results.sent.length,
-          errors: results.errors.length,
+          sent: results.sent,
+          errors: results.errors,
         }
       });
     } catch (error) {
@@ -13862,8 +13858,9 @@ Do not add any explanation or additional text. Just the single word answer.`
       const { action, token } = req.query;
       
       // Verify secret token to allow approval from email without login
-      const expectedToken = process.env.REVIEW_APPROVAL_SECRET || 'geoquest-review-approval-2026';
-      if (token !== expectedToken) {
+      // Fail closed: if REVIEW_APPROVAL_SECRET is not configured, deny all requests
+      const expectedToken = process.env.REVIEW_APPROVAL_SECRET;
+      if (!expectedToken || token !== expectedToken) {
         return res.status(401).send(`
           <html>
             <body style="font-family: sans-serif; text-align: center; padding: 50px; background: #FEF3C7;">
