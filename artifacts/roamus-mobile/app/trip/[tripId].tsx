@@ -1436,13 +1436,42 @@ function DayDetail({
 
         {/* Empty day */}
         {dayStops.length === 0 && (
-          <View style={dd.emptyDay}>
-            <Text style={dd.emptyText}>No stops planned for this day yet.</Text>
+          <View style={dd.emptyCard}>
+            <View style={dd.emptyIconWrap}>
+              <Text style={{ fontSize: 26 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+            </View>
+            <Text style={dd.emptyCardTitle}>Nothing planned for Day {selectedDay} yet</Text>
+            <Text style={dd.emptyCardSub}>
+              {isEditable
+                ? 'Add stops and we\u2019ll build a full guide — hours, tips, and what to expect.'
+                : 'This day has no stops in the itinerary.'}
+            </Text>
+            {isEditable && (
+              <>
+                <Pressable style={dd.emptyCardBtn} onPress={onAddStop}>
+                  <Text style={dd.emptyCardBtnTxt}>+ Plan this day</Text>
+                </Pressable>
+                <Text style={dd.emptyQuickLabel}>QUICK ADD</Text>
+                <View style={dd.emptyChipRow}>
+                  {([
+                    { emoji: '\uD83C\uDF54', label: 'Lunch' },
+                    { emoji: '\uD83C\uDFDB\uFE0F', label: 'Museum' },
+                    { emoji: '\uD83C\uDF3F', label: 'Park' },
+                    { emoji: '\uD83C\uDF66', label: 'Treat stop' },
+                  ] as { emoji: string; label: string }[]).map(chip => (
+                    <Pressable key={chip.label} style={dd.emptyChip} onPress={onAddStop}>
+                      <Text style={{ fontSize: 14 }}>{chip.emoji}</Text>
+                      <Text style={dd.emptyChipTxt}>{chip.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         )}
 
-        {/* Add a stop — editable only */}
-        {isEditable && (
+        {/* Add a stop — editable, only when stops already exist */}
+        {isEditable && dayStops.length > 0 && (
           <Pressable style={dd.addStopBtn} onPress={onAddStop}>
             <IconPlus />
             <Text style={dd.addStopText}> Add a stop</Text>
@@ -3374,10 +3403,11 @@ export default function TripPlanScreen() {
   // ── Derived ──
   const totalDays = (() => {
     if (!trip) return 0;
-    if (trip.plannerTripDays) return trip.plannerTripDays;
+    // Explicit date range always wins — covers both AI-created trips and user-edited dates
     if (trip.startDate && trip.endDate) {
       return Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1;
     }
+    if (trip.plannerTripDays) return trip.plannerTripDays;
     if (trip.tripDays) return trip.tripDays;
     if (localStops.length > 0) return Math.max(...localStops.map(s => (s.dayIndex ?? 0) + 1));
     return 0;
@@ -4023,8 +4053,16 @@ const dd = StyleSheet.create({
   bfgText: { fontFamily: F.regular, fontSize: 12, color: C.muted, flex: 1 },
   bfgAct:  { fontFamily: F.bold, fontSize: 11, color: C.orange, marginLeft: 8 },
   secLabel: { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 0.08, textTransform: 'uppercase', marginBottom: 9, marginTop: 4 },
-  emptyDay: { alignItems: 'center', paddingVertical: 32 },
-  emptyText: { fontFamily: F.regular, fontSize: 13, color: C.muted },
+  emptyCard:       { backgroundColor: '#fff', borderRadius: 20, padding: 24, marginTop: 4, borderWidth: 1, borderColor: '#EDE9E3', alignItems: 'center' },
+  emptyIconWrap:   { width: 56, height: 56, backgroundColor: '#FDF0E9', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyCardTitle:  { fontFamily: F.bold, fontSize: 16, color: C.deep, marginBottom: 6, textAlign: 'center' },
+  emptyCardSub:    { fontFamily: F.regular, fontSize: 13, color: C.muted, lineHeight: 20, textAlign: 'center', marginBottom: 20 },
+  emptyCardBtn:    { backgroundColor: C.orange, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20, width: '100%', alignItems: 'center', marginBottom: 16 },
+  emptyCardBtnTxt: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  emptyQuickLabel: { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  emptyChipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  emptyChip:       { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, borderColor: '#E0DDD8', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#fff' },
+  emptyChipTxt:    { fontFamily: F.regular, fontSize: 13, color: C.deep },
   addStopBtn: { borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(232,105,42,0.45)', borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   addStopText: { fontFamily: F.semibold, fontSize: 13, color: C.orange },
   footer: { paddingHorizontal: 16, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
