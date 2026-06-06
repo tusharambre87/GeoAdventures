@@ -6796,6 +6796,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Convert date strings to Date objects if supplied
+      if (updates.startDate && !(updates.startDate instanceof Date)) {
+        updates.startDate = new Date(updates.startDate as unknown as string);
+      }
+      if (updates.endDate && !(updates.endDate instanceof Date)) {
+        updates.endDate = new Date(updates.endDate as unknown as string);
+      }
+
       const trip = await storage.updateTrip(tripId, updates);
       res.json(trip);
     } catch (error) {
@@ -6803,7 +6811,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update trip" });
     }
   });
-  
+
+  // Trim stops beyond keepDays when a trip's duration is shortened
+  app.post('/api/travel/trips/:tripId/trim-days', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { keepDays } = req.body;
+      if (typeof keepDays !== 'number' || keepDays < 1) {
+        return res.status(400).json({ message: "keepDays must be a positive integer" });
+      }
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      if (trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      const stops = await storage.getStopsByTripId(tripId);
+      const toDelete = stops.filter(s => (s.dayIndex ?? 0) >= keepDays);
+      await Promise.all(toDelete.map(s => storage.deleteStop(s.id)));
+      res.json({ deleted: toDelete.length });
+    } catch (error) {
+      req.log?.error({ error }, "Error trimming days");
+      res.status(500).json({ message: "Failed to trim days" });
+    }
+  });
+
   // Delete a trip
   app.delete('/api/travel/trips/:tripId', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
