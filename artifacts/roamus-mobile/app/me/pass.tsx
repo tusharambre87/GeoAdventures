@@ -53,34 +53,14 @@ export default function PassScreen() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [annualLoading, setAnnualLoading] = useState(false);
-
-  async function handleUpgradeToAnnual() {
-    setAnnualLoading(true);
-    try {
-      const token = await AsyncStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE}/api/stripe/checkout`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ plan: "roamus", annual: true }),
-      });
-      const data = await res.json();
-      const url = data.url ?? data.sessionUrl ?? data.checkoutUrl;
-      if (url) {
-        Linking.openURL(url).catch(() =>
-          Alert.alert("Could not open browser", "Please try again.")
-        );
-      } else {
-        Alert.alert("Something went wrong", "Could not start checkout. Please try again.");
-      }
-    } catch {
-      Alert.alert("Something went wrong", "Could not connect. Please check your connection.");
-    } finally {
-      setAnnualLoading(false);
-    }
+  function handleUpgradeToAnnual() {
+    const url =
+      Platform.OS === "android"
+        ? "https://play.google.com/store/account/subscriptions"
+        : "https://apps.apple.com/account/subscriptions";
+    Linking.openURL(url).catch(() =>
+      Alert.alert("Could not open", "Please manage your subscription in the App Store / Google Play.")
+    );
   }
 
   React.useEffect(() => {
@@ -213,9 +193,8 @@ export default function PassScreen() {
                   <Text style={s.secLbl}>{"SAVE MORE"}</Text>
                   <View style={s.card}>
                     <Pressable
-                      style={({ pressed }) => [s.upgradeRow, (pressed || annualLoading) && { opacity: 0.7 }]}
+                      style={({ pressed }) => [s.upgradeRow, pressed && { opacity: 0.7 }]}
                       onPress={handleUpgradeToAnnual}
-                      disabled={annualLoading}
                     >
                       <View style={s.upgradeIconWrap}>
                         <Text style={{ fontSize: 20 }}>{"\uD83D\uDCC5"}</Text>
@@ -227,10 +206,7 @@ export default function PassScreen() {
                       <View style={s.saveTag}>
                         <Text style={s.saveTagText}>{"Save 30%"}</Text>
                       </View>
-                      {annualLoading
-                        ? <ActivityIndicator size="small" color={G.orange} style={{ marginLeft: 4 }} />
-                        : <Text style={s.rowArrow}>{"›"}</Text>
-                      }
+                      <Text style={s.rowArrow}>{"›"}</Text>
                     </Pressable>
                   </View>
                 </>
