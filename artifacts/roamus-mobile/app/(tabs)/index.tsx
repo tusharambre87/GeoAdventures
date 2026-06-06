@@ -37,7 +37,7 @@ function greeting() {
   return "Good evening";
 }
 
-function ActiveHeroCard({ trip, offlineReady, user, onUpgradePress }: { trip: Trip; offlineReady?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void }) {
+function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePress, onDownloadPress }: { trip: Trip; offlineReady?: boolean; isDownloading?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void; onDownloadPress?: () => void }) {
   const isFree = !user?.subscriptionTier || user.subscriptionTier === "free";
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
@@ -114,11 +114,17 @@ function ActiveHeroCard({ trip, offlineReady, user, onUpgradePress }: { trip: Tr
         </View>
       ) : (
         <Pressable
-          style={({ pressed }) => [s.offlinePillEmpty, { opacity: pressed ? 0.75 : 1 }]}
-          onPress={() => Alert.alert('Offline Mode', 'Your trip is being prepared for offline use. This may take a few minutes.')}
+          style={({ pressed }) => [s.offlinePillEmpty, { opacity: (pressed || isDownloading) ? 0.75 : 1 }]}
+          onPress={onDownloadPress}
+          disabled={isDownloading}
           hitSlop={8}
         >
-          <Text style={s.offlinePillEmptyTxt}>{"Download for offline \u2192"}</Text>
+          {isDownloading ? (
+            <ActivityIndicator size="small" color="#E8692A" style={{ marginRight: 4 }} />
+          ) : null}
+          <Text style={s.offlinePillEmptyTxt}>
+            {isDownloading ? "Downloading\u2026" : "Download for offline \u2192"}
+          </Text>
         </Pressable>
       )}
 
@@ -187,6 +193,7 @@ export default function TripsScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const [cacheStatus, setCacheStatus] = useState<"idle" | "ready">("idle");
+  const [downloading, setDownloading] = useState(false);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [overrideHeroId, setOverrideHeroId] = useState<string | null>(null);
@@ -269,16 +276,30 @@ export default function TripsScreen() {
   const completedTrips = trips.filter(t => t.status === "completed" || t.status === "archived");
   const inProgressTrips = currentTrips.filter(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
   const upcomingTrips = currentTrips.filter(t => !inProgressTrips.some(ip => ip.id === t.id));
-  function switchHeroTrip(tripId: string) {
-    setOverrideHeroId(tripId);
-    AsyncStorage.setItem('heroTripOverride', tripId);
-    setShowSwitcher(false);
-  }
 
   // Hero: respect override, then date-active trip, then first current trip
   const heroTrip = overrideHeroId
     ? (currentTrips.find(t => t.id === overrideHeroId) ?? activeTrip ?? currentTrips[0] ?? null)
     : (activeTrip ?? currentTrips[0] ?? null);
+
+  async function handleDownloadOffline() {
+    if (!heroTrip || !token || downloading) return;
+    setDownloading(true);
+    try {
+      await preCacheTrip(heroTrip.id, token);
+      setCacheStatus("ready");
+    } catch {
+      Alert.alert("Download failed", "Could not download trip for offline use. Please check your connection and try again.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  function switchHeroTrip(tripId: string) {
+    setOverrideHeroId(tripId);
+    AsyncStorage.setItem('heroTripOverride', tripId);
+    setShowSwitcher(false);
+  }
 
   const displayName = user?.firstName || user?.username || user?.email?.split("@")[0] || "";
 
@@ -326,7 +347,7 @@ export default function TripsScreen() {
           </View>
         ) : heroTrip ? (
           <>
-            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} user={user} onUpgradePress={() => setUpgradeVisible(true)} />
+            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} isDownloading={downloading} user={user} onUpgradePress={() => setUpgradeVisible(true)} onDownloadPress={handleDownloadOffline} />
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow} onPress={() => setShowSwitcher(true)}>
                 <Text style={s.switchText}>Switch trip →</Text>
