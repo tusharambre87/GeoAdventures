@@ -799,10 +799,22 @@ export default function AtStopScreen() {
             </>
           )}
           {dayStops.length === 0 && (
-            <View style={sc.emptyDay}>
-              <Text style={sc.emptyDayEmoji}>{'\uD83D\uDDFA\uFE0F'}</Text>
-              <Text style={sc.emptyDayTitle}>No stops planned for today</Text>
-              <Text style={sc.emptyDaySub}>Add stops to your trip to get started.</Text>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+              <Text style={{ fontSize: 26, marginBottom: 16 }}>{'\uD83D\uDCCD'}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1A1F2E', textAlign: 'center', marginBottom: 8 }}>
+                No stop running yet
+              </Text>
+              <Text style={{ fontSize: 14, color: '#8A8FA8', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
+                Head to Today to start your day and pick your first stop.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/today')}
+                style={{ borderWidth: 1.5, borderColor: '#E8692A', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24 }}
+              >
+                <Text style={{ color: '#E8692A', fontSize: 15, fontWeight: '600' }}>
+                  Go to Today {'\u2192'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
           <View style={{ height: 36 }} />

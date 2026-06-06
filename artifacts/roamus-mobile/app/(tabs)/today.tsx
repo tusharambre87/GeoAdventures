@@ -1406,6 +1406,14 @@ export default function TodayScreen() {
 
     const moHeroUrl = CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
     console.log('hero image url:', moHeroUrl);
+    const handleAddStop = () =>
+      router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex } } as never);
+    const handleQuickAdd = (category: string) => {
+      const filterMap: Record<string, string> = {
+        'Lunch': 'food', 'Museum': 'museum', 'Park': 'park', 'Treat stop': 'food',
+      };
+      router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex, filter: filterMap[category] ?? 'all' } } as never);
+    };
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false}
@@ -1472,7 +1480,59 @@ export default function TodayScreen() {
           <View style={mo.stopsSection}>
             <Text style={mo.stopsLabel}>TODAY'S STOPS</Text>
             {dayStops.length === 0 && (
-              <Text style={mo.emptyText}>No stops planned for this day yet.</Text>
+              <View style={{
+                backgroundColor: '#fff', borderRadius: 20, padding: 24,
+                marginTop: 4, borderWidth: 1, borderColor: '#EDE9E3', alignItems: 'center',
+              }}>
+                <View style={{
+                  width: 56, height: 56, backgroundColor: '#FDF0E9', borderRadius: 16,
+                  alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+                }}>
+                  <Text style={{ fontSize: 26 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1F2E', marginBottom: 6, textAlign: 'center' }}>
+                  Nothing planned yet
+                </Text>
+                <Text style={{ fontSize: 13, color: '#8A8FA8', lineHeight: 20, textAlign: 'center', marginBottom: 20 }}>
+                  Add a stop and we&apos;ll guide your family through it in real time.
+                </Text>
+                <TouchableOpacity
+                  onPress={handleAddStop}
+                  style={{
+                    backgroundColor: '#E8692A', borderRadius: 14,
+                    paddingVertical: 14, paddingHorizontal: 20,
+                    width: '100%', alignItems: 'center', marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                    + Add a stop for today
+                  </Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: '#8A8FA8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>
+                  Quick add
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                  {([
+                    { emoji: '\uD83C\uDF54', label: 'Lunch' },
+                    { emoji: '\uD83C\uDFDB\uFE0F', label: 'Museum' },
+                    { emoji: '\uD83C\uDF3F', label: 'Park' },
+                    { emoji: '\uD83C\uDF66', label: 'Treat stop' },
+                  ] as { emoji: string; label: string }[]).map(chip => (
+                    <TouchableOpacity
+                      key={chip.label}
+                      onPress={() => handleQuickAdd(chip.label)}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 5,
+                        borderWidth: 1.5, borderColor: '#E0DDD8', borderRadius: 20,
+                        paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#fff',
+                      }}
+                    >
+                      <Text style={{ fontSize: 14 }}>{chip.emoji}</Text>
+                      <Text style={{ fontSize: 13, color: '#1A1F2E' }}>{chip.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             )}
             {dayStops.map((stop, i) => {
               const meta = parseMetadata(stop.metadata);
