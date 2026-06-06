@@ -2719,7 +2719,6 @@ function AddStopSheet({
   getStopsForDay,
   allStops,
   defaultFilter,
-  onOpenStopDetail,
   queryClient,
   onClose,
 }: {
@@ -2729,7 +2728,6 @@ function AddStopSheet({
   getStopsForDay: (d: number) => Stop[];
   allStops: Stop[];
   defaultFilter?: 'food' | 'kids' | 'landmarks';
-  onOpenStopDetail: (stop: Stop) => void;
   queryClient: ReturnType<typeof useQueryClient>;
   onClose: () => void;
 }) {
@@ -2911,7 +2909,25 @@ function AddStopSheet({
                   <Pressable
                     key={s.id}
                     style={rep.otherDayRow}
-                    onPress={() => onOpenStopDetail(s)}
+                    onPress={async () => {
+                      try {
+                        const targetDayIndex = selectedDay - 1;
+                        const targetDayStops = allStops
+                          .filter(x => x.dayIndex === targetDayIndex)
+                          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+                        await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                          method: 'PATCH',
+                          body: JSON.stringify({
+                            stopOrders: [{ stopId: s.id, displayOrder: targetDayStops.length, dayIndex: targetDayIndex }],
+                          }),
+                        });
+                        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                        onClose();
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
                   >
                     <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
                     <View style={{ flex: 1 }}>
@@ -3739,7 +3755,6 @@ export default function TripPlanScreen() {
             getStopsForDay={getStopsForDay}
             allStops={localStops}
             defaultFilter={addStopFilter}
-            onOpenStopDetail={(stop) => { closeSheet(); openStopDetails(stop); }}
             queryClient={queryClient}
             onClose={closeSheet}
           />
