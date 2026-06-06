@@ -35,7 +35,7 @@ import { getVapidPublicKey, sendTestNotification, sendDailyQuestReminder, sendSt
 import { authRateLimit, signupRateLimit, passwordResetRateLimit, sensitiveApiRateLimit } from "../rateLimiter";
 import { logLoginAttempt, logAdminAction, logSensitiveDataAccess } from "../auditLog";
 import { detectUserGeo, extractClientIp } from "../geoDetection";
-import { getPricingBandFromCountry, getUserPricing, type PricingBand } from "../shared/geoPricing";
+import { getPricingBandFromCountry, getUserPricing, getAllowedSubscriptionPriceIds, type PricingBand } from "../shared/geoPricing";
 import { registerAdminRoutes } from "../adminRoutes";
 import { registerBlogRoutes } from "../blogRoutes";
 
@@ -4190,6 +4190,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!priceId) {
         return res.status(400).json({ message: "Price ID is required" });
+      }
+
+      const allowedPriceIds = getAllowedSubscriptionPriceIds();
+      if (!allowedPriceIds.has(priceId)) {
+        return res.status(400).json({ message: "Invalid price ID" });
       }
       
       const user = await storage.getUser(userId);

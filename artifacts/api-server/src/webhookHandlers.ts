@@ -1,7 +1,7 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { storage } from './storage';
 import Stripe from 'stripe';
-import { getUserPricing, type PricingBand } from './shared/geoPricing';
+import { getUserPricing, getAllowedSubscriptionPriceIds, getFoundingSubscriptionPriceIds, type PricingBand } from './shared/geoPricing';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -94,6 +94,18 @@ export class WebhookHandlers {
       }
       
       const priceId = subscription.items?.data?.[0]?.price?.id;
+
+      // Reject entitlement for any price not in the server-side catalog.
+      // This prevents an attacker who enumerates Stripe prices from receiving
+      // premium access via a cheaper or unintended recurring price.
+      const allowedSubscriptionIds = getAllowedSubscriptionPriceIds();
+      const foundingIds = getFoundingSubscriptionPriceIds();
+      const isKnownPrice = priceId && (allowedSubscriptionIds.has(priceId) || foundingIds.has(priceId));
+      if (!isKnownPrice) {
+        console.error(`[Webhook] Subscription price ${priceId} is not in the server-side allowlist — refusing entitlement grant for user ${user.id}`);
+        return;
+      }
+
       const isFoundingFamilies = await WebhookHandlers.isFoundingFamiliesPrice(priceId);
       
       // Check Founding Families cap (band-aware)

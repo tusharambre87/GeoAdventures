@@ -262,3 +262,34 @@ export const STRIPE_PRICE_IDS: Record<PricingBand, { annual: string; monthly: st
     foundingAnnual: process.env.STRIPE_PRICE_BAND_C_FOUNDING || '',
   },
 };
+
+/**
+ * Returns the server-side allowlist of valid non-founding subscription price IDs
+ * (annual and monthly for each geo-pricing band).  Founding prices are intentionally
+ * excluded — they are handled by the dedicated founding-families checkout route.
+ *
+ * Used to validate caller-supplied priceId values before creating a Stripe checkout
+ * session, and to guard entitlement grants in webhook handlers.
+ */
+export function getAllowedSubscriptionPriceIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const band of Object.values(STRIPE_PRICE_IDS)) {
+    if (band.annual) ids.add(band.annual);
+    if (band.monthly) ids.add(band.monthly);
+  }
+  return ids;
+}
+
+/**
+ * Returns the set of all price IDs that should grant founding-family entitlement.
+ * Combines the band-specific founding prices with the top-level founding-families price.
+ */
+export function getFoundingSubscriptionPriceIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const band of Object.values(STRIPE_PRICE_IDS)) {
+    if (band.foundingAnnual) ids.add(band.foundingAnnual);
+  }
+  const topLevel = process.env.STRIPE_FOUNDING_FAMILIES_PRICE_ID;
+  if (topLevel) ids.add(topLevel);
+  return ids;
+}
