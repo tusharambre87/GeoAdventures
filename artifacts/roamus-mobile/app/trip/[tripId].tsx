@@ -1162,7 +1162,7 @@ function DayDetail({
   onRunDay: () => void;
   onOpenOptions: () => void;
   onDelete: (stopId: string) => Promise<void>;
-  onAddStop: () => void;
+  onAddStop: (filter?: 'food' | 'kids' | 'landmarks') => void;
   isFree?: boolean;
   onShowUpgrade?: () => void;
 }) {
@@ -1443,7 +1443,7 @@ function DayDetail({
             </Text>
             {isEditable && (
               <>
-                <Pressable style={dd.emptyCardBtn} onPress={onAddStop}>
+                <Pressable style={dd.emptyCardBtn} onPress={() => onAddStop()}>
                   <Text style={dd.emptyCardBtnTxt}>+ Plan this day</Text>
                 </Pressable>
                 <Text style={dd.emptyQuickLabel}>QUICK ADD</Text>
@@ -1454,7 +1454,12 @@ function DayDetail({
                     { emoji: '\uD83C\uDF3F', label: 'Park' },
                     { emoji: '\uD83C\uDF66', label: 'Treat stop' },
                   ] as { emoji: string; label: string }[]).map(chip => (
-                    <Pressable key={chip.label} style={dd.emptyChip} onPress={onAddStop}>
+                    <Pressable key={chip.label} style={dd.emptyChip} onPress={() => {
+                      const filterMap: Record<string, 'food' | 'kids' | 'landmarks'> = {
+                        'Lunch': 'food', 'Museum': 'landmarks', 'Park': 'landmarks', 'Treat stop': 'food',
+                      };
+                      onAddStop(filterMap[chip.label] ?? 'food');
+                    }}>
                       <Text style={{ fontSize: 14 }}>{chip.emoji}</Text>
                       <Text style={dd.emptyChipTxt}>{chip.label}</Text>
                     </Pressable>
@@ -1467,17 +1472,15 @@ function DayDetail({
 
         {/* Add a stop — editable, only when stops already exist */}
         {isEditable && dayStops.length > 0 && (
-          <Pressable style={dd.addStopBtn} onPress={onAddStop}>
+          <Pressable style={dd.addStopBtn} onPress={() => onAddStop()}>
             <IconPlus />
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
         )}
 
-        <View style={dd.disclaimer}>
-          <Text style={dd.disclaimerText}>
-            {'\u26A0\uFE0F RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit. RoamUs is a planning and guidance tool — we’re not responsible for decisions made during your trip.'}
-          </Text>
-        </View>
+        <Text style={{ fontSize: 11, color: '#B0ADA8', textAlign: 'center', paddingHorizontal: 24, paddingTop: 16, lineHeight: 16 }}>
+          Hours and prices may vary — always verify before visiting.
+        </Text>
       </ScrollView>
 
 
@@ -2714,6 +2717,8 @@ function AddStopSheet({
   tripId,
   selectedDay,
   getStopsForDay,
+  allStops,
+  defaultFilter,
   queryClient,
   onClose,
 }: {
@@ -2721,6 +2726,8 @@ function AddStopSheet({
   tripId: string;
   selectedDay: number;
   getStopsForDay: (d: number) => Stop[];
+  allStops: Stop[];
+  defaultFilter?: 'food' | 'kids' | 'landmarks';
   queryClient: ReturnType<typeof useQueryClient>;
   onClose: () => void;
 }) {
@@ -2728,7 +2735,7 @@ function AddStopSheet({
   const city      = trip.city ?? trip.destination ?? 'your destination';
   const lastStop  = getStopsForDay(selectedDay).at(-1) ?? null;
 
-  const [category,    setCategory]    = useState<'food' | 'kids' | 'landmarks'>('food');
+  const [category,    setCategory]    = useState<'food' | 'kids' | 'landmarks'>(defaultFilter ?? 'food');
   const [options,     setOptions]     = useState<StopOption[]>([]);
   const [loading,     setLoading]     = useState(false);
   const [search,      setSearch]      = useState('');
@@ -2763,7 +2770,7 @@ function AddStopSheet({
     }
   }, [city, selectedDay, getStopsForDay]);
 
-  useEffect(() => { fetchOptions('food'); }, []);
+  useEffect(() => { fetchOptions(defaultFilter ?? 'food'); }, []);
 
   function changeCategory(cat: 'food' | 'kids' | 'landmarks') {
     setCategory(cat);
@@ -2883,6 +2890,40 @@ function AddStopSheet({
           />
         </View>
       </View>
+
+      {/* From other days */}
+      {(() => {
+        const otherDayStops = allStops.filter(s => (s.dayIndex ?? 0) !== selectedDay - 1);
+        if (otherDayStops.length === 0) return null;
+        return (
+          <View>
+            <Text style={rep.secLabel}>FROM OTHER DAYS</Text>
+            {otherDayStops.slice(0, 5).map(s => (
+              <Pressable
+                key={s.id}
+                style={rep.otherDayRow}
+                onPress={async () => {
+                  try {
+                    await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                      method: 'PATCH',
+                      body: JSON.stringify({ stopId: s.id, newDayIndex: selectedDay - 1 }),
+                    });
+                    await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                    onClose();
+                  } catch { /* ignore */ }
+                }}
+              >
+                <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={rep.otherDayName}>{s.name}</Text>
+                  <Text style={rep.otherDayMeta}>Day {(s.dayIndex ?? 0) + 1} · {getStopDuration(s)} min</Text>
+                </View>
+              </Pressable>
+            ))}
+            <View style={rep.divider} />
+          </View>
+        );
+      })()}
 
       {/* Scrollable content */}
       {loading ? (
@@ -3359,6 +3400,7 @@ export default function TripPlanScreen() {
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
+  const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('food');
   const [showCommunityShare, setShowCommunityShare] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
@@ -3580,7 +3622,7 @@ export default function TripPlanScreen() {
           onRunDay={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
           onDelete={deleteStop}
-          onAddStop={() => setActiveSheet('addStop')}
+          onAddStop={(filter) => { setAddStopFilter(filter ?? 'food'); setActiveSheet('addStop'); }}
           isFree={isFree}
           onShowUpgrade={() => { setUpgradeContext('locked_day'); setUpgradeVisible(true); }}
         />
@@ -3703,6 +3745,8 @@ export default function TripPlanScreen() {
             tripId={tripId ?? ''}
             selectedDay={selectedDay}
             getStopsForDay={getStopsForDay}
+            allStops={localStops}
+            defaultFilter={addStopFilter}
             queryClient={queryClient}
             onClose={closeSheet}
           />
