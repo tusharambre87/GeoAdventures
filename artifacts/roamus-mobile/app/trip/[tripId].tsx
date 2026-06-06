@@ -1477,10 +1477,20 @@ function DayDetail({
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
         )}
-
-        <Text style={{ fontSize: 11, color: '#B0ADA8', textAlign: 'center', paddingHorizontal: 24, paddingTop: 16, lineHeight: 16 }}>
-          Hours and prices may vary — always verify before visiting.
-        </Text>
+        <Pressable
+          onPress={() => setDisclaimerExpanded(!disclaimerExpanded)}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 16, paddingHorizontal: 24 }}
+        >
+          <Text style={{ fontSize: 11, color: '#B0ADA8' }}>ℹ️</Text>
+          <Text style={{ fontSize: 11, color: '#B0ADA8' }}>
+            Hours and prices may vary — always verify before visiting.
+          </Text>
+        </Pressable>
+        {disclaimerExpanded && (
+          <Text style={{ fontSize: 11, color: '#B0ADA8', textAlign: 'center', paddingHorizontal: 24, paddingTop: 8, lineHeight: 17 }}>
+            RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit.
+          </Text>
+        )}
       </ScrollView>
 
 
