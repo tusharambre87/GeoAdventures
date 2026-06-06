@@ -299,12 +299,28 @@ export default function TripPlanStopSheet({
                   <Text style={[s.logisticsRowValue, { color: C.green }]}>{crowdLevel}</Text>
                 </View>
               ) : null}
-              {enrichment?.parkingNotes ? (
-                <View style={s.logisticsRow}>
-                  <Text style={s.logisticsRowLabel}>Parking</Text>
-                  <Text style={s.logisticsRowValue}>{enrichment.parkingNotes}</Text>
-                </View>
-              ) : null}
+              <Pressable
+                onPress={() => {
+                  const query = encodeURIComponent(`parking near ${stop.name} ${stop.address ?? ''}`);
+                  const url = Platform.OS === 'ios'
+                    ? `maps://?q=${query}`
+                    : `geo:0,0?q=${query}`;
+                  Linking.openURL(url);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 12,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: '#F0EDE8',
+                }}
+              >
+                <Text style={s.logisticsRowLabel}>Parking</Text>
+                <Text style={{ fontSize: 14, color: C.orange, fontWeight: '600' }}>
+                  Find parking nearby {'\u2192'}
+                </Text>
+              </Pressable>
             </View>
 
             {stop.address ? (

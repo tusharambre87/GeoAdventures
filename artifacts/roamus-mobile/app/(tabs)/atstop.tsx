@@ -1117,8 +1117,29 @@ export default function AtStopScreen() {
 
               {/* Parking & access */}
               <Text style={dt.exploreSubLabel}>Parking {'&'} access</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const query = encodeURIComponent(`parking near ${currentStop.name} ${(currentStop as any).cityGroup ?? trip?.city ?? trip?.destination ?? ''}`);
+                  const url = Platform.OS === 'ios'
+                    ? `maps://?q=${query}`
+                    : `geo:0,0?q=${query}`;
+                  Linking.openURL(url);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 12,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: '#F0EDE8',
+                }}
+              >
+                <Text style={dt.exploreKey}>Parking</Text>
+                <Text style={{ fontFamily: F.semibold, fontSize: 14, color: '#E8692A' }}>
+                  {'Find parking nearby →'}
+                </Text>
+              </TouchableOpacity>
               {([
-                enrichment.parkingNotes ? ['Parking', enrichment.parkingNotes] : null,
                 meta.restroomConfidence ? ['Restrooms', meta.restroomConfidence] : null,
                 address ? ['Address', address] : null,
               ] as const).filter((x): x is [string, string] => x !== null && Array.isArray(x) && x[1] !== '—' && x[1] !== '').map(([k, v]) => (

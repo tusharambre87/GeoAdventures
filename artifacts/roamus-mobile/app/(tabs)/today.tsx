@@ -38,6 +38,7 @@ import ChecklistSheet from "@/components/ChecklistSheet";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
+import DirectionsSheet from "@/components/DirectionsSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
 
 const TODAY_STOP_BG: Record<string, string> = {
@@ -515,6 +516,7 @@ export default function TodayScreen() {
   const [isOffline, setIsOffline]               = useState(false);
   const [showFeedback, setShowFeedback]          = useState(false);
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
+  const [showDirections, setShowDirections]      = useState(false);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
@@ -1443,6 +1445,33 @@ export default function TodayScreen() {
                 {dayLabel || ''}
                 {dayStops.length > 0 ? ` · ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}` : ''}
               </Text>
+              {dayStops.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setShowDirections(true)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: 'rgba(232,105,42,0.15)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(232,105,42,0.4)',
+                    borderRadius: 12,
+                    padding: 10,
+                    marginTop: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A' }}>
+                      Directions for today
+                    </Text>
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                      All {dayStops.length} stops mapped in order
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 16, color: '#E8692A' }}>{'\u203A'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ImageBackground>
           {/* Stop count + time pills — below hero in white content area (R2 fix) */}
@@ -1686,6 +1715,14 @@ export default function TodayScreen() {
           onClose={() => setShowHotelSheet(false)}
           onSaved={(name, addr) => { setShowHotelSheet(false); setLocalSavedHotel(addr || name); }}
         />
+        {showDirections && trip && (
+          <DirectionsSheet
+            stops={dayStops}
+            trip={trip}
+            currentDayIndex={resolvedDayIndex}
+            onClose={() => setShowDirections(false)}
+          />
+        )}
         <UpgradeSheet
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
