@@ -4,6 +4,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import compression from "compression";
 import { registerRoutes } from "./routes/routes";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -20,6 +21,7 @@ import {
 import { scheduleStoryRetentionEmails } from "./storyEmailScheduler";
 import { scheduleGuideEmails } from "./guideEmailScheduler";
 import { storage } from "./storage";
+import { checkRateLimit } from "./lib/publicRateLimit";
 
 // @ts-ignore
 import { runMigrations } from "stripe-replit-sync";
@@ -213,21 +215,42 @@ app.post(
 );
 
 // ── Support form — MUST be before express.json() ─────────────────────────────
+// Disk storage: files are streamed to disk rather than buffered in RAM,
+// eliminating the memory exhaustion DoS vector on this public endpoint.
+const supportUploadDir = path.join(os.tmpdir(), "support-uploads");
+fs.mkdirSync(supportUploadDir, { recursive: true });
+
 const supportUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024, files: 10 },
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, supportUploadDir),
+    filename: (_req, _file, cb) =>
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 3 },
 });
+
+// IP-based rate limit: max 5 support submissions per 15 minutes
+// (applied BEFORE multer so floods are rejected before any file data is read)
+async function supportIpRateLimit(req: any, res: any, next: any) {
+  const ip = req.ip || req.connection?.remoteAddress || "unknown";
+  const { allowed } = await checkRateLimit(`support:${ip}`, 5, 15 * 60 * 1000);
+  if (!allowed) {
+    return res.status(429).json({ message: "Too many requests. Please try again later." });
+  }
+  next();
+}
 
 app.post(
   "/api/support/submit",
+  supportIpRateLimit,
   supportUpload.any(),
   async (req: any, res: any) => {
+    const files = (req.files as Express.Multer.File[]) || [];
     try {
       const { feedbackType, country, email, description } = req.body;
       if (!feedbackType || !country || !description) {
         return res.status(400).json({ message: "Missing required fields" });
       }
-      const files = (req.files as Express.Multer.File[]) || [];
       const feedbackLabels: Record<string, string> = {
         technical: "Technical Issue / Bug",
         suggestion: "Feature Suggestion",
@@ -254,8 +277,9 @@ app.post(
           <p>Timestamp: ${new Date().toISOString()}</p>
         </div>
       </div>`;
+      // Read file contents from disk (diskStorage does not populate file.buffer)
       const attachments = files.map((file: Express.Multer.File) => ({
-        content: file.buffer.toString("base64"),
+        content: fs.readFileSync(file.path).toString("base64"),
         filename: file.originalname,
         type: file.mimetype,
         disposition: "attachment" as const,
@@ -276,6 +300,11 @@ app.post(
     } catch (error) {
       console.error("Error submitting support feedback:", error);
       res.status(500).json({ message: "Failed to submit feedback" });
+    } finally {
+      // Always clean up temp files from disk
+      for (const file of files) {
+        try { fs.unlinkSync(file.path); } catch { /* ignore */ }
+      }
     }
   },
 );

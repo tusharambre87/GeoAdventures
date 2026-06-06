@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, getExploreCacheByStop, upsertExploreCache } from "../storage";
+import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
@@ -4053,7 +4054,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
       }
-      
+
+      // Hard message length cap to bound per-request AI cost
+      if (message.length > 500) {
+        return res.status(400).json({ message: "Message too long" });
+      }
+
+      // Durable per-IP rate limit (PostgreSQL-backed, shared across instances)
+      // Applies unconditionally — explorerId is optional and caller-supplied
+      const ip = (req as any).ip || (req as any).connection?.remoteAddress || 'unknown';
+      const { allowed } = await checkRateLimit(`geo-buddy:${ip}`, 10, 10 * 60 * 1000);
+      if (!allowed) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+
       if (explorerId && chatContext !== 'app-help') {
         const player = await storage.getPlayerById(explorerId);
         if (player) {
@@ -10790,7 +10804,6 @@ Return ONLY valid JSON in this exact format:
   });
 
   // Public demo TTS endpoint — no auth required, limited to short texts for sample adventures
-  const demoTtsRateLimit = new Map<string, number>();
   app.post('/api/demo/tts/generate', async (req: any, res) => {
     try {
       const { text, voice } = req.body;
@@ -10799,23 +10812,14 @@ Return ONLY valid JSON in this exact format:
         return res.status(400).json({ message: "Text is required" });
       }
 
-      if (text.length > 2000) {
+      if (text.length > 500) {
         return res.status(400).json({ message: "Text too long for demo" });
       }
 
-      // Simple IP-based rate limiting: max 20 requests per 10 minutes
+      // Durable per-IP rate limit (PostgreSQL-backed, shared across instances)
       const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-      const now = Date.now();
-      const windowMs = 10 * 60 * 1000;
-      const key = `${ip}`;
-      const lastReset = demoTtsRateLimit.get(`${key}-reset`) || 0;
-      if (now - lastReset > windowMs) {
-        demoTtsRateLimit.set(`${key}-count`, 0);
-        demoTtsRateLimit.set(`${key}-reset`, now);
-      }
-      const count = (demoTtsRateLimit.get(`${key}-count`) || 0) + 1;
-      demoTtsRateLimit.set(`${key}-count`, count);
-      if (count > 20) {
+      const { allowed } = await checkRateLimit(`demo-tts:${ip}`, 5, 10 * 60 * 1000);
+      if (!allowed) {
         return res.status(429).json({ message: "Too many requests. Please try again later." });
       }
 
