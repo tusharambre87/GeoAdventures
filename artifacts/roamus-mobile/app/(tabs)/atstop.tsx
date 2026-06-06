@@ -857,6 +857,8 @@ export default function AtStopScreen() {
             style={StyleSheet.absoluteFill}
           />
 
+          {!tripNotStarted && (
+            <>
           {/* Hero top row: Change Stop + Didn’t Visit (left) · SOS (right) */}
           <View style={[dt.heroPills, { top: paddingTop }]}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -895,6 +897,8 @@ export default function AtStopScreen() {
               <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#FCA5A5', letterSpacing: 0.5 }}>Help</Text>
             </TouchableOpacity>
           </View>
+            </>
+          )}
 
           {/* Stop info at hero bottom */}
           <View style={dt.heroBottom}>
@@ -1117,45 +1121,28 @@ export default function AtStopScreen() {
         </View>
 
 
-        {/* ── CTA: We visited + Didn’t make it ───────────────────────────────────────────────── */}
+        {/* ── CTA: We visited + Didn’t make it ────────────────────────────────────────────────────────────────── */}
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
-          <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-            onPress={() => {
-              if (tripNotStarted) {
-                Alert.alert(
-                  "Your trip hasn't started yet",
-                  `This trip starts on ${tripStartLabel}. Marking this stop as visited now will count toward your trip progress. Do you want to continue?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Continue', onPress: () => openSheet('feedback') },
-                  ]
-                );
-                return;
-              }
-              openSheet('feedback');
-            }}>
-            <Text style={dt.ctaPrimaryText}>{'\u2713'} We visited — mark complete</Text>
-          </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.7}
-            onPress={() => {
-              if (tripNotStarted) {
-                Alert.alert(
-                  "Your trip hasn't started yet",
-                  `This trip starts on ${tripStartLabel}. Skipping this stop now will remove it from your itinerary before your trip begins. Do you want to continue?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Continue', onPress: () => openSheet('didnt') },
-                  ]
-                );
-                return;
-              }
-              openSheet('didnt');
-            }}
-            style={{ alignItems: 'center', paddingVertical: 10 }}>
-            <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
-              Didn’t make it → didn’t visit
-            </Text>
-          </TouchableOpacity>
+          {tripNotStarted ? (
+            <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.7}
+              onPress={() => router.back()}>
+              <Text style={dt.ctaSecondaryText}>Got it</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+                onPress={() => openSheet('feedback')}>
+                <Text style={dt.ctaPrimaryText}>{'✓'} We visited — mark complete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.7}
+                onPress={() => openSheet('didnt')}
+                style={{ alignItems: 'center', paddingVertical: 10 }}>
+                <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
+                  Didn’t make it → didn’t visit
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
       </ScrollView>
