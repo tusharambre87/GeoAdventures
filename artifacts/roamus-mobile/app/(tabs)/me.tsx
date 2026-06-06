@@ -385,14 +385,14 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>MEMORIES & COLLECTIONS</Text>
         <View style={s.card}>
           <MenuRow
-            icon="\uD83D\uDDBC\uFE0F"
+            icon={"\uD83D\uDDBC\uFE0F"}
             iconBg="#FDF0E9"
             title="Moments"
             subtitle="All your captured memories"
             onPress={() => router.push("/memories" as never)}
           />
           <MenuRow
-            icon="\uD83D\uDDFA\uFE0F"
+            icon={"\uD83D\uDDFA\uFE0F"}
             iconBg="#EEF5F2"
             title="Travel Map"
             subtitle="Everywhere your family has explored"
@@ -404,7 +404,7 @@ export default function MeScreen() {
             }
           />
           <MenuRow
-            icon="\u2728"
+            icon={"\u2728"}
             iconBg="#FDF0E9"
             title="Keepsakes"
             subtitle="Digital collectibles from your adventures"
@@ -497,7 +497,7 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>YOUR ACCOUNT</Text>
         <View style={s.card}>
           <MenuRow
-            icon="\u2726"
+            icon={"\u2726"}
             iconBg="rgba(232,105,42,0.12)"
             title="RoamUs Pass"
             subtitle={isSubscribed ? "Active subscription" : "Free plan"}
@@ -511,7 +511,7 @@ export default function MeScreen() {
             onPress={() => router.push("/me/pass" as never)}
           />
           <MenuRow
-            icon="\u2699\uFE0F"
+            icon={"\u2699\uFE0F"}
             iconBg="#F5F2EE"
             title="Account"
             subtitle="Family & traveler profiles"
@@ -524,31 +524,28 @@ export default function MeScreen() {
         <Text style={s.sectionLabel}>SUPPORT</Text>
         <View style={[s.card, { marginBottom: 8 }]}>
           <MenuRow
-            icon="\uD83D\uDCAC"
+            icon={"\uD83D\uDCAC"}
             iconBg="#F5F2EE"
             title="Help & FAQ"
             subtitle="Common questions answered"
             onPress={() => router.push("/me/support" as never)}
           />
           <MenuRow
-            icon="\u2B50"
+            icon={"\u2B50"}
             iconBg="#FFFBEB"
             title="Rate RoamUs"
             subtitle="Enjoying the app? Let us know"
-            right={
-              <Text style={s.nativePromptText}>Native prompt ›</Text>
-            }
             onPress={handleRateApp}
           />
           <MenuRow
-            icon="\uD83D\uDEE1\uFE0F"
+            icon={"\uD83D\uDEE1\uFE0F"}
             iconBg="#F5F2EE"
             title="Privacy Policy"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}
             onPress={() => Linking.openURL("https://roamus.app/privacy").catch(() => {})}
           />
           <MenuRow
-            icon="\u2696\uFE0F"
+            icon={"\u2696\uFE0F"}
             iconBg="#EEF5F2"
             title="Terms of Service"
             right={<Text style={s.externalArrow}>{"↗"}</Text>}

@@ -166,6 +166,7 @@ export const CITY_IMGS: Record<string, string> = {
   'San Diego': 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400&q=80',
   Vancouver: 'https://images.unsplash.com/photo-1559656914-a30970c1affd?w=400&q=80',
   'San Antonio': 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80',
+  'Kansas City': 'https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=400&q=80',
 };
 
 export type PopularRoute = { cities: CityEntry[]; label: string };

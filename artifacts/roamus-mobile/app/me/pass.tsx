@@ -53,6 +53,35 @@ export default function PassScreen() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [annualLoading, setAnnualLoading] = useState(false);
+
+  async function handleUpgradeToAnnual() {
+    setAnnualLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("auth_token");
+      const res = await fetch(`${API_BASE}/api/stripe/checkout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan: "roamus", annual: true }),
+      });
+      const data = await res.json();
+      const url = data.url ?? data.sessionUrl ?? data.checkoutUrl;
+      if (url) {
+        Linking.openURL(url).catch(() =>
+          Alert.alert("Could not open browser", "Please try again.")
+        );
+      } else {
+        Alert.alert("Something went wrong", "Could not start checkout. Please try again.");
+      }
+    } catch {
+      Alert.alert("Something went wrong", "Could not connect. Please check your connection.");
+    } finally {
+      setAnnualLoading(false);
+    }
+  }
 
   React.useEffect(() => {
     load();
@@ -184,26 +213,24 @@ export default function PassScreen() {
                   <Text style={s.secLbl}>{"SAVE MORE"}</Text>
                   <View style={s.card}>
                     <Pressable
-                      style={({ pressed }) => [s.upgradeRow, pressed && { opacity: 0.8 }]}
-                      onPress={() =>
-                        Alert.alert(
-                          "Coming Soon",
-                          "Annual upgrade is coming shortly — check back soon!"
-                        )
-                      }
+                      style={({ pressed }) => [s.upgradeRow, (pressed || annualLoading) && { opacity: 0.7 }]}
+                      onPress={handleUpgradeToAnnual}
+                      disabled={annualLoading}
                     >
                       <View style={s.upgradeIconWrap}>
                         <Text style={{ fontSize: 20 }}>{"\uD83D\uDCC5"}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={s.upgradeTitle}>{"Switch to Annual"}</Text>
-                        {/* TODO: pull from pricing API */}
-                        <Text style={s.upgradeSub}>{"$24.99/yr — save 30%"}</Text>
+                        <Text style={s.upgradeSub}>{"$39.99/yr — save 30%"}</Text>
                       </View>
                       <View style={s.saveTag}>
                         <Text style={s.saveTagText}>{"Save 30%"}</Text>
                       </View>
-                      <Text style={s.rowArrow}>{"›"}</Text>
+                      {annualLoading
+                        ? <ActivityIndicator size="small" color={G.orange} style={{ marginLeft: 4 }} />
+                        : <Text style={s.rowArrow}>{"›"}</Text>
+                      }
                     </Pressable>
                   </View>
                 </>
