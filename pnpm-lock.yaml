@@ -152,6 +152,7 @@ overrides:
   '@expo/ngrok-bin>@expo/ngrok-bin-win32-x64': '-'
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   esbuild: 0.27.3
+  xmldom: npm:@xmldom/xmldom@^0.9.0
 
 importers:
 
@@ -7089,10 +7090,6 @@ packages:
     resolution: {integrity: sha512-yMqGBqtXyeN1e3TGYvgNgDVZ3j84W4cwkOXQswghol6APgZWaff9lnbvN7MHYJOiXsvGPXtjTYJEiC9J2wv9Eg==}
     engines: {node: '>=8.0'}
 
-  xmldom@0.5.0:
-    resolution: {integrity: sha512-Foaj5FXVzgn7xFzsKeNIde9g6aFBxTPi37iwsno8QvApmtg7KYrr+OPyRHcJF7dud2a5nGRBXK3n0dL62Gf7PA==}
-    engines: {node: '>=10.0.0'}
-
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -8248,7 +8245,7 @@ snapshots:
     dependencies:
       base64-js: 1.5.1
       xmlbuilder: 14.0.0
-      xmldom: 0.5.0
+      xmldom: '@xmldom/xmldom@0.9.10'
 
   '@expo/plist@0.4.8':
     dependencies:
@@ -14515,8 +14512,6 @@ snapshots:
   xmlbuilder@14.0.0: {}
 
   xmlbuilder@15.1.1: {}
-
-  xmldom@0.5.0: {}
 
   xtend@4.0.2: {}
 

@@ -158,3 +158,6 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
+  # xmldom ≤0.6.0 has a critical vulnerability (GHSA-crh6-fp67-6883). The original
+  # package is abandoned; redirect all consumers to the maintained @xmldom/xmldom fork.
+  xmldom: "npm:@xmldom/xmldom@^0.9.0"
