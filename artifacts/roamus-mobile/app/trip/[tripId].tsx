@@ -2891,40 +2891,6 @@ function AddStopSheet({
         </View>
       </View>
 
-      {/* From other days */}
-      {(() => {
-        const otherDayStops = allStops.filter(s => (s.dayIndex ?? 0) !== selectedDay - 1);
-        if (otherDayStops.length === 0) return null;
-        return (
-          <View>
-            <Text style={rep.secLabel}>FROM OTHER DAYS</Text>
-            {otherDayStops.slice(0, 5).map(s => (
-              <Pressable
-                key={s.id}
-                style={rep.otherDayRow}
-                onPress={async () => {
-                  try {
-                    await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
-                      method: 'PATCH',
-                      body: JSON.stringify({ stopId: s.id, newDayIndex: selectedDay - 1 }),
-                    });
-                    await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                    onClose();
-                  } catch { /* ignore */ }
-                }}
-              >
-                <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={rep.otherDayName}>{s.name}</Text>
-                  <Text style={rep.otherDayMeta}>Day {(s.dayIndex ?? 0) + 1} · {getStopDuration(s)} min</Text>
-                </View>
-              </Pressable>
-            ))}
-            <View style={rep.divider} />
-          </View>
-        );
-      })()}
-
       {/* Scrollable content */}
       {loading ? (
         <View style={as.loadingWrap}>
@@ -2932,6 +2898,39 @@ function AddStopSheet({
         </View>
       ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={as.body} showsVerticalScrollIndicator={false}>
+          {/* From other days — inside scroll so it doesn't squish the list */}
+          {(() => {
+            const otherDayStops = allStops.filter(s => (s.dayIndex ?? 0) !== selectedDay - 1);
+            if (otherDayStops.length === 0) return null;
+            return (
+              <View>
+                <Text style={rep.secLabel}>FROM OTHER DAYS</Text>
+                {otherDayStops.slice(0, 5).map(s => (
+                  <Pressable
+                    key={s.id}
+                    style={rep.otherDayRow}
+                    onPress={async () => {
+                      try {
+                        await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                          method: 'PATCH',
+                          body: JSON.stringify({ stopId: s.id, newDayIndex: selectedDay - 1 }),
+                        });
+                        await queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                        onClose();
+                      } catch { /* ignore */ }
+                    }}
+                  >
+                    <View style={[rep.otherDayIco, { backgroundColor: stopHeroBg(s.stopType) }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={rep.otherDayName}>{s.name}</Text>
+                      <Text style={rep.otherDayMeta}>Day {(s.dayIndex ?? 0) + 1} · {getStopDuration(s)} min</Text>
+                    </View>
+                  </Pressable>
+                ))}
+                <View style={rep.divider} />
+              </View>
+            );
+          })()}
           {featured && (
             <LinearGradient
               colors={featuredGradient(category)}
