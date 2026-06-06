@@ -57,16 +57,18 @@ export default function TripMemoryIndex() {
   const queryClient = useQueryClient();
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
 
-  const { data: trip, isLoading: tripLoading } = useQuery({
+  const { data: trip, isLoading: tripLoading, isError: tripError } = useQuery({
     queryKey: ['trip', tripId],
     queryFn: () => travelAPI.getTrip(tripId),
     enabled: !!tripId,
+    retry: 1,
   });
 
-  const { data: moments = [], isLoading: momentsLoading } = useQuery({
+  const { data: moments = [], isLoading: momentsLoading, isError: momentsError } = useQuery({
     queryKey: ['moments', tripId],
     queryFn: () => memoriesAPI.getMoments(tripId),
     enabled: !!tripId,
+    retry: 1,
   });
 
   const { visitedStops, momentsByStop, allPhotos } = useMemo(() => {
@@ -102,6 +104,27 @@ export default function TripMemoryIndex() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <ActivityIndicator color={C.orange} style={{ marginTop: 80 }} />
+      </View>
+    );
+  }
+
+  if (tripError || momentsError) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={12}>
+            <Text style={styles.backBtnText}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>Trip</Text>
+          <View style={{ width: 72 }} />
+        </View>
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyTitle}>Can't load this trip</Text>
+          <Text style={styles.emptyBody}>
+            This trip may belong to a different account. Go back and open it from your trips list.
+          </Text>
+        </View>
       </View>
     );
   }

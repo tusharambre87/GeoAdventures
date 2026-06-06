@@ -10177,6 +10177,10 @@ Return ONLY valid JSON in this exact format:
         return res.status(404).json({ message: "Trip not found" });
       }
       
+      const momentUserId = req.user?.claims?.sub;
+      if (!momentUserId) return res.status(401).json({ message: "Unauthorized" });
+      if (trip.userId !== momentUserId) return res.status(403).json({ message: "Access denied" });
+
       if (trip.allowMediaCapture === false) {
         return res.status(403).json({ 
           message: "At-Home adventures do not support photo capture. Save moments on your real travel adventures!",

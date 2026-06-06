@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -106,8 +107,10 @@ export default function ConfirmPhotoScreen() {
       }
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
       router.replace(`/memories/${tripId}` as never);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save photos failed:', err);
+      const msg = err?.message ?? 'Something went wrong. Please try again.';
+      Alert.alert('Could not save photos', msg);
     } finally {
       setSaving(false);
     }
