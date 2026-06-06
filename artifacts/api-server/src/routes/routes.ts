@@ -6482,25 +6482,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch { res.json({ isOwner: false }); }
   });
 
-  app.get('/api/trips/:tripId/replay-data', attachUserIfPresent, async (req: any, res) => {
+  app.get('/api/trips/:tripId/replay-data', isAuthenticated, async (req: any, res) => {
     try {
       const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
       const trip = await storage.getTripById(tripId);
       if (!trip) return res.status(404).json({ message: "Trip not found" });
-      const userId = req.user?.claims?.sub ?? null;
-      const isOwner = !!(userId && trip.userId === userId);
+      if (trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
       const stops = await storage.getTripReplayData(tripId);
-      let ownerName: string | null = null;
-      if (trip.userId) {
-        try {
-          const ownerRows = await db.select({ firstName: users.firstName, email: users.email })
-            .from(users).where(eq(users.id, trip.userId)).limit(1);
-          if (ownerRows.length > 0) {
-            ownerName = ownerRows[0].firstName || ownerRows[0].email?.split('@')[0] || null;
-          }
-        } catch { /* non-fatal */ }
-      }
-      res.json({ tripName: trip.name || trip.destination, destination: trip.destination, stops, isOwner, ownerName });
+      res.json({ tripName: trip.name || trip.destination, destination: trip.destination, stops, isOwner: true });
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch replay data" });
     }
@@ -8598,7 +8589,13 @@ Return ONLY valid JSON in this exact format:
   app.post('/api/travel/stops/:stopId/favorite', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { isFavorite } = req.body;
+      const favStop = await storage.getStopById(stopId);
+      if (!favStop) return res.status(404).json({ message: "Stop not found" });
+      const favTrip = await storage.getTripById(favStop.tripId);
+      if (!favTrip || favTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
       const stop = await storage.updateStop(stopId, {
         isFavorite: Boolean(isFavorite),
         favoriteSource: 'manual',
@@ -8727,7 +8724,9 @@ Return ONLY valid JSON in this exact format:
   app.post('/api/travel/trips/:tripId/recalculate-city-groups', isAuthenticated, async (req: any, res) => {
     try {
       const { tripId } = req.params;
-      const [trip] = await db.select().from(travelTrips).where(eq(travelTrips.id, tripId)).limit(1);
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const [trip] = await db.select().from(travelTrips).where(and(eq(travelTrips.id, tripId), eq(travelTrips.userId, userId))).limit(1);
       if (!trip) return res.status(404).json({ message: "Trip not found" });
 
       const stayLocs = (trip.stayLocations as Array<{ cityName?: string }> | null) ?? [];
@@ -9073,6 +9072,12 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/stops/:stopId/games', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const gamesStop = await storage.getStopById(stopId);
+      if (!gamesStop) return res.status(404).json({ message: "Stop not found" });
+      const gamesTrip = await storage.getTripById(gamesStop.tripId);
+      if (!gamesTrip || gamesTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
       const { getGameContent } = await import('../gameContentService');
       const gameContent = await getGameContent(stopId);
       res.json(gameContent);
@@ -9096,6 +9101,8 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/stops/:stopId/explore', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       // 1. Resolve travel stop
       const stop = await storage.getStopById(stopId);
@@ -9105,6 +9112,7 @@ Return ONLY valid JSON in this exact format:
 
       // Get trip for destination context (used as explore_cache city fallback)
       const trip = await storage.getTripById(stop.tripId);
+      if (!trip || trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
       const destination = stop.cityGroup ?? trip?.destination ?? '';
       const stopType = stop.stopType ?? 'landmark';
 
@@ -9181,11 +9189,19 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/stops/:stopId/hero-image', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       // Check in-memory cache first
       if (heroImageCache[stopId]) {
         return res.json({ url: heroImageCache[stopId] });
       }
+
+      const stop = await storage.getStopById(stopId);
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+
+      const trip = await storage.getTripById(stop.tripId);
+      if (!trip || trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
 
       // Check if already cached in journey pack
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
@@ -9194,11 +9210,6 @@ Return ONLY valid JSON in this exact format:
         heroImageCache[stopId] = url;
         return res.json({ url });
       }
-
-      const stop = await storage.getStopById(stopId);
-      if (!stop) return res.status(404).json({ message: "Stop not found" });
-
-      const trip = await storage.getTripById(stop.tripId);
       const destination = trip?.destination || '';
 
       const { generateStopHeroImage } = await import('../exploreContentService');
@@ -9229,16 +9240,20 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/stops/:stopId/nearby', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const refresh = req.query.refresh === 'true';
 
-      // 1. In-memory cache (fast path)
+      // 1. Load stop and verify ownership before serving any cached data
+      const stop = await storage.getStopById(stopId);
+      if (!stop) return res.status(404).json({ message: 'Stop not found' });
+      const nearbyTrip = await storage.getTripById(stop.tripId);
+      if (!nearbyTrip || nearbyTrip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      // 2. In-memory cache (fast path)
       if (!refresh && nearbyEssentialsCache.has(stopId)) {
         return res.json(nearbyEssentialsCache.get(stopId));
       }
-
-      // 2. Load stop
-      const stop = await storage.getStopById(stopId);
-      if (!stop) return res.status(404).json({ message: 'Stop not found' });
 
       // 3. Persistent cache in metadata (survives restarts)
       const meta = (stop.metadata ?? {}) as Record<string, unknown>;
@@ -10770,6 +10785,8 @@ Return ONLY valid JSON in this exact format:
   app.post('/api/travel/stops/:stopId/generate-tip', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const stop = await storage.getStopById(stopId);
       
       if (!stop) {
@@ -10777,7 +10794,8 @@ Return ONLY valid JSON in this exact format:
       }
       
       const trip = await storage.getTripById(stop.tripId);
-      const destination = trip?.destination || "this location";
+      if (!trip || trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      const destination = trip.destination || "this location";
       
       const { generateParentTip } = await import("../travelContent");
       const tip = await generateParentTip(
@@ -10840,17 +10858,22 @@ Return ONLY valid JSON in this exact format:
     try {
       const { stopId } = req.params;
       const { text, voice } = req.body;
+      const audioUserId = req.user?.claims?.sub || req.user?.id;
+      if (!audioUserId) return res.status(401).json({ message: "Unauthorized" });
       const stop = await storage.getStopById(stopId);
       
       if (!stop) {
         return res.status(404).json({ message: "Stop not found" });
       }
       
+      const audioTrip = await storage.getTripById(stop.tripId);
+      if (!audioTrip || audioTrip.userId !== audioUserId) return res.status(403).json({ message: "Access denied" });
+
       const validVoices = ['eva', 'avi', 'ari'];
       const normalizeVoice2 = (v: string) => v === 'ari' ? 'avi' : v;
       let narratorVoice = validVoices.includes(voice) ? normalizeVoice2(voice) : null;
       if (!narratorVoice) {
-        const userId = req.user?.claims?.sub || req.user?.id;
+        const userId = audioUserId;
         if (userId) {
           const user = await storage.getUser(userId);
           const userVoice = (user as any)?.narratorVoice;
@@ -11527,12 +11550,17 @@ Rules (all critical):
   app.post('/api/travel/stops/:stopId/wonder-response', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { stopId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { response, promptUsed, explorerId } = req.body;
       
       const stop = await storage.getStopById(stopId);
       if (!stop) {
         return res.status(404).json({ message: "Stop not found" });
       }
+      
+      const wonderTrip = await storage.getTripById(stop.tripId);
+      if (!wonderTrip || wonderTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
       
       const wonderResponse = await storage.createWonderResponse({
         tripId: stop.tripId,
