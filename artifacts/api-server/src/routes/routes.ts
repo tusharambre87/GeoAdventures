@@ -722,6 +722,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OG meta tags for shared trip stories — /s/:tripId
+  app.get('/s/:tripId', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const trip = await storage.getTripById(req.params.tripId);
+      if (!trip) {
+        return res.redirect(301, 'https://roamus.app');
+      }
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['host'] || 'roamus.app';
+      const baseUrl = `${protocol}://${host}`;
+      const shareUrl = `${baseUrl}/s/${trip.id}`;
+      const title = `${trip.name ?? trip.destination} — RoamUs Family Adventure`;
+      const description = `Explore ${trip.destination ?? 'this destination'} with the family. Tap to see the full trip story.`;
+      const imageUrl = (trip as any).heroImageUrl || `${baseUrl}/favicon.png`;
+      const userAgent = req.headers['user-agent'] || '';
+      if (!isSocialCrawler(userAgent)) {
+        return res.redirect(302, 'https://roamus.app');
+      }
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${shareUrl}" />
+  <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+  <meta property="og:site_name" content="RoamUs" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+  <meta http-equiv="refresh" content="0;url=${shareUrl}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${shareUrl}">${escapeHtml(title)}</a>…</p>
+</body>
+</html>`;
+      res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+    } catch {
+      next();
+    }
+  });
+
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

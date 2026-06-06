@@ -54,6 +54,11 @@ function handleDeepLink(url: string) {
   const storyMatch = url.match(/\/s\/([^/?#]+)/);
   if (storyMatch) {
     router.push(`/memories/shared/${storyMatch[1]}`);
+    return;
+  }
+  const legacyStoryMatch = url.match(/\/story\/([^/?#]+)/);
+  if (legacyStoryMatch) {
+    router.push(`/memories/shared/${legacyStoryMatch[1]}`);
   }
 }
 

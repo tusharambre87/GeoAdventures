@@ -125,7 +125,7 @@ export default function RecapScreen() {
   async function handleShare() {
     try {
       await Share.share({
-        url: `https://roamus.app/story/${tripId}`,
+        url: `https://roamus.app/s/${tripId}`,
         message: `Our ${trip?.destination ?? ''} family adventure \uD83D\uDDFA`,
       });
     } catch {}
