@@ -1,4 +1,4 @@
-import { users, players, gameEvents, userSessions, dailyQuestCities, cityStickers, userCityStickers, userRewards, userMiniGames, geoArtCreations, proWaitlist, rewardTiers, rewardUnlocks, DEFAULT_REWARD_TIERS, travelTrips, travelStops, journeyPacks, journeyPackProgress, journeyGamePrompts, travelMoments, memoryStars, rememberThisCards, travelWonderResponses, travelTripStories, travelArtifacts, explorerCollectedArtifacts, locationStoryCache, explorerIdentityTraits, ALL_CURATED_ARTIFACTS, geoRelicPuzzles, geoRelicPuzzlePieces, playerPuzzleProgress, travelKeepsakes, explorerCollectedKeepsakes, mapPuzzles, mapPuzzleRegions, playerMapPuzzleProgress, trailTalesRiddles, trailTalesAttempts, trailTalesProgress, itineraryShares, itineraryShareStops, itineraryUpvotes, itineraryBookmarks, itineraryComments, explorerTravelBadges, TRAVEL_BADGE_CATEGORIES, experienceContent, experienceProgress, pwaInstalls, analyticsWeeklySnapshots, playTogetherPlays, playerGameStats, pendingTransfers, pushSubscriptions, parentReviews, userFeedback, cityAdventureTemplates, compassQuests, compassAttempts, compassChallenges, type InsertParentReview, type ParentReview, type InsertUserFeedback, type UserFeedback, type InsertPlayTogetherPlays, type PlayTogetherPlays, type InsertExperienceContent, type ExperienceContent, type InsertExperienceProgress, type ExperienceProgress, type User, type UpsertUser, type InsertPlayer, type Player, type UpdatePlayerStats, type InsertGameEvent, type GameEvent, type InsertUserSession, type UpdateUserSession, type UserSession, type TimeSummary, type InsertDailyQuestCity, type DailyQuestCity, type InsertCitySticker, type CitySticker, type InsertUserCitySticker, type UserCitySticker, type InsertUserReward, type UserReward, type InsertUserMiniGame, type UserMiniGame, type InsertGeoArtCreation, type GeoArtCreation, type InsertRewardTier, type RewardTier, type InsertRewardUnlock, type RewardUnlock, type RewardClaim, type InsertTravelTrip, type TravelTrip, type InsertTravelStop, type TravelStop, type InsertJourneyPack, type JourneyPack, type InsertJourneyPackProgress, type JourneyPackProgress, type InsertTravelMoment, type TravelMoment, type InsertMemoryStars, type MemoryStars, type InsertPushSubscription, type PushSubscription, type PlayerGameStats, type InsertRememberThisCard, type RememberThisCard, type InsertWonderResponse, type WonderResponse, type InsertTripStory, type TripStory, type InsertTravelArtifact, type TravelArtifact, type InsertExplorerCollectedArtifact, type ExplorerCollectedArtifact, type InsertLocationStoryCache, type LocationStoryCache, type InsertExplorerIdentityTraits, type InsertExplorerTravelBadge, type ExplorerTravelBadge, type ExplorerIdentityTraits, type IncrementTrait, type InsertItineraryShare, type ItineraryShare, type InsertItineraryShareStop, type ItineraryShareStop, type InsertItineraryUpvote, type ItineraryUpvote, type InsertItineraryComment, type ItineraryComment, type InsertGeoRelicPuzzle, type GeoRelicPuzzle, type InsertGeoRelicPuzzlePiece, type GeoRelicPuzzlePiece, type InsertPlayerPuzzleProgress, type PlayerPuzzleProgress, type InsertTravelKeepsake, type TravelKeepsake, type InsertExplorerCollectedKeepsake, type ExplorerCollectedKeepsake, type InsertMapPuzzle, type MapPuzzle, type InsertMapPuzzleRegion, type MapPuzzleRegion, type InsertPlayerMapPuzzleProgress, type PlayerMapPuzzleProgress, type InsertTrailTalesRiddle, type TrailTalesRiddle, type InsertTrailTalesAttempt, type TrailTalesAttempt, type InsertTrailTalesProgress, type TrailTalesProgress, type InsertPwaInstall, type PwaInstall, type InsertAnalyticsWeeklySnapshot, type AnalyticsWeeklySnapshot, type InsertPendingTransfer, type PendingTransfer, type InsertCityAdventureTemplate, type CityAdventureTemplate, type InsertCompassQuest, type CompassQuest, type InsertCompassAttempt, type CompassAttempt, type InsertCompassChallenge, type CompassChallenge, tripAnchors, type InsertTripAnchor, type TripAnchor } from "@workspace/db";
+import { users, players, gameEvents, userSessions, dailyQuestCities, cityStickers, userCityStickers, userRewards, userMiniGames, geoArtCreations, proWaitlist, rewardTiers, rewardUnlocks, DEFAULT_REWARD_TIERS, travelTrips, travelStops, journeyPacks, journeyPackProgress, journeyGamePrompts, travelMoments, memoryStars, rememberThisCards, travelWonderResponses, travelTripStories, travelArtifacts, explorerCollectedArtifacts, locationStoryCache, explorerIdentityTraits, ALL_CURATED_ARTIFACTS, geoRelicPuzzles, geoRelicPuzzlePieces, playerPuzzleProgress, travelKeepsakes, explorerCollectedKeepsakes, mapPuzzles, mapPuzzleRegions, playerMapPuzzleProgress, trailTalesRiddles, trailTalesAttempts, trailTalesProgress, itineraryShares, itineraryShareStops, itineraryUpvotes, itineraryBookmarks, itineraryComments, explorerTravelBadges, TRAVEL_BADGE_CATEGORIES, experienceContent, experienceProgress, pwaInstalls, analyticsWeeklySnapshots, playTogetherPlays, playerGameStats, pendingTransfers, pushSubscriptions, parentReviews, userFeedback, cityAdventureTemplates, compassQuests, compassAttempts, compassChallenges, type InsertParentReview, type ParentReview, type InsertUserFeedback, type UserFeedback, type InsertPlayTogetherPlays, type PlayTogetherPlays, type InsertExperienceContent, type ExperienceContent, type InsertExperienceProgress, type ExperienceProgress, type User, type UpsertUser, type InsertPlayer, type Player, type UpdatePlayerStats, type InsertGameEvent, type GameEvent, type InsertUserSession, type UpdateUserSession, type UserSession, type TimeSummary, type InsertDailyQuestCity, type DailyQuestCity, type InsertCitySticker, type CitySticker, type InsertUserCitySticker, type UserCitySticker, type InsertUserReward, type UserReward, type InsertUserMiniGame, type UserMiniGame, type InsertGeoArtCreation, type GeoArtCreation, type InsertRewardTier, type RewardTier, type InsertRewardUnlock, type RewardUnlock, type RewardClaim, type InsertTravelTrip, type TravelTrip, type InsertTravelStop, type TravelStop, type InsertJourneyPack, type JourneyPack, type InsertJourneyPackProgress, type JourneyPackProgress, type InsertTravelMoment, type TravelMoment, type InsertMemoryStars, type MemoryStars, type InsertPushSubscription, type PushSubscription, type PlayerGameStats, type InsertRememberThisCard, type RememberThisCard, type InsertWonderResponse, type WonderResponse, type InsertTripStory, type TripStory, type InsertTravelArtifact, type TravelArtifact, type InsertExplorerCollectedArtifact, type ExplorerCollectedArtifact, type InsertLocationStoryCache, type LocationStoryCache, type InsertExplorerIdentityTraits, type InsertExplorerTravelBadge, type ExplorerTravelBadge, type ExplorerIdentityTraits, type IncrementTrait, type InsertItineraryShare, type ItineraryShare, type InsertItineraryShareStop, type ItineraryShareStop, type InsertItineraryUpvote, type ItineraryUpvote, type InsertItineraryComment, type ItineraryComment, type InsertGeoRelicPuzzle, type GeoRelicPuzzle, type InsertGeoRelicPuzzlePiece, type GeoRelicPuzzlePiece, type InsertPlayerPuzzleProgress, type PlayerPuzzleProgress, type InsertTravelKeepsake, type TravelKeepsake, type InsertExplorerCollectedKeepsake, type ExplorerCollectedKeepsake, type InsertMapPuzzle, type MapPuzzle, type InsertMapPuzzleRegion, type MapPuzzleRegion, type InsertPlayerMapPuzzleProgress, type PlayerMapPuzzleProgress, type InsertTrailTalesRiddle, type TrailTalesRiddle, type InsertTrailTalesAttempt, type TrailTalesAttempt, type InsertTrailTalesProgress, type TrailTalesProgress, type InsertPwaInstall, type PwaInstall, type InsertAnalyticsWeeklySnapshot, type AnalyticsWeeklySnapshot, type InsertPendingTransfer, type PendingTransfer, type InsertCityAdventureTemplate, type CityAdventureTemplate, type InsertCompassQuest, type CompassQuest, type InsertCompassAttempt, type CompassAttempt, type InsertCompassChallenge, type CompassChallenge, tripAnchors, type InsertTripAnchor, type TripAnchor, reflectionGameSessions, reflectionGameCache, reflectionGameResponses, scavengerHunts, inMyBagGames, geoguessGames, tripWalletItems, tripDayMemories, stopQualitySignals } from "@workspace/db";
 import { cityStopPoolCache, type CityStopPoolCache, type InsertCityStopPoolCache } from "@workspace/db";
 import { tripUnlocks, type TripUnlock, type InsertTripUnlock } from "@workspace/db";
 import { promoCodes, promoRedemptions, type PromoCode, type InsertPromoCode, type PromoRedemption, type InsertPromoRedemption } from "@workspace/db";
@@ -2750,53 +2750,82 @@ export class DatabaseStorage implements IStorage {
   async deleteTrip(tripId: string): Promise<boolean> {
     // Get all stops for this trip to delete their related data
     const stops = await this.getStopsByTripId(tripId);
-    
-    // Delete journey game prompts and journey packs for all stops (FK constraints)
+    const stopIds = stops.map(s => s.id);
+
+    // --- Reflection games (responses reference sessions, so responses first) ---
+    await db.delete(reflectionGameResponses).where(eq(reflectionGameResponses.tripId, tripId));
+    await db.delete(reflectionGameCache).where(eq(reflectionGameCache.tripId, tripId));
+    await db.delete(reflectionGameSessions).where(eq(reflectionGameSessions.tripId, tripId));
+
+    // --- Stop-quality signals (references stops + trip) ---
+    if (stopIds.length > 0) {
+      await db.delete(stopQualitySignals).where(inArray(stopQualitySignals.stopId, stopIds));
+    }
+
+    // --- Wallet items (references stops + trip) ---
+    await db.delete(tripWalletItems).where(eq(tripWalletItems.tripId, tripId));
+
+    // --- Journey game prompts and journey packs for all stops ---
     for (const stop of stops) {
       await db.delete(journeyGamePrompts).where(eq(journeyGamePrompts.stopId, stop.id));
       await db.delete(journeyPacks).where(eq(journeyPacks.stopId, stop.id));
     }
-    
-    // Delete journey pack progress for this trip
+
+    // --- Journey pack progress ---
     await db.delete(journeyPackProgress).where(eq(journeyPackProgress.tripId, tripId));
-    
-    // Delete all stops
-    await db.delete(travelStops).where(eq(travelStops.tripId, tripId));
-    
-    // Delete all moments for this trip
-    await db.delete(travelMoments).where(eq(travelMoments.tripId, tripId));
-    
-    // Delete memory stars for this trip
-    await db.delete(memoryStars).where(eq(memoryStars.tripId, tripId));
-    
-    // Delete wonder responses for all stops
+
+    // --- Wonder responses (per stop) ---
     for (const stop of stops) {
       await db.delete(travelWonderResponses).where(eq(travelWonderResponses.stopId, stop.id));
     }
-    
-    // Delete trip stories
+
+    // --- All stops ---
+    await db.delete(travelStops).where(eq(travelStops.tripId, tripId));
+
+    // --- Moments ---
+    await db.delete(travelMoments).where(eq(travelMoments.tripId, tripId));
+
+    // --- Memory stars ---
+    await db.delete(memoryStars).where(eq(memoryStars.tripId, tripId));
+
+    // --- Trip stories ---
     await db.delete(travelTripStories).where(eq(travelTripStories.tripId, tripId));
-    
-    // Delete trail tales riddles and progress
+
+    // --- Trail tales ---
+    await db.delete(trailTalesAttempts).where(eq(trailTalesAttempts.tripId, tripId));
     await db.delete(trailTalesProgress).where(eq(trailTalesProgress.tripId, tripId));
     await db.delete(trailTalesRiddles).where(eq(trailTalesRiddles.tripId, tripId));
-    
-    // Delete any itinerary shares for this trip (including related data)
+
+    // --- Remember This cards ---
+    await db.delete(rememberThisCards).where(eq(rememberThisCards.tripId, tripId));
+
+    // --- Explorer collectibles ---
+    await db.delete(explorerCollectedArtifacts).where(eq(explorerCollectedArtifacts.tripId, tripId));
+    await db.delete(explorerCollectedKeepsakes).where(eq(explorerCollectedKeepsakes.tripId, tripId));
+
+    // --- Mini-games ---
+    await db.delete(playTogetherPlays).where(eq(playTogetherPlays.tripId, tripId));
+    await db.delete(scavengerHunts).where(eq(scavengerHunts.tripId, tripId));
+    await db.delete(inMyBagGames).where(eq(inMyBagGames.tripId, tripId));
+    await db.delete(geoguessGames).where(eq(geoguessGames.tripId, tripId));
+
+    // --- Trip anchors & day memories ---
+    await db.delete(tripAnchors).where(eq(tripAnchors.tripId, tripId));
+    await db.delete(tripDayMemories).where(eq(tripDayMemories.tripId, tripId));
+
+    // --- Itinerary shares (with nested FK data) ---
     const shareRecords = await db.select().from(itineraryShares).where(eq(itineraryShares.tripId, tripId));
     for (const share of shareRecords) {
-      // Delete share stops
       await db.delete(itineraryShareStops).where(eq(itineraryShareStops.shareId, share.id));
-      // Delete comments
       await db.delete(itineraryComments).where(eq(itineraryComments.shareId, share.id));
-      // Delete upvotes
       await db.delete(itineraryUpvotes).where(eq(itineraryUpvotes.shareId, share.id));
-      // Delete bookmarks
       await db.delete(itineraryBookmarks).where(eq(itineraryBookmarks.shareId, share.id));
     }
-    // Delete the share records
     await db.delete(itineraryShares).where(eq(itineraryShares.tripId, tripId));
-    
-    // Finally delete the trip itself
+
+    // --- storyEmailSchedules has onDelete: cascade, handled automatically ---
+
+    // --- Finally delete the trip itself ---
     await db.delete(travelTrips).where(eq(travelTrips.id, tripId));
     return true;
   }
