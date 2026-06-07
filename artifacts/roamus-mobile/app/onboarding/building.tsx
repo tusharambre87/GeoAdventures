@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useRef, useEffect, useState } from 'react';
 import { Animated, Dimensions, Platform, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +27,25 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 export default function BuildingScreen() {
   const insets = useSafeAreaInsets();
   const { data, set } = useOnboarding();
+  const params = useLocalSearchParams<{ cityDatesParam?: string; citiesParam?: string; cityMode?: string }>();
+
+  // Hydrate context from nav params when coming from the Discover/customize path.
+  // This is more reliable than the context write in customize.tsx which can be
+  // lost across the reset() + setOnboarding() boundary.
+  useEffect(() => {
+    const updates: Record<string, unknown> = {};
+    if (params.citiesParam) {
+      try { updates.cities = JSON.parse(params.citiesParam); } catch {}
+    }
+    if (params.cityMode) {
+      updates.cityMode = params.cityMode;
+    }
+    if (params.cityDatesParam) {
+      try { updates.cityDates = JSON.parse(params.cityDatesParam); } catch {}
+    }
+    if (Object.keys(updates).length > 0) set(updates as any);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const city    = data.cities[0] ?? 'Chicago';
   const country = CITY_COUNTRY[city] ?? 'USA';

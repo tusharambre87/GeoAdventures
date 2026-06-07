@@ -5229,6 +5229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               missionDifficulty: stop.missionDifficulty || 'normal',
               missionKeepsakeReward: stop.missionKeepsakeReward || false,
               stopMissions: stop.stopMissions || null,
+              cityGroup: cityName,
             });
           }
           const missionCount = templateStops.filter(s => s.missionType).length;
@@ -6130,6 +6131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           missionDifficulty: 'normal',
           missionKeepsakeReward: false,
           stopMissions: null,
+          cityGroup: cityName,
         });
       }
       console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" (preloaded=${!!preloadedStops}) for trip ${tripId}`);

@@ -506,6 +506,17 @@ export default function PreviewScreen() {
                   templateSlug: data.templateSlug || undefined,
                   tripDays: data.tripDays || undefined,
                   templateStops: data.templateStops || undefined,
+                  ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
+                    cityDates: Object.fromEntries(
+                      Object.entries(data.cityDates).map(([c, dates]) => [
+                        c,
+                        {
+                          startDate: (dates as any).startDate ?? (dates as any).arrive,
+                          endDate:   (dates as any).endDate   ?? (dates as any).leave,
+                        },
+                      ])
+                    ),
+                  } : {}),
                   tailoring: {
                     transport: data.transport,
                     stroller: data.stroller,

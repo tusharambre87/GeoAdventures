@@ -200,17 +200,19 @@ export default function DiscoverCustomizeScreen() {
     const midIso = city1End ? toISO(city1End) : null;
 
     const cityDates = isMulti && midIso ? {
-      [destination]:          { arrive: startIso, leave: midIso },
-      [secondCity!.trim()]:   { arrive: midIso,   leave: endIso },
+      [destination]:          { startDate: startIso, endDate: midIso },
+      [secondCity!.trim()]:   { startDate: midIso,   endDate: endIso },
     } : {};
+
+    const citiesArr = isMulti ? [destination, secondCity!.trim()] : [destination];
+    const cityMode  = isMulti ? "multi" : "one";
 
     const savedTravelers = onboardingData.travelers;
     reset();
     setOnboarding({
       travelers: savedTravelers,
-      cities:    isMulti ? [destination, secondCity!.trim()] : [destination],
-      cityMode:  isMulti ? "multi" : "one",
-      cityDates,
+      cities:    citiesArr,
+      cityMode,
       startDate: startIso,
       endDate:   endIso,
       returningUser: true,
@@ -220,7 +222,14 @@ export default function DiscoverCustomizeScreen() {
       tripDays,
       templateStops: isAi ? getAiPickTemplateStops(slug) : null,
     });
-    router.push("/onboarding/building" as any);
+    router.push({
+      pathname: "/onboarding/building" as any,
+      params: {
+        cityDatesParam: isMulti ? JSON.stringify(cityDates) : "",
+        citiesParam:    JSON.stringify(citiesArr),
+        cityMode,
+      },
+    });
   }
 
   return (
