@@ -54,9 +54,38 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(600)).current;
 
-  const [parkingStops, setParkingStops]         = useState<ParkingStop[]>([]);
+  const [parkingStops, setParkingStops]           = useState<ParkingStop[]>([]);
   const [editingParkingFor, setEditingParkingFor] = useState<string | null>(null);
   const [parkingInput, setParkingInput]           = useState('');
+  const [manualStartPoint, setManualStartPoint]   = useState<string | null>(null);
+  const [editingStart, setEditingStart]           = useState(false);
+  const [startInput, setStartInput]               = useState('');
+
+  // Resolve starting point — same lookup pattern as today.tsx hotel card
+  const resolvedStayLocation = (() => {
+    const locs = trip.stayLocations;
+    if (!locs || locs.length === 0) return null;
+    const dest = trip.destination ?? trip.city ?? '';
+    return (
+      locs.find(s => !s.cityName || s.cityName === dest) ??
+      locs[0]
+    );
+  })();
+
+  const startingPoint: string | null =
+    manualStartPoint ??
+    resolvedStayLocation?.address ??
+    (resolvedStayLocation?.cityName ? resolvedStayLocation.cityName : null);
+
+  // Diagnostics — visible in Metro/Expo logs
+  console.log('DIRECTIONS_SHEET_MOUNTED', { stopsCount: stops.length, startingPoint });
+  console.log('STAY_LOCATIONS_DEBUG', {
+    stayLocations: trip.stayLocations,
+    tripCity: trip.city,
+    tripDestination: trip.destination,
+    resolvedStayLocation,
+    resolvedStart: startingPoint,
+  });
 
   useEffect(() => {
     Animated.parallel([
@@ -73,26 +102,21 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
     ]).start(({ finished }) => { if (finished) onClose(); });
   }
 
-  // Resolve starting point from stayLocations (array shape)
-  const startingPoint = (() => {
-    const locs = trip.stayLocations;
-    if (locs && locs.length > 0) {
-      const city = trip.city ?? trip.destination ?? '';
-      const match = locs.find(s => s.cityName === city) ?? locs[0];
-      return match.address ?? match.cityName ?? null;
-    }
-    return null;
-  })();
-
   function handleOpenMaps() {
     const waypoints: string[] = [];
+
+    // Start
     if (startingPoint) waypoints.push(encodeURIComponent(startingPoint));
 
+    // Stops interleaved with confirmed parking
     for (const stop of stops) {
       const parking = parkingStops.find(p => p.beforeStopId === stop.id && p.confirmed);
       if (parking) waypoints.push(encodeURIComponent(parking.address));
-      waypoints.push(encodeURIComponent(`${stop.name} ${trip.destination ?? ''}`));
+      waypoints.push(encodeURIComponent(`${stop.name} ${trip.destination ?? trip.city ?? ''}`));
     }
+
+    // Return to hotel / start (loop route)
+    if (startingPoint) waypoints.push(encodeURIComponent(startingPoint));
 
     const googleUrl    = `https://www.google.com/maps/dir/${waypoints.join('/')}`;
     const googleAppUrl = `comgooglemaps://?waypoints=${waypoints.join('|')}`;
@@ -135,6 +159,40 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
               contentContainerStyle={{ paddingBottom: 8 }}
               showsVerticalScrollIndicator={false}
             >
+              {/* No hotel prompt */}
+              {!startingPoint && !editingStart && (
+                <TouchableOpacity
+                  onPress={() => { setEditingStart(true); setStartInput(''); }}
+                  style={s.addStartPrompt}
+                >
+                  <Text style={s.addStartLabel}>+ Add hotel or starting address</Text>
+                  <Text style={s.addStartSub}>for accurate directions</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Inline start point input */}
+              {editingStart && (
+                <View style={[s.addStartPrompt, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+                  <TextInput
+                    value={startInput}
+                    onChangeText={setStartInput}
+                    placeholder="Hotel name or address"
+                    placeholderTextColor="#8A8FA8"
+                    autoFocus
+                    style={[s.parkingInput, { flex: 1 }]}
+                  />
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (startInput.trim()) setManualStartPoint(startInput.trim());
+                      setEditingStart(false);
+                      setStartInput('');
+                    }}
+                  >
+                    <Text style={s.parkingDone}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Starting point row */}
               <View style={s.routeItem}>
                 <View style={s.lineWrap}>
@@ -145,7 +203,9 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
                   <Text style={s.routeName}>
                     {startingPoint ?? 'Your current location'}
                   </Text>
-                  <Text style={s.routeMeta}>Starting point</Text>
+                  <Text style={s.routeMeta}>
+                    {startingPoint ? 'Starting point' : 'Add hotel above for accurate route'}
+                  </Text>
                 </View>
               </View>
 
@@ -195,8 +255,8 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
                     {/* Stop row */}
                     <View style={s.routeItem}>
                       <View style={s.lineWrap}>
-                        <View style={[s.dot, isLast ? s.dotEnd : s.dotStop]} />
-                        {!isLast && <View style={s.connector} />}
+                        <View style={[s.dot, isLast && !startingPoint ? s.dotEnd : s.dotStop]} />
+                        {(!isLast || !!startingPoint) && <View style={s.connector} />}
                       </View>
                       <View style={s.routeContent}>
                         <Text style={s.routeName}>{stop.name}</Text>
@@ -254,6 +314,19 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
                   </React.Fragment>
                 );
               })}
+
+              {/* Return to hotel row (loop route) */}
+              {startingPoint && (
+                <View style={s.routeItem}>
+                  <View style={s.lineWrap}>
+                    <View style={[s.dot, s.dotEnd]} />
+                  </View>
+                  <View style={s.routeContent}>
+                    <Text style={s.routeName}>{startingPoint}</Text>
+                    <Text style={s.routeMeta}>Return to hotel</Text>
+                  </View>
+                </View>
+              )}
             </ScrollView>
 
             {/* Open Maps CTA */}
@@ -320,6 +393,28 @@ const s = StyleSheet.create({
   routeScroll: {
     paddingHorizontal: 20,
     flexGrow: 0,
+  },
+  addStartPrompt: {
+    backgroundColor: '#FDF0E9',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addStartLabel: {
+    fontSize: 13,
+    color: '#E8692A',
+    fontWeight: '600',
+    fontFamily: F.semibold,
+  },
+  addStartSub: {
+    fontSize: 12,
+    color: '#8A8FA8',
+    flex: 1,
+    fontFamily: F.regular,
   },
   routeItem: {
     flexDirection: 'row',
