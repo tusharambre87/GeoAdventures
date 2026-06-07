@@ -1452,9 +1452,9 @@ export default function TodayScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 8,
-                    backgroundColor: 'rgba(232,105,42,0.15)',
+                    backgroundColor: 'rgba(0,0,0,0.4)',
                     borderWidth: 1,
-                    borderColor: 'rgba(232,105,42,0.4)',
+                    borderColor: 'rgba(232,105,42,0.6)',
                     borderRadius: 12,
                     padding: 10,
                     marginTop: 12,
@@ -1465,7 +1465,7 @@ export default function TodayScreen() {
                     <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A' }}>
                       Directions for today
                     </Text>
-                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>
                       All {dayStops.length} stops mapped in order
                     </Text>
                   </View>
@@ -1639,7 +1639,7 @@ export default function TodayScreen() {
               ?? null;
             return (
               <TouchableOpacity
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginTop: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
                 activeOpacity={0.85}
                 onPress={() => setShowHotelSheet(true)}
               >
@@ -1713,7 +1713,34 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
-          onSaved={(name, addr) => { setShowHotelSheet(false); setLocalSavedHotel(addr || name); }}
+          onSaved={(name, addr) => {
+            const resolvedAddr = addr || name;
+            setShowHotelSheet(false);
+            const saveForDay = () => setLocalSavedHotel(resolvedAddr);
+            const saveForAllDays = async () => {
+              setLocalSavedHotel(resolvedAddr);
+              if (!trip) return;
+              const cities: string[] = (trip as any).cities?.length > 0
+                ? (trip as any).cities
+                : [trip.destination ?? (trip as any).city ?? ''].filter(Boolean);
+              const allLocs = cities.map((c: string) => ({ cityName: c, address: resolvedAddr }));
+              try {
+                await apiFetch(`/api/travel/trips/${trip.id}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ stayLocations: allLocs }),
+                });
+                setTrip(prev => prev ? { ...prev, stayLocations: allLocs } : prev);
+              } catch {}
+            };
+            Alert.alert(
+              'Use for all days?',
+              `Use "${name || addr}" as the starting point for every day of your trip?`,
+              [
+                { text: 'This day only', style: 'cancel', onPress: saveForDay },
+                { text: 'All days', onPress: () => { void saveForAllDays(); } },
+              ]
+            );
+          }}
         />
         {showDirections && trip && (
           <DirectionsSheet

@@ -84,13 +84,12 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose 
     (resolvedStayLocation?.cityName ? resolvedStayLocation.cityName : null);
 
   // Diagnostics — visible in Metro/Expo logs
-  console.log('DIRECTIONS_SHEET_MOUNTED', { stopsCount: stops.length, startingPoint });
-  console.log('STAY_LOCATIONS_DEBUG', {
-    stayLocations: trip.stayLocations,
-    tripCity: trip.city,
-    tripDestination: trip.destination,
-    resolvedStayLocation,
-    resolvedStart: startingPoint,
+  console.log('DIRECTIONS_START_DEBUG', {
+    stayLocations: trip?.stayLocations,
+    cities: trip?.cities,
+    destination: trip?.destination,
+    currentDayIndex,
+    resolved: startingPoint,
   });
 
   useEffect(() => {
@@ -192,7 +191,13 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose 
                   />
                   <TouchableOpacity
                     onPress={() => {
-                      if (startInput.trim()) setManualStartPoint(startInput.trim());
+                      const raw = startInput.trim();
+                      if (raw) {
+                        const resolved = raw.includes(',')
+                          ? raw
+                          : `${raw}, ${trip.destination ?? trip.city ?? ''}`;
+                        setManualStartPoint(resolved);
+                      }
                       setEditingStart(false);
                       setStartInput('');
                     }}
@@ -379,7 +384,7 @@ const s = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
+    maxHeight: '80%',
   },
   handle: {
     width: 36,
@@ -411,7 +416,7 @@ const s = StyleSheet.create({
   },
   routeScroll: {
     paddingHorizontal: 20,
-    flexGrow: 0,
+    flex: 1,
   },
   addStartPrompt: {
     backgroundColor: '#FDF0E9',
