@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -158,6 +159,18 @@ export default function DiscoverCustomizeScreen() {
     return Math.max(1, diff + 1);
   }, [start, end, templateDays]);
 
+  const [secondCity, setSecondCity]         = useState<string | null>(null);
+  const [showSecondCity, setShowSecondCity]  = useState(false);
+  const [city1Days, setCity1Days]            = useState<number>(() => Math.ceil(templateDays / 2));
+  const [city2Days, setCity2Days]            = useState<number>(() => templateDays - Math.ceil(templateDays / 2));
+
+  // Keep day split in sync whenever total trip length changes
+  useEffect(() => {
+    const half = Math.ceil(tripDays / 2);
+    setCity1Days(half);
+    setCity2Days(tripDays - half);
+  }, [tripDays]);
+
   const adaptNote = useMemo(() => {
     if (!start || !end) {
       return `Select your dates — AI will adapt the ${templateDays}-day template for your family.`;
@@ -171,18 +184,35 @@ export default function DiscoverCustomizeScreen() {
     return `${tripDays} days selected — AI will add ${(tripDays - templateDays) * 2} new stops to fill the extra days.`;
   }, [tripDays, templateDays, start, end]);
 
+  const canBuild = !showSecondCity || (!!secondCity && secondCity.trim().length > 0);
+
   function handleBuild() {
+    if (!canBuild) return;
     const startIso = start ? toISO(start) : null;
-    const endIso = end ? toISO(end) : null;
-    const isAi = isAiPick === "true";
+    const endIso   = end   ? toISO(end)   : null;
+    const isAi     = isAiPick === "true";
+    const isMulti  = showSecondCity && !!secondCity && secondCity.trim().length > 0;
+
+    // Compute per-city date ranges from the day-split stepper
+    const city1End = startIso
+      ? new Date(new Date(startIso).getTime() + city1Days * 86400000)
+      : null;
+    const midIso = city1End ? toISO(city1End) : null;
+
+    const cityDates = isMulti && midIso ? {
+      [destination]:          { arrive: startIso, leave: midIso },
+      [secondCity!.trim()]:   { arrive: midIso,   leave: endIso },
+    } : {};
+
     const savedTravelers = onboardingData.travelers;
     reset();
     setOnboarding({
       travelers: savedTravelers,
-      cities: [destination],
-      cityMode: "one",
+      cities:    isMulti ? [destination, secondCity!.trim()] : [destination],
+      cityMode:  isMulti ? "multi" : "one",
+      cityDates,
       startDate: startIso,
-      endDate: endIso,
+      endDate:   endIso,
       returningUser: true,
       onboardingInProgress: true,
       templateSlug: slug,
@@ -244,16 +274,98 @@ export default function DiscoverCustomizeScreen() {
             )}
           </View>
         </View>
+        {/* Second city card */}
+        {!showSecondCity ? (
+          <TouchableOpacity
+            onPress={() => setShowSecondCity(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, paddingHorizontal: 4 }}
+          >
+            <Text style={{ fontSize: 14, color: G.orange, fontWeight: '600', fontFamily: F.semibold }}>
+              + Add a second city
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{
+            backgroundColor: '#fff', borderRadius: 16, padding: 16,
+            marginBottom: 12, borderWidth: 1, borderColor: '#EDE9E3',
+          }}>
+            {/* Second city input */}
+            <Text style={{ fontSize: 11, color: '#8A8FA8', letterSpacing: 0.08, textTransform: 'uppercase', marginBottom: 6, fontFamily: F.regular }}>
+              Second city
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <TextInput
+                value={secondCity ?? ''}
+                onChangeText={setSecondCity}
+                placeholder="e.g. Chicago"
+                placeholderTextColor="#8A8FA8"
+                style={{
+                  flex: 1, height: 44, borderWidth: 1, borderColor: '#E0DDD8',
+                  borderRadius: 10, paddingHorizontal: 14, fontSize: 15,
+                  color: '#1A1F2E', backgroundColor: '#F5F2EE', fontFamily: F.regular,
+                }}
+              />
+              <TouchableOpacity onPress={() => { setShowSecondCity(false); setSecondCity(null); }}>
+                <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.regular }}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Day stepper — only when second city has text */}
+            {secondCity && secondCity.trim().length > 0 && (
+              <>
+                <Text style={{ fontSize: 11, color: '#8A8FA8', letterSpacing: 0.08, textTransform: 'uppercase', marginBottom: 10, fontFamily: F.regular }}>
+                  Days per city
+                </Text>
+
+                {/* City 1 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 14, color: '#1A1F2E', flex: 1, fontFamily: F.regular }}>{destination}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => { if (city1Days > 1 && city2Days < tripDays - 1) { setCity1Days(d => d - 1); setCity2Days(d => d + 1); } }}>
+                      <Text style={{ fontSize: 20, color: G.orange, fontWeight: '600' }}>{'\u2212'}</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1F2E', minWidth: 24, textAlign: 'center', fontFamily: F.bold }}>{city1Days}</Text>
+                    <TouchableOpacity onPress={() => { if (city2Days > 1 && city1Days < tripDays - 1) { setCity1Days(d => d + 1); setCity2Days(d => d - 1); } }}>
+                      <Text style={{ fontSize: 20, color: G.orange, fontWeight: '600' }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* City 2 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 14, color: '#1A1F2E', flex: 1, fontFamily: F.regular }}>{secondCity}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => { if (city2Days > 1 && city1Days < tripDays - 1) { setCity2Days(d => d - 1); setCity1Days(d => d + 1); } }}>
+                      <Text style={{ fontSize: 20, color: G.orange, fontWeight: '600' }}>{'\u2212'}</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1F2E', minWidth: 24, textAlign: 'center', fontFamily: F.bold }}>{city2Days}</Text>
+                    <TouchableOpacity onPress={() => { if (city1Days > 1 && city2Days < tripDays - 1) { setCity2Days(d => d + 1); setCity1Days(d => d - 1); } }}>
+                      <Text style={{ fontSize: 20, color: G.orange, fontWeight: '600' }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 11, color: '#8A8FA8', textAlign: 'center', marginTop: 10, fontFamily: F.regular }}>
+                  {city1Days + city2Days} days total{'\u00B7 adjusts automatically'}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Sticky build CTA */}
       <View style={[s.ctaBar, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
-          style={s.ctaBtn}
+          style={[s.ctaBtn, !canBuild && { opacity: 0.45 }]}
           onPress={handleBuild}
-          activeOpacity={0.88}
+          activeOpacity={canBuild ? 0.88 : 1}
         >
-          <Text style={s.ctaBtnTxt}>Build my {destination} trip →</Text>
+          <Text style={s.ctaBtnTxt}>
+            {showSecondCity && secondCity?.trim()
+              ? `Build my ${destination} + ${secondCity.trim()} trip \u2192`
+              : `Build my ${destination} trip \u2192`}
+          </Text>
         </TouchableOpacity>
         <Text style={s.ctaNote}>Takes about 10 seconds · Personalised for your family</Text>
       </View>

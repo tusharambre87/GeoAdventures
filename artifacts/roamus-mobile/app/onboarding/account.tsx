@@ -100,6 +100,17 @@ export default function AccountScreen() {
           templateSlug: data.templateSlug || undefined,
           tripDays: data.tripDays || undefined,
           templateStops: data.templateStops || undefined,
+          ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
+            cityDates: Object.fromEntries(
+              Object.entries(data.cityDates).map(([city, dates]) => [
+                city,
+                {
+                  startDate: (dates as any).arrive    ?? (dates as any).startDate,
+                  endDate:   (dates as any).leave     ?? (dates as any).endDate,
+                },
+              ])
+            ),
+          } : {}),
           tailoring: {
             transport: data.transport,
             stroller: data.stroller,
