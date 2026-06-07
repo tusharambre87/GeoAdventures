@@ -2,10 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Keyboard,
-  KeyboardAvoidingView,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -133,15 +131,14 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose,
 
   return (
     <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={handleClose}>
+      {/* Backdrop */}
       <Animated.View style={[s.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={s.kav}
-        >
-          <Animated.View
-            style={[s.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetAnim }] }]}
-          >
+      </Animated.View>
+      {/* Sheet — absolute height so ScrollView flex:1 has a real bound */}
+      <Animated.View
+        style={[s.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetAnim }] }]}
+      >
             {/* Handle */}
             <View style={s.handle} />
 
@@ -361,8 +358,6 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose,
             <Text style={s.ctaNote}>
               Falls back to Google Maps web if app isn&apos;t installed
             </Text>
-          </Animated.View>
-        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
@@ -370,16 +365,19 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose,
 
 const s = StyleSheet.create({
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  kav: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '80%',
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    flexDirection: 'column',
   },
   handle: {
     width: 36,

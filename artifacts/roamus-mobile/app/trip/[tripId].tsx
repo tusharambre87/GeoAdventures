@@ -3492,10 +3492,49 @@ export default function TripPlanScreen() {
   const tripStarted = tripStartDate ? tripStartDate <= today : false;
 
   const getStopsForDay = useCallback((dayNum: number): Stop[] => {
-    return [...localStops]
+    const direct = [...localStops]
       .filter(s => s.dayIndex === dayNum - 1)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-  }, [localStops]);
+
+    // Distribute null-dayIndex stops (bg-multicity secondary-city stops that
+    // weren't assigned a dayIndex at generation time) across their city's date range
+    const nullStops = localStops.filter(s => s.dayIndex == null && s.cityGroup);
+    if (nullStops.length === 0) return direct;
+
+    const cd = trip?.cityDates as Record<string, { start?: string; startDate?: string; end?: string; endDate?: string }> | null | undefined;
+    if (!cd || !trip?.startDate) return direct;
+
+    const tripStart = new Date(trip.startDate);
+    const currentDate = new Date(tripStart);
+    currentDate.setDate(tripStart.getDate() + dayNum - 1);
+    const dateStr = currentDate.toISOString().split('T')[0];
+
+    // Find which city owns this calendar date
+    const ownerEntry = Object.entries(cd).find(([, range]) => {
+      const s = range.startDate ?? range.start ?? '';
+      const e = range.endDate ?? range.end ?? '';
+      return !!s && !!e && s <= dateStr && dateStr <= e;
+    });
+    if (!ownerEntry) return direct;
+    const [ownerCity, ownerRange] = ownerEntry;
+
+    const cityNullStops = nullStops
+      .filter(s => s.cityGroup === ownerCity)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    if (cityNullStops.length === 0) return direct;
+
+    // Evenly distribute across the city's days
+    const cityStartStr = ownerRange.startDate ?? ownerRange.start ?? trip.startDate!;
+    const cityEndStr   = ownerRange.endDate   ?? ownerRange.end   ?? cityStartStr;
+    const cityStart    = new Date(cityStartStr);
+    const cityEnd      = new Date(cityEndStr);
+    const cityDayCount = Math.round((cityEnd.getTime() - cityStart.getTime()) / 86400000) + 1;
+    const localOffset  = Math.round((currentDate.getTime() - cityStart.getTime()) / 86400000);
+    const perDay       = Math.ceil(cityNullStops.length / Math.max(cityDayCount, 1));
+    const cityStopsForDay = cityNullStops.slice(localOffset * perDay, (localOffset + 1) * perDay);
+
+    return [...direct, ...cityStopsForDay];
+  }, [localStops, trip]);
 
   const getAnchorStopForDay = useCallback((dayNum: number): Stop | null => {
     return getAnchorStop(getStopsForDay(dayNum));
