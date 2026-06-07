@@ -518,6 +518,14 @@ export default function TodayScreen() {
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [showDirections, setShowDirections]      = useState(false);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
+
+  // Persist hotel across navigation — load on mount/trip change
+  useEffect(() => {
+    if (!trip?.id) return;
+    AsyncStorage.getItem(`hotel_${trip.id}_day${resolvedDayIndex}`).then(saved => {
+      if (saved) setLocalSavedHotel(saved);
+    }).catch(() => {});
+  }, [trip?.id, resolvedDayIndex]);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
   const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string; name: string }[]>([]);
@@ -1716,9 +1724,17 @@ export default function TodayScreen() {
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
-            const saveForDay = () => setLocalSavedHotel(resolvedAddr);
+            const saveForDay = () => {
+              setLocalSavedHotel(resolvedAddr);
+              if (trip?.id) {
+                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+              }
+            };
             const saveForAllDays = async () => {
               setLocalSavedHotel(resolvedAddr);
+              if (trip?.id) {
+                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+              }
               if (!trip) return;
               const cities: string[] = (trip as any).cities?.length > 0
                 ? (trip as any).cities
