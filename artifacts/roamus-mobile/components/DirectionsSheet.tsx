@@ -33,6 +33,7 @@ type Trip = {
   id: string;
   destination?: string | null;
   city?: string | null;
+  cities?: string[] | null;
   stayLocations?: StayLocation[] | null;
 };
 
@@ -49,7 +50,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function DirectionsSheet({ stops, trip, onClose }: Props) {
+export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(600)).current;
@@ -61,13 +62,18 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
   const [editingStart, setEditingStart]           = useState(false);
   const [startInput, setStartInput]               = useState('');
 
-  // Resolve starting point — same lookup pattern as today.tsx hotel card
+  // Resolve starting point — try today's city first, then destination/city, then first entry
   const resolvedStayLocation = (() => {
     const locs = trip.stayLocations;
     if (!locs || locs.length === 0) return null;
-    const dest = trip.destination ?? trip.city ?? '';
+    const dayCity =
+      trip.cities?.[currentDayIndex] ??
+      trip.cities?.[0] ??
+      trip.destination ??
+      trip.city ??
+      '';
     return (
-      locs.find(s => !s.cityName || s.cityName === dest) ??
+      locs.find(s => !s.cityName || s.cityName === dayCity) ??
       locs[0]
     );
   })();
@@ -108,11 +114,14 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
     // Start
     if (startingPoint) waypoints.push(encodeURIComponent(startingPoint));
 
-    // Stops interleaved with confirmed parking
+    // Stops — parking address replaces stop when present
     for (const stop of stops) {
       const parking = parkingStops.find(p => p.beforeStopId === stop.id && p.confirmed);
-      if (parking) waypoints.push(encodeURIComponent(parking.address));
-      waypoints.push(encodeURIComponent(`${stop.name} ${trip.destination ?? trip.city ?? ''}`));
+      if (parking) {
+        waypoints.push(encodeURIComponent(parking.address));
+      } else {
+        waypoints.push(encodeURIComponent(`${stop.name} ${trip.destination ?? trip.city ?? ''}`));
+      }
     }
 
     // Return to hotel / start (loop route)
@@ -259,12 +268,22 @@ export default function DirectionsSheet({ stops, trip, onClose }: Props) {
                         {(!isLast || !!startingPoint) && <View style={s.connector} />}
                       </View>
                       <View style={s.routeContent}>
-                        <Text style={s.routeName}>{stop.name}</Text>
+                        {/* Stop name — muted when parking is navigating there instead */}
+                        <Text style={[s.routeName, parking ? s.routeNameMuted : null]}>
+                          {stop.name}
+                        </Text>
+
+                        {/* Parking active label */}
+                        {parking && (
+                          <Text style={s.navigatingLabel}>Navigating to parking lot</Text>
+                        )}
+
+                        {/* Duration / session meta */}
                         {!!metaStr && (
                           <Text style={s.routeMeta}>{metaStr}</Text>
                         )}
 
-                        {/* Add parking link */}
+                        {/* Add parking link — hidden once parking is confirmed */}
                         {!parking && editingParkingFor !== stop.id && (
                           <Pressable
                             onPress={() => {
@@ -458,6 +477,15 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: '#8A8FA8',
     marginTop: 1,
+    fontFamily: F.regular,
+  },
+  routeNameMuted: {
+    color: '#8A8FA8',
+  },
+  navigatingLabel: {
+    fontSize: 11,
+    color: '#F5A623',
+    marginTop: 2,
     fontFamily: F.regular,
   },
   addParkingLink: {
