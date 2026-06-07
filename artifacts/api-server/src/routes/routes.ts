@@ -6258,6 +6258,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Derive the correct country for a city name, handling "Paris, France"-style names
+      const deriveCountryFromCity = (cityName: string): string => {
+        const CITY_COUNTRY_SERVER: Record<string, string> = {
+          London: 'United Kingdom', Paris: 'France', Rome: 'Italy', Barcelona: 'Spain',
+          Amsterdam: 'Netherlands', Dublin: 'Ireland', Edinburgh: 'United Kingdom',
+          Lisbon: 'Portugal', Porto: 'Portugal', Madrid: 'Spain', Prague: 'Czech Republic',
+          Vienna: 'Austria', Tokyo: 'Japan', Kyoto: 'Japan', Sydney: 'Australia',
+          Melbourne: 'Australia', Toronto: 'Canada', Vancouver: 'Canada', Montreal: 'Canada',
+          'Mexico City': 'Mexico', Cancun: 'Mexico',
+        };
+        if (CITY_COUNTRY_SERVER[cityName]) return CITY_COUNTRY_SERVER[cityName];
+        const parts = cityName.split(',').map(p => p.trim());
+        if (parts.length >= 2) {
+          const hint = parts[parts.length - 1];
+          const hintMap: Record<string, string> = {
+            France: 'France', UK: 'United Kingdom', England: 'United Kingdom',
+            Italy: 'Italy', Spain: 'Spain', Germany: 'Germany', Portugal: 'Portugal',
+            Japan: 'Japan', Australia: 'Australia', Netherlands: 'Netherlands',
+            Belgium: 'Belgium', Switzerland: 'Switzerland', Austria: 'Austria',
+            Greece: 'Greece', 'Czech Republic': 'Czech Republic', Hungary: 'Hungary',
+            Denmark: 'Denmark', Sweden: 'Sweden', Norway: 'Norway', Finland: 'Finland',
+            Poland: 'Poland', Canada: 'Canada', Mexico: 'Mexico', Brazil: 'Brazil',
+            Argentina: 'Argentina', Colombia: 'Colombia', Peru: 'Peru', Chile: 'Chile',
+            'South Africa': 'South Africa', Morocco: 'Morocco', Egypt: 'Egypt',
+            India: 'India', China: 'China', Thailand: 'Thailand', Vietnam: 'Vietnam',
+            Indonesia: 'Indonesia', Malaysia: 'Malaysia', Singapore: 'Singapore',
+            'South Korea': 'South Korea', UAE: 'UAE', Turkey: 'Turkey',
+            'New Zealand': 'New Zealand', Ireland: 'Ireland',
+          };
+          return hintMap[hint] ?? hint;
+        }
+        return CITY_COUNTRY_SERVER[cityName] ?? 'USA';
+      };
+
       // Multi-city: generate stops for remaining cities server-side so they are reliable
       if (!isHomeAdventure && cityDates && city && typeof cityDates === 'object') {
         const cdMap = cityDates as Record<string, { startDate: string; endDate: string }>;
@@ -6288,7 +6322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const cityStopCount = Math.min(cityDays * spd, 30);
             const capturedTripId = trip.id;
             const capturedOrderOffset = orderOffset;
-            const capturedCountry = country;
+            const capturedCountry = deriveCountryFromCity(extraCity);
             const capturedStyle = adventureStyle;
             const capturedCity = extraCity;
             const capturedAnchors = allTripAnchors;

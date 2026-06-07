@@ -129,6 +129,65 @@ export const CITY_COUNTRY: Record<string, string> = Object.fromEntries(
   ALL_CITIES.map(c => [c.name, c.country])
 );
 
+const COUNTRY_HINT_MAP: Record<string, string> = {
+  France: 'France',
+  UK: 'United Kingdom',
+  England: 'United Kingdom',
+  Italy: 'Italy',
+  Spain: 'Spain',
+  Germany: 'Germany',
+  Portugal: 'Portugal',
+  Japan: 'Japan',
+  Australia: 'Australia',
+  Netherlands: 'Netherlands',
+  Belgium: 'Belgium',
+  Switzerland: 'Switzerland',
+  Austria: 'Austria',
+  Greece: 'Greece',
+  'Czech Republic': 'Czech Republic',
+  Hungary: 'Hungary',
+  Denmark: 'Denmark',
+  Sweden: 'Sweden',
+  Norway: 'Norway',
+  Finland: 'Finland',
+  Poland: 'Poland',
+  Canada: 'Canada',
+  Mexico: 'Mexico',
+  Brazil: 'Brazil',
+  Argentina: 'Argentina',
+  Colombia: 'Colombia',
+  Peru: 'Peru',
+  Chile: 'Chile',
+  'South Africa': 'South Africa',
+  Morocco: 'Morocco',
+  Egypt: 'Egypt',
+  Kenya: 'Kenya',
+  Tanzania: 'Tanzania',
+  India: 'India',
+  China: 'China',
+  Thailand: 'Thailand',
+  Vietnam: 'Vietnam',
+  Indonesia: 'Indonesia',
+  Malaysia: 'Malaysia',
+  Singapore: 'Singapore',
+  'South Korea': 'South Korea',
+  UAE: 'UAE',
+  Qatar: 'Qatar',
+  Turkey: 'Turkey',
+  'New Zealand': 'New Zealand',
+  Ireland: 'Ireland',
+};
+
+export function deriveCountry(cityName: string): string {
+  if (CITY_COUNTRY[cityName]) return CITY_COUNTRY[cityName];
+  const parts = cityName.split(',').map(p => p.trim());
+  if (parts.length >= 2) {
+    const hint = parts[parts.length - 1];
+    return COUNTRY_HINT_MAP[hint] ?? hint;
+  }
+  return 'USA';
+}
+
 export const CITY_IMGS: Record<string, string> = {
   Chicago: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=400&q=80',
   'New York': 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&q=80',

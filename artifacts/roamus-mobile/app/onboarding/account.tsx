@@ -7,7 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackBtn, Wordmark } from "@/lib/onboardingAtoms";
-import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP } from "@/lib/tokens";
+import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/tokens";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useOnboarding } from "@/lib/onboardingContext";
 
@@ -73,7 +73,7 @@ export default function AccountScreen() {
   async function createTripWithJwt(jwt: string) {
     try {
       const city = data.cities[0] ?? "Chicago";
-      const country = CITY_COUNTRY[city] ?? "USA";
+      const country = deriveCountry(city);
       const players = data.travelers.map(t => ({
         name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
       }));

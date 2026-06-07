@@ -7,7 +7,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP } from "@/lib/tokens";
+import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/tokens";
 import { useOnboarding, type PreviewDay } from "@/lib/onboardingContext";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useLandmarkImage } from "@/lib/useLandmarkImage";
@@ -480,7 +480,7 @@ export default function PreviewScreen() {
             setSaving(true);
             try {
               const city = data.cities[0] ?? "Chicago";
-              const country = CITY_COUNTRY[city] ?? "USA";
+              const country = deriveCountry(city);
               const isMultiCity = data.cityMode === "multi" && data.cities.length > 1;
               const tripName = isMultiCity
                 ? `${data.cities.slice(0, -1).join(", ")} & ${data.cities[data.cities.length - 1]} Family Trip`
