@@ -74,16 +74,20 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
   const sheetAnim   = useRef(new Animated.Value(500)).current;
   const [mounted, setMounted] = useState(false);
 
-  const [hotelName,   setHotelName]   = useState('');
-  const [address,     setAddress]     = useState('');
-  const [suggestions, setSuggestions] = useState<Array<{ name: string; sub: string }>>([]);
-  const [saving,      setSaving]      = useState(false);
-  const [saved,       setSaved]       = useState(false);
+  const [hotelName,          setHotelName]          = useState('');
+  const [address,            setAddress]            = useState('');
+  const [suggestions,        setSuggestions]        = useState<Array<{ name: string; sub: string }>>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [saving,             setSaving]             = useState(false);
+  const [saved,              setSaved]              = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
       setSaved(false); setHotelName(''); setAddress(''); setSuggestions([]);
+      setAddressSuggestions([]); setIsSearchingAddress(false);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 24, stiffness: 200, useNativeDriver: true }),
@@ -101,10 +105,46 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
     setSuggestions(getSuggestions(hotelName, destination));
   }, [hotelName, destination]);
 
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
+  function handleHotelNameChange(text: string) {
+    setHotelName(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (text.trim().length < 3) {
+      setAddressSuggestions([]);
+      setIsSearchingAddress(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setIsSearchingAddress(true);
+      try {
+        const query = encodeURIComponent(`${text.trim()}, ${destination}`);
+        const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=3&addressdetails=1`;
+        const res = await fetch(url, { headers: { 'User-Agent': 'RoamUs/1.0', 'Accept-Language': 'en' } });
+        if (!res.ok) { setAddressSuggestions([]); return; }
+        const data = await res.json() as Array<{ display_name?: string }>;
+        setAddressSuggestions(
+          data.slice(0, 3).map(r => r.display_name ?? '').filter(Boolean)
+        );
+      } catch {
+        setAddressSuggestions([]);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 800);
+  }
+
   function selectSuggestion(item: { name: string; sub: string }) {
     setHotelName(item.sub);
     setSuggestions([]);
     Keyboard.dismiss();
+  }
+
+  function selectAddressSuggestion(addr: string) {
+    setAddress(addr);
+    setAddressSuggestions([]);
   }
 
   async function handleSave() {
@@ -158,7 +198,7 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
                 placeholder={`Search hotel in ${destination}...`}
                 placeholderTextColor={C.muted}
                 value={hotelName}
-                onChangeText={text => setHotelName(text)}
+                onChangeText={handleHotelNameChange}
                 autoFocus
                 returnKeyType="next"
               />
@@ -187,6 +227,30 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
                       <Text style={s.suggName} numberOfLines={1}>{item.name}</Text>
                       <Text style={s.suggSub} numberOfLines={1}>{item.sub} · {destination}</Text>
                     </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            {isSearchingAddress && (
+              <Text style={s.searchingLabel}>Looking up address...</Text>
+            )}
+
+            {addressSuggestions.length > 0 && (
+              <ScrollView
+                style={s.suggList}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {addressSuggestions.map((addr, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[s.suggRow, i < addressSuggestions.length - 1 && s.suggRowBorder]}
+                    onPress={() => selectAddressSuggestion(addr)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.suggIco}>{'\uD83D\uDCCD'}</Text>
+                    <Text style={[s.suggName, { flex: 1 }]} numberOfLines={2}>{addr}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -301,7 +365,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  suggRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  suggRowBorder:   { borderBottomWidth: 1, borderBottomColor: C.border },
+  searchingLabel: {
+    fontFamily: F.regular,
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 4,
+    marginBottom: 2,
+    paddingHorizontal: 4,
+  },
   suggIco:  { fontSize: 16 },
   suggName: { fontFamily: F.semibold, fontSize: 14, color: C.deep },
   suggSub:  { fontFamily: F.regular, fontSize: 12, color: C.muted, marginTop: 1 },
