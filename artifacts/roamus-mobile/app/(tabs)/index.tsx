@@ -407,20 +407,37 @@ export default function TripsScreen() {
             )}
           </>
         ) : (
-          <View style={s.emptyCard}>
-            <View style={s.emptyIconWrap}>
-              <Ionicons name="briefcase-outline" size={32} color={G.orange} />
+          <>
+            <View style={s.emptyCard}>
+              <View style={s.emptyIconWrap}>
+                <Ionicons name="briefcase-outline" size={32} color={G.orange} />
+              </View>
+              <Text style={s.emptyTitle}>No trips yet</Text>
+              <Text style={s.emptyDesc}>Plan your family adventure and unlock quests, stories, and memories along the way.</Text>
+              <Pressable
+                style={({ pressed }) => [s.planBtn, { opacity: pressed ? 0.85 : 1 }]}
+                onPress={startNewTrip}
+              >
+                <Ionicons name="add-circle-outline" size={18} color="#fff" />
+                <Text style={s.planBtnText}>Plan a Trip</Text>
+              </Pressable>
             </View>
-            <Text style={s.emptyTitle}>No trips yet</Text>
-            <Text style={s.emptyDesc}>Plan your family adventure and unlock quests, stories, and memories along the way.</Text>
-            <Pressable
-              style={({ pressed }) => [s.planBtn, { opacity: pressed ? 0.85 : 1 }]}
-              onPress={startNewTrip}
+
+            <TouchableOpacity
+              style={s.discoverBtn}
+              onPress={() => router.push('/discover' as any)}
+              activeOpacity={0.85}
             >
-              <Ionicons name="add-circle-outline" size={18} color="#fff" />
-              <Text style={s.planBtnText}>Plan a Trip</Text>
-            </Pressable>
-          </View>
+              <View style={s.discoverBtnIco}>
+                <Text style={{ fontSize: 18 }}>🌍</Text>
+              </View>
+              <View style={s.discoverBtnBody}>
+                <Text style={s.discoverBtnTitle}>Discover trips</Text>
+                <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
+              </View>
+              <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
+            </TouchableOpacity>
+          </>
         )}
       </ScrollView>
 
