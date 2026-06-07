@@ -3496,25 +3496,57 @@ export default function TripPlanScreen() {
       .filter(s => s.dayIndex === dayNum - 1)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
 
-    // Distribute null-dayIndex stops (bg-multicity secondary-city stops that
+    // Distribute null-dayIndex stops (multi-city secondary-city stops that
     // weren't assigned a dayIndex at generation time) across their city's date range
     const nullStops = localStops.filter(s => s.dayIndex == null && s.cityGroup);
     if (nullStops.length === 0) return direct;
 
-    const cd = trip?.cityDates as Record<string, { start?: string; startDate?: string; end?: string; endDate?: string }> | null | undefined;
-    if (!cd || !trip?.startDate) return direct;
+    // Normalise city dates — API may return startDate/endDate or start/end keys
+    const rawCd = trip?.cityDates as Record<string, Record<string, string>> | null | undefined;
+    const cd: Record<string, { start: string; end: string }> = {};
+    if (rawCd && typeof rawCd === 'object') {
+      for (const [city, range] of Object.entries(rawCd)) {
+        if (!range) continue;
+        const s = range.startDate ?? range.start ?? '';
+        const e = range.endDate   ?? range.end   ?? '';
+        if (s && e) cd[city] = { start: s, end: e };
+      }
+    }
 
-    const tripStart = new Date(trip.startDate);
-    const currentDate = new Date(tripStart);
-    currentDate.setDate(tripStart.getDate() + dayNum - 1);
-    const dateStr = currentDate.toISOString().split('T')[0];
+    // UTC-safe day offset: avoids getDate()/setDate() local-time drift
+    const toUTCMidnight = (d: string | Date) =>
+      new Date(typeof d === 'string' ? d : d.toISOString()).setUTCHours(0, 0, 0, 0);
+
+    if (Object.keys(cd).length === 0 || !trip?.startDate) {
+      // Fallback — no cityDates: distribute null stops across days after the last
+      // day that has direct stops, spread evenly over remaining trip days.
+      const maxDirectDayIndex = localStops
+        .filter(s => s.dayIndex != null)
+        .reduce((m, s) => Math.max(m, s.dayIndex as number), -1);
+      const firstNullDay = maxDirectDayIndex + 2; // 1-indexed dayNum of first null-stop day
+      const nullDayOffset = dayNum - firstNullDay;
+      if (nullDayOffset < 0) return direct;
+
+      let totalNullDays = 1;
+      if (trip?.startDate && trip?.endDate) {
+        const tripDays = Math.round(
+          (toUTCMidnight(trip.endDate) - toUTCMidnight(trip.startDate)) / 86_400_000
+        ) + 1;
+        totalNullDays = Math.max(1, tripDays - (maxDirectDayIndex + 1));
+      }
+      const perDay = Math.ceil(nullStops.length / totalNullDays);
+      return [...direct, ...nullStops.slice(nullDayOffset * perDay, (nullDayOffset + 1) * perDay)];
+    }
+
+    // UTC date string for the requested day (timezone-safe)
+    const tripStartMs = toUTCMidnight(trip.startDate!);
+    const dayMs       = tripStartMs + (dayNum - 1) * 86_400_000;
+    const dateStr     = new Date(dayMs).toISOString().split('T')[0];
 
     // Find which city owns this calendar date
-    const ownerEntry = Object.entries(cd).find(([, range]) => {
-      const s = range.startDate ?? range.start ?? '';
-      const e = range.endDate ?? range.end ?? '';
-      return !!s && !!e && s <= dateStr && dateStr <= e;
-    });
+    const ownerEntry = Object.entries(cd).find(([, range]) =>
+      range.start <= dateStr && dateStr <= range.end
+    );
     if (!ownerEntry) return direct;
     const [ownerCity, ownerRange] = ownerEntry;
 
@@ -3523,17 +3555,14 @@ export default function TripPlanScreen() {
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     if (cityNullStops.length === 0) return direct;
 
-    // Evenly distribute across the city's days
-    const cityStartStr = ownerRange.startDate ?? ownerRange.start ?? trip.startDate!;
-    const cityEndStr   = ownerRange.endDate   ?? ownerRange.end   ?? cityStartStr;
-    const cityStart    = new Date(cityStartStr);
-    const cityEnd      = new Date(cityEndStr);
-    const cityDayCount = Math.round((cityEnd.getTime() - cityStart.getTime()) / 86400000) + 1;
-    const localOffset  = Math.round((currentDate.getTime() - cityStart.getTime()) / 86400000);
+    // Evenly distribute across the city's days (UTC arithmetic throughout)
+    const cityStartMs  = toUTCMidnight(ownerRange.start);
+    const cityEndMs    = toUTCMidnight(ownerRange.end);
+    const cityDayCount = Math.round((cityEndMs - cityStartMs) / 86_400_000) + 1;
+    const localOffset  = Math.round((dayMs - cityStartMs) / 86_400_000);
     const perDay       = Math.ceil(cityNullStops.length / Math.max(cityDayCount, 1));
-    const cityStopsForDay = cityNullStops.slice(localOffset * perDay, (localOffset + 1) * perDay);
 
-    return [...direct, ...cityStopsForDay];
+    return [...direct, ...cityNullStops.slice(localOffset * perDay, (localOffset + 1) * perDay)];
   }, [localStops, trip]);
 
   const getAnchorStopForDay = useCallback((dayNum: number): Stop | null => {
