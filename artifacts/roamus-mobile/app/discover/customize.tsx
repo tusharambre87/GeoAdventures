@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -233,7 +235,10 @@ export default function DiscoverCustomizeScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: G.bg }]}>
+    <KeyboardAvoidingView
+      style={[s.root, { backgroundColor: G.bg }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <ScrollView
         contentContainerStyle={[s.scroll, { paddingBottom: 120 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
@@ -378,7 +383,7 @@ export default function DiscoverCustomizeScreen() {
         </TouchableOpacity>
         <Text style={s.ctaNote}>Takes about 10 seconds · Personalised for your family</Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
