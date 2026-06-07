@@ -1748,6 +1748,13 @@ export default function TodayScreen() {
             trip={trip}
             currentDayIndex={resolvedDayIndex}
             onClose={() => setShowDirections(false)}
+            localHotel={
+              localSavedHotel ??
+              (trip.stayLocations ?? []).find(
+                s => !s.cityName || s.cityName === (trip.destination ?? (trip as any).city)
+              )?.address ??
+              null
+            }
           />
         )}
         <UpgradeSheet

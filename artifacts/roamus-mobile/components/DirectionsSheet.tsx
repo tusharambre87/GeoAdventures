@@ -48,9 +48,10 @@ interface Props {
   trip: Trip;
   currentDayIndex: number;
   onClose: () => void;
+  localHotel?: string | null;
 }
 
-export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose }: Props) {
+export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose, localHotel }: Props) {
   const insets = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(600)).current;
@@ -80,6 +81,7 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose 
 
   const startingPoint: string | null =
     manualStartPoint ??
+    localHotel ??
     resolvedStayLocation?.address ??
     (resolvedStayLocation?.cityName ? resolvedStayLocation.cityName : null);
 
