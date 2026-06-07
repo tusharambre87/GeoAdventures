@@ -48,10 +48,10 @@ interface Props {
   trip: Trip;
   currentDayIndex: number;
   onClose: () => void;
-  localHotel?: string | null;
+  savedHotel?: string | null;
 }
 
-export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose, localHotel }: Props) {
+export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose, savedHotel }: Props) {
   const insets = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(600)).current;
@@ -63,36 +63,29 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose,
   const [editingStart, setEditingStart]           = useState(false);
   const [startInput, setStartInput]               = useState('');
 
-  // Resolve starting point — try today's city first, then destination/city, then first entry
-  const resolvedStayLocation = (() => {
-    const locs = trip.stayLocations;
+  // Resolve hotel from trip's stayLocations (fallback path)
+  function resolveStartingPoint(t: Trip): string | null {
+    const locs = t.stayLocations;
     if (!locs || locs.length === 0) return null;
     const dayCity =
-      trip.cities?.[currentDayIndex] ??
-      trip.cities?.[0] ??
-      trip.destination ??
-      trip.city ??
+      t.cities?.[currentDayIndex] ??
+      t.cities?.[0] ??
+      t.destination ??
+      t.city ??
       '';
-    return (
+    const loc =
       locs.find(s => !s.cityName || s.cityName === dayCity) ??
-      locs[0]
-    );
-  })();
+      locs[0];
+    return loc?.address ?? (loc?.cityName || null);
+  }
 
   const startingPoint: string | null =
     manualStartPoint ??
-    localHotel ??
-    resolvedStayLocation?.address ??
-    (resolvedStayLocation?.cityName ? resolvedStayLocation.cityName : null);
+    savedHotel ??
+    resolveStartingPoint(trip);
 
-  // Diagnostics — visible in Metro/Expo logs
-  console.log('DIRECTIONS_START_DEBUG', {
-    stayLocations: trip?.stayLocations,
-    cities: trip?.cities,
-    destination: trip?.destination,
-    currentDayIndex,
-    resolved: startingPoint,
-  });
+  // Diagnostic — remove once hotel resolution is confirmed working
+  console.log('DIRECTIONS_START_DEBUG', { savedHotel, destination: trip?.destination, resolved: startingPoint });
 
   useEffect(() => {
     Animated.parallel([
@@ -381,7 +374,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  kav: { justifyContent: 'flex-end' },
+  kav: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
@@ -419,6 +412,7 @@ const s = StyleSheet.create({
   routeScroll: {
     paddingHorizontal: 20,
     flex: 1,
+    flexShrink: 1,
   },
   addStartPrompt: {
     backgroundColor: '#FDF0E9',
