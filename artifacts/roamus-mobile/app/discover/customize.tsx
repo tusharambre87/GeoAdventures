@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { getAiPickTemplateStops } from "@/lib/discoverData";
+import { API_BASE, useAuth } from "@/lib/authContext";
 
 // ─ Calendar helpers ─────────────────────────────────────────────
 
@@ -125,6 +127,36 @@ export default function DiscoverCustomizeScreen() {
   }>();
   const insets = useSafeAreaInsets();
   const { set: setOnboarding, reset, data: onboardingData } = useOnboarding();
+  const { token } = useAuth();
+  const [existingRanges, setExistingRanges] = useState<{ start: string; end: string }[]>([]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/travel/trips`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => {
+        const ranges = (json.trips ?? [])
+          .filter((t: any) => t.startDate && t.endDate && t.status !== 'completed' && t.status !== 'archived')
+          .map((t: any) => ({ start: t.startDate as string, end: t.endDate as string }));
+        setExistingRanges(ranges);
+      })
+      .catch(() => {});
+  }, [token]);
+
+  function datesOverlapExisting(newStart: string | null, newEnd: string | null): string | null {
+    if (!newStart || !newEnd) return null;
+    const ns = new Date(newStart); ns.setHours(0, 0, 0, 0);
+    const ne = new Date(newEnd); ne.setHours(23, 59, 59, 999);
+    for (const r of existingRanges) {
+      const rs = new Date(r.start); rs.setHours(0, 0, 0, 0);
+      const re = new Date(r.end); re.setHours(23, 59, 59, 999);
+      if (ns <= re && ne >= rs) {
+        const fmt2 = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `You already have a trip planned ${fmt2(rs)}–${fmt2(re)}. Please choose different dates.`;
+      }
+    }
+    return null;
+  }
 
   const destination = destParam ? decodeURIComponent(destParam) : slug.replace(/^ai-/, "").replace(/-/g, " ");
   const templateDays = tdParam ? parseInt(tdParam, 10) || DEFAULT_TEMPLATE_DAYS : DEFAULT_TEMPLATE_DAYS;
@@ -192,6 +224,11 @@ export default function DiscoverCustomizeScreen() {
     if (!canBuild) return;
     const startIso = start ? toISO(start) : null;
     const endIso   = end   ? toISO(end)   : null;
+    const overlapMsg = datesOverlapExisting(startIso, endIso);
+    if (overlapMsg) {
+      Alert.alert('Dates conflict', overlapMsg, [{ text: 'OK' }]);
+      return;
+    }
     const isAi     = isAiPick === "true";
     const isMulti  = showSecondCity && !!secondCity && secondCity.trim().length > 0;
 
