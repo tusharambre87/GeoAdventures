@@ -2745,14 +2745,37 @@ function AddStopSheet({
   const city      = trip.city ?? trip.destination ?? 'your destination';
   const lastStop  = getStopsForDay(selectedDay).at(-1) ?? null;
 
-  const [category,    setCategory]    = useState<'food' | 'kids' | 'landmarks'>(defaultFilter ?? 'food');
-  const [options,     setOptions]     = useState<StopOption[]>([]);
-  const [loading,     setLoading]     = useState(false);
-  const [search,      setSearch]      = useState('');
-  const [selectedOpt, setSelectedOpt] = useState<StopOption | null>(null);
-  const [adding,      setAdding]      = useState(false);
-  const [detailOpt,   setDetailOpt]   = useState<StopOption | null>(null);
-  const [positionOpt, setPositionOpt] = useState<StopOption | null>(null);
+  const [category,       setCategory]       = useState<'food' | 'kids' | 'landmarks'>(defaultFilter ?? 'food');
+  const [options,        setOptions]        = useState<StopOption[]>([]);
+  const [loading,        setLoading]        = useState(false);
+  const [search,         setSearch]         = useState('');
+  const [searchResults,  setSearchResults]  = useState<StopOption[]>([]);
+  const [searchLoading,  setSearchLoading]  = useState(false);
+  const [selectedOpt,    setSelectedOpt]    = useState<StopOption | null>(null);
+  const [adding,         setAdding]         = useState(false);
+  const [detailOpt,      setDetailOpt]      = useState<StopOption | null>(null);
+  const [positionOpt,    setPositionOpt]    = useState<StopOption | null>(null);
+
+  // Debounced live search — fires when user types ≥ 2 chars
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await apiFetch<{ results?: StopOption[] }>(
+          '/api/travel/stops/search',
+          { method: 'POST', body: JSON.stringify({ destination: city, query: q }) }
+        );
+        setSearchResults(result.results ?? []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, city]);
 
   const fetchOptions = useCallback(async (cat: 'food' | 'kids' | 'landmarks') => {
     setLoading(true);
@@ -2854,11 +2877,18 @@ function AddStopSheet({
         } as StopOption & { _fromOtherDay?: boolean }))
     : [];
 
+  // Merge: loaded options filtered by query + live search results (deduped by name)
   const filteredOptions = searchLower
-    ? [
-        ...options.filter(o => o?.name?.toLowerCase().includes(searchLower)),
-        ...otherDayMatches.filter(m => m?.name && !options.some(o => o?.name?.toLowerCase() === m.name.toLowerCase())),
-      ]
+    ? (() => {
+        const loaded = options.filter(o => o?.name?.toLowerCase().includes(searchLower));
+        const loadedNames = new Set(loaded.map(o => o.name.toLowerCase()));
+        const fromOther = otherDayMatches.filter(m => m?.name && !loadedNames.has(m.name.toLowerCase()));
+        const fromOtherNames = new Set(fromOther.map(m => m.name.toLowerCase()));
+        const fromSearch = searchResults.filter(
+          r => r?.name && !loadedNames.has(r.name.toLowerCase()) && !fromOtherNames.has(r.name.toLowerCase())
+        );
+        return [...loaded, ...fromOther, ...fromSearch];
+      })()
     : options;
 
   const featured   = filteredOptions[0] ?? null;
@@ -2914,6 +2944,7 @@ function AddStopSheet({
             value={search}
             onChangeText={setSearch}
           />
+          {searchLoading && <ActivityIndicator size="small" color="#8A8FA8" style={{ marginRight: 8 }} />}
         </View>
       </View>
 

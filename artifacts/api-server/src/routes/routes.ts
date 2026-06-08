@@ -7697,6 +7697,82 @@ Example structure:
     }
   });
 
+  // ─── Stop search — library first, AI fallback ──────────────────────────────
+  // POST /api/travel/stops/search
+  app.post('/api/travel/stops/search', async (req: any, res) => {
+    try {
+      const { destination, query } = req.body;
+      if (!destination || !query) {
+        return res.status(400).json({ message: 'destination and query are required' });
+      }
+      const cityLower = (destination as string).toLowerCase().split(',')[0].trim();
+      const q = (query as string).trim();
+
+      // 1. Search stop_library by name (ilike) + city (ilike)
+      const libRows = await db
+        .select({
+          name: stopLibrary.name,
+          stopType: stopLibrary.stopType,
+          description: stopLibrary.description,
+          address: stopLibrary.address,
+        })
+        .from(stopLibrary)
+        .where(
+          and(
+            ilike(stopLibrary.city, `%${cityLower}%`),
+            ilike(stopLibrary.name, `%${q}%`),
+          )
+        )
+        .orderBy(drizzleSql`RANDOM()`)
+        .limit(8);
+
+      if (libRows.length >= 2) {
+        return res.json({
+          results: libRows.map(r => ({
+            name: r.name,
+            stopType: r.stopType,
+            description: r.description ?? '',
+            address: r.address ?? '',
+            _source: 'library',
+          })),
+        });
+      }
+
+      // 2. AI fallback — ask for real stops matching the query
+      const openai = getOpenAI();
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a family travel expert. Return a JSON object with a "results" array of up to 5 real places in the given city that match the search query. Each item must have: name (real place name), stopType (landmark/museum/park/zoo/aquarium/restaurant/food/other), description (1 sentence on kid appeal). Return ONLY real places. Return valid JSON only.`,
+          },
+          {
+            role: 'user',
+            content: `City: "${destination}"\nSearch: "${q}"`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 600,
+      });
+      const data = JSON.parse(response.choices[0].message.content || '{}');
+      const results: any[] = Array.isArray(data.results) ? data.results : [];
+      res.json({
+        results: results
+          .filter(r => r && typeof r.name === 'string' && r.name.length > 0)
+          .map(r => ({
+            name: r.name,
+            stopType: r.stopType ?? 'other',
+            description: r.description ?? '',
+            _source: 'ai',
+          })),
+      });
+    } catch (error) {
+      console.error('[Travel] Stop search error:', error);
+      res.status(500).json({ message: 'Search failed' });
+    }
+  });
+
   // ─── Rescue Extras — AI-generated break spots & kid-friendly places ─────────
   // POST /api/travel/stops/rescue-extras
   app.post('/api/travel/stops/rescue-extras', async (req: any, res) => {
