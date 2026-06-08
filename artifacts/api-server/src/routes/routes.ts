@@ -2641,7 +2641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Array.isArray(travelers)) {
         return res.status(400).json({ message: "travelers must be an array" });
       }
-      // Persist travelers to the user's most recent active trip
+      // 1. Persist travelers to the user's most recent active trip
       const trips = await storage.getTripsByUserId(userId);
       const activeTrip = trips.find(t => t.status !== 'completed' && t.status !== 'archived') ?? trips[0];
       if (activeTrip) {
@@ -2651,6 +2651,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(t.age != null ? { age: Number(t.age) } : {}),
         }));
         await storage.updateTrip(activeTrip.id, { travelers: formatted as any });
+      }
+      // 2. Sync players table so Me tab reflects the full crew
+      const existingPlayers = await storage.getActiveExplorers(userId);
+      const existingNames = new Set(existingPlayers.map(p => p.name.toLowerCase().trim()));
+      const incomingNames = new Set(travelers.map((t: any) => (t.name ?? '').toLowerCase().trim()));
+      // Create player records for new travelers
+      for (const t of travelers) {
+        const nameLower = (t.name ?? '').toLowerCase().trim();
+        if (!nameLower) continue;
+        if (!existingNames.has(nameLower)) {
+          const isParent = Boolean(t.isParent);
+          const age = t.age != null ? String(t.age) : (isParent ? 'adult' : 'unknown');
+          await db.insert(players).values({
+            userId,
+            name: t.name,
+            age,
+            profileType: isParent ? 'adult' : 'kid',
+            ageRange: isParent ? 'adult' : (t.age != null ? (Number(t.age) <= 5 ? '3-5' : Number(t.age) <= 9 ? '6-9' : '9+') : undefined),
+            isGuest: false,
+            isArchived: false,
+          });
+        }
+      }
+      // Archive player records for travelers that were removed
+      for (const p of existingPlayers) {
+        if (!incomingNames.has(p.name.toLowerCase().trim())) {
+          await db.update(players)
+            .set({ isArchived: true, updatedAt: new Date() })
+            .where(eq(players.id, p.id));
+        }
       }
       res.json({ success: true });
     } catch (error) {
