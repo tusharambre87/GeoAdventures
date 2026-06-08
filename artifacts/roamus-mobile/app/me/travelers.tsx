@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -88,7 +89,7 @@ export default function TravelersScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      await fetch(`${API_BASE}/api/users/travelers`, {
+      const res = await fetch(`${API_BASE}/api/users/travelers`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -96,7 +97,17 @@ export default function TravelersScreen() {
         },
         body: JSON.stringify({ travelers }),
       });
-    } catch {}
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        Alert.alert("Couldn't save", body?.message ?? `Server error ${res.status}. Try again.`);
+        setSaving(false);
+        return;
+      }
+    } catch {
+      Alert.alert("Couldn't save", "Check your connection and try again.");
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     router.back();
   }
