@@ -6100,6 +6100,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Seed stops from a shared itinerary template, scaling to the requested trip length
+  // Server-authoritative AI pick stop definitions — keyed by slug.
+  // These must NEVER be sourced from the client request body.
+  const AI_PICK_STOPS: Record<string, { durationDays: number; stops: Array<{ name: string; stopType: string; isOptional: boolean }> }> = {
+    "ai-dc": { durationDays: 3, stops: [
+      { name: "National Air and Space Museum", stopType: "museum", isOptional: false },
+      { name: "National Museum of Natural History", stopType: "museum", isOptional: false },
+      { name: "Lincoln Memorial", stopType: "landmark", isOptional: false },
+      { name: "Washington Monument", stopType: "landmark", isOptional: true },
+      { name: "National Zoo", stopType: "zoo", isOptional: false },
+      { name: "National Botanic Garden", stopType: "park", isOptional: true },
+      { name: "National Archives", stopType: "museum", isOptional: false },
+      { name: "US Capitol Visitor Center", stopType: "landmark", isOptional: false },
+      { name: "Library of Congress", stopType: "landmark", isOptional: true },
+    ]},
+    "ai-nashville": { durationDays: 2, stops: [
+      { name: "Country Music Hall of Fame", stopType: "museum", isOptional: false },
+      { name: "Ryman Auditorium", stopType: "landmark", isOptional: false },
+      { name: "Printers Alley", stopType: "landmark", isOptional: true },
+      { name: "Centennial Park & Parthenon", stopType: "park", isOptional: false },
+      { name: "Adventure Science Center", stopType: "museum", isOptional: false },
+      { name: "Nashville Zoo", stopType: "zoo", isOptional: true },
+    ]},
+    "ai-denver": { durationDays: 3, stops: [
+      { name: "Denver Museum of Nature & Science", stopType: "museum", isOptional: false },
+      { name: "Denver Art Museum", stopType: "museum", isOptional: true },
+      { name: "16th Street Mall", stopType: "landmark", isOptional: false },
+      { name: "Red Rocks Amphitheatre", stopType: "landmark", isOptional: false },
+      { name: "Denver Botanic Gardens", stopType: "park", isOptional: true },
+      { name: "Denver Zoo", stopType: "zoo", isOptional: false },
+      { name: "City Park", stopType: "park", isOptional: false },
+      { name: "Meow Wolf Denver", stopType: "attraction", isOptional: true },
+    ]},
+    "ai-austin": { durationDays: 2, stops: [
+      { name: "Texas State Capitol", stopType: "landmark", isOptional: false },
+      { name: "Blanton Museum of Art", stopType: "museum", isOptional: true },
+      { name: "South Congress Avenue", stopType: "landmark", isOptional: false },
+      { name: "Barton Springs Pool", stopType: "park", isOptional: false },
+      { name: "Zilker Park", stopType: "park", isOptional: false },
+      { name: "Natural Bridge Caverns", stopType: "nature", isOptional: true },
+    ]},
+    "ai-seattle": { durationDays: 3, stops: [
+      { name: "Pike Place Market", stopType: "market", isOptional: false },
+      { name: "Seattle Great Wheel", stopType: "attraction", isOptional: false },
+      { name: "Seattle Aquarium", stopType: "aquarium", isOptional: false },
+      { name: "Space Needle", stopType: "landmark", isOptional: false },
+      { name: "Museum of Pop Culture", stopType: "museum", isOptional: false },
+      { name: "Pacific Science Center", stopType: "museum", isOptional: false },
+      { name: "Chihuly Garden and Glass", stopType: "attraction", isOptional: true },
+      { name: "Woodland Park Zoo", stopType: "zoo", isOptional: false },
+      { name: "Discovery Park", stopType: "park", isOptional: true },
+    ]},
+    "ai-sandiego": { durationDays: 3, stops: [
+      { name: "San Diego Zoo", stopType: "zoo", isOptional: false },
+      { name: "Fleet Science Center", stopType: "museum", isOptional: false },
+      { name: "Balboa Park Gardens", stopType: "park", isOptional: true },
+      { name: "Mission Beach", stopType: "park", isOptional: false },
+      { name: "Pacific Beach Boardwalk", stopType: "landmark", isOptional: false },
+      { name: "Ocean Beach Pier", stopType: "landmark", isOptional: true },
+      { name: "Old Town San Diego", stopType: "landmark", isOptional: false },
+      { name: "USS Midway Museum", stopType: "museum", isOptional: false },
+      { name: "Seaport Village", stopType: "landmark", isOptional: true },
+    ]},
+  };
+
   async function generateStopsFromTemplate(
     tripId: string,
     templateSlug: string,
@@ -6107,21 +6171,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     adventureStyle: string | undefined,
     cityName: string,
     country: string,
-    preloadedStops?: Array<{ name: string; stopType: string; isOptional: boolean }>,
   ) {
     try {
       let rawStops: Array<{ name: string; stopType?: string; locationType?: string; isOptional?: boolean; wonderPrompt?: string; listenSummary?: string; address?: string; description?: string; latitude?: number | null; longitude?: number | null; displayOrder?: number }> = [];
       let templateDays: number;
 
-      if (preloadedStops && preloadedStops.length > 0) {
-        // AI pick: stops provided directly by the client — use them as the seed pool
-        rawStops = preloadedStops.map((s, i) => ({ ...s, displayOrder: i }));
-        // Infer original template length from stop count (templates use ~3 stops/day).
-        // Do NOT use requestedDays here — that is the *target*, not the template's original
-        // length. Setting templateDays = requestedDays makes targetDays === templateDays and
-        // the trim/expand branches below never fire.
-        templateDays = Math.max(1, Math.ceil(preloadedStops.length / 3));
+      // AI picks: resolve from server-side constants — never trust client-supplied stops
+      const aiPick = AI_PICK_STOPS[templateSlug];
+      if (aiPick) {
+        rawStops = aiPick.stops.map((s, i) => ({ ...s, displayOrder: i }));
+        templateDays = aiPick.durationDays;
       } else {
+        // Community template: fetch from shares table
         const share = await storage.getItineraryShareBySlug(templateSlug);
         if (!share || !share.stops || (share.stops as any[]).length === 0) {
           console.log(`[Travel][template] No share for slug "${templateSlug}" — falling back to AI`);
@@ -6198,9 +6259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/travel/trips', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug, templateStops: rawTemplateStops } = req.body;
-      const templateStops: Array<{ name: string; stopType: string; isOptional: boolean }> | undefined =
-        Array.isArray(rawTemplateStops) && rawTemplateStops.length > 0 ? rawTemplateStops : undefined;
+      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug } = req.body;
+      // templateStops is intentionally NOT read from req.body — stops are always sourced server-side
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
@@ -6318,7 +6378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (templateSlug && typeof templateSlug === 'string') {
           generateStopsFromTemplate(
             trip.id, templateSlug, computedTripDays || null,
-            adventureStyle, city || destination, country ?? '', templateStops
+            adventureStyle, city || destination, country ?? ''
           );
         } else {
           generateStopsInBackground(

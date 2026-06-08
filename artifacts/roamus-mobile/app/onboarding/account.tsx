@@ -99,7 +99,6 @@ export default function AccountScreen() {
           autoGenerateStops: true,
           templateSlug: data.templateSlug || undefined,
           tripDays: data.tripDays || undefined,
-          templateStops: data.templateStops || undefined,
           ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
             cityDates: Object.fromEntries(
               Object.entries(data.cityDates).map(([city, dates]) => [
@@ -128,7 +127,7 @@ export default function AccountScreen() {
       if (res.ok) {
         const trip = await res.json();
         set({ createdTripId: trip.id });
-        set({ templateSlug: null, isTemplate: false, tripDays: null, templateStops: null });
+        set({ templateSlug: null, isTemplate: false, tripDays: null });
         fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}` },

@@ -56,8 +56,6 @@ export type OnboardingData = {
   isTemplate: boolean;
   /** Explicit trip-day count selected in the Discover customize screen */
   tripDays: number | null;
-  /** Stop list from an AI Pick template to seed trip creation directly */
-  templateStops: Array<{ name: string; stopType: string; isOptional: boolean }> | null;
 };
 
 const DEFAULT: OnboardingData = {
@@ -86,7 +84,6 @@ const DEFAULT: OnboardingData = {
   templateSlug: null,
   isTemplate: false,
   tripDays: null,
-  templateStops: null,
 };
 
 type Ctx = {

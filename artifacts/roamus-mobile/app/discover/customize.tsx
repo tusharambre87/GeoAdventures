@@ -16,7 +16,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
-import { getAiPickTemplateStops } from "@/lib/discoverData";
 import { API_BASE, useAuth } from "@/lib/authContext";
 
 // ─ Calendar helpers ─────────────────────────────────────────────
@@ -259,7 +258,6 @@ export default function DiscoverCustomizeScreen() {
       templateSlug: slug,
       isTemplate: true,
       tripDays,
-      templateStops: isAi ? getAiPickTemplateStops(slug) : null,
     });
     router.push({
       pathname: "/onboarding/building" as any,
