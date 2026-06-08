@@ -735,7 +735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shareUrl = `${baseUrl}/s/${trip.id}`;
       const title = `${trip.name ?? trip.destination} — RoamUs Family Adventure`;
       const description = `Explore ${trip.destination ?? 'this destination'} with the family. Tap to see the full trip story.`;
-      const imageUrl = (trip as any).heroImageUrl || `${baseUrl}/favicon.png`;
+      const imageUrl = trip.heroImageUrl || `${baseUrl}/favicon.png`;
       const userAgent = req.headers['user-agent'] || '';
       if (!isSocialCrawler(userAgent)) {
         return res.redirect(302, 'https://roamus.app');
@@ -6241,6 +6241,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Respond IMMEDIATELY with the created trip so the client is never blocked
       // Stop generation runs in the background — ParentPlanView polls for stops via ?generating=true
       res.json({ ...trip, stops: [], _generatingStops: true });
+
+      // Non-blocking: fetch a Wikipedia thumbnail for the destination and store as hero image
+      (async () => {
+        try {
+          const dest = (destination ?? city ?? '').trim();
+          if (!dest) return;
+          const encoded = encodeURIComponent(dest.replace(/ /g, '_'));
+          const wikiRes = await fetch(
+            `https://en.wikipedia.org/w/api.php?action=query&titles=${encoded}&prop=pageimages&format=json&pithumbsize=1200`
+          );
+          const wikiData = await wikiRes.json() as any;
+          const pages = Object.values(wikiData?.query?.pages ?? {}) as any[];
+          const imageUrl: string | null = pages[0]?.thumbnail?.source ?? null;
+          if (imageUrl) {
+            await db.update(travelTrips).set({ heroImageUrl: imageUrl }).where(eq(travelTrips.id, trip.id));
+          }
+        } catch {
+          // Non-blocking — trip creation already succeeded
+        }
+      })();
 
       // Auto-generate stops in the background — trip is already returned to client
       if (autoGenerateStops !== false && (city || destination)) {

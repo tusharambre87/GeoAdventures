@@ -928,6 +928,7 @@ export const travelTrips = pgTable("travel_trips", {
   missionsCompleted: integer("missions_completed").default(0),
   missionXpTotal: integer("mission_xp_total").default(0),
   isArchived: boolean("is_archived").default(false),
+  heroImageUrl: text("hero_image_url"), // Cover image fetched from Wikipedia at trip creation
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

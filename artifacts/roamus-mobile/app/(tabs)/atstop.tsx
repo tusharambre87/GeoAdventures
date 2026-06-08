@@ -280,6 +280,12 @@ function buildStopTimes(stops: Stop[], startHour = 9): string[] {
 }
 
 const WIKI_AMBIGUOUS = ['bridge','zoo','park','museum','garden','library','center','centre','aquarium','monument','memorial','falls'];
+
+const WIKI_TITLE_OVERRIDES: Record<string, string> = {
+  'Como Zoo': 'Como_Park_Zoo_and_Conservatory',
+  'Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
+};
+
 function buildWikiTitle(stopName: string, city?: string): string {
   const base = stopName.replace(/\s+/g, '_');
   if (!city) return base;
@@ -287,8 +293,25 @@ function buildWikiTitle(stopName: string, city?: string): string {
   return isAmbiguous ? `${base},_${city.replace(/\s+/g, '_')}` : base;
 }
 
+async function fetchWikiThumbnail(title: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+    if (!res.ok) return null;
+    const d = (await res.json()) as { thumbnail?: { source: string } };
+    return d.thumbnail?.source ?? null;
+  } catch { return null; }
+}
+
 async function fetchWikiImages(name: string, city?: string): Promise<string[]> {
   try {
+    // Check hardcoded overrides first — bypasses the generic title-building logic
+    const override = WIKI_TITLE_OVERRIDES[name];
+    if (override) {
+      console.log('[fetchWikiImages] override:', override);
+      const url = await fetchWikiThumbnail(override);
+      if (url) return [url];
+    }
+
     const titleWithCity = buildWikiTitle(name, city);
     const titleOnly = name.replace(/\s+/g, '_');
     console.log('[fetchWikiImages] trying:', decodeURIComponent(titleWithCity));
