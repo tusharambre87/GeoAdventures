@@ -512,6 +512,7 @@ export default function TodayScreen() {
   const [showMenu, setShowMenu]                 = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
+  const [currentTemp, setCurrentTemp]           = useState<number | null>(null);
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
   const [isOffline, setIsOffline]               = useState(false);
   const [showFeedback, setShowFeedback]          = useState(false);
@@ -606,6 +607,27 @@ export default function TodayScreen() {
       })
       .catch(() => setRainAlert(null));
   }, [dayStops, currentStopIndex]);
+
+  // ── Open-Meteo temperature fetch for hero weather pill ──
+  useEffect(() => {
+    const stops = dayStops;
+    if (stops.length === 0) return;
+    const first = stops.find(s => s.latitude && s.longitude) ?? stops[0];
+    if (!first?.latitude || !first?.longitude) return;
+    const lat = parseFloat(first.latitude);
+    const lon = parseFloat(first.longitude);
+    if (isNaN(lat) || isNaN(lon)) return;
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m&temperature_unit=fahrenheit&timezone=auto`
+    )
+      .then(r => r.json())
+      .then((d: Record<string, unknown>) => {
+        const cur = d.current as Record<string, unknown> | undefined;
+        const t = cur?.temperature_2m;
+        if (typeof t === 'number') setCurrentTemp(Math.round(t));
+      })
+      .catch(() => {});
+  }, [dayStops]);
 
   // ── Bounce animation for stop_complete hero emoji ──
   const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -1438,11 +1460,13 @@ export default function TodayScreen() {
               start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            {/* Weather pill */}
-            <View style={mo.weatherPill}>
-              <Text style={{ fontSize: 15 }}>{'\uD83C\uDF24'}</Text>
-              <Text style={mo.weatherText}>72°F</Text>
-            </View>
+            {/* Weather pill — anchored below status bar */}
+            {currentTemp !== null && (
+              <View style={[mo.weatherPill, { top: insets.top + 8 }]}>
+                <Text style={{ fontSize: 14 }}>{'\uD83C\uDF24'}</Text>
+                <Text style={mo.weatherText}>{currentTemp}°F</Text>
+              </View>
+            )}
             {/* Bottom copy */}
             <View style={mo.heroBottom}>
               <Text style={mo.greeting}>Good morning {'\uD83D\uDC4B'}</Text>
