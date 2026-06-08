@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAuth, API_BASE } from "@/lib/authContext";
+import { apiFetch } from "@/lib/apiClient";
 import { CHIP_COLORS, F, G } from "@/lib/tokens";
 
 const AGES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
@@ -27,7 +27,6 @@ type Traveler = {
 
 export default function TravelersScreen() {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
 
   const [travelers, setTravelers] = useState<Traveler[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -38,11 +37,7 @@ export default function TravelersScreen() {
 
   // Load travelers from the most recent active trip
   useEffect(() => {
-    if (!token) { setLoadingInitial(false); return; }
-    fetch(`${API_BASE}/api/travel/trips`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
+    apiFetch<{ trips?: any[] }>("/api/travel/trips")
       .then(json => {
         const allTrips: any[] = json.trips ?? [];
         const trip =
@@ -64,7 +59,7 @@ export default function TravelersScreen() {
         setTravelers([{ id: 0, init: "Y", name: "You", isParent: true }]);
       })
       .finally(() => setLoadingInitial(false));
-  }, [token]);
+  }, []);
 
   function confirmAdd() {
     if (!newName.trim()) return;
@@ -89,22 +84,12 @@ export default function TravelersScreen() {
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/api/users/travelers`, {
+      await apiFetch("/api/users/travelers", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ travelers }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        Alert.alert("Couldn't save", body?.message ?? `Server error ${res.status}. Try again.`);
-        setSaving(false);
-        return;
-      }
-    } catch {
-      Alert.alert("Couldn't save", "Check your connection and try again.");
+    } catch (err: any) {
+      Alert.alert("Couldn't save", err?.message ?? "Check your connection and try again.");
       setSaving(false);
       return;
     }
