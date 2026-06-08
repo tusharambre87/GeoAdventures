@@ -6246,7 +6246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cityGroup: cityName,
         });
       }
-      console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" (preloaded=${!!preloadedStops}) for trip ${tripId}`);
+      console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" for trip ${tripId}`);
     } catch (err) {
       console.error('[Travel][template] generateStopsFromTemplate failed:', err);
       try {
