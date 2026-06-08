@@ -2632,6 +2632,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user's default travelers (used by who.tsx in edit mode)
+  app.put('/api/users/travelers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { travelers } = req.body;
+      if (!Array.isArray(travelers)) {
+        return res.status(400).json({ message: "travelers must be an array" });
+      }
+      // Persist travelers to the user's most recent active trip
+      const trips = await storage.getTripsByUserId(userId);
+      const activeTrip = trips.find(t => t.status !== 'completed' && t.status !== 'archived') ?? trips[0];
+      if (activeTrip) {
+        const formatted = travelers.map((t: any) => ({
+          name: t.name ?? 'Traveler',
+          isParent: Boolean(t.isParent),
+          ...(t.age != null ? { age: Number(t.age) } : {}),
+        }));
+        await storage.updateTrip(activeTrip.id, { travelers: formatted as any });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating travelers:", error);
+      res.status(500).json({ message: "Failed to update travelers" });
+    }
+  });
+
   // Update narrator voice preference
   app.post('/api/user/narrator-voice', async (req, res) => {
     try {

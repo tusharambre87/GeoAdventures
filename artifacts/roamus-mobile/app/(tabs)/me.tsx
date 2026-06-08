@@ -515,7 +515,7 @@ export default function MeScreen() {
             iconBg="#FFF7ED"
             title="Edit travelers"
             subtitle="Add or update your travel crew"
-            onPress={() => router.push("/onboarding/who" as never)}
+            onPress={() => router.push("/onboarding/who?editMode=true" as never)}
           />
           <MenuRow
             icon={"\u2699\uFE0F"}

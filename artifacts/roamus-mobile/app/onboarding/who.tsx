@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -16,6 +16,9 @@ export default function WhoScreen() {
   const insets = useSafeAreaInsets();
   const { data, set } = useOnboarding();
   const { token } = useAuth();
+  const params = useLocalSearchParams<{ editMode?: string }>();
+  const isEditMode = params.editMode === 'true';
+  const [saving, setSaving] = useState(false);
 
   const [travelers, setTravelers] = useState<Traveler[]>(
     data.travelers.length > 0
@@ -23,10 +26,9 @@ export default function WhoScreen() {
       : [{ id: 0, init: "Y", name: "You", isParent: true }]
   );
 
-  // Pre-populate travelers from user's existing trips when returning user
+  // Pre-populate travelers from user's existing trips when returning user or in edit mode
   useEffect(() => {
-    if (!data.returningUser || !token) return;
-    // Only pre-populate if travelers is just the default "You"
+    if ((!data.returningUser && !isEditMode) || !token) return;
     const isDefault = travelers.length === 1 && travelers[0].name === "You";
     if (!isDefault) return;
     fetch(`${API_BASE}/api/travel/trips`, {
@@ -49,7 +51,8 @@ export default function WhoScreen() {
         }
       })
       .catch(() => {});
-  }, [data.returningUser, token]);
+  }, [data.returningUser, isEditMode, token]);
+
   const [addingType, setAddingType] = useState<"child" | "adult" | null>(null);
   const [newName, setNewName] = useState("");
   const [newAge, setNewAge] = useState(8);
@@ -83,16 +86,44 @@ export default function WhoScreen() {
     router.push("/onboarding/when");
   }
 
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    set({ travelers });
+    try {
+      await fetch(`${API_BASE}/api/users/travelers`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ travelers }),
+      });
+    } catch {}
+    setSaving(false);
+    router.back();
+  }
+
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
       <View style={[s.header, { paddingTop: insets.top + 14 }]}>
         <View style={s.navRow}>
           <BackBtn onPress={() => router.back()} />
-          <View style={{ flex: 1, alignItems: "center" }}><ProgressDots total={4} cur={1} /></View>
+          {isEditMode
+            ? <Text style={s.editTitle}>Edit travelers</Text>
+            : <View style={{ flex: 1, alignItems: "center" }}><ProgressDots total={4} cur={1} /></View>
+          }
           <View style={{ width: 40 }} />
         </View>
-        <Text style={s.title}>Who's going? {'\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66'}</Text>
-        <Text style={s.sub}>We'll adjust every stop for their ages.</Text>
+        {!isEditMode && (
+          <>
+            <Text style={s.title}>Who's going? {'\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66'}</Text>
+            <Text style={s.sub}>We'll adjust every stop for their ages.</Text>
+          </>
+        )}
+        {isEditMode && (
+          <Text style={s.sub}>Add or remove people from your travel crew.</Text>
+        )}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[s.scroll, { paddingBottom: 140 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -205,7 +236,10 @@ export default function WhoScreen() {
       </ScrollView>
 
       <View style={[s.cta, { paddingBottom: insets.bottom + 20 }]}>
-        <BigBtn label="Continue →" onPress={handleContinue} />
+        {isEditMode
+          ? <BigBtn label={saving ? "Saving…" : "Save changes"} onPress={handleSave} />
+          : <BigBtn label="Continue →" onPress={handleContinue} />
+        }
       </View>
     </View>
   );
@@ -215,6 +249,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   header: { paddingHorizontal: 24, flexShrink: 0 },
   navRow: { flexDirection: "row", alignItems: "center", marginBottom: 22 },
+  editTitle: { flex: 1, fontFamily: F.bold, fontSize: 17, fontWeight: "700", color: G.deep, textAlign: "center" },
   title: { fontFamily: F.bold, fontSize: 30, fontWeight: "800", letterSpacing: -0.6, color: G.deep, marginBottom: 6 },
   sub: { fontFamily: F.regular, fontSize: 16, color: G.muted, marginBottom: 20 },
   scroll: { paddingHorizontal: 24 },

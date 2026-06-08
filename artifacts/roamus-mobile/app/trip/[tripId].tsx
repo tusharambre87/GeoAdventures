@@ -2766,7 +2766,7 @@ function AddStopSheet({
       } else if (cat === 'kids') {
         body.context = 'fun';
       } else {
-        body.stopTypes = ['landmark', 'museum', 'park'];
+        body.stopTypes = ['landmark', 'museum', 'park', 'zoo', 'aquarium', 'attraction', 'theme_park', 'nature', 'adventure', 'other'];
       }
       const result = await apiFetch<{ nearby?: StopOption[]; popular?: StopOption[] }>(
         '/api/travel/stops/smart-suggestions',
@@ -2856,8 +2856,8 @@ function AddStopSheet({
 
   const filteredOptions = searchLower
     ? [
-        ...options.filter(o => o.name.toLowerCase().includes(searchLower)),
-        ...otherDayMatches.filter(m => !options.some(o => o.name.toLowerCase() === m.name.toLowerCase())),
+        ...options.filter(o => o?.name?.toLowerCase().includes(searchLower)),
+        ...otherDayMatches.filter(m => m?.name && !options.some(o => o?.name?.toLowerCase() === m.name.toLowerCase())),
       ]
     : options;
 

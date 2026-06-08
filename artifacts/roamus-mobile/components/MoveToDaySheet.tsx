@@ -164,7 +164,7 @@ export default function MoveToDaySheet({
 
       {/* ── Step 1: Day picker ─────────────────────────── */}
       {step === 1 && (
-        <View style={{ flex: 1 }}>
+        <View>
           <View style={s.movingLabel}>
             <Text style={s.movingCaption}>MOVING STOP</Text>
             <Text style={s.movingName} numberOfLines={2}>{stop.name}</Text>
