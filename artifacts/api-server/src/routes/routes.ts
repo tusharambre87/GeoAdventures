@@ -7757,8 +7757,18 @@ Example structure:
         .limit(8);
 
       if (libRows.length >= 2) {
+        // Deduplicate by normalized name (strips &, and, punctuation, extra spaces)
+        const normalize = (s: string) =>
+          s.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        const seen = new Set<string>();
+        const deduped = libRows.filter(r => {
+          const key = normalize(r.name);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
         return res.json({
-          results: libRows.map(r => ({
+          results: deduped.map(r => ({
             name: r.name,
             stopType: r.stopType,
             description: r.description ?? '',
