@@ -240,7 +240,8 @@ export default function MeScreen() {
   const initials = firstLetter.toUpperCase();
   const displayName = user?.firstName ?? user?.username ?? user?.email?.split('@')[0] ?? 'Explorer';
   const email = user?.email ?? "";
-  const isSubscribed = user?.subscriptionTier && user.subscriptionTier !== "free";
+  const isSubscribed = user?.subscriptionTier &&
+    !['free', 'trial', null, undefined].includes(user.subscriptionTier as any);
 
   const heroCity = heroTrip?.destination ?? "";
   const heroBg = heroTrip

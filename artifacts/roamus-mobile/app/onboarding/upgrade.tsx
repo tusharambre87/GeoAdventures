@@ -112,13 +112,12 @@ export default function UpgradeScreen() {
   }
 
   async function handleContinue() {
-    if (token && selected !== 'free') {
+    if (token) {
       try {
-        await fetch(`${API_BASE}/api/pricing`, { method: 'HEAD' }).catch(() => {});
         await fetch(`${API_BASE}/api/auth/user/subscription`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ plan: selected, annual }),
+          body: JSON.stringify({ plan: selected, annual, subscriptionTier: selected }),
         });
         await refreshUser();
       } catch {}

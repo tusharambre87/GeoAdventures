@@ -907,11 +907,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { plan, annual } = req.body;
       const tierMap: Record<string, string> = {
+        free:     'free',
         roamus:   annual ? 'annual' : 'monthly',
         trippack: 'trip_pass',
         bundle:   'trip_pass',
       };
-      const newTier = tierMap[plan as string] ?? 'monthly';
+      const newTier = tierMap[plan as string] ?? 'free';
       await db.update(users).set({ subscriptionTier: newTier }).where(eq(users.id, userId));
       const updatedUser = await storage.getUser(userId);
       res.json(sanitizeUser(updatedUser!));
@@ -963,17 +964,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const passwordHash = await bcrypt.hash(password, 10);
 
-      // Only start trial if Founding Families flag is enabled
-      // When flag is off, users start as 'free' tier
-      let subscriptionTier: string = 'free';
-      let trialStartDate: Date | undefined;
-      let trialEndDate: Date | undefined;
-      
-      if (FOUNDING_FAMILIES_ENABLED) {
-        trialStartDate = new Date();
-        trialEndDate = new Date(trialStartDate.getTime() + 14 * 24 * 60 * 60 * 1000);
-        subscriptionTier = 'trial';
-      }
+      // New users always start as 'free' — they choose a plan on the upgrade screen
+      const subscriptionTier: string = 'free';
+      const trialStartDate: Date | undefined = undefined;
+      const trialEndDate: Date | undefined = undefined;
 
       // Geo-logical pricing: Detect user's region from IP + locale + timezone
       const clientIp = extractClientIp(req);
