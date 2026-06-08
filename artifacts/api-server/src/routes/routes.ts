@@ -9665,7 +9665,10 @@ Return ONLY valid JSON in this exact format:
       }
       
       // stopOrders may include dayIndex for cross-day moves
-      const stops = await storage.reorderStops(tripId, stopOrders as { stopId: string; displayOrder: number; cityGroup?: string | null; dayIndex?: number | null }[]);
+      // Round displayOrder to integer — travel_stops.display_order is integer type
+      const safeOrders = (stopOrders as { stopId: string; displayOrder: number; cityGroup?: string | null; dayIndex?: number | null }[])
+        .map(o => ({ ...o, displayOrder: Math.round(o.displayOrder) }));
+      const stops = await storage.reorderStops(tripId, safeOrders);
       res.json(stops);
     } catch (error) {
       console.error("Error reordering stops:", error);

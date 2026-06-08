@@ -204,11 +204,12 @@ export default function TripsScreen() {
       if (id) setOverrideHeroId(id);
     });
   }, []);
-  const { reset: resetOnboarding, set: setOnboarding } = useOnboarding();
+  const { reset: resetOnboarding, set: setOnboarding, data: onboardingData } = useOnboarding();
 
   function startNewTrip() {
+    const existingTravelers = onboardingData.travelers ?? [];
     resetOnboarding();
-    setOnboarding({ onboardingInProgress: true, returningUser: true });
+    setOnboarding({ onboardingInProgress: true, returningUser: true, travelers: existingTravelers });
     router.push("/onboarding/where" as any);
   }
 

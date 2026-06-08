@@ -511,10 +511,17 @@ export default function MeScreen() {
             onPress={() => router.push("/me/pass" as never)}
           />
           <MenuRow
+            icon={"\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66"}
+            iconBg="#FFF7ED"
+            title="Edit travelers"
+            subtitle="Add or update your travel crew"
+            onPress={() => router.push("/onboarding/who" as never)}
+          />
+          <MenuRow
             icon={"\u2699\uFE0F"}
             iconBg="#F5F2EE"
             title="Account"
-            subtitle="Family & traveler profiles"
+            subtitle="Profile & settings"
             onPress={() => router.push("/me/account" as never)}
             noDivider
           />

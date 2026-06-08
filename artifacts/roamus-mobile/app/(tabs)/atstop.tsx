@@ -284,6 +284,9 @@ const WIKI_AMBIGUOUS = ['bridge','zoo','park','museum','garden','library','cente
 const WIKI_TITLE_OVERRIDES: Record<string, string> = {
   'Como Zoo': 'Como_Park_Zoo_and_Conservatory',
   'Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
+  'The Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
+  'St. Louis Zoo': 'Saint_Louis_Zoo',
+  'Saint Louis Zoo': 'Saint_Louis_Zoo',
 };
 
 function buildWikiTitle(stopName: string, city?: string): string {

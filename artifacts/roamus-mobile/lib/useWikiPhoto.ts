@@ -7,6 +7,14 @@ const AMBIGUOUS_TERMS = [
   'center', 'centre', 'aquarium', 'monument', 'memorial', 'falls',
 ];
 
+const WIKI_TITLE_OVERRIDES: Record<string, string> = {
+  'Como Zoo': 'Como_Park_Zoo_and_Conservatory',
+  'Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
+  'The Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
+  'St. Louis Zoo': 'Saint_Louis_Zoo',
+  'Saint Louis Zoo': 'Saint_Louis_Zoo',
+};
+
 function buildWikiTitle(stopName: string, city?: string): string {
   const base = stopName.replace(/\s+/g, '_');
   if (!city) return base;
@@ -20,6 +28,22 @@ function buildWikiTitle(stopName: string, city?: string): string {
 }
 
 async function fetchWikiThumbnail(stopName: string, city?: string): Promise<string | null> {
+  const overrideTitle = WIKI_TITLE_OVERRIDES[stopName];
+  if (overrideTitle) {
+    console.log('[useWikiPhoto] override:', overrideTitle);
+    try {
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(overrideTitle)}`);
+      if (r.ok) {
+        const d = (await r.json()) as { thumbnail?: { source: string } };
+        if (d.thumbnail?.source) {
+          console.log('[useWikiPhoto] override hit:', d.thumbnail.source);
+          return d.thumbnail.source;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
   const titleWithCity = buildWikiTitle(stopName, city);
   console.log('[useWikiPhoto] trying:', decodeURIComponent(titleWithCity));
 

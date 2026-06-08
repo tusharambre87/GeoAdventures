@@ -2841,8 +2841,24 @@ function AddStopSheet({
     }
   }
 
-  const filteredOptions = search.trim()
-    ? options.filter(o => o.name.toLowerCase().includes(search.toLowerCase()))
+  const searchLower = search.trim().toLowerCase();
+  const otherDayMatches: StopOption[] = searchLower
+    ? allStops
+        .filter(s => s.dayIndex !== selectedDay - 1 && s.name.toLowerCase().includes(searchLower))
+        .map(s => ({
+          name: s.name,
+          stopType: s.stopType ?? 'other',
+          duration: s.durationMinutes ? `${s.durationMinutes} min` : '60 min',
+          description: `From Day ${(s.dayIndex ?? 0) + 1} of your trip`,
+          _fromOtherDay: true,
+        } as StopOption & { _fromOtherDay?: boolean }))
+    : [];
+
+  const filteredOptions = searchLower
+    ? [
+        ...options.filter(o => o.name.toLowerCase().includes(searchLower)),
+        ...otherDayMatches.filter(m => !options.some(o => o.name.toLowerCase() === m.name.toLowerCase())),
+      ]
     : options;
 
   const featured   = filteredOptions[0] ?? null;

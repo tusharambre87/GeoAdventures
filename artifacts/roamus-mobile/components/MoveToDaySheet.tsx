@@ -51,7 +51,7 @@ function computeDisplayOrder(targetStops: MoveStop[], afterStopId: string | null
   const after = sorted[idx];
   const next  = sorted[idx + 1];
   if (!next) return (after.displayOrder ?? idx) + 1;
-  return ((after.displayOrder ?? idx) + (next.displayOrder ?? idx + 1)) / 2;
+  return Math.round(((after.displayOrder ?? idx) + (next.displayOrder ?? idx + 1)) / 2);
 }
 
 function getDurationMins(stop: MoveStop): number {
