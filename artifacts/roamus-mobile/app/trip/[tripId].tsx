@@ -1503,7 +1503,7 @@ function DayDetail({
             disabled={runBtnDisabled}>
             {isDayComplete
               ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'\u2713'} Day {selectedDay} Complete</Text>
-              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Start Day 1</Text></>}
+              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run today</Text></>}
           </Pressable>
           {!isDayComplete && (
             <Text style={dd.runSub}>Switches to Today tab — live mode</Text>

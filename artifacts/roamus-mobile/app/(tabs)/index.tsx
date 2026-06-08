@@ -136,9 +136,9 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
         <Text style={s.continueBtnText}>
           {trip.status === 'completed'
             ? 'View memories \u2192'
-            : isActiveNow && dayStops.some(s => s.isVisited || s.visited)
+            : isActiveNow && activeDay > 1
               ? `\u25B6 Continue Day ${activeDay}`
-              : `\u25B6 Start Day 1`}
+              : '\u25B6 Start Day 1'}
         </Text>
       </Pressable>
 
