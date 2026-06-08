@@ -197,6 +197,27 @@ export default function MoveToDaySheet({
             })}
           </ScrollView>
 
+          {/* Stops preview for selected day */}
+          {targetDay && (
+            <View style={s.dayPreview}>
+              <Text style={s.dayPreviewLabel}>
+                STOPS ON DAY {targetDay.dayNum}{targetDay.date ? `  ·  ${targetDay.date}` : ''}
+              </Text>
+              {targetStopsSorted.length === 0 ? (
+                <Text style={s.dayPreviewEmpty}>No stops yet — yours will be the first!</Text>
+              ) : (
+                targetStopsSorted.map((ts, i) => (
+                  <View key={ts.id} style={s.dayPreviewRow}>
+                    <View style={s.dayPreviewIdx}>
+                      <Text style={s.dayPreviewIdxText}>{i + 1}</Text>
+                    </View>
+                    <Text style={s.dayPreviewName} numberOfLines={1}>{ts.name}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+
           <View style={[s.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 8 }]}>
             <Pressable
               style={[s.ctaBtn, targetDayIdx === null && s.ctaBtnDisabled]}
@@ -285,6 +306,41 @@ export default function MoveToDaySheet({
                 </Pressable>
               );
             })}
+
+            {/* Result preview — shows day order with moving stop inserted */}
+            {posSelected && (() => {
+              // Build the merged ordered list
+              const insertAfter = afterStopId as string | null;
+              const result: Array<{ id: string; name: string; isMoving?: boolean }> = [];
+              if (insertAfter === null) {
+                result.push({ id: '__moving__', name: stop.name, isMoving: true });
+                targetStopsSorted.forEach(ts => result.push({ id: ts.id, name: ts.name }));
+              } else {
+                targetStopsSorted.forEach(ts => {
+                  result.push({ id: ts.id, name: ts.name });
+                  if (ts.id === insertAfter) {
+                    result.push({ id: '__moving__', name: stop.name, isMoving: true });
+                  }
+                });
+              }
+              return (
+                <View style={s.resultPreview}>
+                  <Text style={s.resultPreviewLabel}>DAY {targetDay.dayNum} RESULT</Text>
+                  {result.map((r, i) => (
+                    <View key={r.id} style={s.resultRow}>
+                      <View style={[s.resultLine, i === result.length - 1 && { opacity: 0 }]} />
+                      <View style={[s.resultDot, r.isMoving && s.resultDotMoving]} />
+                      <Text
+                        style={[s.resultName, r.isMoving && s.resultNameMoving]}
+                        numberOfLines={1}
+                      >
+                        {r.isMoving ? `${r.name} (moving here)` : r.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </ScrollView>
 
           <View style={[s.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 8 }]}>
@@ -446,4 +502,23 @@ const s = StyleSheet.create({
   ctaBtnText:   { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   secBtn:       { borderWidth: 1.5, borderColor: '#E0DDD8', borderRadius: 14, padding: 12, alignItems: 'center' },
   secBtnText:   { fontFamily: F.semibold, fontSize: 14, color: C.muted },
+
+  // Step 1 — stops preview below day pills
+  dayPreview:      { marginHorizontal: 20, marginTop: 16, marginBottom: 4, backgroundColor: C.bg, borderRadius: 14, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6 },
+  dayPreviewLabel: { fontFamily: F.bold, fontSize: 9, color: C.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  dayPreviewEmpty: { fontFamily: F.regular, fontSize: 13, color: C.muted, paddingBottom: 8 },
+  dayPreviewRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 9 },
+  dayPreviewIdx:   { width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(26,31,46,0.1)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  dayPreviewIdxText: { fontFamily: F.bold, fontSize: 10, fontWeight: '700', color: C.deep },
+  dayPreviewName:  { fontFamily: F.regular, fontSize: 13, color: C.deep, flex: 1 },
+
+  // Step 2 — result preview
+  resultPreview:       { marginHorizontal: 20, marginTop: 20, marginBottom: 8, backgroundColor: C.bg, borderRadius: 14, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 },
+  resultPreviewLabel:  { fontFamily: F.bold, fontSize: 9, color: C.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+  resultRow:           { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 32, position: 'relative' },
+  resultLine:          { position: 'absolute', left: 7, top: 16, bottom: -16, width: 1.5, backgroundColor: '#E0DDD8', zIndex: 0 },
+  resultDot:           { width: 16, height: 16, borderRadius: 8, backgroundColor: '#E0DDD8', borderWidth: 1.5, borderColor: '#E0DDD8', flexShrink: 0, zIndex: 1 },
+  resultDotMoving:     { backgroundColor: C.orange, borderColor: C.orange },
+  resultName:          { fontFamily: F.regular, fontSize: 13, color: C.deep, flex: 1 },
+  resultNameMoving:    { fontFamily: F.semibold, color: C.orange },
 });
