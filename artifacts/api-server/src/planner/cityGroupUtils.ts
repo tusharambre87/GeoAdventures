@@ -144,7 +144,7 @@ async function getRouteCityCoords(
   if (needsGeocode.length > 0) {
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "user",

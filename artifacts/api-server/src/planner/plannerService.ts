@@ -3199,7 +3199,7 @@ Also add for each suggestion:
 - effortDelta: "same", "easier", or "harder"`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     messages: [
       { role: "system", content: "You are a family travel expert. Return only valid JSON." },
       { role: "user", content: prompt },

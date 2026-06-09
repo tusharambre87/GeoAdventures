@@ -261,7 +261,7 @@ export async function generateAIColdStartSignals(
     const stopListText = newStops.map((s, i) => `${i + 1}. "${s.name}" (${s.stopType ?? "landmark"})`).join("\n");
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [
         {
           role: "system",

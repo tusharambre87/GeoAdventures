@@ -4,7 +4,7 @@ import { reflectionGameCache, reflectionGameSessions, reflectionGameResponses, t
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { GEOQUEST_SAFETY_PROMPT } from "./contentSafety";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-5-mini";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,

@@ -7734,7 +7734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : "";
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -8073,7 +8073,7 @@ Example structure:
       }
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `City: "${destination}"` },
@@ -8198,7 +8198,7 @@ Example structure:
       // 2. AI fallback — ask for real stops matching the query
       const openai = getOpenAI();
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -8264,7 +8264,7 @@ Each item must have:
 Return valid JSON only. No markdown.`;
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
         max_tokens: 800,
@@ -8603,12 +8603,12 @@ Return valid JSON only. No markdown.`;
       }
 
       // Find an indoor rainy-day alternative using the shared replace-suggestions logic pattern.
-      // This uses the same service (gpt-4o-mini, json_object format) as /api/travel/stops/replace-suggestions
+      // This uses the same service (gpt-5-mini, json_object format) as /api/travel/stops/replace-suggestions
       // but scoped to indoor/covered venues suitable for rain — the "chipFilter=indoor" scenario.
       const openai = getOpenAI();
       const existingNames = allDayStops.map(s => s.name).join(", ");
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -8859,7 +8859,7 @@ Return ONLY real, well-known indoor places in ${destination}. Return valid JSON 
       // --- Step 2: AI for description, duration, kid-friendliness etc. ---
       const openai = getOpenAI();
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -8926,7 +8926,7 @@ ${nominatimAddress ? '- Do NOT include address/lat/lon — those are provided se
 
       const openai = getOpenAI();
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -9082,7 +9082,7 @@ Return ONLY valid JSON in this exact format:
           const cityContext = trip?.city || trip?.destination || '';
           const openai = getOpenAI();
           const lookupResponse = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-5-mini",
             messages: [
               { role: "system", content: "You are a geography expert. Return ONLY a JSON object with 'address' (full street address), 'lat' (decimal latitude), and 'lon' (decimal longitude) for the given place. If you cannot find a specific address, provide the best known address." },
               { role: "user", content: `Find the address and coordinates for: "${name}"${cityContext ? ` in or near ${cityContext}` : ''}` }
@@ -10339,7 +10339,7 @@ Return ONLY valid JSON in this exact format:
 
       const openai = getOpenAI();
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           { role: "system", content: "You are a geography expert. Given a place name and its city/region context, return the full street address. Return ONLY a JSON object with a single 'address' field containing the full address string. If you cannot determine the address, return {\"address\": null}." },
           { role: "user", content: `Find the address for "${placeName}" in ${tripContext}` }
@@ -12252,7 +12252,7 @@ Return ONLY valid JSON in this exact format:
         const openai = getOpenAI();
         const stopList = stopNames.length > 0 ? stopNames.join(', ') : 'various places';
         const response = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [
             {
               role: "system",
@@ -13532,7 +13532,7 @@ Respond with JSON only, no markdown:
 }`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 600,
@@ -13649,7 +13649,7 @@ Return JSON only with max 3 suggestions:
 }`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 800,
@@ -14546,7 +14546,7 @@ Return JSON only with max 3 suggestions:
 
       const openai = getOpenAI();
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "system",
@@ -15394,7 +15394,7 @@ CRITICAL RULES:
 ANTI-SPOILER CHECK: Before returning, verify each clue does NOT contain the destination city name or any obvious identifying name. If it does, rewrite the clue.`;
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         max_tokens: 8000,
@@ -15771,7 +15771,7 @@ CRITICAL RULES:
 6. Return ONLY valid JSON`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       max_tokens: 8000,

@@ -3,7 +3,7 @@ import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { GEOQUEST_SAFETY_PROMPT, isProhibitedContent } from "./contentSafety";
 import { getTopSignalsForCity, formatSignalsForPrompt } from "./familySignals";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-5-mini";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -372,7 +372,7 @@ export async function generateStoryPack(
   let realFacts: string[] = [];
   try {
     const factsCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [
         {
           role: "system",

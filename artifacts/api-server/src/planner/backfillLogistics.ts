@@ -4,7 +4,7 @@
  * Runs to completion in a single invocation — no manual re-runs needed.
  *
  * Writes a lightweight logistics JSON object to each stop_library row that
- * currently has enrichment IS NULL. Uses gpt-4o-mini (not gpt-4o) — this is
+ * currently has enrichment IS NULL. Uses gpt-5-mini (not gpt-4o) — this is
  * structured extraction, not full intelligence scoring.
  *
  * Ordering: US cities first → India second → rest of world.
@@ -38,7 +38,7 @@ const BATCH_SIZE = 5;
 const BATCH_PAUSE_MS = 2000;
 const FETCH_PAGE_SIZE = 50;
 
-// gpt-4o-mini pricing estimate: ~500 input + ~200 output tokens per call
+// gpt-5-mini pricing estimate: ~500 input + ~200 output tokens per call
 // $0.15/1M input + $0.60/1M output → ~$0.000075 + $0.00012 ≈ $0.0002/call
 const COST_PER_CALL_USD = 0.0002;
 
@@ -93,7 +93,7 @@ Return ONLY a JSON object with exactly these 6 fields:
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     messages: [
       { role: "system", content: systemMessage },
       { role: "user", content: userMessage },
@@ -151,7 +151,7 @@ async function run(): Promise<void> {
   }
 
   console.log(`[BackfillLogistics] ${total} stop(s) with enrichment IS NULL. Starting full run…`);
-  console.log(`[BackfillLogistics] Estimated cost if all are new: ${fmtCost(total)} (gpt-4o-mini @ ~$0.0002/call)`);
+  console.log(`[BackfillLogistics] Estimated cost if all are new: ${fmtCost(total)} (gpt-5-mini @ ~$0.0002/call)`);
 
   let totalEnriched = 0;
   let totalSkipped = 0;

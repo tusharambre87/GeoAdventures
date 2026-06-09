@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import { findFactByKeyword, suggestedTopics } from "./geoBuddyData";
 import { GEOQUEST_SAFETY_PROMPT } from "./contentSafety";
 
-// Using gpt-4o-mini for cost efficiency in a kids app
-const MODEL = "gpt-4o-mini";
+// Using gpt-5-mini for cost efficiency in a kids app
+const MODEL = "gpt-5-mini";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,

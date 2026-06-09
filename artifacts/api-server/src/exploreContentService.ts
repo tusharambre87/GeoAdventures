@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { GEOQUEST_SAFETY_PROMPT, isProhibitedContent, isProhibitedStoryContent } from "./contentSafety";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = "gpt-5-mini";
 const STORY_MODEL = "gpt-4o";
 
 const openai = new OpenAI({

@@ -4,7 +4,7 @@
  *
  * Runs to completion in a single invocation — no manual re-runs needed.
  *
- * Uses gpt-4o-mini via generateMissionsForStop() (same model used in the live
+ * Uses gpt-5-mini via generateMissionsForStop() (same model used in the live
  * enrichment pipeline). Estimated cost: ~$0.04 for 195 stops.
  *
  * Ordering: US cities first → India second → rest of world.
@@ -30,7 +30,7 @@ const BATCH_SIZE = 5;
 const BATCH_PAUSE_MS = 2000;
 const FETCH_PAGE_SIZE = 50;
 
-// gpt-4o-mini pricing estimate: ~800 input + ~600 output tokens per call
+// gpt-5-mini pricing estimate: ~800 input + ~600 output tokens per call
 // $0.15/1M input + $0.60/1M output → ~$0.000120 + $0.000360 ≈ $0.0005/call
 const COST_PER_CALL_USD = 0.0005;
 
@@ -127,7 +127,7 @@ async function run(): Promise<void> {
   }
 
   console.log(`[BackfillMissions] ${total} stop(s) with stop_missions IS NULL. Starting full run…`);
-  console.log(`[BackfillMissions] Estimated cost if all are new: ${fmtCost(total)} (gpt-4o-mini @ ~$0.0005/call)`);
+  console.log(`[BackfillMissions] Estimated cost if all are new: ${fmtCost(total)} (gpt-5-mini @ ~$0.0005/call)`);
 
   let totalEnriched = 0;
   let totalSkipped = 0;

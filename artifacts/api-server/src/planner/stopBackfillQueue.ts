@@ -111,7 +111,7 @@ async function callLogisticsAI(stop: LogisticsRow) {
   const destination = stop.country ? `${stop.city}, ${stop.country}` : stop.city;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     messages: [
       {
         role: "system",
