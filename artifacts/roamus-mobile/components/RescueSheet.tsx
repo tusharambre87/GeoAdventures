@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { F } from '@/lib/tokens';
 import {
   computeDoneForDay,
+  computeFoodStop,
+  computeFunDay,
   computeLateDay,
   computeSickDay,
   computeSkipDay,
@@ -50,9 +52,8 @@ export default function RescueSheet({
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(700)).current;
 
-  const [view,  setView]  = useState<SheetView>('picker');
-  const [plan,  setPlan]  = useState<RescuePlan | null>(null);
-  const [appliedLabel, setAppliedLabel] = useState('');
+  const [view, setView] = useState<SheetView>('picker');
+  const [plan, setPlan] = useState<RescuePlan | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -80,12 +81,14 @@ export default function RescueSheet({
   function selectOption(id: RescueOptionId) {
     let computed: RescuePlan;
     switch (id) {
-      case 'tired':   computed = computeTiredDay(stops, currentStopIndex); break;
-      case 'late':    computed = computeLateDay(stops, currentStopIndex);  break;
+      case 'tired':   computed = computeTiredDay(stops, currentStopIndex);   break;
+      case 'late':    computed = computeLateDay(stops, currentStopIndex);    break;
       case 'weather': computed = computeWeatherDay(stops, currentStopIndex); break;
-      case 'sick':    computed = computeSickDay(); break;
-      case 'skip':    computed = computeSkipDay(stops, currentStopIndex);  break;
+      case 'sick':    computed = computeSickDay();                           break;
+      case 'skip':    computed = computeSkipDay(stops, currentStopIndex);   break;
       case 'done':    computed = computeDoneForDay(stops, currentStopIndex); break;
+      case 'fun':     computed = computeFunDay(stops, currentStopIndex);    break;
+      case 'food':    computed = computeFoodStop();                          break;
     }
     setPlan(computed);
     setView(id);
@@ -93,34 +96,16 @@ export default function RescueSheet({
 
   function applyPlan() {
     if (!plan) return;
-    let label = 'Changes applied';
-    switch (plan.type) {
-      case 'tired':
-      case 'late':
-        if (plan.dropStop) {
-          onDropStop?.(plan.dropStop.id);
-          label = `\u201C${plan.dropStop.name}\u201D removed`;
-        }
-        break;
-      case 'weather':
-        label = 'Outdoor stops flagged for swaps';
-        break;
-      case 'sick':
-        label = 'Rest day marked';
-        break;
-      case 'skip':
-        label = 'Day skipped';
-        break;
-      case 'done':
-        onWrapDay?.();
-        label = 'Day wrapped up';
-        break;
+    if ((plan.type === 'tired' || plan.type === 'late') && plan.dropStop) {
+      onDropStop?.(plan.dropStop.id);
     }
-    setAppliedLabel(label);
+    if (plan.type === 'done') {
+      onWrapDay?.();
+    }
     setView('applied');
   }
 
-  const options = getOptions(context);
+  const { primary, secondary } = getOptions(context);
 
   return (
     <Modal visible={visible} transparent statusBarTranslucent animationType="none" onRequestClose={handleClose}>
@@ -141,28 +126,44 @@ export default function RescueSheet({
           <>
             <View style={s.header}>
               <Text style={s.headerTitle}>Day not going to plan?</Text>
-              <Text style={s.headerSub}>What\u2019s going on?</Text>
+              <Text style={s.headerSub}>What's going on?</Text>
             </View>
             <ScrollView
               style={s.scroll}
-              contentContainerStyle={{ paddingBottom: 12 }}
+              contentContainerStyle={s.pickerContent}
               showsVerticalScrollIndicator={false}
             >
-              {options.map((opt, i) => (
+              {/* Zone 1 — 2x2 tile grid */}
+              <View style={s.tileGrid}>
+                {primary.map(opt => (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={s.tile}
+                    activeOpacity={0.75}
+                    onPress={() => selectOption(opt.id)}
+                  >
+                    <Text style={s.tileIcon}>{opt.icon}</Text>
+                    <Text style={s.tileTitle}>{opt.title}</Text>
+                    <Text style={s.tileSub}>{opt.subtitle}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Zone 2 — secondary list rows */}
+              <Text style={s.moreLabel}>More options</Text>
+              {secondary.map(opt => (
                 <TouchableOpacity
                   key={opt.id}
-                  style={[s.optionRow, i < options.length - 1 && s.optionBorder]}
+                  style={s.secRow}
                   activeOpacity={0.75}
                   onPress={() => selectOption(opt.id)}
                 >
-                  <View style={s.optionIconWrap}>
-                    <Text style={s.optionIcon}>{opt.emoji}</Text>
+                  <Text style={s.secIcon}>{opt.icon}</Text>
+                  <View style={s.secText}>
+                    <Text style={s.secTitle}>{opt.title}</Text>
+                    <Text style={s.secSub}>{opt.subtitle}</Text>
                   </View>
-                  <View style={s.optionText}>
-                    <Text style={s.optionLabel}>{opt.label}</Text>
-                    <Text style={s.optionSub}>{opt.sub}</Text>
-                  </View>
-                  <Text style={s.optionChevron}>{'\u203A'}</Text>
+                  <Text style={s.secChevron}>{'\u203A'}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -175,20 +176,20 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.dropStop ? `Drop \u201C${plan.dropStop.name}\u201D` : 'Apply'}
+            ctaLabel={plan.dropStop ? `Drop "${plan.dropStop.name}"` : 'Apply'}
           >
             {plan.dropStop && (
               <>
-                <Text style={s.resultSectionLabel}>DROPPING THIS STOP</Text>
+                <Text style={s.sectionLabel}>DROPPING THIS STOP</Text>
                 <View style={s.stopCard}>
-                  <View style={[s.stopDot, { backgroundColor: '#E8693A' }]} />
+                  <View style={[s.stopDot, { backgroundColor: '#E8692A' }]} />
                   <View style={s.stopCardText}>
                     <Text style={s.stopCardName}>{plan.dropStop.name}</Text>
                     <Text style={s.stopCardMeta}>
                       {plan.dropStop.stopType
                         ? plan.dropStop.stopType.charAt(0).toUpperCase() + plan.dropStop.stopType.slice(1)
                         : 'Stop'}
-                      {plan.dropStop.durationMinutes ? ` \u00B7 ${plan.dropStop.durationMinutes} min` : ''}
+                      {plan.dropStop.durationMinutes ? ` · ${plan.dropStop.durationMinutes} min` : ''}
                     </Text>
                   </View>
                 </View>
@@ -199,7 +200,7 @@ export default function RescueSheet({
                 )}
                 {plan.keptStops && plan.keptStops.length > 0 && (
                   <>
-                    <Text style={[s.resultSectionLabel, { marginTop: 20 }]}>KEEPING</Text>
+                    <Text style={[s.sectionLabel, { marginTop: 20 }]}>KEEPING</Text>
                     {plan.keptStops.map(st => (
                       <View key={st.id} style={s.keptRow}>
                         <Text style={s.keptCheck}>{'\u2713'}</Text>
@@ -219,11 +220,11 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.dropStop ? `Cut \u201C${plan.dropStop.name}\u201D` : 'Apply'}
+            ctaLabel={plan.dropStop ? `Cut "${plan.dropStop.name}"` : 'Apply'}
           >
             {plan.dropStop && (
               <>
-                <Text style={s.resultSectionLabel}>CUTTING THIS STOP</Text>
+                <Text style={s.sectionLabel}>CUTTING THIS STOP</Text>
                 <View style={s.stopCard}>
                   <View style={[s.stopDot, { backgroundColor: '#F5A623' }]} />
                   <View style={s.stopCardText}>
@@ -231,8 +232,8 @@ export default function RescueSheet({
                     <Text style={s.stopCardMeta}>
                       {plan.dropStop.travelMinsFromPrevious
                         ? `${plan.dropStop.travelMinsFromPrevious} min away`
-                        : 'Furthest stop'}
-                      {plan.dropStop.durationMinutes ? ` \u00B7 ${plan.dropStop.durationMinutes} min visit` : ''}
+                        : 'Farthest stop'}
+                      {plan.dropStop.durationMinutes ? ` · ${plan.dropStop.durationMinutes} min visit` : ''}
                     </Text>
                   </View>
                 </View>
@@ -243,7 +244,7 @@ export default function RescueSheet({
                 )}
                 {plan.keptStops && plan.keptStops.length > 0 && (
                   <>
-                    <Text style={[s.resultSectionLabel, { marginTop: 20 }]}>KEEPING</Text>
+                    <Text style={[s.sectionLabel, { marginTop: 20 }]}>KEEPING</Text>
                     {plan.keptStops.map(st => (
                       <View key={st.id} style={s.keptRow}>
                         <Text style={s.keptCheck}>{'\u2713'}</Text>
@@ -263,11 +264,12 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.swaps && plan.swaps.length > 0 ? 'Move indoors \u2192' : 'Got it'}
+            ctaLabel={plan.swaps && plan.swaps.length > 0 ? 'Move indoors' : 'Got it'}
+            ctaColor="#7A9E8E"
           >
             {plan.swaps && plan.swaps.length > 0 ? (
               <>
-                <Text style={s.resultSectionLabel}>OUTDOOR STOPS TO SWAP</Text>
+                <Text style={s.sectionLabel}>OUTDOOR STOPS TO SWAP</Text>
                 {plan.swaps.map(swap => (
                   <View key={swap.from.id} style={s.swapRow}>
                     <View style={s.swapFrom}>
@@ -285,14 +287,10 @@ export default function RescueSheet({
                     </View>
                   </View>
                 ))}
-                <Text style={s.swapNote}>
-                  {'\uD83D\uDCA1'} Indoor suggestions are a starting point \u2014 you choose what fits best.
-                </Text>
               </>
             ) : (
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyEmoji}>{'\uD83C\uDF7A'}</Text>
-                <Text style={s.emptyText}>Your remaining stops are mostly indoors already \u2014 you\u2019re good!</Text>
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>Your remaining stops are mostly indoors already — you're good!</Text>
               </View>
             )}
           </ResultView>
@@ -304,18 +302,17 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel="Mark as rest day \u2192"
+            ctaLabel="Mark as rest day"
             ctaColor="#7A9E8E"
           >
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyEmoji}>{'\uD83E\uDD12'}</Text>
-              <Text style={s.sickBody}>
+            <View style={s.centeredNote}>
+              <Text style={[s.centeredNoteText, { color: '#1A1F2E', fontSize: 14, lineHeight: 22 }]}>
                 Everyone deserves a break. Mark today as a rest day and your itinerary will be ready when you feel better.
               </Text>
             </View>
-            <View style={[s.infoBox, { backgroundColor: '#EEF5F2' }]}>
+            <View style={[s.infoBox, { backgroundColor: '#EEF5F2', marginTop: 12 }]}>
               <Text style={[s.infoBoxText, { color: '#3D7A60' }]}>
-                {'\u2139\uFE0F'}{'  '}Your stops stay saved and can be revisited on any day of the trip.
+                Your stops stay saved and can be visited on any day of the trip.
               </Text>
             </View>
           </ResultView>
@@ -327,12 +324,12 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel="Skip today \u2192"
+            ctaLabel="Skip today"
             ctaColor="#8A8FA8"
           >
             {plan.keptStops && plan.keptStops.length > 0 ? (
               <>
-                <Text style={s.resultSectionLabel}>STOPS THAT WILL BE SKIPPED</Text>
+                <Text style={s.sectionLabel}>STOPS BEING SKIPPED</Text>
                 {plan.keptStops.map(st => (
                   <View key={st.id} style={[s.keptRow, { opacity: 0.55 }]}>
                     <Text style={[s.keptCheck, { color: '#8A8FA8' }]}>{'\u2715'}</Text>
@@ -343,13 +340,13 @@ export default function RescueSheet({
                 ))}
               </>
             ) : (
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyText}>No stops left to skip \u2014 you\u2019re already done!</Text>
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>No stops left to skip!</Text>
               </View>
             )}
             <View style={[s.infoBox, { backgroundColor: '#FEF2F1', marginTop: 16 }]}>
               <Text style={[s.infoBoxText, { color: '#C0392B' }]}>
-                {'\u26A0\uFE0F'}{'  '}This will mark the whole day as skipped. This can\u2019t be undone from the app.
+                This marks the whole day as skipped. This can't be undone from the app.
               </Text>
             </View>
           </ResultView>
@@ -361,28 +358,61 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel="Wrap it up \u2192"
+            ctaLabel="Wrap it up"
             ctaColor="#3DAA6E"
           >
             {plan.keptStops && plan.keptStops.length > 0 ? (
               <>
-                <Text style={s.resultSectionLabel}>REMAINING STOPS (SAVED)</Text>
+                <Text style={s.sectionLabel}>REMAINING STOPS (SAVED)</Text>
                 {plan.keptStops.map(st => (
                   <View key={st.id} style={s.keptRow}>
-                    <Text style={[s.keptCheck, { color: '#B0ADA8' }]}>{'\u25CB'}</Text>
+                    <Text style={[s.keptCheck, { color: '#C4C8D8' }]}>{'\u25CB'}</Text>
                     <Text style={[s.keptName, { color: '#8A8FA8' }]} numberOfLines={1}>{st.name}</Text>
                   </View>
                 ))}
               </>
             ) : (
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyEmoji}>{'\uD83C\uDFC1'}</Text>
-                <Text style={s.emptyText}>You\u2019ve covered everything \u2014 great day!</Text>
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>You've covered everything — great day!</Text>
               </View>
             )}
             <View style={[s.infoBox, { backgroundColor: '#E8F7EF', marginTop: 16 }]}>
               <Text style={[s.infoBoxText, { color: '#2D6A4F' }]}>
-                {'\u2139\uFE0F'}{'  '}Wrapping up will take you to the Day Complete screen.
+                Wrapping up takes you to the Day Complete screen.
+              </Text>
+            </View>
+          </ResultView>
+        )}
+
+        {/* ── FUN VIEW (placeholder) ── */}
+        {view === 'fun' && plan && (
+          <ResultView
+            plan={plan}
+            onBack={() => setView('picker')}
+            onApply={applyPlan}
+            ctaLabel="Find a swap"
+            ctaColor="#E8692A"
+          >
+            <View style={s.centeredNote}>
+              <Text style={s.centeredNoteText}>
+                Stop swap suggestions are coming soon. For now, head to Discover to find something different.
+              </Text>
+            </View>
+          </ResultView>
+        )}
+
+        {/* ── FOOD VIEW (placeholder) ── */}
+        {view === 'food' && plan && (
+          <ResultView
+            plan={plan}
+            onBack={() => setView('picker')}
+            onApply={applyPlan}
+            ctaLabel="Find food nearby"
+            ctaColor="#F5A623"
+          >
+            <View style={s.centeredNote}>
+              <Text style={s.centeredNoteText}>
+                Food finder is coming soon. For now, check Google Maps for restaurants nearby.
               </Text>
             </View>
           </ResultView>
@@ -390,16 +420,20 @@ export default function RescueSheet({
 
         {/* ── APPLIED VIEW ── */}
         {view === 'applied' && (
-          <View style={s.appliedWrap}>
-            <View style={s.appliedIconCircle}>
-              <Text style={s.appliedIcon}>{'\u2713'}</Text>
+          <>
+            <View style={s.appliedWrap}>
+              <Text style={s.appliedEmoji}>{'\u2705'}</Text>
+              <Text style={s.appliedTitle}>Day adjusted</Text>
+              <Text style={s.appliedSub}>Your updated plan is live. Today tab reflects the changes.</Text>
             </View>
-            <Text style={s.appliedTitle}>{appliedLabel}</Text>
-            <Text style={s.appliedSub}>Your plan has been updated.</Text>
-            <TouchableOpacity style={s.appliedBtn} activeOpacity={0.85} onPress={handleClose}>
-              <Text style={s.appliedBtnText}>Close</Text>
+            <TouchableOpacity
+              style={s.appliedBtn}
+              activeOpacity={0.85}
+              onPress={handleClose}
+            >
+              <Text style={s.appliedBtnText}>Got it {'\u2014'} continue day</Text>
             </TouchableOpacity>
-          </View>
+          </>
         )}
       </Animated.View>
     </Modal>
@@ -420,32 +454,29 @@ interface ResultViewProps {
 function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', children }: ResultViewProps) {
   return (
     <>
-      {/* Result header */}
       <View style={s.resultHeader}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn} hitSlop={12} activeOpacity={0.7}>
-          <Text style={s.backBtnText}>{'\u2039'} Back</Text>
-        </TouchableOpacity>
         <Text style={s.resultTitle}>{plan.headline}</Text>
         <Text style={s.resultBody}>{plan.body}</Text>
       </View>
-
-      {/* Scrollable result content */}
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8 }}
         showsVerticalScrollIndicator={false}
       >
         {children}
       </ScrollView>
-
-      {/* CTA */}
-      <TouchableOpacity
-        style={[s.cta, { backgroundColor: ctaColor }]}
-        activeOpacity={0.85}
-        onPress={onApply}
-      >
-        <Text style={s.ctaText}>{ctaLabel}</Text>
-      </TouchableOpacity>
+      <View style={s.resultFooter}>
+        <TouchableOpacity style={s.goBackBtn} onPress={onBack} activeOpacity={0.7}>
+          <Text style={s.goBackText}>Go back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.ctaBtn, { backgroundColor: ctaColor, flex: 1 }]}
+          activeOpacity={0.85}
+          onPress={onApply}
+        >
+          <Text style={s.ctaBtnText}>{ctaLabel}</Text>
+        </TouchableOpacity>
+      </View>
     </>
   );
 }
@@ -459,9 +490,7 @@ const s = StyleSheet.create({
   },
   sheet: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: 0, right: 0, bottom: 0,
     maxHeight: '82%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
@@ -469,342 +498,156 @@ const s = StyleSheet.create({
     flexDirection: 'column',
   },
   handle: {
-    width: 36,
-    height: 4,
+    width: 36, height: 4,
     backgroundColor: '#D0CCC6',
     borderRadius: 2,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 12, marginBottom: 4,
   },
 
-  // ── Picker ──
+  // ── Header ──
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 12,
+    paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.10)',
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A1F2E',
-    fontFamily: F.bold,
-  },
-  headerSub: {
-    fontSize: 13,
-    color: '#8A8FA8',
-    marginTop: 2,
-    fontFamily: F.regular,
-  },
-  scroll: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 14,
-  },
-  optionBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(26,31,46,0.08)',
-  },
-  optionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold },
+  headerSub:   { fontSize: 13, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular },
+
+  scroll: { flex: 1, flexShrink: 1 },
+
+  // ── Picker: tile grid ──
+  pickerContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  tile: {
+    width: '47%',
     backgroundColor: '#F5F2EE',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'transparent',
+    borderRadius: 18, padding: 16, gap: 5,
   },
-  optionIcon: {
-    fontSize: 22,
+  tileIcon:  { fontSize: 26, marginBottom: 2 },
+  tileTitle: { fontSize: 14, fontWeight: '800', color: '#1A1F2E', lineHeight: 19, fontFamily: F.bold },
+  tileSub:   { fontSize: 12, color: '#8A8FA8', fontWeight: '500', lineHeight: 17, fontFamily: F.medium },
+
+  // ── Picker: secondary rows ──
+  moreLabel: {
+    fontSize: 10, fontWeight: '700', color: '#8A8FA8',
+    textTransform: 'uppercase', letterSpacing: 1,
+    marginBottom: 8, fontFamily: F.bold,
   },
-  optionText: {
-    flex: 1,
+  secRow: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14, padding: 12, paddingHorizontal: 15,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginBottom: 8,
+    shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4,
+    elevation: 2,
   },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1F2E',
-    fontFamily: F.semibold,
-  },
-  optionSub: {
-    fontSize: 12,
-    color: '#8A8FA8',
-    marginTop: 2,
-    fontFamily: F.regular,
-  },
-  optionChevron: {
-    fontSize: 20,
-    color: '#C4C8D8',
-    fontFamily: F.regular,
-  },
+  secIcon:    { fontSize: 20 },
+  secText:    { flex: 1 },
+  secTitle:   { fontSize: 13, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold },
+  secSub:     { fontSize: 12, color: '#8A8FA8', fontWeight: '500', fontFamily: F.medium },
+  secChevron: { color: '#D1D5E0', fontSize: 18 },
 
   // ── Result header ──
   resultHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.10)',
   },
-  backBtn: {
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-  },
-  backBtnText: {
-    fontSize: 14,
-    color: '#E8692A',
-    fontWeight: '600',
-    fontFamily: F.semibold,
-  },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1F2E',
-    fontFamily: F.bold,
-    marginBottom: 4,
-  },
-  resultBody: {
-    fontSize: 13,
-    color: '#8A8FA8',
-    fontFamily: F.regular,
-    lineHeight: 18,
-  },
+  resultTitle: { fontSize: 18, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold, marginBottom: 4 },
+  resultBody:  { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, lineHeight: 18 },
 
-  // ── Stop card (tired / late) ──
-  resultSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#B0ADA8',
-    letterSpacing: 0.8,
-    fontFamily: F.bold,
-    marginTop: 18,
-    marginBottom: 8,
+  // ── Result footer ──
+  resultFooter: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(26,31,46,0.08)',
+  },
+  goBackBtn: {
+    backgroundColor: '#F5F2EE', borderRadius: 14,
+    paddingVertical: 15, paddingHorizontal: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  goBackText: { fontSize: 14, fontWeight: '700', color: '#8A8FA8', fontFamily: F.bold },
+  ctaBtn:   { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  ctaBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
+
+  // ── Stop card ──
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', color: '#B0ADA8',
+    letterSpacing: 0.8, fontFamily: F.bold,
+    marginTop: 16, marginBottom: 8,
   },
   stopCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#F5F2EE',
-    borderRadius: 12,
-    padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14,
   },
-  stopDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    flexShrink: 0,
-  },
-  stopCardText: {
-    flex: 1,
-  },
-  stopCardName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1F2E',
-    fontFamily: F.semibold,
-  },
-  stopCardMeta: {
-    fontSize: 12,
-    color: '#8A8FA8',
-    marginTop: 2,
-    fontFamily: F.regular,
-  },
+  stopDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  stopCardText: { flex: 1 },
+  stopCardName: { fontSize: 14, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  stopCardMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular },
 
-  // ── Savings pill ──
   savingPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E8F7EF',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginTop: 10,
+    alignSelf: 'flex-start', backgroundColor: '#E8F7EF',
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginTop: 10,
   },
-  savingPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2D6A4F',
-    fontFamily: F.semibold,
-  },
+  savingPillText: { fontSize: 12, fontWeight: '600', color: '#2D6A4F', fontFamily: F.semibold },
 
-  // ── Kept stops list ──
   keptRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.07)',
   },
-  keptCheck: {
-    fontSize: 13,
-    color: '#3DAA6E',
-    fontWeight: '700',
-    fontFamily: F.bold,
-    width: 16,
-  },
-  keptName: {
-    flex: 1,
-    fontSize: 13,
-    color: '#1A1F2E',
-    fontFamily: F.regular,
-  },
+  keptCheck: { fontSize: 13, color: '#3DAA6E', fontWeight: '700', fontFamily: F.bold, width: 16 },
+  keptName:  { flex: 1, fontSize: 13, color: '#1A1F2E', fontFamily: F.regular },
 
   // ── Weather swaps ──
   swapRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.07)',
   },
-  swapFrom: {
-    flex: 1,
-  },
-  swapFromName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8A8FA8',
-    textDecorationLine: 'line-through',
-    fontFamily: F.semibold,
-  },
-  swapFromMeta: {
-    fontSize: 11,
-    color: '#B0ADA8',
-    fontFamily: F.regular,
-  },
-  swapArrow: {
-    fontSize: 16,
-    color: '#C4C8D8',
-  },
-  swapTo: {
-    flex: 1,
-  },
-  swapToName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1A1F2E',
-    fontFamily: F.semibold,
-  },
-  swapToMeta: {
-    fontSize: 11,
-    color: '#8A8FA8',
-    fontFamily: F.regular,
-  },
-  swapNote: {
-    fontSize: 12,
-    color: '#8A8FA8',
-    fontFamily: F.regular,
-    marginTop: 16,
-    lineHeight: 17,
-  },
+  swapFrom:     { flex: 1 },
+  swapFromName: { fontSize: 13, fontWeight: '600', color: '#8A8FA8', textDecorationLine: 'line-through', fontFamily: F.semibold },
+  swapFromMeta: { fontSize: 11, color: '#B0ADA8', fontFamily: F.regular },
+  swapArrow:    { fontSize: 16, color: '#C4C8D8' },
+  swapTo:       { flex: 1 },
+  swapToName:   { fontSize: 13, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  swapToMeta:   { fontSize: 11, color: '#8A8FA8', fontFamily: F.regular },
 
-  // ── Sick body ──
-  sickBody: {
-    fontSize: 14,
-    color: '#1A1F2E',
-    fontFamily: F.regular,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 12,
-    paddingHorizontal: 8,
-  },
-
-  // ── Info box ──
-  infoBox: {
-    borderRadius: 10,
-    padding: 12,
-  },
-  infoBoxText: {
-    fontSize: 12,
-    fontFamily: F.regular,
-    lineHeight: 17,
-  },
-
-  // ── Empty / centered ──
-  emptyWrap: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#8A8FA8',
-    fontFamily: F.regular,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // ── CTA ──
-  cta: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  ctaText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: F.bold,
-  },
+  // ── Info / centered note ──
+  centeredNote: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 8 },
+  centeredNoteText: { fontSize: 14, color: '#8A8FA8', fontFamily: F.regular, textAlign: 'center', lineHeight: 21 },
+  infoBox: { borderRadius: 10, padding: 12 },
+  infoBoxText: { fontSize: 12, fontFamily: F.regular, lineHeight: 17 },
 
   // ── Applied ──
   appliedWrap: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
+    alignItems: 'center', paddingTop: 40, paddingBottom: 24, paddingHorizontal: 24,
   },
-  appliedIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#E8F7EF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
-  appliedIcon: {
-    fontSize: 32,
-    color: '#3DAA6E',
-    fontWeight: '700',
-  },
+  appliedEmoji: { fontSize: 52, marginBottom: 14 },
   appliedTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1F2E',
-    fontFamily: F.bold,
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 22, fontWeight: '900', color: '#1A1F2E',
+    marginBottom: 8, textAlign: 'center',
+    fontFamily: F.serif,
   },
   appliedSub: {
-    fontSize: 14,
-    color: '#8A8FA8',
-    fontFamily: F.regular,
-    textAlign: 'center',
-    marginBottom: 32,
+    fontSize: 14, color: '#8A8FA8', fontWeight: '500',
+    lineHeight: 21, textAlign: 'center',
+    fontFamily: F.medium,
   },
   appliedBtn: {
-    backgroundColor: '#F5F2EE',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 48,
+    marginHorizontal: 16, marginTop: 4,
+    backgroundColor: '#E8692A', borderRadius: 16, padding: 16,
+    alignItems: 'center',
+    shadowColor: '#E8692A', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3, shadowRadius: 20,
+    elevation: 8,
   },
-  appliedBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1F2E',
-    fontFamily: F.semibold,
-  },
+  appliedBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', fontFamily: F.bold },
 });

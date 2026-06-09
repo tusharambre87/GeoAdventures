@@ -1479,7 +1479,7 @@ export default function TodayScreen() {
             {/* Bottom copy */}
             <View style={mo.heroBottom}>
               <Text style={mo.greeting}>Good morning {'\uD83D\uDC4B'}</Text>
-              <Text style={mo.heroHeadline}>
+              <Text style={[mo.heroHeadline, { paddingRight: 60 }]} numberOfLines={2}>
                 Day {resolvedDayIndex + 1}{city ? ` in ${city}` : ''}
               </Text>
               <Text style={mo.heroMeta}>
@@ -1492,25 +1492,24 @@ export default function TodayScreen() {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 8,
-                    backgroundColor: 'rgba(0,0,0,0.4)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(232,105,42,0.6)',
-                    borderRadius: 12,
-                    padding: 10,
+                    gap: 10,
+                    backgroundColor: 'rgba(255,255,255,0.12)',
+                    borderRadius: 14,
+                    padding: 12,
+                    paddingHorizontal: 14,
                     marginTop: 12,
                   }}
                 >
-                  <Text style={{ fontSize: 16 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+                  <Text style={{ fontSize: 18 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#E8692A' }}>
                       Directions for today
                     </Text>
-                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>
+                    <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500', marginTop: 1 }}>
                       All {dayStops.length} stops mapped in order
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 16, color: '#E8692A' }}>{'\u203A'}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>{'\u203A'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1518,7 +1517,7 @@ export default function TodayScreen() {
           {/* Stop count + time pills — below hero in white content area (R2 fix) */}
           <View style={mo.metaRow}>
             <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDCCD'} {dayStops.length} stop{dayStops.length !== 1 ? 's' : ''}</Text></View>
-            <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDD50'}{' ~'}{estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
+            <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDD50'}{' '}{estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
           </View>
 
           {offlineBannerEl}
