@@ -8334,7 +8334,7 @@ Return valid JSON only. No markdown.`;
           }).from(travelStops)
             .where(and(
               eq(travelStops.tripId, tripId),
-              sql`${travelStops.dayIndex} != ${dayIndex}`,
+              drizzleSql`${travelStops.dayIndex} != ${dayIndex}`,
             ))
             .orderBy(asc(travelStops.dayIndex), asc(travelStops.displayOrder))
             .limit(20)
