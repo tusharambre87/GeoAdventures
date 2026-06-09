@@ -12,7 +12,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { travelAPI, memoriesAPI, Trip, Moment } from '@/lib/apiClient';
@@ -307,6 +307,8 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
 export default function MemoriesScreen() {
   const insets = useSafeAreaInsets();
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+  const { focusDayIndex } = useLocalSearchParams<{ focusDayIndex?: string }>();
+  const focusDay = focusDayIndex != null ? parseInt(focusDayIndex, 10) : null;
   const { data, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: () => travelAPI.getTrips(),
@@ -376,6 +378,61 @@ export default function MemoriesScreen() {
           </Text>
           <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} onAddPhoto={() => setShowPhotoSheet(true)} />
         </View>
+      )}
+
+      {/* ── Focused day recap banner (when navigated from Day Complete screen) ── */}
+      {focusDay !== null && heroTrip && (
+        (() => {
+          const dayNumber = focusDay + 1;
+          const dayMoments = (moments ?? []).filter(m => {
+            if (m.stopId) {
+              const stop = heroTrip.stops?.find(s => s.id === m.stopId);
+              if (stop?.dayIndex != null) return stop.dayIndex === focusDay;
+            }
+            return false;
+          });
+          const hasPhotos = dayMoments.some(m => (m.photoUrls ?? []).length > 0 || m.photoUrl);
+          return (
+            <View style={{
+              marginHorizontal: 20, marginBottom: 16,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              overflow: 'hidden',
+              shadowColor: '#1A1F2E',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 3,
+            }}>
+              <LinearGradient
+                colors={['#1A1F2E', '#163830']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={{ padding: 16, paddingBottom: 14 }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>
+                  Day {dayNumber} Recap
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 }}>
+                  {hasPhotos ? 'Your memories from this day' : 'No photos yet for this day'}
+                </Text>
+              </LinearGradient>
+              {!hasPhotos && (
+                <TouchableWithoutFeedback onPress={() => setShowPhotoSheet(true)}>
+                  <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#F5F2EE', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 18 }}>{'\uD83D\uDCF8'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E' }}>Add photos from Day {dayNumber}</Text>
+                      <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>Tap to upload from your library</Text>
+                    </View>
+                    <Text style={{ fontSize: 18, color: '#E8692A' }}>{'\u203A'}</Text>
+                  </View>
+                </TouchableWithoutFeedback>
+              )}
+            </View>
+          );
+        })()
       )}
 
       {/* ── Photo Journal — day-grouped photos & kid quotes ── */}

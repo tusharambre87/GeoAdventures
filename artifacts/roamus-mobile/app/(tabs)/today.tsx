@@ -1402,71 +1402,157 @@ export default function TodayScreen() {
       const timeStr = dayHrs > 0
         ? (dayMinRem > 0 ? `${dayHrs}h ${dayMinRem}m` : `${dayHrs}h`)
         : `${dayMins}m`;
+
+      if (isPast) {
+        const todayDayStops = (trip.stops ?? [])
+          .filter(s => (s.dayIndex ?? 0) === currentDayIndex)
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        const visibleTodayStops = todayDayStops.slice(0, 3);
+        return (
+          <View style={{ flex: 1, backgroundColor: C.bg }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 60 }}
+            >
+              {offlineBannerEl}
+
+              {/* ── Yesterday card — compact dark ── */}
+              <View style={{
+                backgroundColor: '#1A1F2E',
+                marginHorizontal: 16, marginBottom: 10,
+                borderRadius: 20, padding: 20,
+                flexDirection: 'row', alignItems: 'center', gap: 14,
+              }}>
+                <View style={{
+                  width: 44, height: 44,
+                  backgroundColor: 'rgba(255,255,255,0.12)',
+                  borderRadius: 12,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Text style={{ fontSize: 20, color: '#FFFFFF', fontFamily: F.bold }}>{'\u2713'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.5)', marginBottom: 2, fontFamily: F.semibold }}>
+                    Day {viewingDay + 1} · {formatDayDate(trip.startDate, viewingDay)}
+                  </Text>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold }}>
+                    {visitedCount > 0
+                      ? `${visitedCount} stop${visitedCount > 1 ? 's' : ''} visited`
+                      : `${viewingDayStops.length} stop${viewingDayStops.length !== 1 ? 's' : ''} planned`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => router.push({
+                    pathname: '/(tabs)/memories' as never,
+                    params: { focusDayIndex: viewingDay.toString() },
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A', fontFamily: F.semibold }}>
+                    Recap {'\u2192'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Today card — hero ── */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                marginHorizontal: 16,
+                borderRadius: 20,
+                overflow: 'hidden',
+                shadowColor: '#1A1F2E',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 4,
+              }}>
+                <View style={{ padding: 20, paddingBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4, fontFamily: F.bold }}>
+                    Today · Day {currentDayIndex + 1}
+                  </Text>
+                  <Text style={{ fontSize: 26, fontWeight: '900', color: '#1A1F2E', letterSpacing: -0.3, fontFamily: F.bold }}>
+                    {city || 'Your day'}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: '#8A8FA8', fontWeight: '500', marginTop: 3, fontFamily: F.medium }}>
+                    {formatDayDate(trip.startDate, currentDayIndex)} · {todayDayStops.length} stop{todayDayStops.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                {visibleTodayStops.length > 0 && (
+                  <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.06)', paddingHorizontal: 20 }}>
+                    {visibleTodayStops.map((stop, i) => (
+                      <View key={stop.id} style={{
+                        flexDirection: 'row', alignItems: 'center',
+                        paddingVertical: 11,
+                        borderBottomWidth: i < visibleTodayStops.length - 1 ? 1 : 0,
+                        borderBottomColor: 'rgba(26,31,46,0.06)',
+                      }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: '#F5F2EE', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#8A8FA8', fontFamily: F.bold }}>{i + 1}</Text>
+                        </View>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E', flex: 1, fontFamily: F.semibold }} numberOfLines={1}>{stop.name}</Text>
+                      </View>
+                    ))}
+                    {todayDayStops.length > 3 && (
+                      <Text style={{ fontSize: 12, color: '#8A8FA8', paddingVertical: 10, fontFamily: F.regular }}>
+                        +{todayDayStops.length - 3} more stop{todayDayStops.length - 3 !== 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                <View style={{ padding: 16, paddingTop: 12 }}>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#E8692A',
+                      borderRadius: 14, padding: 16,
+                      alignItems: 'center',
+                      shadowColor: '#E8692A',
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 0.25, shadowRadius: 16,
+                    }}
+                    activeOpacity={0.85}
+                    onPress={() => { setViewingDay(currentDayIndex); handleStartDay(); }}
+                  >
+                    <Text style={{ color: 'white', fontSize: 16, fontWeight: '800', letterSpacing: -0.2, fontFamily: F.bold }}>
+                      {'\u25B6'} Start Day {currentDayIndex + 1}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+            {menuOverlay}
+          </View>
+        );
+      }
+
       return (
         <View style={{ flex: 1, backgroundColor: C.bg }}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
             {offlineBannerEl}
-            {isPast ? (
-              <View style={alt.card}>
-                <View style={alt.doneRow}>
-                  <Text style={alt.doneIcon}>{'\u2713'}</Text>
-                  <Text style={alt.doneTitle}>Day {viewingDay + 1} Complete</Text>
-                </View>
-                <Text style={alt.doneSub}>{city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}</Text>
-                <View style={alt.statRow}>
-                  <View style={alt.stat}>
-                    <Text style={alt.statVal}>{visitedCount}</Text>
-                    <Text style={alt.statLbl}>stops visited</Text>
-                  </View>
-                  <View style={alt.stat}>
-                    <Text style={alt.statVal}>{timeStr}</Text>
-                    <Text style={alt.statLbl}>time planned</Text>
-                  </View>
-                  <View style={alt.stat}>
-                    <Text style={alt.statVal}>{viewingDayStops.length}</Text>
-                    <Text style={alt.statLbl}>total stops</Text>
-                  </View>
-                </View>
-                {viewingDayStops.map((stop, i) => (
-                  <View key={stop.id} style={alt.stopRow}>
-                    <View style={[alt.stopCheck, (stop.isVisited || stop.visited) && alt.stopCheckDone]}>
-                      <Text style={alt.stopCheckText}>{(stop.isVisited || stop.visited) ? '\u2713' : String(i + 1)}</Text>
-                    </View>
+            <View style={alt.card}>
+              <Text style={alt.futureTitle}>Day {viewingDay + 1}</Text>
+              <Text style={alt.futureSub}>
+                {city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}
+                {' · '}{viewingDayStops.length} stop{viewingDayStops.length !== 1 ? 's' : ''}
+                {' · '}~{timeStr}
+              </Text>
+              {viewingDayStops.map((stop, i) => (
+                <View key={stop.id} style={alt.stopRow}>
+                  <View style={alt.stopNum}><Text style={alt.stopNumText}>{i + 1}</Text></View>
+                  <View style={{ flex: 1 }}>
                     <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
+                    {stop.travelMinsFromPrevious ? (
+                      <Text style={alt.stopTravel}>{'\uD83D\uDE97'} {stop.travelMinsFromPrevious} min from prev</Text>
+                    ) : null}
                   </View>
-                ))}
-                <Pressable style={alt.linkBtn} onPress={() => router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}>
-                  <Text style={alt.linkBtnText}>View full day recap →</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={alt.card}>
-                <Text style={alt.futureTitle}>Day {viewingDay + 1}</Text>
-                <Text style={alt.futureSub}>
-                  {city ? `${city} · ` : ''}{formatDayDate(trip.startDate, viewingDay)}
-                  {' · '}{viewingDayStops.length} stop{viewingDayStops.length !== 1 ? 's' : ''}
-                  {' · '}~{timeStr}
-                </Text>
-                {viewingDayStops.map((stop, i) => (
-                  <View key={stop.id} style={alt.stopRow}>
-                    <View style={alt.stopNum}><Text style={alt.stopNumText}>{i + 1}</Text></View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={alt.stopName} numberOfLines={1}>{stop.name}</Text>
-                      {stop.travelMinsFromPrevious ? (
-                        <Text style={alt.stopTravel}>{'\uD83D\uDE97'} {stop.travelMinsFromPrevious} min from prev</Text>
-                      ) : null}
-                    </View>
-                    <Text style={alt.stopDur}>{stop.durationMinutes ?? 60}m</Text>
-                  </View>
-                ))}
-                {viewingDayStops.length === 0 && (
-                  <Text style={alt.emptyText}>No stops planned for this day yet.</Text>
-                )}
-                <Pressable style={alt.linkBtn} onPress={() => router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}>
-                  <Text style={alt.linkBtnText}>See full plan →</Text>
-                </Pressable>
-              </View>
-            )}
+                  <Text style={alt.stopDur}>{stop.durationMinutes ?? 60}m</Text>
+                </View>
+              ))}
+              {viewingDayStops.length === 0 && (
+                <Text style={alt.emptyText}>No stops planned for this day yet.</Text>
+              )}
+              <Pressable style={alt.linkBtn} onPress={() => router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}>
+                <Text style={alt.linkBtnText}>See full plan →</Text>
+              </Pressable>
+            </View>
             <Pressable style={alt.backBtn} onPress={() => setViewingDay(currentDayIndex)}>
               <Text style={alt.backBtnText}>{'←'} Back to Day {currentDayIndex + 1} (Today)</Text>
             </Pressable>
