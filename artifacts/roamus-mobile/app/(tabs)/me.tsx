@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -15,7 +15,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as StoreReview from "expo-store-review";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -122,6 +122,12 @@ export default function MeScreen() {
   useEffect(() => {
     load();
   }, [cachedUser?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [cachedUser?.id])
+  );
 
   async function load() {
     setLoading(true);

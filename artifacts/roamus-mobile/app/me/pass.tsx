@@ -16,6 +16,7 @@ import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE } from "@/lib/authContext";
 import { F, G } from "@/lib/tokens";
+import UpgradeSheet from "@/components/UpgradeSheet";
 
 type UserData = {
   id: string;
@@ -53,6 +54,8 @@ export default function PassScreen() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [upgradeSheetOpen, setUpgradeSheetOpen] = useState(false);
+
   function handleUpgradeToAnnual() {
     const url =
       Platform.OS === "android"
@@ -252,7 +255,7 @@ export default function PassScreen() {
 
               <Pressable
                 style={({ pressed }) => [s.upgradeCTA, pressed && { opacity: 0.88 }]}
-                onPress={() => router.push("/onboarding/upgrade" as never)}
+                onPress={() => setUpgradeSheetOpen(true)}
               >
                 <Text style={s.upgradeCTAText}>{"Upgrade to RoamUs Pass — " + planPriceShort}</Text>
               </Pressable>
@@ -260,6 +263,12 @@ export default function PassScreen() {
           )}
         </ScrollView>
       )}
+
+      <UpgradeSheet
+        visible={upgradeSheetOpen}
+        onClose={() => setUpgradeSheetOpen(false)}
+        context="at_stop"
+      />
     </View>
   );
 }

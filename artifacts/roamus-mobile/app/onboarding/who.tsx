@@ -26,19 +26,15 @@ export default function WhoScreen() {
       : [{ id: 0, init: "Y", name: "You", isParent: true }]
   );
 
-  // Pre-populate travelers from user's existing trips when returning user or in edit mode
+  // Pre-populate travelers from the canonical players table for returning users / edit mode
   useEffect(() => {
     if ((!data.returningUser && !isEditMode) || !token) return;
-    const isDefault = travelers.length === 1 && travelers[0].name === "You";
-    if (!isDefault) return;
-    fetch(`${API_BASE}/api/travel/trips`, {
+    fetch(`${API_BASE}/api/users/travelers`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
       .then(json => {
-        const allTrips: any[] = json.trips ?? [];
-        const trip = allTrips.find(t => t.status !== "completed" && t.status !== "archived") ?? allTrips[0];
-        const raw: any[] = trip?.travelers ?? [];
+        const raw: any[] = json.travelers ?? [];
         if (raw.length > 0) {
           const fetched: Traveler[] = raw.map((tv: any, i: number) => ({
             id: typeof tv.id === "number" ? tv.id : Date.now() + i,

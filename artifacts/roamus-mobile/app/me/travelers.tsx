@@ -35,15 +35,11 @@ export default function TravelersScreen() {
   const [newName, setNewName] = useState("");
   const [newAge, setNewAge] = useState(8);
 
-  // Load travelers from the most recent active trip
+  // Load travelers from the canonical players table (source of truth)
   useEffect(() => {
-    apiFetch<{ trips?: any[] }>("/api/travel/trips")
+    apiFetch<{ travelers?: any[] }>("/api/users/travelers")
       .then(json => {
-        const allTrips: any[] = json.trips ?? [];
-        const trip =
-          allTrips.find(t => t.status !== "completed" && t.status !== "archived") ??
-          allTrips[0];
-        const raw: any[] = trip?.travelers ?? [];
+        const raw: any[] = json.travelers ?? [];
         const loaded: Traveler[] = raw.length > 0
           ? raw.map((tv: any, i: number) => ({
               id: typeof tv.id === "number" ? tv.id : Date.now() + i,

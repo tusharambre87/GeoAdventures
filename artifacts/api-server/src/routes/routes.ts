@@ -2626,6 +2626,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's canonical travelers list from the players table
+  app.get('/api/users/travelers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const activePlayers = await storage.getActiveExplorers(userId);
+      const travelers = activePlayers.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        isParent: p.profileType === 'adult' || p.ageRange === 'adult',
+        ...(p.age && p.age !== 'adult' && p.age !== 'unknown' ? { age: Number(p.age) } : {}),
+      }));
+      res.json({ travelers });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to load travelers" });
+    }
+  });
+
   // Update user's default travelers (used by who.tsx in edit mode)
   app.put('/api/users/travelers', isAuthenticated, async (req: any, res) => {
     try {
