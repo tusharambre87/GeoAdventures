@@ -6,6 +6,7 @@ export type Traveler = {
   name: string;
   isParent: boolean;
   age?: number;
+  avatar?: string | null;
 };
 
 export type PreviewStop = {

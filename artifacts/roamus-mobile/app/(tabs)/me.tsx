@@ -24,6 +24,7 @@ import { API_BASE } from "@/lib/authContext";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 
 const EXPLORER_COLORS = ["#7C3AED", "#E8692A", "#1A1F2E", "#DC2626", "#16A34A"];
+const FALLBACK_CREW_COLORS = ["#F97316", "#8B5CF6", "#3B82F6", "#10B981", "#EC4899", "#F59E0B"];
 
 function getExplorerRank(xp: number): string {
   if (xp >= 5000) return "\uD83C\uDFC6 Legend";
@@ -112,6 +113,7 @@ export default function MeScreen() {
   const [fetchedUser, setFetchedUser] = useState<FetchedUser | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [explorers, setExplorers] = useState<Explorer[]>([]);
+  const [crewKids, setCrewKids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -160,6 +162,16 @@ export default function MeScreen() {
         const expData = await explorersRes.json();
         setExplorers(Array.isArray(expData) ? expData : expData.explorers ?? []);
       }
+
+      // Load crew (with avatars) for the FOR THE KIDS section
+      try {
+        const crewRes = await fetch(`${API_BASE}/api/users/travelers`, { headers: authHeaders });
+        if (crewRes.ok) {
+          const crewData = await crewRes.json();
+          const all: any[] = crewData.travelers ?? [];
+          setCrewKids(all.filter((t: any) => !t.isParent && !t.is_parent));
+        }
+      } catch {}
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -427,38 +439,30 @@ export default function MeScreen() {
         {/* ── 4. For the Kids ── */}
         <Text style={s.sectionLabel}>FOR THE KIDS</Text>
         <View style={s.card}>
-          {explorers.length > 0 && (
+          {crewKids.length > 0 && (
             <>
-              <View style={s.explorerStrip}>
-                {explorers.map((exp, i) => (
-                  <View key={exp.id} style={s.explorerChip}>
-                    <View
-                      style={[
-                        s.explorerCircle,
-                        { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length] },
-                      ]}
-                    >
-                      <Text style={s.explorerInitial}>{exp.name[0]?.toUpperCase() ?? "?"}</Text>
-                    </View>
-                    <View>
-                      <Text style={s.explorerName}>{exp.name}</Text>
-                      <Text style={s.explorerXp}>{"\u26A1"} {exp.totalXp ?? 0} XP</Text>
-                      <Text style={s.explorerRank}>{getExplorerRank(exp.totalXp ?? 0)}</Text>
-                      {(exp.unlockedAchievementIds?.length ?? 0) > 0 && (
-                        <View style={s.explorerBadges}>
-                          {exp.unlockedAchievementIds!.slice(0, 3).map(id => (
-                            <View key={id} style={s.explorerBadge}>
-                              <Text style={s.explorerBadgeIcon}>{"\uD83C\uDFC5"}</Text>
-                            </View>
-                          ))}
-                          {exp.unlockedAchievementIds!.length > 3 && (
-                            <Text style={s.explorerBadgeMore}>+{exp.unlockedAchievementIds!.length - 3}</Text>
-                          )}
+              <View style={s.crewPillStrip}>
+                {crewKids.map((c: any, i: number) => {
+                  const hasEmoji = c.avatar && !c.avatar.startsWith("http") && !c.avatar.startsWith("/");
+                  const hasPhoto = c.avatar && (c.avatar.startsWith("http") || c.avatar.startsWith("/"));
+                  const fallbackColor = FALLBACK_CREW_COLORS[i % FALLBACK_CREW_COLORS.length];
+                  return (
+                    <View key={String(c.id ?? i)} style={s.crewPill}>
+                      {hasPhoto ? (
+                        <Image source={{ uri: c.avatar }} style={s.crewPillAvatar} contentFit="cover" />
+                      ) : (
+                        <View style={[s.crewPillAvatar, { backgroundColor: hasEmoji ? "#FDF0E9" : fallbackColor }]}>
+                          {hasEmoji
+                            ? <Text style={s.crewPillEmoji}>{c.avatar}</Text>
+                            : <Text style={s.crewPillInitial}>{c.name[0]?.toUpperCase() ?? "?"}</Text>
+                          }
                         </View>
                       )}
+                      <Text style={s.crewPillName} numberOfLines={1}>{c.name}</Text>
+                      {c.age != null && <Text style={s.crewPillAge}>Age {c.age}</Text>}
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
               <Divider />
             </>
@@ -845,6 +849,31 @@ const s = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 8,
   },
+  crewPillStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  crewPill: {
+    alignItems: "center",
+    gap: 4,
+    minWidth: 56,
+  },
+  crewPillAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  crewPillEmoji: { fontSize: 26 },
+  crewPillInitial: { fontFamily: "PlusJakartaSans_700Bold", fontSize: 18, color: "#fff" },
+  crewPillName: { fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 11, color: "#1A1F2E", maxWidth: 64, textAlign: "center" },
+  crewPillAge: { fontFamily: "PlusJakartaSans_400Regular", fontSize: 10, color: "#8A8FA8" },
   sheetOverlay: { backgroundColor: "rgba(0,0,0,0.45)" },
   pickerSheet: {
     position: "absolute",

@@ -27,6 +27,7 @@ import { validateUserInput } from "../contentSafety";
 import { stripeService } from "../stripeService";
 import { getStripePublishableKey, getUncachableStripeClient } from "../stripeClient";
 import OpenAI from "openai";
+import { objectStorageClient } from "../lib/objectStorage";
 import multer from "multer";
 import { getOrGenerateExperienceContent } from "../experienceContentService";
 import { sendWeeklyMetricsReport, calculateDayMetrics, calculateWeeklyMetricsReport } from "../dailyMetrics";
@@ -2636,6 +2637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: p.id,
         name: p.name,
         isParent: p.profileType === 'adult' || p.ageRange === 'adult',
+        avatar: p.avatar ?? null,
         ...(p.age && p.age !== 'adult' && p.age !== 'unknown' ? { age: Number(p.age) } : {}),
       }));
       res.json({ travelers });
@@ -2668,17 +2670,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingPlayers = await storage.getActiveExplorers(userId);
       const existingNames = new Set(existingPlayers.map(p => p.name.toLowerCase().trim()));
       const incomingNames = new Set(travelers.map((t: any) => (t.name ?? '').toLowerCase().trim()));
-      // Create player records for new travelers
+      // Create or update player records
       for (const t of travelers) {
         const nameLower = (t.name ?? '').toLowerCase().trim();
         if (!nameLower) continue;
-        if (!existingNames.has(nameLower)) {
+        const existingPlayer = existingPlayers.find((p: any) => p.name.toLowerCase().trim() === nameLower);
+        if (existingPlayer) {
+          if (t.avatar !== undefined) {
+            await db.update(players)
+              .set({ avatar: t.avatar ?? null, updatedAt: new Date() })
+              .where(eq(players.id, existingPlayer.id));
+          }
+        } else {
           const isParent = Boolean(t.isParent);
           const age = t.age != null ? String(t.age) : (isParent ? 'adult' : 'unknown');
           await db.insert(players).values({
             userId,
             name: t.name,
             age,
+            avatar: t.avatar ?? null,
             profileType: isParent ? 'adult' : 'kid',
             ageRange: isParent ? 'adult' : (t.age != null ? (Number(t.age) <= 5 ? '3-5' : Number(t.age) <= 9 ? '6-9' : '9+') : undefined),
             isGuest: false,
@@ -2698,6 +2708,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating travelers:", error);
       res.status(500).json({ message: "Failed to update travelers" });
+    }
+  });
+
+// Upload avatar image to object storage and return a public URL
+  app.post('/api/users/avatar-upload', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { imageBase64, mimeType = 'image/jpeg' } = req.body;
+      if (!imageBase64) return res.status(400).json({ message: "imageBase64 required" });
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return res.status(500).json({ message: "Storage not configured" });
+      const ext = mimeType.includes('png') ? 'png' : 'jpg';
+      const fileName = `avatars/${userId}/${crypto.randomUUID()}.${ext}`;
+      const bucket = objectStorageClient.bucket(bucketId);
+      const file = bucket.file(fileName);
+      const buffer = Buffer.from(imageBase64, 'base64');
+      await file.save(buffer, { contentType: mimeType, public: true });
+      const url = `https://storage.googleapis.com/${bucketId}/${fileName}`;
+      res.json({ url });
+    } catch (err) {
+      req.log?.error({ err }, 'avatar-upload failed');
+      res.status(500).json({ message: "Upload failed" });
     }
   });
 
