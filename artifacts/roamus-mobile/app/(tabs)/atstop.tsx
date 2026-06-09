@@ -527,20 +527,27 @@ export default function AtStopScreen() {
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
     if (!currentStop) return;
-    // Set immediate fallback so the hero is never blank while wiki fetch is in flight
+    // Set immediate fallback so the hero is never blank while wiki/AI fetch is in flight
     const immediateFallback =
       (parseMetadata(currentStop.metadata).imageUrl as string | undefined) ??
       CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
       'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80';
     setHeroImageUrl(immediateFallback);
     setStopImages([immediateFallback, null, null]);
-    fetchWikiImages(currentStop.name, (currentStop as any).cityGroup ?? trip?.destination).then(urls => {
-      const fallback = CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
-        'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
-      const hero = urls[0] ?? fallback;
-      setHeroImageUrl(hero);
-      setStopImages([hero, urls[1] ?? null, urls[2] ?? null]);
-    });
+    // Use AI-generated hero image if available; fall back to Wikipedia
+    const generatedHero = (currentStop as any).heroImageUrl as string | null | undefined;
+    if (generatedHero) {
+      setHeroImageUrl(generatedHero);
+      setStopImages([generatedHero, null, null]);
+    } else {
+      fetchWikiImages(currentStop.name, (currentStop as any).cityGroup ?? trip?.destination).then(urls => {
+        const fallback = CITY_IMGS[(currentStop as { cityGroup?: string | null }).cityGroup ?? ''] ??
+          'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
+        const hero = urls[0] ?? fallback;
+        setHeroImageUrl(hero);
+        setStopImages([hero, urls[1] ?? null, urls[2] ?? null]);
+      });
+    }
     // Reset food + extras + moments state for new stop
     setFoodPlaces([]); setFoodLoaded(false);
     setBreakPlaces([]); setKidPlaces([]);

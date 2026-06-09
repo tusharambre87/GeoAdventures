@@ -5282,6 +5282,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`✅ [StoryPreload] Complete: ${generated}/${stops.length} stops preloaded for trip ${tripId}`);
   }
 
+  // Background DALL-E image generation — generates a hero image per stop after trip creation.
+  // Never blocks the HTTP response or the stop generation flow.
+  // Rate: DALL-E 3 standard tier → 5 images/min → 12s delay between images.
+  async function generateStopImagesInBackground(tripId: string, destination: string) {
+    try {
+      const stops = await db.select().from(travelStops).where(eq(travelStops.tripId, tripId));
+      console.log(`[img-gen] Generating hero images for ${stops.length} stops (tripId=${tripId})`);
+      const openai = getOpenAI();
+      for (const stop of stops) {
+        try {
+          const prompt = `Travel photo of ${stop.name} in ${stop.cityGroup ?? destination}. Daytime, no people, architectural or landscape shot, family friendly, vibrant colors, high quality.`;
+          const response = await openai.images.generate({
+            model: 'dall-e-3',
+            prompt,
+            n: 1,
+            size: '1792x1024',
+            quality: 'standard',
+          });
+          const imageUrl = response.data[0]?.url;
+          if (imageUrl) {
+            await db.update(travelStops).set({ heroImageUrl: imageUrl }).where(eq(travelStops.id, stop.id));
+          }
+        } catch (stopErr) {
+          console.error(`[img-gen] Failed for stop "${stop.name}":`, stopErr);
+        }
+        // 5 images/min standard tier → 12s gap
+        await new Promise(r => setTimeout(r, 12000));
+      }
+      console.log(`[img-gen] Done generating images for tripId=${tripId}`);
+    } catch (err) {
+      console.error(`[img-gen] Job failed for tripId=${tripId}:`, err);
+    }
+  }
+
   // Background stop generation — called after trip is created and response already sent.
   // All AI calls (OpenAI) happen here so they never block the HTTP response.
   async function generateStopsInBackground(
@@ -5714,6 +5748,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // never wait 15–20 seconds when they first open Kids Mode.
       preloadStoriesForTrip(tripId, destination).catch(e =>
         console.error("[StoryPreload] Background preload failed:", e)
+      );
+      // Generate DALL-E hero images for all stops — never blocks stop generation
+      generateStopImagesInBackground(tripId, destination).catch(e =>
+        console.error("[img-gen] Background image generation failed:", e)
       );
     } catch (err) {
       console.error(`❌ [Travel] [bg] Stop generation failed for tripId=${tripId}:`, err);
@@ -6298,6 +6336,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       console.log(`[Travel][template] Seeded ${templateStops.length} stops from "${templateSlug}" for trip ${tripId}`);
+      // Generate DALL-E hero images for all stops — never blocks stop generation
+      generateStopImagesInBackground(tripId, cityName).catch(e =>
+        console.error("[img-gen] Background image generation failed:", e)
+      );
     } catch (err) {
       console.error('[Travel][template] generateStopsFromTemplate failed:', err);
       try {

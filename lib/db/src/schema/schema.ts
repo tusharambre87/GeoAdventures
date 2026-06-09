@@ -978,6 +978,7 @@ export const travelStops = pgTable("travel_stops", {
   // doThisFirst, parkingSignal, ticketSignal, routeMeta, confidenceSummary.
   // Populated at start-adventure time from planner intelligence tables.
   metadata: jsonb("metadata"),
+  heroImageUrl: text("hero_image_url"), // AI-generated hero image (DALL-E 3); null until background job completes
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_travel_stops_trip").on(table.tripId),
