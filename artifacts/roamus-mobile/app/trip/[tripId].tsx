@@ -1294,10 +1294,15 @@ function DayDetail({
       </View>
 
       {/* Body */}
-      <ScrollView
+      {/* Body — DraggableFlatList IS the scroll container; no outer ScrollView */}
+      <DraggableFlatList
+        data={localContentStops}
+        keyExtractor={s => s.id}
+        onDragEnd={handleDragEnd}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
-      >
+        ListHeaderComponent={
+          <>
         {/* Locked banner */}
         {!isEditable && (
           <View style={dd.lockedBanner}>
@@ -1392,38 +1397,35 @@ function DayDetail({
           );
         })()}
 
-        {/* Stop cards — draggable; meal cards splice in after first content stop */}
-        <DraggableFlatList
-          data={localContentStops}
-          keyExtractor={s => s.id}
-          scrollEnabled={false}
-          onDragEnd={handleDragEnd}
-          renderItem={({ item: stop, drag, isActive, getIndex }: RenderItemParams<Stop>) => {
-            const i      = getIndex() ?? 0;
-            const isLast = i === localContentStops.length - 1;
-            return (
-              <ScaleDecorator activeScale={0.97}>
-                <StopCard
-                  stop={stop}
-                  isEditable={isEditable}
-                  isAnchor={anchor?.id === stop.id}
-                  tripId={tripId}
-                  onDetails={onStopDetails}
-                  onReplace={onReplaceStop}
-                  onDelete={onDelete}
-                  drag={isEditable ? drag : undefined}
-                  isActive={isActive}
-                />
-                {i === 0 && mealStops.map(ms => (
-                  <MealCard key={ms.id} stop={ms} />
-                ))}
-                {!isLast && (
-                  <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
-                )}
-              </ScaleDecorator>
-            );
-          }}
-        />
+          </>
+        }
+        renderItem={({ item: stop, drag, isActive, getIndex }: RenderItemParams<Stop>) => {
+          const i      = getIndex() ?? 0;
+          const isLast = i === localContentStops.length - 1;
+          return (
+            <ScaleDecorator activeScale={0.97}>
+              <StopCard
+                stop={stop}
+                isEditable={isEditable}
+                isAnchor={anchor?.id === stop.id}
+                tripId={tripId}
+                onDetails={onStopDetails}
+                onReplace={onReplaceStop}
+                onDelete={onDelete}
+                drag={isEditable ? drag : undefined}
+                isActive={isActive}
+              />
+              {i === 0 && mealStops.map(ms => (
+                <MealCard key={ms.id} stop={ms} />
+              ))}
+              {!isLast && (
+                <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
+              )}
+            </ScaleDecorator>
+          );
+        }}
+        ListFooterComponent={
+          <>
         {/* Meal cards for days with no content stops */}
         {localContentStops.length === 0 && mealStops.map(stop => (
           <MealCard key={stop.id} stop={stop} />
@@ -1491,7 +1493,9 @@ function DayDetail({
             RoamUs uses AI to generate trip plans and stop information. While we work hard to keep things accurate, we can’t guarantee that hours, prices, accessibility, or availability are current. Always verify important details directly with each venue before you visit.
           </Text>
         )}
-      </ScrollView>
+          </>
+        }
+      />
 
 
       {/* Footer — show for the selected day */}
