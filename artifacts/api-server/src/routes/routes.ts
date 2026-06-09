@@ -5300,21 +5300,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const prompt = `Travel photo of ${stop.name} in ${stop.cityGroup ?? destination}. Daytime, no people, architectural or landscape shot, family friendly, vibrant colors, high quality.`;
           const response = await openai.images.generate({
-            model: "dall-e-3",
+            model: "gpt-image-1",
             prompt,
             n: 1,
-            size: "1792x1024",
-            quality: "standard",
-            response_format: "b64_json",
-          });
-          const b64 = response.data[0]?.b64_json;
+            size: "1536x1024",
+            quality: "medium",
+          } as any);
+          const b64 = (response.data[0] as any)?.b64_json;
           if (b64) {
             const buffer = Buffer.from(b64, "base64");
             const fileName = `stop-images/${tripId}/${stop.id}.png`;
             const file = bucket.file(fileName);
-            await file.save(buffer, { contentType: "image/png", public: true });
-            const url = `https://storage.googleapis.com/${bucketId}/${fileName}`;
-            await db.update(travelStops).set({ heroImageUrl: url }).where(eq(travelStops.id, stop.id));
+            await file.save(buffer, { contentType: "image/png" });
+            await db.update(travelStops).set({ heroImageUrl: fileName }).where(eq(travelStops.id, stop.id));
           }
         } catch (stopErr) {
           console.error(`[img-gen] Failed for stop "${stop.name}":`, stopErr);
@@ -9749,7 +9747,32 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
-  // In-memory cache for hero images (stopId → url)
+  // Proxy route: serve privately-stored stop hero images from GCS.
+  // No auth required — these are landmark/city photos, not personal content.
+  app.get('/api/travel/stops/:stopId/hero-img', async (req: any, res) => {
+    try {
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return res.status(500).end();
+      const { stopId } = req.params;
+      const [stop] = await db.select({ heroImageUrl: travelStops.heroImageUrl, tripId: travelStops.tripId })
+        .from(travelStops).where(eq(travelStops.id, stopId)).limit(1);
+      if (!stop) return res.status(404).end();
+      const path = stop.heroImageUrl;
+      if (!path || !path.startsWith('stop-images/')) return res.status(404).end();
+      const bucket = objectStorageClient.bucket(bucketId);
+      const file = bucket.file(path);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).end();
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      file.createReadStream().pipe(res);
+    } catch (err) {
+      console.error('[hero-img]', err);
+      res.status(500).end();
+    }
+  });
+
+    // In-memory cache for hero images (stopId → url)
   const heroImageCache: Record<string, string> = {};
 
   app.get('/api/travel/stops/:stopId/hero-image', isAuthenticated, travelModeGuard, async (req: any, res) => {

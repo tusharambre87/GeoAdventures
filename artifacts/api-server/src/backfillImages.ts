@@ -26,7 +26,10 @@ import { objectStorageClient } from "./lib/objectStorage.js";
 const DELAY_MS = 12_000;
 const MAX_STOPS = 1_200; // safety ceiling — re-run if there are more
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+});
 
 async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
@@ -58,27 +61,26 @@ async function main() {
     try {
       const location = stop.cityGroup ?? "the destination";
       const prompt = `Travel photo of ${stop.name} in ${location}. Daytime, no people, architectural or landscape shot, family friendly, vibrant colors, high quality.`;
+      console.log(`[backfill:images] Generating: "${stop.name}" (${done + 1}/${stops.length})`);
 
-      const response = await openai.images.generate({
-        model: "dall-e-3",
+      const response = await (openai.images as any).generate({
+        model: "gpt-image-1",
         prompt,
         n: 1,
-        size: "1792x1024",
-        quality: "standard",
-        response_format: "b64_json",
-      });
+        size: "1536x1024",
+        quality: "medium",
+      }, { timeout: 120_000 });
 
       const b64 = (response.data ?? [])[0]?.b64_json;
       if (b64) {
         const buffer = Buffer.from(b64, "base64");
         const fileName = `stop-images/${stop.tripId}/${stop.id}.png`;
         const file = bucket.file(fileName);
-        await file.save(buffer, { contentType: "image/png", public: true });
-        const url = `https://storage.googleapis.com/${bucketId}/${fileName}`;
+        await file.save(buffer, { contentType: "image/png" });
 
         await db
           .update(travelStops)
-          .set({ heroImageUrl: url })
+          .set({ heroImageUrl: fileName })
           .where(eq(travelStops.id, stop.id));
 
         done++;

@@ -535,7 +535,12 @@ export default function AtStopScreen() {
     setHeroImageUrl(immediateFallback);
     setStopImages([immediateFallback, null, null]);
     // Use AI-generated hero image if available; fall back to Wikipedia
-    const generatedHero = (currentStop as any).heroImageUrl as string | null | undefined;
+    const rawHero = (currentStop as any).heroImageUrl as string | null | undefined;
+    const generatedHero = rawHero
+      ? rawHero.startsWith('stop-images/')
+        ? `${API_BASE}/api/travel/stops/${currentStop.id}/hero-img`
+        : rawHero
+      : null;
     if (generatedHero) {
       setHeroImageUrl(generatedHero);
       setStopImages([generatedHero, null, null]);
