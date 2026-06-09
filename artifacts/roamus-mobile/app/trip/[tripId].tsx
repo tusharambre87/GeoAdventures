@@ -23,7 +23,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { useFonts as useFrauncesFonts, Fraunces_900Black } from "@expo-google-fonts/fraunces";
-import { TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
+import { TouchableOpacity as GHTouchable, Swipeable } from "react-native-gesture-handler";
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
@@ -683,6 +683,24 @@ function StopCard({
   const ticket   = needsTicket(stop);
   const duration = getStopDuration(stop);
 
+  const renderRightActions = () => (
+    <GHTouchable
+      style={{
+        backgroundColor: '#E8692A',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 80,
+        borderRadius: 12,
+        marginVertical: 4,
+        marginRight: 4,
+      }}
+      onPress={() => onReplace(stop)}
+    >
+      <Text style={{ fontSize: 20 }}>{'\uD83D\uDD04'}</Text>
+      <Text style={{ color: 'white', fontSize: 11, fontWeight: '800', marginTop: 3, letterSpacing: 0.3 }}>Replace</Text>
+    </GHTouchable>
+  );
+
   // actionRow lives outside the card so long-press drag is never blocked
   const actionRow = (
     <View style={sc.actionRow}>
@@ -730,6 +748,12 @@ function StopCard({
       {/* Body */}
       <View style={sc.body}>
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
+        {isEditable && (
+          <View style={{ position: 'absolute', bottom: 10, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.35 }}>
+            <Text style={sc.swipeHintText}>Replace</Text>
+            <Text style={sc.swipeHintText}>{'\u2039'}</Text>
+          </View>
+        )}
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
             <Text style={sc.tagMutedText}>{duration} min</Text>
@@ -758,10 +782,16 @@ function StopCard({
   }
 
   return (
-    <View style={sc.wrap}>
-      {card}
-      {actionRow}
-    </View>
+    <Swipeable
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={2}
+    >
+      <View style={sc.wrap}>
+        {card}
+        {actionRow}
+      </View>
+    </Swipeable>
   );
 }
 

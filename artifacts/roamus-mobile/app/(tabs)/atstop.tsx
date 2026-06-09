@@ -1032,10 +1032,17 @@ export default function AtStopScreen() {
               const kidExplorer = travelers.find(t => t.name && t.name !== 'You') ?? travelers[0];
               const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
                 ? kidExplorer.name : travelers[0]?.name ?? 'Explorer';
+              const childAgesList = travelers
+                .filter(t => t.name && t.name !== 'You' && !(t as any).isParent)
+                .map(t => Number((t as any).age ?? 99));
+              const minChildAge = childAgesList.length > 0 ? Math.min(...childAgesList) : 99;
+              const allUnder5 = childAgesList.length > 0 && childAgesList.every((a: number) => a <= 5);
               keepDetailOnFocus.current = true; router.push({ pathname: '/kids' as never, params: {
                 stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
                 tripId: trip?.id ?? '', explorerId: explorerName,
                 explorerName: encodeURIComponent(explorerName),
+                minChildAge: String(minChildAge),
+                allUnder5: allUnder5 ? '1' : '0',
               }});
             }}>
             <Text style={dt.gridIcon}>{'\uD83E\uDDED'}</Text>

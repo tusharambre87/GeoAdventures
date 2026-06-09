@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Speech from "expo-speech";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
@@ -45,7 +46,7 @@ function ShimmerRow() {
 
 export default function ExplorerHome() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string }>();
+  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string }>();
   const kids = useKids();
 
   useEffect(() => {
@@ -92,6 +93,10 @@ export default function ExplorerHome() {
         .catch(() => {});
     }
   }, [stopId]);
+
+  const minChildAge = parseInt(params.minChildAge ?? '99');
+  const allUnder5 = params.allUnder5 === '1';
+  const funFact = kids.exploreContent?.stories?.main?.text ?? '';
 
   const stopName = kids.stopName || (params.stopName ? decodeURIComponent(params.stopName) : "Explorer");
   const kidName =
@@ -152,7 +157,7 @@ export default function ExplorerHome() {
               style={({ pressed }) => [s.storyCard, pressed && { transform: [{ scale: 0.98 }] }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/kids/story");
+                router.push({ pathname: '/kids/story' as any, params: { minChildAge: params.minChildAge ?? '99', allUnder5: params.allUnder5 ?? '0' } });
               }}
             >
               <View style={s.scTop}>
@@ -195,18 +200,33 @@ export default function ExplorerHome() {
             <Text style={s.tileSub}>What are you curious about?</Text>
             <Text style={s.tileXp}>{"\u26A1 +5 XP"}</Text>
           </Pressable>
-          <Pressable
-            style={({ pressed }) => [s.tile, pressed && { backgroundColor: K.bg }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/kids/mission-1");
-            }}
-          >
-            <Text style={s.tileIcon}>{"\uD83C\uDFAF"}</Text>
-            <Text style={s.tileName}>Missions</Text>
-            <Text style={s.tileSub}>3 challenges to complete</Text>
-            <Text style={s.tileXp}>{"\u26A1 +15 XP"}</Text>
-          </Pressable>
+          {allUnder5 ? (
+            <Pressable
+              style={[s.tile, { backgroundColor: '#F0EBFF', borderRadius: 20 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Speech.speak(funFact || 'Welcome to the Kids Zone! Tap to explore and discover fun facts about this place!', { language: 'en', rate: 0.85 });
+              }}
+            >
+              <Text style={s.tileIcon}>{"\uD83D\uDD0A"}</Text>
+              <Text style={[s.tileName, { color: '#7C3AED' }]}>Tap to hear!</Text>
+              <Text style={s.tileSub}>Fun facts about this stop</Text>
+              <Text style={[s.tileXp, { color: '#7C3AED' }]}>{"\u26A1 +15 XP"}</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [s.tile, pressed && { backgroundColor: K.bg }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/kids/mission-1");
+              }}
+            >
+              <Text style={s.tileIcon}>{"\uD83C\uDFAF"}</Text>
+              <Text style={s.tileName}>Missions</Text>
+              <Text style={s.tileSub}>3 challenges to complete</Text>
+              <Text style={s.tileXp}>{"\u26A1 +15 XP"}</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* ── Play a quick game ── */}

@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import * as Speech from "expo-speech";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -123,6 +124,8 @@ async function fetchAndCacheAudio(
 export default function StoryPlayer() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+  const params = useLocalSearchParams<{ minChildAge?: string }>();
+  const minChildAge = parseInt(params.minChildAge ?? '99');
 
   const [storyIdx, setStoryIdx] = useState(kids.currentStoryIndex);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -226,6 +229,16 @@ export default function StoryPlayer() {
     return () => { unloadSound(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-play for very young children (age ≤ 5): speak the transcript on load
+  useEffect(() => {
+    if (minChildAge > 5 || !transcript || storyIdx !== 0) return;
+    const timer = setTimeout(() => {
+      Speech.speak(stripEmojis(transcript), { language: 'en', rate: 0.85 });
+    }, 600);
+    return () => { clearTimeout(timer); Speech.stop(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minChildAge, transcript]);
 
   // ── Controls ─────────────────────────────────────────────────────────────
 

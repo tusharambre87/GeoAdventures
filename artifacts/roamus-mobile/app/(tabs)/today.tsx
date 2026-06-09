@@ -2360,7 +2360,32 @@ export default function TodayScreen() {
             </View>
           </LinearGradient>
 
-          <View style={dc.card}>
+          {children.length > 0 && (
+            <View style={dc.card}>
+              <Text style={dc.cardLabel}>KID QUOTES</Text>
+              {children.map(kid => {
+                const key = `dw-${kid.name}`;
+                return (
+                  <View key={kid.name} style={dc.quoteBlock}>
+                    <Text style={dc.quoteWho}>
+                      {kid.name.toUpperCase()}{kid.age ? ` (AGE ${kid.age})` : ''} SAID
+                    </Text>
+                    <SpeechTextInput
+                      style={dc.quoteInput}
+                      value={kidQuotes[key] ?? ''}
+                      onChangeText={text => setKidQuotes(prev => ({ ...prev, [key]: text }))}
+                      placeholder={`"Something memorable…"`}
+                      placeholderTextColor={C.muted}
+                      multiline numberOfLines={2}
+                      returnKeyType="done" blurOnSubmit
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+<View style={dc.card}>
             <Text style={dc.cardLabel}>BEST PHOTOS FROM TODAY</Text>
             <View style={dc.photoGrid}>
               {wrapPhotos.map(uri => (
@@ -2389,31 +2414,6 @@ export default function TodayScreen() {
               <Text style={dc.photoCount}>Tap + to add photos from your library</Text>
             )}
           </View>
-
-          {children.length > 0 && (
-            <View style={dc.card}>
-              <Text style={dc.cardLabel}>KID QUOTES</Text>
-              {children.map(kid => {
-                const key = `dw-${kid.name}`;
-                return (
-                  <View key={kid.name} style={dc.quoteBlock}>
-                    <Text style={dc.quoteWho}>
-                      {kid.name.toUpperCase()}{kid.age ? ` (AGE ${kid.age})` : ''} SAID
-                    </Text>
-                    <SpeechTextInput
-                      style={dc.quoteInput}
-                      value={kidQuotes[key] ?? ''}
-                      onChangeText={text => setKidQuotes(prev => ({ ...prev, [key]: text }))}
-                      placeholder={`"Something memorable…"`}
-                      placeholderTextColor={C.muted}
-                      multiline numberOfLines={2}
-                      returnKeyType="done" blurOnSubmit
-                    />
-                  </View>
-                );
-              })}
-            </View>
-          )}
 
           <View style={dc.card}>
             <Text style={dc.cardLabel}>HOW WAS TODAY?</Text>

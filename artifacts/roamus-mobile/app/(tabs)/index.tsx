@@ -422,22 +422,24 @@ export default function TripsScreen() {
                 <Ionicons name="add-circle-outline" size={18} color="#fff" />
                 <Text style={s.planBtnText}>Plan a Trip</Text>
               </Pressable>
-            </View>
 
-            <TouchableOpacity
-              style={s.discoverBtn}
-              onPress={() => router.push('/discover' as any)}
-              activeOpacity={0.85}
-            >
-              <View style={s.discoverBtnIco}>
-                <Text style={{ fontSize: 18 }}>🌍</Text>
-              </View>
-              <View style={s.discoverBtnBody}>
-                <Text style={s.discoverBtnTitle}>Discover trips</Text>
-                <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
-              </View>
-              <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
-            </TouchableOpacity>
+              <View style={s.emptyDivider} />
+
+              <TouchableOpacity
+                style={s.discoverRow}
+                onPress={() => router.push('/discover' as any)}
+                activeOpacity={0.85}
+              >
+                <View style={s.discoverBtnIco}>
+                  <Text style={{ fontSize: 18 }}>🌍</Text>
+                </View>
+                <View style={s.discoverBtnBody}>
+                  <Text style={s.discoverBtnTitle}>Discover trips</Text>
+                  <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
+                </View>
+                <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
       </ScrollView>
@@ -672,6 +674,15 @@ const s = StyleSheet.create({
   },
   offlinePillEmptyTxt: { fontFamily: F.semibold, fontSize: 12, fontWeight: "700", color: "#E8692A" },
 
+  emptyDivider: {
+    height: 1,
+    backgroundColor: "rgba(26,31,46,0.07)",
+    marginVertical: 4,
+  },
+  discoverRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 4,
+  },
   discoverBtn: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: "#fff", borderRadius: 16,

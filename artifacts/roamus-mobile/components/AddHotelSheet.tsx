@@ -81,6 +81,8 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [saving,             setSaving]             = useState(false);
   const [saved,              setSaved]              = useState(false);
+  const [inputY,             setInputY]             = useState(0);
+  const [inputHeight,        setInputHeight]        = useState(48);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -191,7 +193,13 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
             <Text style={s.sub}>Set your daily starting point for better travel times</Text>
 
             <Text style={s.fieldLabel}>HOTEL NAME</Text>
-            <View style={s.inputWrap}>
+            <View
+              style={s.inputWrap}
+              onLayout={(e) => {
+                setInputY(e.nativeEvent.layout.y);
+                setInputHeight(e.nativeEvent.layout.height);
+              }}
+            >
               <Text style={s.inputIcon}>{'\uD83C\uDFE8'}</Text>
               <TextInput
                 style={s.input}
@@ -211,7 +219,14 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
 
             {suggestions.length > 0 && (
               <ScrollView
-                style={s.suggList}
+                style={[s.suggList, {
+                  position: 'absolute',
+                  top: inputY + inputHeight + 4,
+                  left: 0,
+                  right: 0,
+                  zIndex: 999,
+                  elevation: 10,
+                }]}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
@@ -275,16 +290,18 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
               )}
             </View>
 
-            <Pressable
-              style={[s.saveBtn, saved && s.saveBtnDone, !canSave && { opacity: 0.5 }]}
-              onPress={handleSave}
-              disabled={!canSave}
-            >
-              {saving
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
-              }
-            </Pressable>
+            {suggestions.length === 0 && (
+              <Pressable
+                style={[s.saveBtn, saved && s.saveBtnDone, !canSave && { opacity: 0.5 }]}
+                onPress={handleSave}
+                disabled={!canSave}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
+                }
+              </Pressable>
+            )}
           </Animated.View>
         </KeyboardAvoidingView>
       </Animated.View>
