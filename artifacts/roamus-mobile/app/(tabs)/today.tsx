@@ -312,9 +312,10 @@ function getStopDuration(stop: Stop): number {
 }
 
 function familyInterStopGap(childrenAges: number[]): number {
-  let gap = 50;
-  if (childrenAges.some(a => a < 5)) gap += 15;
-  if (childrenAges.length >= 3) gap += 10;
+  // Small additive transition buffer on top of the displayed travel time
+  let gap = 5;
+  if (childrenAges.some(a => a < 5)) gap += 5;
+  if (childrenAges.length >= 3) gap += 5;
   return gap;
 }
 
@@ -329,9 +330,8 @@ function getTravelToNext(stops: Stop[], idx: number): number {
   const next = stops[idx + 1];
   const fromAPI = (next as Stop & { travelMinsFromPrevious?: number | null }).travelMinsFromPrevious;
   const fromMeta = parseMetadata(next.metadata).travelMinutes;
-  if (fromMeta != null) return Math.max(25, fromMeta + 15);
-  if (fromAPI != null) return Math.max(25, fromAPI + 15);
-  return 30;
+  // Return the raw travel time shown to the user — no hidden padding
+  return fromAPI ?? fromMeta ?? 15;
 }
 
 function isMealStop(type?: string | null): boolean {
@@ -349,7 +349,8 @@ function buildStopTimes(stops: Stop[], pace: Pace = 'balanced', childrenAges: nu
     const label = `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
     const travel = getTravelToNext(stops, i);
     const nextIsMeal = i < stops.length - 1 && isMealStop(stops[i + 1].stopType);
-    const interGap = nextIsMeal ? Math.max(travel, 15) : Math.max(travel, gap);
+    // Add travel + small family buffer so displayed times match the travel shown between stops
+    const interGap = i < stops.length - 1 ? (travel + (nextIsMeal ? 0 : gap)) : 0;
     cursor += effectiveDuration(s, pace) + interGap;
     return label;
   });
@@ -360,7 +361,7 @@ function estimateTotalTime(stops: Stop[], pace: Pace = 'balanced', childrenAges:
   const content = stops.filter(s => !isMealStop(s.stopType));
   const total = content.reduce((sum, s, i) => {
     const travel = getTravelToNext(content, i);
-    return sum + effectiveDuration(s, pace) + Math.max(travel, i < content.length - 1 ? gap : 0);
+    return sum + effectiveDuration(s, pace) + (i < content.length - 1 ? travel + gap : 0);
   }, 0);
   if (total < 60) return `~${total} min`;
   const h = Math.floor(total / 60);
