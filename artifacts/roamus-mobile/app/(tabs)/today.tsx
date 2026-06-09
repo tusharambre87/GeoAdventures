@@ -2029,7 +2029,7 @@ export default function TodayScreen() {
               </View>
               {userDistMi !== null ? (
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <Text style={er.etaIcon}>{'📍'}</Text>
                 <View>
                   <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
                   <Text style={er.etaLbl}>Away</Text>
@@ -2037,7 +2037,7 @@ export default function TodayScreen() {
               </View>
             ) : travelMins ? (
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <Text style={er.etaIcon}>{'📍'}</Text>
                 <View>
                   <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
                   <Text style={er.etaLbl}>Away</Text>
@@ -2251,7 +2251,7 @@ export default function TodayScreen() {
                 </View>
                 {userDistMi !== null ? (
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <Text style={er.etaIcon}>{'📍'}</Text>
                 <View>
                   <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
                   <Text style={er.etaLbl}>Away</Text>
@@ -2259,7 +2259,7 @@ export default function TodayScreen() {
               </View>
             ) : travelMins ? (
               <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'\U0001F4CD'}</Text>
+                <Text style={er.etaIcon}>{'📍'}</Text>
                 <View>
                   <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
                   <Text style={er.etaLbl}>Away</Text>

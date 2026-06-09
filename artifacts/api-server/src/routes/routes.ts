@@ -8341,9 +8341,10 @@ Return valid JSON only. No markdown.`;
         : [];
 
       return res.json({ options: filtered, otherDayStops });
-    } catch (error) {
-      req.log?.error({ error }, '[Rescue] swap-options error');
-      return res.status(500).json({ message: 'Failed to load swap options' });
+    } catch (error: any) {
+      console.error('[swap-options] REAL ERROR:', error?.message ?? String(error), error?.stack ?? '');
+      req.log?.error({ err: error }, '[Rescue] swap-options error');
+      return res.status(500).json({ message: error?.message ?? 'Failed to load swap options' });
     }
   });
 
