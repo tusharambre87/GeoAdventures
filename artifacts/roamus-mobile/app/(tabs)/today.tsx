@@ -39,6 +39,7 @@ import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import DirectionsSheet from "@/components/DirectionsSheet";
+import RescueSheet from "@/components/RescueSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
 
 const TODAY_STOP_BG: Record<string, string> = {
@@ -518,6 +519,7 @@ export default function TodayScreen() {
   const [showFeedback, setShowFeedback]          = useState(false);
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [showDirections, setShowDirections]      = useState(false);
+  const [showRescue, setShowRescue]              = useState(false);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
   // Persist hotel across navigation — load on mount/trip change
@@ -1745,6 +1747,11 @@ export default function TodayScreen() {
               ? <ActivityIndicator color="#fff" />
               : <Text style={mo.startBtnText}>{'▶'}  Start Day {resolvedDayIndex + 1}</Text>}
           </Pressable>
+          {/* Day not going to plan trigger */}
+          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 20 }} />
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
+            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
+          </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
         <AddHotelSheet
@@ -1802,6 +1809,13 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        />
+        <RescueSheet
+          visible={showRescue}
+          onClose={() => setShowRescue(false)}
+          context="morning"
+          stops={dayStops}
+          currentStopIndex={currentStopIndex}
         />
       </View>
     );
@@ -2011,6 +2025,11 @@ export default function TodayScreen() {
               <Text style={er.hereBtnText}>I’m here {'\u2713'}</Text>
             </TouchableOpacity>
           </View>
+          {/* Day not going to plan trigger */}
+          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
+            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
+          </TouchableOpacity>
         </ScrollView>
         <IndoorAlternativesSheet
           visible={indoorSheetVisible}
@@ -2022,6 +2041,13 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        />
+        <RescueSheet
+          visible={showRescue}
+          onClose={() => setShowRescue(false)}
+          context="en_route"
+          stops={dayStops}
+          currentStopIndex={currentStopIndex}
         />
         {menuOverlay}
       </View>
@@ -2225,6 +2251,14 @@ export default function TodayScreen() {
               </TouchableOpacity>
             </View>
           )}
+          {!isLastStop && (
+            <>
+              <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
+              <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
+                <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
         {menuOverlay}
         {showFeedback && feedbackStop && (
@@ -2239,6 +2273,13 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        />
+        <RescueSheet
+          visible={showRescue}
+          onClose={() => setShowRescue(false)}
+          context="stop_complete"
+          stops={dayStops}
+          currentStopIndex={currentStopIndex}
         />
       </View>
     );
