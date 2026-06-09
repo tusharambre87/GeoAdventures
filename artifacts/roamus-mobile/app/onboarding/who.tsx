@@ -451,7 +451,7 @@ export default function WhoScreen() {
                 </View>
                 <View>
                   <Text style={[s.addBtnTitle, { color: G.deep }]}>Add an adult</Text>
-                  <Text style={s.addBtnSub}>Partner, grandparent\u2026</Text>
+                  <Text style={s.addBtnSub}>{'Partner, grandparent\u2026'}</Text>
                 </View>
               </Pressable>
             )}
@@ -463,7 +463,7 @@ export default function WhoScreen() {
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         {isEditMode
           ? <BigBtn label={saving ? "Saving\u2026" : "Save changes"} onPress={handleSave} />
-          : <BigBtn label="Continue \u2192" onPress={handleContinue} />
+          : <BigBtn label={'Continue \u2192'} onPress={handleContinue} />
         }
       </View>
     </View>
