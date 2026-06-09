@@ -8323,7 +8323,24 @@ Return valid JSON only. No markdown.`;
         return true;
       }).slice(0, 6);
 
-      return res.json({ options: filtered });
+      // Other-day stops for two-way swap
+      const otherDayStops = (dayIndex != null)
+        ? await db.select({
+            id: travelStops.id,
+            name: travelStops.name,
+            stopType: travelStops.stopType,
+            dayIndex: travelStops.dayIndex,
+            durationMinutes: travelStops.durationMinutes,
+          }).from(travelStops)
+            .where(and(
+              eq(travelStops.tripId, tripId),
+              sql`${travelStops.dayIndex} != ${dayIndex}`,
+            ))
+            .orderBy(asc(travelStops.dayIndex), asc(travelStops.displayOrder))
+            .limit(20)
+        : [];
+
+      return res.json({ options: filtered, otherDayStops });
     } catch (error) {
       req.log?.error({ error }, '[Rescue] swap-options error');
       return res.status(500).json({ message: 'Failed to load swap options' });
@@ -8371,21 +8388,56 @@ Return valid JSON only. No markdown.`;
   // POST /api/travel/rescue/apply-swap
   app.post('/api/travel/rescue/apply-swap', isAuthenticated, async (req: any, res) => {
     try {
-      const { tripId, fromStopId, toLibraryStopId, dayIndex } = req.body;
-      if (!tripId || !fromStopId || !toLibraryStopId) {
-        return res.status(400).json({ message: 'tripId, fromStopId, toLibraryStopId are required' });
+      const { tripId, action,
+              // two_way_swap params
+              stopAId, stopBId,
+              // one_way_swap params (also accepts legacy names)
+              removeStopId, addStopLibraryId, fromStopId, toLibraryStopId,
+              dayIndex } = req.body;
+      if (!tripId) return res.status(400).json({ message: 'tripId is required' });
+
+      // ── Case A: two-way swap between two trip stops ────────────────────
+      if (action === 'two_way_swap') {
+        if (!stopAId || !stopBId) {
+          return res.status(400).json({ message: 'stopAId and stopBId are required' });
+        }
+        const [stopA] = await db.select().from(travelStops).where(
+          and(eq(travelStops.id, stopAId), eq(travelStops.tripId, tripId))
+        );
+        const [stopB] = await db.select().from(travelStops).where(
+          and(eq(travelStops.id, stopBId), eq(travelStops.tripId, tripId))
+        );
+        if (!stopA || !stopB) return res.status(404).json({ message: 'Stop not found' });
+
+        const aDayIndex = stopA.dayIndex;
+        const aDisplayOrder = stopA.displayOrder;
+        await db.update(travelStops)
+          .set({ dayIndex: stopB.dayIndex, displayOrder: stopB.displayOrder })
+          .where(eq(travelStops.id, stopA.id));
+        await db.update(travelStops)
+          .set({ dayIndex: aDayIndex, displayOrder: aDisplayOrder })
+          .where(eq(travelStops.id, stopB.id));
+
+        return res.json({ action: 'two_way_swap', stopAId, stopBId });
+      }
+
+      // ── Case B: one-way swap (remove trip stop, insert library stop) ───
+      const resolvedFromId  = removeStopId ?? fromStopId;
+      const resolvedToLibId = addStopLibraryId ?? toLibraryStopId;
+      if (!resolvedFromId || !resolvedToLibId) {
+        return res.status(400).json({ message: 'removeStopId and addStopLibraryId are required' });
       }
 
       const [fromStop] = await db.select().from(travelStops).where(
-        and(eq(travelStops.id, fromStopId), eq(travelStops.tripId, tripId))
+        and(eq(travelStops.id, resolvedFromId), eq(travelStops.tripId, tripId))
       );
       if (!fromStop) return res.status(404).json({ message: 'Stop not found' });
 
-      const [libStop] = await db.select().from(stopLibrary).where(eq(stopLibrary.id, toLibraryStopId));
+      const [libStop] = await db.select().from(stopLibrary).where(eq(stopLibrary.id, resolvedToLibId));
       if (!libStop) return res.status(404).json({ message: 'Library stop not found' });
 
-      // Delete the original stop so the replacement takes its position (not an addition)
-      await db.delete(travelStops).where(eq(travelStops.id, fromStopId));
+      // Delete the original stop so the replacement takes its slot
+      await db.delete(travelStops).where(eq(travelStops.id, resolvedFromId));
 
       const [newStop] = await db.insert(travelStops).values({
         tripId,
@@ -8399,7 +8451,7 @@ Return valid JSON only. No markdown.`;
         displayOrder: fromStop.displayOrder ?? 0,
       }).returning();
 
-      return res.json({ newStop, removedId: fromStopId });
+      return res.json({ newStop, removedId: resolvedFromId });
     } catch (error) {
       req.log?.error({ error }, '[Rescue] apply-swap error');
       return res.status(500).json({ message: 'Failed to apply swap' });

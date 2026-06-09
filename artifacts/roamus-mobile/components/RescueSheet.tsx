@@ -38,6 +38,14 @@ interface LibraryStop {
   city?: string | null;
 }
 
+interface OtherDayStop {
+  id: string;
+  name: string;
+  stopType: string | null;
+  dayIndex: number;
+  durationMinutes?: number | null;
+}
+
 type Context = 'morning' | 'en_route' | 'stop_complete';
 type SheetView = 'picker' | RescueOptionId | 'applied';
 
@@ -103,10 +111,14 @@ export default function RescueSheet({
   const [plan, setPlan] = useState<RescuePlan | null>(null);
 
   // Swap / fun
-  const [swapOptions, setSwapOptions] = useState<LibraryStop[]>([]);
-  const [swapLoading, setSwapLoading] = useState(false);
-  const [swapError, setSwapError]     = useState<string | null>(null);
-  const [selectedSwapId, setSelectedSwapId] = useState<string | null>(null);
+  const [swapLoading, setSwapLoading]           = useState(false);
+  const [swapError, setSwapError]               = useState<string | null>(null);
+  const [swapStep, setSwapStep]                 = useState<1 | 2>(1);
+  const [selectedStopId, setSelectedStopId]     = useState<string | null>(null);
+  const [selectedStopName, setSelectedStopName] = useState('');
+  const [otherDayStops, setOtherDayStops]       = useState<OtherDayStop[]>([]);
+  const [newOptions, setNewOptions]             = useState<LibraryStop[]>([]);
+  const [lastSwapType, setLastSwapType]         = useState<'one_way' | 'two_way' | null>(null);
 
   // Food
   const [foodOptions, setFoodOptions] = useState<LibraryStop[]>([]);
@@ -131,9 +143,14 @@ export default function RescueSheet({
     if (visible) {
       setView('picker');
       setPlan(null);
-      setSwapOptions([]);
+      setSwapLoading(false);
       setSwapError(null);
-      setSelectedSwapId(null);
+      setSwapStep(1);
+      setSelectedStopId(null);
+      setSelectedStopName('');
+      setOtherDayStops([]);
+      setNewOptions([]);
+      setLastSwapType(null);
       setFoodOptions([]);
       setFoodError(null);
       setWeatherOptions([]);
@@ -158,12 +175,12 @@ export default function RescueSheet({
     if (view !== 'fun' || !tripId) return;
     setSwapLoading(true);
     setSwapError(null);
-    const swapStop = stops[currentStopIndex];
-    apiFetch<{ options: LibraryStop[] }>('/api/travel/rescue/swap-options', {
+    apiFetch<{ options: LibraryStop[]; otherDayStops: OtherDayStop[] }>('/api/travel/rescue/swap-options', {
       method: 'POST',
-      body: JSON.stringify({ tripId, dayIndex: dayIndex ?? 0, swapStopId: swapStop?.id }),
+      body: JSON.stringify({ tripId, dayIndex: dayIndex ?? 0 }),
     }).then(r => {
-      setSwapOptions(r.options ?? []);
+      setNewOptions(r.options ?? []);
+      setOtherDayStops(r.otherDayStops ?? []);
     }).catch(() => {
       setSwapError('Could not load options. Check your connection.');
     }).finally(() => setSwapLoading(false));
@@ -246,27 +263,36 @@ export default function RescueSheet({
     }
   }
 
-  async function applySwap() {
-    const chosen = swapOptions.find(o => o.id === selectedSwapId);
-    if (!chosen) return;
-    const fromStop = stops[currentStopIndex];
+  async function applySwap(chosen: LibraryStop | OtherDayStop, swapType: 'one_way' | 'two_way') {
+    if (!tripId || !selectedStopId) return;
+    setApplyingPlan(true);
     setSwappedToName(chosen.name);
-    if (tripId && fromStop) {
-      setApplyingPlan(true);
-      try {
+    setLastSwapType(swapType);
+    try {
+      if (swapType === 'two_way') {
         await apiFetch('/api/travel/rescue/apply-swap', {
           method: 'POST',
           body: JSON.stringify({
+            action: 'two_way_swap',
             tripId,
-            fromStopId: fromStop.id,
-            toLibraryStopId: chosen.id,
-            dayIndex: dayIndex ?? 0,
+            stopAId: selectedStopId,
+            stopBId: chosen.id,
           }),
         });
-        onStopsChanged?.();
-      } catch { /* best-effort — plan still shown */ }
-      setApplyingPlan(false);
-    }
+      } else {
+        await apiFetch('/api/travel/rescue/apply-swap', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'one_way_swap',
+            tripId,
+            removeStopId: selectedStopId,
+            addStopLibraryId: chosen.id,
+          }),
+        });
+      }
+      onStopsChanged?.();
+    } catch { /* best-effort — plan still shown */ }
+    setApplyingPlan(false);
     setView('applied');
   }
 
@@ -451,57 +477,150 @@ export default function RescueSheet({
         )}
 
         {/* ── SWAP / FUN VIEW ── */}
-        {view === 'fun' && plan && (
-          <ResultView
-            plan={plan}
-            onBack={() => { setView('picker'); setSelectedSwapId(null); }}
-            onApply={applySwap}
-            ctaLabel={applyingPlan ? 'Swapping…' : selectedSwapId
-              ? `Swap in ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? ''} →`
-              : 'Select a stop below'}
-            ctaColor={selectedSwapId && !applyingPlan ? '#E8692A' : '#C4C8D8'}
-          >
-            {swapLoading ? (
-              <View style={s.centeredNote}>
-                <ActivityIndicator color="#E8692A" />
-                <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding alternatives…</Text>
-              </View>
-            ) : swapError ? (
-              <View style={s.centeredNote}>
-                <Text style={[s.centeredNoteText, { color: '#C0392B' }]}>{swapError}</Text>
-              </View>
-            ) : swapOptions.length === 0 ? (
-              <View style={s.centeredNote}>
-                <Text style={s.centeredNoteText}>No swap options found for your city. Head to Discover to explore more.</Text>
-              </View>
-            ) : (
+        {view === 'fun' && (
+          <>
+            {/* Step 1: pick which stop to swap out */}
+            {swapStep === 1 && (
               <>
-                <Text style={s.sectionLabel}>PICK AN ALTERNATIVE</Text>
-                <View style={s.swapGrid}>
-                  {swapOptions.slice(0, 6).map(opt => {
-                    const selected = opt.id === selectedSwapId;
-                    return (
-                      <TouchableOpacity
-                        key={opt.id}
-                        style={[s.swapCard, selected && s.swapCardSelected]}
-                        activeOpacity={0.8}
-                        onPress={() => setSelectedSwapId(opt.id === selectedSwapId ? null : opt.id)}
-                      >
-                        <Text style={s.swapCardIcon}>{stopEmoji(opt.stopType)}</Text>
-                        <Text style={s.swapCardName} numberOfLines={2}>{opt.name}</Text>
-                        <Text style={s.swapCardMeta} numberOfLines={1}>
-                          {opt.stopType ?? 'attraction'}
+                <View style={s.header}>
+                  <Text style={s.headerTitle}>Swap a stop</Text>
+                  <Text style={s.headerSub}>Pick the stop you want to replace</Text>
+                </View>
+                <ScrollView style={s.scroll}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={s.sectionLabel}>TODAY'S STOPS</Text>
+                  {stops.map((stop, i) => (
+                    <TouchableOpacity
+                      key={stop.id}
+                      style={s.stopSelectRow}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSelectedStopId(stop.id);
+                        setSelectedStopName(stop.name);
+                        setSwapStep(2);
+                      }}
+                    >
+                      <View style={s.stopNumBadge}>
+                        <Text style={s.stopNumText}>{i + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.stopSelectName} numberOfLines={1}>{stop.name}</Text>
+                        <Text style={s.stopSelectMeta}>
+                          {stop.durationMinutes ?? 60} min
+                          {stop.stopType ? ' \u00B7 ' + stop.stopType : ''}
                         </Text>
-                        <Text style={[s.swapCardCta, selected && { color: '#E8692A' }]}>
-                          {selected ? '\u2713 Selected' : 'Swap in →'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                      </View>
+                      <Text style={s.swapArrowCta}>Swap this {'\u2192'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={s.resultFooter}>
+                  <TouchableOpacity style={[s.goBackBtn, { flex: 1 }]} onPress={() => setView('picker')} activeOpacity={0.7}>
+                    <Text style={s.goBackText}>Go back</Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
-          </ResultView>
+
+            {/* Step 2: pick replacement */}
+            {swapStep === 2 && (
+              <>
+                <View style={s.header}>
+                  <Text style={s.headerTitle}>Swap a stop</Text>
+                  <Text style={s.headerSub} numberOfLines={2}>
+                    {'Replacing "' + selectedStopName + '" \u2014 pick what goes in'}
+                  </Text>
+                </View>
+                <ScrollView style={s.scroll}
+                  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={s.swappingOutBanner}>
+                    <Text style={s.swappingOutLabel}>SWAPPING OUT</Text>
+                    <Text style={s.swappingOutName}>{selectedStopName}</Text>
+                  </View>
+
+                  {otherDayStops.length > 0 && (
+                    <>
+                      <Text style={s.sectionLabel}>FROM OTHER DAYS</Text>
+                      {otherDayStops.map(stop => (
+                        <TouchableOpacity
+                          key={stop.id}
+                          style={s.otherDayRow}
+                          activeOpacity={0.8}
+                          onPress={() => !applyingPlan && applySwap(stop, 'two_way')}
+                        >
+                          <View style={s.otherDayThumb}>
+                            <Text style={{ fontSize: 22 }}>{stopEmoji(stop.stopType)}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.stopSelectName} numberOfLines={1}>{stop.name}</Text>
+                            <Text style={s.stopSelectMeta}>
+                              {'Day ' + (stop.dayIndex + 1)}
+                              {stop.durationMinutes ? ' \u00B7 ' + stop.durationMinutes + ' min' : ''}
+                            </Text>
+                          </View>
+                          <Text style={s.swapArrowCta}>Swap {'\u2192'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <View style={s.sectionDivider} />
+                    </>
+                  )}
+
+                  {swapLoading ? (
+                    <View style={s.centeredNote}>
+                      <ActivityIndicator color="#E8692A" />
+                      <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding alternatives{'\u2026'}</Text>
+                    </View>
+                  ) : swapError ? (
+                    <View style={s.centeredNote}>
+                      <Text style={[s.centeredNoteText, { color: '#C0392B' }]}>{swapError}</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={s.sectionLabel}>NEW OPTIONS</Text>
+                      {newOptions.length === 0 ? (
+                        <View style={s.centeredNote}>
+                          <Text style={s.centeredNoteText}>No options found for your city. Head to Discover to explore more.</Text>
+                        </View>
+                      ) : (
+                        <View style={s.swapGrid}>
+                          {newOptions.slice(0, 6).map(opt => (
+                            <TouchableOpacity
+                              key={opt.id}
+                              style={s.swapCard}
+                              activeOpacity={0.8}
+                              onPress={() => !applyingPlan && applySwap(opt, 'one_way')}
+                            >
+                              <Text style={s.swapCardIcon}>{stopEmoji(opt.stopType)}</Text>
+                              <Text style={s.swapCardName} numberOfLines={2}>{opt.name}</Text>
+                              <Text style={s.swapCardMeta} numberOfLines={1}>
+                                {opt.stopType ?? 'attraction'}
+                              </Text>
+                              <Text style={s.swapCardCta}>Swap in {'\u2192'}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  )}
+                  {applyingPlan && (
+                    <View style={[s.centeredNote, { paddingTop: 8 }]}>
+                      <ActivityIndicator color="#E8692A" />
+                      <Text style={[s.centeredNoteText, { marginTop: 8 }]}>Swapping{'\u2026'}</Text>
+                    </View>
+                  )}
+                </ScrollView>
+                <View style={s.resultFooter}>
+                  <TouchableOpacity style={[s.goBackBtn, { flex: 1 }]} onPress={() => setSwapStep(1)} activeOpacity={0.7}>
+                    <Text style={s.goBackText}>Go back</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </>
         )}
 
         {/* ── FOOD VIEW ── */}
@@ -724,7 +843,9 @@ export default function RescueSheet({
               <Text style={s.appliedSub}>
                 {plan?.type === 'fun'
                   ? swappedToName
-                    ? `${stops[currentStopIndex]?.name ?? 'Old stop'} removed. Head to ${swappedToName} instead — it's now on your list.`
+                    ? lastSwapType === 'two_way'
+                      ? `${swappedToName} is now on Day ${(dayIndex ?? 0) + 1}. ${selectedStopName || 'Original stop'} moved to another day.`
+                      : `${selectedStopName || stops[currentStopIndex]?.name || 'Old stop'} removed. Head to ${swappedToName} instead — it's now on your list.`
                     : 'Your Today tab will refresh with the new stop.'
                   : plan?.type === 'weather'
                   ? 'Outdoor stops swapped for indoor alternatives. Your Today tab is updated.'
@@ -995,6 +1116,54 @@ const s = StyleSheet.create({
     borderRadius: 12, padding: 14,
   },
   infoBoxText: { fontSize: 13, fontFamily: F.regular, lineHeight: 19 },
+
+  // ── Stop select rows (swap step 1) ──
+  stopSelectRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12, padding: 13, marginBottom: 8,
+    shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  stopNumBadge: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: '#F5F2EE',
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  stopNumText: { fontSize: 12, fontWeight: '800', color: '#8A8FA8', fontFamily: F.bold },
+  stopSelectName: { fontSize: 14, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold },
+  stopSelectMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 1, fontFamily: F.regular, textTransform: 'capitalize' },
+  swapArrowCta: { fontSize: 12, fontWeight: '700', color: '#E8692A', fontFamily: F.bold, flexShrink: 0 },
+
+  // ── Swapping out banner (swap step 2) ──
+  swappingOutBanner: {
+    backgroundColor: '#FDF0E9',
+    borderWidth: 1, borderColor: 'rgba(232,105,42,0.2)',
+    borderRadius: 12, padding: 12, marginBottom: 12,
+  },
+  swappingOutLabel: {
+    fontSize: 10, fontWeight: '700', color: '#E8692A',
+    textTransform: 'uppercase', letterSpacing: 0.8,
+    marginBottom: 2, fontFamily: F.bold,
+  },
+  swappingOutName: { fontSize: 15, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold },
+
+  // ── Other day rows (swap step 2) ──
+  otherDayRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 8,
+    shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  otherDayThumb: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: '#F5F2EE',
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  sectionDivider: {
+    height: 1, backgroundColor: 'rgba(26,31,46,0.08)',
+    marginVertical: 12,
+  },
 
   // ── Centered note ──
   centeredNote: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 8 },
