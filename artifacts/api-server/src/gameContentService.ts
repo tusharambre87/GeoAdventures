@@ -92,7 +92,7 @@ ${GEOQUEST_SAFETY_PROMPT}`
           content: prompts[gameType]
         }
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       temperature: 0.9,
       response_format: { type: "json_object" }
     });

@@ -188,7 +188,7 @@ Focus only on real, named, specific places. Avoid vague descriptions like "explo
       const response = await openai.chat.completions.create({
         model,
         messages: [{ role: "user", content: researchPrompt }],
-        max_tokens: 1600,
+        max_completion_tokens: 1600,
       });
       const result = response.choices[0]?.message?.content;
       if (result && result.length > 200) {
@@ -3205,7 +3205,7 @@ Also add for each suggestion:
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
-    max_tokens: 4000,
+    max_completion_tokens: 4000,
     temperature: 0.7,
   });
 

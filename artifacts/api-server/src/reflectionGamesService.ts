@@ -108,7 +108,7 @@ Location: ${stop.address || 'Unknown'}
 Make it fun and mysterious for kids!`
         }
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
       temperature: 0.8,
       response_format: { type: "json_object" }
     });
@@ -176,7 +176,7 @@ Location type: ${stop.stopType || 'landmark'}
 Region: ${stop.address || 'Unknown'}`
         }
       ],
-      max_tokens: 300,
+      max_completion_tokens: 300,
       temperature: 0.7,
       response_format: { type: "json_object" }
     });
@@ -226,7 +226,7 @@ ${GEOQUEST_SAFETY_PROMPT}`
           content: `Create a "Which One Doesn't Belong?" puzzle using these places: ${stopNames.join(', ')}`
         }
       ],
-      max_tokens: 600,
+      max_completion_tokens: 600,
       temperature: 0.8,
       response_format: { type: "json_object" }
     });
@@ -280,7 +280,7 @@ ${GEOQUEST_SAFETY_PROMPT}`
 Stop IDs: ${stops.slice(0, 4).map(s => s.id).join(', ')}`
         }
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
       temperature: 0.8,
       response_format: { type: "json_object" }
     });
@@ -336,7 +336,7 @@ ${GEOQUEST_SAFETY_PROMPT}`
 Places visited: ${highlights.join(', ')}`
         }
       ],
-      max_tokens: 200,
+      max_completion_tokens: 200,
       temperature: 0.9,
       response_format: { type: "json_object" }
     });
@@ -385,7 +385,7 @@ ${GEOQUEST_SAFETY_PROMPT}`
 "${storyContent.slice(0, 800)}"`
         }
       ],
-      max_tokens: 400,
+      max_completion_tokens: 400,
       temperature: 0.7,
       response_format: { type: "json_object" }
     });

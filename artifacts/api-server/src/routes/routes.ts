@@ -7759,7 +7759,7 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
           { role: "user", content: `Replace "${stopName}" in ${destination}${search ? ` — parent searched for "${search}"` : ""}` },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 700,
+        max_completion_tokens: 700,
       });
       const data = JSON.parse(response.choices[0].message.content || "{}");
       res.json({ better: data.better || [], similar: data.similar || [] });
@@ -8080,7 +8080,7 @@ Example structure:
           { role: "user", content: `City: "${destination}"` },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 1200,
+        max_completion_tokens: 1200,
       });
       const data = JSON.parse(response.choices[0].message.content || "{}");
 
@@ -8211,7 +8211,7 @@ Example structure:
           },
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 600,
+        max_completion_tokens: 600,
       });
       const data = JSON.parse(response.choices[0].message.content || '{}');
       const results: any[] = Array.isArray(data.results) ? data.results : [];
@@ -8268,7 +8268,7 @@ Return valid JSON only. No markdown.`;
         model: 'gpt-5-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 800,
+        max_completion_tokens: 800,
         response_format: { type: 'json_object' },
       });
 
@@ -8632,7 +8632,7 @@ Return ONLY real, well-known indoor places in ${destination}. Return valid JSON 
           { role: "user", content: `Indoor rainy-day alternative to "${firstImpacted.name}" in ${destination}` },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 250,
+        max_completion_tokens: 250,
       });
 
       const parsed = JSON.parse(response.choices[0].message.content || "{}") as { better?: Array<{ name?: string; stopType?: string; duration?: string; description?: string }> };
@@ -8879,7 +8879,7 @@ ${nominatimAddress ? '- Do NOT include address/lat/lon — those are provided se
           { role: "user", content: `Place: "${name}"${destination ? `, near ${destination}` : ""}` },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 400,
+        max_completion_tokens: 400,
       });
       const data = JSON.parse(response.choices[0].message.content || "{}");
 
@@ -8965,7 +8965,7 @@ Return ONLY valid JSON in this exact format:
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 800,
+        max_completion_tokens: 800,
       });
 
       const raw = completion.choices[0].message.content || "{}";
@@ -9090,7 +9090,7 @@ Return ONLY valid JSON in this exact format:
               { role: "user", content: `Find the address and coordinates for: "${name}"${cityContext ? ` in or near ${cityContext}` : ''}` }
             ],
             response_format: { type: "json_object" },
-            max_tokens: 200,
+            max_completion_tokens: 200,
           });
           const locationData = JSON.parse(lookupResponse.choices[0].message.content || "{}");
           if (locationData.address) resolvedAddress = locationData.address;
@@ -10347,7 +10347,7 @@ Return ONLY valid JSON in this exact format:
           { role: "user", content: `Find the address for "${placeName}" in ${tripContext}` }
         ],
         response_format: { type: "json_object" },
-        max_tokens: 150,
+        max_completion_tokens: 150,
       });
       const result = JSON.parse(response.choices[0].message.content || '{"address": null}');
       res.json({ address: result.address || null });
@@ -12266,7 +12266,7 @@ Return ONLY valid JSON in this exact format:
             },
           ],
           response_format: { type: "json_object" },
-          max_tokens: 200,
+          max_completion_tokens: 200,
         });
         const raw = JSON.parse(response.choices[0].message.content || "{}");
         const parsed = Array.isArray(raw) ? raw : (Array.isArray(raw.lines) ? raw.lines : Object.values(raw).find(v => Array.isArray(v)));
@@ -12856,7 +12856,7 @@ Return ONLY the statement, nothing else.`;
       const response = await getOpenAI().chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 50,
+        max_completion_tokens: 50,
         temperature: 0.7,
       });
       
@@ -12937,7 +12937,7 @@ Format your response as JSON:
           const response = await getOpenAI().chat.completions.create({
             model: "gpt-4o",
             messages: [{ role: "user", content: prompt }],
-            max_tokens: 300,
+            max_completion_tokens: 300,
             temperature: 0.8,
           });
           
@@ -13537,7 +13537,7 @@ Respond with JSON only, no markdown:
         model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
-        max_tokens: 600,
+        max_completion_tokens: 600,
         response_format: { type: "json_object" },
       });
 
@@ -13654,7 +13654,7 @@ Return JSON only with max 3 suggestions:
         model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
-        max_tokens: 800,
+        max_completion_tokens: 800,
         response_format: { type: "json_object" },
       });
 
@@ -14563,7 +14563,7 @@ Do not add any explanation or additional text. Just the single word answer.`
           }
         ],
         temperature: 0.3,
-        max_tokens: 10,
+        max_completion_tokens: 10,
       });
 
       const answer = completion.choices[0]?.message?.content?.trim() || "That depends";
@@ -15399,7 +15399,7 @@ ANTI-SPOILER CHECK: Before returning, verify each clue does NOT contain the dest
         model: 'gpt-5-mini',
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        max_tokens: 8000,
+        max_completion_tokens: 8000,
         temperature: 0.65,
       });
 
@@ -15776,7 +15776,7 @@ CRITICAL RULES:
       model: 'gpt-5-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      max_tokens: 8000,
+      max_completion_tokens: 8000,
       temperature: 0.65,
     });
     const content = completion.choices[0]?.message?.content;

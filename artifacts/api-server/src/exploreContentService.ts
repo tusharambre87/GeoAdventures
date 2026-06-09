@@ -243,7 +243,7 @@ Return JSON:
 }`,
         },
       ],
-      max_tokens: 600,
+      max_completion_tokens: 600,
       temperature: 0.3,
       response_format: { type: "json_object" },
     });
@@ -336,7 +336,7 @@ Return JSON with exactly these three fields. Every field is a single string of p
 }`,
         },
       ],
-      max_tokens: 9000,
+      max_completion_tokens: 9000,
       temperature: 0.72,
       response_format: { type: "json_object" },
     });

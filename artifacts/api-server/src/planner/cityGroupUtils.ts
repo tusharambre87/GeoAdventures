@@ -152,7 +152,7 @@ async function getRouteCityCoords(
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 300,
+        max_completion_tokens: 300,
       });
 
       const data = JSON.parse(response.choices[0].message.content || "{}") as Record<
