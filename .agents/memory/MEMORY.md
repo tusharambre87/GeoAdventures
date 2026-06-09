@@ -4,3 +4,4 @@
 - [emoji rendering fix — RN Android](emoji-rn-fix.md) — Raw emoji in TSX render as tofu boxes; fix with state-machine script at /tmp/fix_emoji_v2.py.
 - [Animated.Text in RN 0.76 Fabric](animated-text-fabric.md) — Animated.Text HOC does not propagate isInAParentText context; use Animated.View + Text instead.
 - [AuthGate onboarding redirect](authgate-onboarding-redirect.md) — Authenticated users navigating to /onboarding/* are bounced to home unless onboardingInProgress=true; put auth-required standalone screens in me/ or another non-onboarding group.
+- [stop_library dedup safety order](stop-library-dedup-safety.md) — Reassign live trip FK references BEFORE deleting any duplicate stop_library row; never delete first.
