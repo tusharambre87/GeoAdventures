@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -10,13 +12,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { F } from '@/lib/tokens';
+import { apiFetch } from '@/lib/apiClient';
 import {
   computeDoneForDay,
   computeFoodStop,
   computeFunDay,
   computeLateDay,
-  computeSickDay,
   computeSkipDay,
   computeTiredDay,
   computeWeatherDay,
@@ -25,6 +28,15 @@ import {
   type RescuePlan,
   type StopLike,
 } from '@/lib/rescueEngine';
+
+interface LibraryStop {
+  id: string;
+  name: string;
+  stopType: string | null;
+  address: string | null;
+  description: string | null;
+  city?: string | null;
+}
 
 type Context = 'morning' | 'en_route' | 'stop_complete';
 type SheetView = 'picker' | RescueOptionId | 'applied';
@@ -35,8 +47,32 @@ interface Props {
   context: Context;
   stops: StopLike[];
   currentStopIndex: number;
+  tripId?: string;
+  dayIndex?: number;
   onDropStop?: (stopId: string) => void;
   onWrapDay?: () => void;
+}
+
+const STOP_TYPE_EMOJI: Record<string, string> = {
+  restaurant: '\uD83C\uDF7D',
+  food: '\uD83C\uDF54',
+  cafe: '\u2615',
+  lunch: '\uD83E\uDD6A',
+  dining: '\uD83C\uDF7D',
+  street_food: '\uD83E\uDDB4',
+  museum: '\uD83C\uDFDB',
+  aquarium: '\uD83D\uDC20',
+  park: '\uD83C\uDF33',
+  zoo: '\uD83E\uDD81',
+  landmark: '\uD83D\uDDFD',
+  science_center: '\uD83D\uDD2D',
+  theater: '\uD83C\uDFAD',
+  gallery: '\uD83D\uDDBC',
+  indoor_attraction: '\uD83C\uDFAB',
+};
+
+function stopEmoji(type: string | null): string {
+  return STOP_TYPE_EMOJI[type ?? ''] ?? '\uD83D\uDCCD';
 }
 
 export default function RescueSheet({
@@ -45,6 +81,8 @@ export default function RescueSheet({
   context,
   stops,
   currentStopIndex,
+  tripId,
+  dayIndex,
   onDropStop,
   onWrapDay,
 }: Props) {
@@ -55,10 +93,32 @@ export default function RescueSheet({
   const [view, setView] = useState<SheetView>('picker');
   const [plan, setPlan] = useState<RescuePlan | null>(null);
 
+  // Swap / fun
+  const [swapOptions, setSwapOptions] = useState<LibraryStop[]>([]);
+  const [swapLoading, setSwapLoading] = useState(false);
+  const [swapError, setSwapError]     = useState<string | null>(null);
+  const [selectedSwapId, setSelectedSwapId] = useState<string | null>(null);
+
+  // Food
+  const [foodOptions, setFoodOptions] = useState<LibraryStop[]>([]);
+  const [foodLoading, setFoodLoading] = useState(false);
+  const [foodError, setFoodError]     = useState<string | null>(null);
+  const [foodCity, setFoodCity]       = useState('');
+
+  // Weather indoor
+  const [weatherOptions, setWeatherOptions] = useState<LibraryStop[]>([]);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+
   useEffect(() => {
     if (visible) {
       setView('picker');
       setPlan(null);
+      setSwapOptions([]);
+      setSwapError(null);
+      setSelectedSwapId(null);
+      setFoodOptions([]);
+      setFoodError(null);
+      setWeatherOptions([]);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -71,6 +131,52 @@ export default function RescueSheet({
     }
   }, [visible]);
 
+  // Load swap options when fun view opens
+  useEffect(() => {
+    if (view !== 'fun' || !tripId) return;
+    setSwapLoading(true);
+    setSwapError(null);
+    const swapStop = stops[currentStopIndex];
+    apiFetch<{ options: LibraryStop[] }>('/api/travel/rescue/swap-options', {
+      method: 'POST',
+      body: JSON.stringify({ tripId, dayIndex: dayIndex ?? 0, swapStopId: swapStop?.id }),
+    }).then(r => {
+      setSwapOptions(r.options ?? []);
+    }).catch(() => {
+      setSwapError('Could not load options. Check your connection.');
+    }).finally(() => setSwapLoading(false));
+  }, [view]);
+
+  // Load food options when food view opens
+  useEffect(() => {
+    if (view !== 'food' || !tripId) return;
+    setFoodLoading(true);
+    setFoodError(null);
+    apiFetch<{ options: LibraryStop[]; city: string }>('/api/travel/rescue/food-options', {
+      method: 'POST',
+      body: JSON.stringify({ tripId }),
+    }).then(r => {
+      setFoodOptions(r.options ?? []);
+      setFoodCity(r.city ?? '');
+    }).catch(() => {
+      setFoodError('Could not load food options. Check your connection.');
+    }).finally(() => setFoodLoading(false));
+  }, [view]);
+
+  // Load indoor alternatives when weather view opens
+  useEffect(() => {
+    if (view !== 'weather' || !tripId) return;
+    setWeatherLoading(true);
+    apiFetch<{ options: LibraryStop[] }>('/api/travel/rescue/swap-options', {
+      method: 'POST',
+      body: JSON.stringify({ tripId, dayIndex: dayIndex ?? 0, filterIndoor: true }),
+    }).then(r => {
+      setWeatherOptions(r.options ?? []);
+    }).catch(() => {
+      setWeatherOptions([]);
+    }).finally(() => setWeatherLoading(false));
+  }, [view]);
+
   function handleClose() {
     Animated.parallel([
       Animated.timing(overlayAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
@@ -79,16 +185,21 @@ export default function RescueSheet({
   }
 
   function selectOption(id: RescueOptionId) {
+    if (id === 'sick') {
+      handleClose();
+      setTimeout(() => router.push('/atstop/sos' as never), 300);
+      return;
+    }
     let computed: RescuePlan;
     switch (id) {
       case 'tired':   computed = computeTiredDay(stops, currentStopIndex);   break;
       case 'late':    computed = computeLateDay(stops, currentStopIndex);    break;
       case 'weather': computed = computeWeatherDay(stops, currentStopIndex); break;
-      case 'sick':    computed = computeSickDay();                           break;
       case 'skip':    computed = computeSkipDay(stops, currentStopIndex);   break;
       case 'done':    computed = computeDoneForDay(stops, currentStopIndex); break;
       case 'fun':     computed = computeFunDay(stops, currentStopIndex);    break;
       case 'food':    computed = computeFoodStop();                          break;
+      default:        computed = { type: id, headline: '', body: '' };
     }
     setPlan(computed);
     setView(id);
@@ -96,10 +207,10 @@ export default function RescueSheet({
 
   function applyPlan() {
     if (!plan) return;
-    if ((plan.type === 'tired' || plan.type === 'late') && plan.dropStop) {
+    if (plan.type === 'tired' && plan.dropStop) {
       onDropStop?.(plan.dropStop.id);
     }
-    if (plan.type === 'done') {
+    if (plan.type === 'done' || plan.type === 'skip') {
       onWrapDay?.();
     }
     setView('applied');
@@ -109,16 +220,13 @@ export default function RescueSheet({
 
   return (
     <Modal visible={visible} transparent statusBarTranslucent animationType="none" onRequestClose={handleClose}>
-      {/* Backdrop */}
       <Animated.View style={[s.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
       </Animated.View>
 
-      {/* Sheet */}
       <Animated.View
         style={[s.sheet, { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetAnim }] }]}
       >
-        {/* Handle */}
         <View style={s.handle} />
 
         {/* ── PICKER VIEW ── */}
@@ -128,36 +236,19 @@ export default function RescueSheet({
               <Text style={s.headerTitle}>Day not going to plan?</Text>
               <Text style={s.headerSub}>What's going on?</Text>
             </View>
-            <ScrollView
-              style={s.scroll}
-              contentContainerStyle={s.pickerContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Zone 1 — 2x2 tile grid */}
+            <ScrollView style={s.scroll} contentContainerStyle={s.pickerContent} showsVerticalScrollIndicator={false}>
               <View style={s.tileGrid}>
                 {primary.map(opt => (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={s.tile}
-                    activeOpacity={0.75}
-                    onPress={() => selectOption(opt.id)}
-                  >
+                  <TouchableOpacity key={opt.id} style={s.tile} activeOpacity={0.75} onPress={() => selectOption(opt.id)}>
                     <Text style={s.tileIcon}>{opt.icon}</Text>
                     <Text style={s.tileTitle}>{opt.title}</Text>
                     <Text style={s.tileSub}>{opt.subtitle}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-
-              {/* Zone 2 — secondary list rows */}
               <Text style={s.moreLabel}>More options</Text>
               {secondary.map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={s.secRow}
-                  activeOpacity={0.75}
-                  onPress={() => selectOption(opt.id)}
-                >
+                <TouchableOpacity key={opt.id} style={s.secRow} activeOpacity={0.75} onPress={() => selectOption(opt.id)}>
                   <Text style={s.secIcon}>{opt.icon}</Text>
                   <View style={s.secText}>
                     <Text style={s.secTitle}>{opt.title}</Text>
@@ -176,9 +267,11 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.dropStop ? `Drop "${plan.dropStop.name}"` : 'Apply'}
+            ctaLabel={plan.dropStop ? `Drop "${plan.dropStop.name}"` : 'Nothing to drop'}
+            ctaColor={plan.dropStop ? '#E8692A' : '#8A8FA8'}
+            headerColor="#2D6A4F"
           >
-            {plan.dropStop && (
+            {plan.dropStop ? (
               <>
                 <Text style={s.sectionLabel}>DROPPING THIS STOP</Text>
                 <View style={s.stopCard}>
@@ -190,6 +283,7 @@ export default function RescueSheet({
                         ? plan.dropStop.stopType.charAt(0).toUpperCase() + plan.dropStop.stopType.slice(1)
                         : 'Stop'}
                       {plan.dropStop.durationMinutes ? ` · ${plan.dropStop.durationMinutes} min` : ''}
+                      {' \u2014 lowest importance'}
                     </Text>
                   </View>
                 </View>
@@ -210,6 +304,10 @@ export default function RescueSheet({
                   </>
                 )}
               </>
+            ) : (
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>{plan.body}</Text>
+              </View>
             )}
           </ResultView>
         )}
@@ -220,39 +318,166 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.dropStop ? `Cut "${plan.dropStop.name}"` : 'Apply'}
+            ctaLabel="Apply tighter schedule"
+            ctaColor="#E8692A"
+            headerColor="#B45309"
           >
-            {plan.dropStop && (
+            {plan.trimmedStops && plan.trimmedStops.length > 0 ? (
               <>
-                <Text style={s.sectionLabel}>CUTTING THIS STOP</Text>
-                <View style={s.stopCard}>
-                  <View style={[s.stopDot, { backgroundColor: '#F5A623' }]} />
-                  <View style={s.stopCardText}>
-                    <Text style={s.stopCardName}>{plan.dropStop.name}</Text>
-                    <Text style={s.stopCardMeta}>
-                      {plan.dropStop.travelMinsFromPrevious
-                        ? `${plan.dropStop.travelMinsFromPrevious} min away`
-                        : 'Farthest stop'}
-                      {plan.dropStop.durationMinutes ? ` · ${plan.dropStop.durationMinutes} min visit` : ''}
-                    </Text>
-                  </View>
-                </View>
-                {plan.timeSavedMins != null && (
-                  <View style={s.savingPill}>
-                    <Text style={s.savingPillText}>{'\u23F1'} Recovers ~{plan.timeSavedMins} min</Text>
+                {plan.totalRecovered != null && plan.totalRecovered > 0 && (
+                  <View style={[s.savingPill, { marginTop: 0, marginBottom: 12, backgroundColor: '#FEF3C7' }]}>
+                    <Text style={[s.savingPillText, { color: '#92400E' }]}>{'\u23F1'} Recover ~{plan.totalRecovered} min</Text>
                   </View>
                 )}
-                {plan.keptStops && plan.keptStops.length > 0 && (
+                <Text style={s.sectionLabel}>PER-STOP TRIM PLAN</Text>
+                {plan.trimmedStops.map(t => (
+                  <View key={t.stop.id} style={s.trimRow}>
+                    <View style={s.trimLeft}>
+                      <Text style={s.trimStopName} numberOfLines={1}>{t.stop.name}</Text>
+                      <Text style={s.trimNote} numberOfLines={2}>{t.note}</Text>
+                    </View>
+                    <View style={s.trimRight}>
+                      {t.protected ? (
+                        <View style={s.protectedBadge}>
+                          <Text style={s.protectedBadgeText}>Protected</Text>
+                        </View>
+                      ) : t.trimBy > 0 ? (
+                        <>
+                          <Text style={s.trimFrom}>{t.stop.durationMinutes ?? 60} min</Text>
+                          <Text style={s.trimArrow}>{'\u2192'}</Text>
+                          <Text style={s.trimTo}>{t.newDuration} min</Text>
+                        </>
+                      ) : (
+                        <Text style={s.trimNoChange}>No change</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>{plan.body}</Text>
+              </View>
+            )}
+          </ResultView>
+        )}
+
+        {/* ── SWAP / FUN VIEW ── */}
+        {view === 'fun' && plan && (
+          <ResultView
+            plan={plan}
+            onBack={() => { setView('picker'); setSelectedSwapId(null); }}
+            onApply={() => {
+              const chosen = swapOptions.find(o => o.id === selectedSwapId);
+              if (chosen) {
+                setPlan(p => p ? { ...p, headline: `Swap in: ${chosen.name}`, body: `Head to ${chosen.name} instead.` } : p);
+              }
+              setView('applied');
+            }}
+            ctaLabel={selectedSwapId
+              ? `Swap in ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? ''} \u2192`
+              : 'Select a stop below'}
+            ctaColor={selectedSwapId ? '#E8692A' : '#C4C8D8'}
+          >
+            {swapLoading ? (
+              <View style={s.centeredNote}>
+                <ActivityIndicator color="#E8692A" />
+                <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding alternatives…</Text>
+              </View>
+            ) : swapError ? (
+              <View style={s.centeredNote}>
+                <Text style={[s.centeredNoteText, { color: '#C0392B' }]}>{swapError}</Text>
+              </View>
+            ) : swapOptions.length === 0 ? (
+              <View style={s.centeredNote}>
+                <Text style={s.centeredNoteText}>No swap options found for your city. Head to Discover to explore more.</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={s.sectionLabel}>PICK AN ALTERNATIVE</Text>
+                <View style={s.swapGrid}>
+                  {swapOptions.slice(0, 6).map(opt => {
+                    const selected = opt.id === selectedSwapId;
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        style={[s.swapCard, selected && s.swapCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => setSelectedSwapId(opt.id === selectedSwapId ? null : opt.id)}
+                      >
+                        <Text style={s.swapCardIcon}>{stopEmoji(opt.stopType)}</Text>
+                        <Text style={s.swapCardName} numberOfLines={2}>{opt.name}</Text>
+                        <Text style={s.swapCardMeta} numberOfLines={1}>
+                          {opt.stopType ?? 'attraction'}
+                        </Text>
+                        <Text style={[s.swapCardCta, selected && { color: '#E8692A' }]}>
+                          {selected ? '\u2713 Selected' : 'Swap in \u2192'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </ResultView>
+        )}
+
+        {/* ── FOOD VIEW ── */}
+        {view === 'food' && plan && (
+          <ResultView
+            plan={plan}
+            onBack={() => setView('picker')}
+            onApply={() => setView('applied')}
+            ctaLabel="Add lunch stop to plan"
+            ctaColor="#E8692A"
+          >
+            {foodLoading ? (
+              <View style={s.centeredNote}>
+                <ActivityIndicator color="#E8692A" />
+                <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding food options…</Text>
+              </View>
+            ) : foodError ? (
+              <View style={s.centeredNote}>
+                <Text style={[s.centeredNoteText, { color: '#C0392B' }]}>{foodError}</Text>
+              </View>
+            ) : (
+              <>
+                {foodOptions.length > 0 && (
                   <>
-                    <Text style={[s.sectionLabel, { marginTop: 20 }]}>KEEPING</Text>
-                    {plan.keptStops.map(st => (
-                      <View key={st.id} style={s.keptRow}>
-                        <Text style={s.keptCheck}>{'\u2713'}</Text>
-                        <Text style={s.keptName} numberOfLines={1}>{st.name}</Text>
-                      </View>
+                    <Text style={s.sectionLabel}>NEARBY OPTIONS</Text>
+                    {foodOptions.map(opt => (
+                      <TouchableOpacity
+                        key={opt.id}
+                        style={s.foodRow}
+                        activeOpacity={0.75}
+                        onPress={() => {
+                          const q = encodeURIComponent(`${opt.name} ${opt.city ?? foodCity}`);
+                          Linking.openURL(`https://maps.google.com/?q=${q}`);
+                        }}
+                      >
+                        <Text style={s.foodRowIcon}>{stopEmoji(opt.stopType)}</Text>
+                        <View style={s.foodRowText}>
+                          <Text style={s.foodRowName} numberOfLines={1}>{opt.name}</Text>
+                          <Text style={s.foodRowMeta} numberOfLines={1}>
+                            {opt.stopType ?? 'restaurant'}
+                            {opt.address ? ` \u00B7 ${opt.address}` : ''}
+                          </Text>
+                        </View>
+                        <Text style={s.foodRowMap}>{'\uD83D\uDDFA'}</Text>
+                      </TouchableOpacity>
                     ))}
                   </>
                 )}
+                {foodOptions.length === 0 && !foodLoading && (
+                  <View style={s.centeredNote}>
+                    <Text style={s.centeredNoteText}>No restaurant data found for your city yet. Try Google Maps for options nearby.</Text>
+                  </View>
+                )}
+                <View style={[s.infoBox, { backgroundColor: '#F5F2EE', marginTop: 16 }]}>
+                  <Text style={[s.infoBoxText, { color: '#6B7280' }]}>
+                    Add as a lunch stop? We'll insert it after your current stop.
+                  </Text>
+                </View>
               </>
             )}
           </ResultView>
@@ -265,56 +490,45 @@ export default function RescueSheet({
             onBack={() => setView('picker')}
             onApply={applyPlan}
             ctaLabel={plan.swaps && plan.swaps.length > 0 ? 'Move indoors' : 'Got it'}
-            ctaColor="#7A9E8E"
+            ctaColor={plan.swaps && plan.swaps.length > 0 ? '#1A1F2E' : '#8A8FA8'}
           >
             {plan.swaps && plan.swaps.length > 0 ? (
               <>
-                <Text style={s.sectionLabel}>OUTDOOR STOPS TO SWAP</Text>
-                {plan.swaps.map(swap => (
-                  <View key={swap.from.id} style={s.swapRow}>
-                    <View style={s.swapFrom}>
-                      <Text style={s.swapFromName} numberOfLines={1}>{swap.from.name}</Text>
-                      <Text style={s.swapFromMeta}>
-                        {swap.from.stopType
-                          ? swap.from.stopType.charAt(0).toUpperCase() + swap.from.stopType.slice(1)
-                          : 'Outdoor'}
-                      </Text>
+                <Text style={s.sectionLabel}>OUTDOOR STOPS TO MOVE INDOORS</Text>
+                {plan.swaps.map((swap, idx) => {
+                  const alt = weatherOptions[idx] ?? null;
+                  return (
+                    <View key={swap.from.id} style={s.swapRow}>
+                      <View style={s.swapFrom}>
+                        <Text style={[s.swapFromName, { textDecorationLine: 'line-through', color: '#8A8FA8' }]} numberOfLines={1}>
+                          {swap.from.name}
+                        </Text>
+                        <Text style={s.swapFromMeta}>
+                          {swap.from.stopType ?? 'Outdoor'}
+                        </Text>
+                      </View>
+                      <Text style={s.swapArrow}>{'\u2192'}</Text>
+                      <View style={s.swapTo}>
+                        {weatherLoading ? (
+                          <Text style={[s.swapToName, { color: '#B0ADA8', fontStyle: 'italic' }]}>Finding indoor alternative…</Text>
+                        ) : alt ? (
+                          <>
+                            <Text style={s.swapToName} numberOfLines={2}>{alt.name}</Text>
+                            <Text style={s.swapToMeta}>{alt.stopType ?? 'Indoor'}</Text>
+                          </>
+                        ) : (
+                          <Text style={[s.swapToName, { color: '#B0ADA8', fontStyle: 'italic' }]}>Indoor option nearby</Text>
+                        )}
+                      </View>
                     </View>
-                    <Text style={s.swapArrow}>{'\u2192'}</Text>
-                    <View style={s.swapTo}>
-                      <Text style={s.swapToName} numberOfLines={2}>{swap.toLabel}</Text>
-                      <Text style={s.swapToMeta}>Suggested swap</Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </>
             ) : (
               <View style={s.centeredNote}>
                 <Text style={s.centeredNoteText}>Your remaining stops are mostly indoors already — you're good!</Text>
               </View>
             )}
-          </ResultView>
-        )}
-
-        {/* ── SICK VIEW ── */}
-        {view === 'sick' && plan && (
-          <ResultView
-            plan={plan}
-            onBack={() => setView('picker')}
-            onApply={applyPlan}
-            ctaLabel="Mark as rest day"
-            ctaColor="#7A9E8E"
-          >
-            <View style={s.centeredNote}>
-              <Text style={[s.centeredNoteText, { color: '#1A1F2E', fontSize: 14, lineHeight: 22 }]}>
-                Everyone deserves a break. Mark today as a rest day and your itinerary will be ready when you feel better.
-              </Text>
-            </View>
-            <View style={[s.infoBox, { backgroundColor: '#EEF5F2', marginTop: 12 }]}>
-              <Text style={[s.infoBoxText, { color: '#3D7A60' }]}>
-                Your stops stay saved and can be visited on any day of the trip.
-              </Text>
-            </View>
           </ResultView>
         )}
 
@@ -325,7 +539,7 @@ export default function RescueSheet({
             onBack={() => setView('picker')}
             onApply={applyPlan}
             ctaLabel="Skip today"
-            ctaColor="#8A8FA8"
+            ctaColor="#6B7280"
           >
             {plan.keptStops && plan.keptStops.length > 0 ? (
               <>
@@ -344,9 +558,9 @@ export default function RescueSheet({
                 <Text style={s.centeredNoteText}>No stops left to skip!</Text>
               </View>
             )}
-            <View style={[s.infoBox, { backgroundColor: '#FEF2F1', marginTop: 16 }]}>
-              <Text style={[s.infoBoxText, { color: '#C0392B' }]}>
-                This marks the whole day as skipped. This can't be undone from the app.
+            <View style={[s.infoBox, { backgroundColor: '#F5F2EE', marginTop: 16 }]}>
+              <Text style={[s.infoBoxText, { color: '#6B7280' }]}>
+                All stops for today will be marked as skipped. You can re-add them from Trip Plan anytime.
               </Text>
             </View>
           </ResultView>
@@ -384,53 +598,21 @@ export default function RescueSheet({
           </ResultView>
         )}
 
-        {/* ── FUN VIEW (placeholder) ── */}
-        {view === 'fun' && plan && (
-          <ResultView
-            plan={plan}
-            onBack={() => setView('picker')}
-            onApply={applyPlan}
-            ctaLabel="Find a swap"
-            ctaColor="#E8692A"
-          >
-            <View style={s.centeredNote}>
-              <Text style={s.centeredNoteText}>
-                Stop swap suggestions are coming soon. For now, head to Discover to find something different.
-              </Text>
-            </View>
-          </ResultView>
-        )}
-
-        {/* ── FOOD VIEW (placeholder) ── */}
-        {view === 'food' && plan && (
-          <ResultView
-            plan={plan}
-            onBack={() => setView('picker')}
-            onApply={applyPlan}
-            ctaLabel="Find food nearby"
-            ctaColor="#F5A623"
-          >
-            <View style={s.centeredNote}>
-              <Text style={s.centeredNoteText}>
-                Food finder is coming soon. For now, check Google Maps for restaurants nearby.
-              </Text>
-            </View>
-          </ResultView>
-        )}
-
         {/* ── APPLIED VIEW ── */}
         {view === 'applied' && (
           <>
             <View style={s.appliedWrap}>
               <Text style={s.appliedEmoji}>{'\u2705'}</Text>
-              <Text style={s.appliedTitle}>Day adjusted</Text>
-              <Text style={s.appliedSub}>Your updated plan is live. Today tab reflects the changes.</Text>
+              <Text style={s.appliedTitle}>{plan?.headline ?? 'Day adjusted'}</Text>
+              <Text style={s.appliedSub}>
+                {plan?.type === 'fun' && selectedSwapId
+                  ? `Head to ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? 'your new stop'} instead.`
+                  : plan?.type === 'late'
+                  ? 'Trim guide is set. Keep it moving!'
+                  : 'Your updated plan is live. Today tab reflects the changes.'}
+              </Text>
             </View>
-            <TouchableOpacity
-              style={s.appliedBtn}
-              activeOpacity={0.85}
-              onPress={handleClose}
-            >
+            <TouchableOpacity style={s.appliedBtn} activeOpacity={0.85} onPress={handleClose}>
               <Text style={s.appliedBtnText}>Got it {'\u2014'} continue day</Text>
             </TouchableOpacity>
           </>
@@ -448,14 +630,15 @@ interface ResultViewProps {
   onApply: () => void;
   ctaLabel: string;
   ctaColor?: string;
+  headerColor?: string;
   children: React.ReactNode;
 }
 
-function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', children }: ResultViewProps) {
+function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', headerColor = '#1A1F2E', children }: ResultViewProps) {
   return (
     <>
       <View style={s.resultHeader}>
-        <Text style={s.resultTitle}>{plan.headline}</Text>
+        <Text style={[s.resultTitle, { color: headerColor }]}>{plan.headline}</Text>
         <Text style={s.resultBody}>{plan.body}</Text>
       </View>
       <ScrollView
@@ -491,7 +674,7 @@ const s = StyleSheet.create({
   sheet: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    maxHeight: '82%',
+    maxHeight: '88%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
@@ -541,8 +724,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     marginBottom: 8,
     shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
   secIcon:    { fontSize: 20 },
   secText:    { flex: 1 },
@@ -556,7 +738,7 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.10)',
   },
-  resultTitle: { fontSize: 18, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold, marginBottom: 4 },
+  resultTitle: { fontSize: 18, fontWeight: '800', fontFamily: F.bold, marginBottom: 4 },
   resultBody:  { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, lineHeight: 18 },
 
   // ── Result footer ──
@@ -572,20 +754,22 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   goBackText: { fontSize: 14, fontWeight: '700', color: '#8A8FA8', fontFamily: F.bold },
-  ctaBtn:   { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  ctaBtn:     { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   ctaBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
 
-  // ── Stop card ──
+  // ── Section label ──
   sectionLabel: {
     fontSize: 11, fontWeight: '700', color: '#B0ADA8',
     letterSpacing: 0.8, fontFamily: F.bold,
     marginTop: 16, marginBottom: 8,
   },
+
+  // ── Stop card ──
   stopCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14,
   },
-  stopDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  stopDot:      { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   stopCardText: { flex: 1 },
   stopCardName: { fontSize: 14, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
   stopCardMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular },
@@ -605,26 +789,80 @@ const s = StyleSheet.create({
   keptCheck: { fontSize: 13, color: '#3DAA6E', fontWeight: '700', fontFamily: F.bold, width: 16 },
   keptName:  { flex: 1, fontSize: 13, color: '#1A1F2E', fontFamily: F.regular },
 
-  // ── Weather swaps ──
+  // ── Late: trim rows ──
+  trimRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(26,31,46,0.07)',
+    gap: 12,
+  },
+  trimLeft:     { flex: 1 },
+  trimRight:    { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+  trimStopName: { fontSize: 13, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold, marginBottom: 3 },
+  trimNote:     { fontSize: 12, color: '#8A8FA8', fontFamily: F.regular, lineHeight: 17 },
+  trimFrom:     { fontSize: 12, color: '#B0ADA8', fontFamily: F.regular, textDecorationLine: 'line-through' },
+  trimArrow:    { fontSize: 12, color: '#8A8FA8' },
+  trimTo:       { fontSize: 12, fontWeight: '700', color: '#E8692A', fontFamily: F.bold },
+  trimNoChange: { fontSize: 12, color: '#C4C8D8', fontFamily: F.regular },
+  protectedBadge: {
+    backgroundColor: '#EEF5F2', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  protectedBadgeText: { fontSize: 11, fontWeight: '600', color: '#3D7A60', fontFamily: F.semibold },
+
+  // ── Swap grid (fun view) ──
+  swapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  swapCard: {
+    width: '47%', backgroundColor: '#F5F2EE',
+    borderRadius: 16, padding: 14, gap: 4,
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  swapCardSelected: {
+    borderColor: '#E8692A', backgroundColor: '#FDF0E9',
+  },
+  swapCardIcon: { fontSize: 24, marginBottom: 2 },
+  swapCardName: { fontSize: 13, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold, lineHeight: 18 },
+  swapCardMeta: { fontSize: 11, color: '#8A8FA8', fontFamily: F.regular, textTransform: 'capitalize' },
+  swapCardCta:  { fontSize: 12, fontWeight: '600', color: '#8A8FA8', fontFamily: F.semibold, marginTop: 6 },
+
+  // ── Food rows ──
+  foodRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(26,31,46,0.07)',
+  },
+  foodRowIcon: { fontSize: 22 },
+  foodRowText: { flex: 1 },
+  foodRowName: { fontSize: 14, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  foodRowMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular, textTransform: 'capitalize' },
+  foodRowMap:  { fontSize: 20 },
+
+  // ── Weather swap rows ──
   swapRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(26,31,46,0.07)',
+    borderBottomColor: 'rgba(26,31,46,0.08)',
   },
   swapFrom:     { flex: 1 },
-  swapFromName: { fontSize: 13, fontWeight: '600', color: '#8A8FA8', textDecorationLine: 'line-through', fontFamily: F.semibold },
-  swapFromMeta: { fontSize: 11, color: '#B0ADA8', fontFamily: F.regular },
-  swapArrow:    { fontSize: 16, color: '#C4C8D8' },
+  swapFromName: { fontSize: 13, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  swapFromMeta: { fontSize: 11, color: '#B0ADA8', fontFamily: F.regular, textTransform: 'capitalize', marginTop: 2 },
+  swapArrow:    { fontSize: 16, color: '#C4C8D8', paddingHorizontal: 4 },
   swapTo:       { flex: 1 },
   swapToName:   { fontSize: 13, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
-  swapToMeta:   { fontSize: 11, color: '#8A8FA8', fontFamily: F.regular },
+  swapToMeta:   { fontSize: 11, color: '#B0ADA8', fontFamily: F.regular, textTransform: 'capitalize', marginTop: 2 },
 
-  // ── Info / centered note ──
+  // ── Info box ──
+  infoBox: {
+    borderRadius: 12, padding: 14,
+  },
+  infoBoxText: { fontSize: 13, fontFamily: F.regular, lineHeight: 19 },
+
+  // ── Centered note ──
   centeredNote: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 8 },
-  centeredNoteText: { fontSize: 14, color: '#8A8FA8', fontFamily: F.regular, textAlign: 'center', lineHeight: 21 },
-  infoBox: { borderRadius: 10, padding: 12 },
-  infoBoxText: { fontSize: 12, fontFamily: F.regular, lineHeight: 17 },
+  centeredNoteText: { fontSize: 14, color: '#8A8FA8', textAlign: 'center', lineHeight: 21, fontFamily: F.regular },
 
   // ── Applied ──
   appliedWrap: {
@@ -646,8 +884,7 @@ const s = StyleSheet.create({
     backgroundColor: '#E8692A', borderRadius: 16, padding: 16,
     alignItems: 'center',
     shadowColor: '#E8692A', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 20,
-    elevation: 8,
+    shadowOpacity: 0.3, shadowRadius: 20, elevation: 8,
   },
   appliedBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', fontFamily: F.bold },
 });

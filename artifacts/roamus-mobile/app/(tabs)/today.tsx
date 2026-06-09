@@ -1841,6 +1841,8 @@ export default function TodayScreen() {
           context="morning"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          tripId={trip?.id}
+          dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
         />
@@ -2075,6 +2077,8 @@ export default function TodayScreen() {
           context="en_route"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          tripId={trip?.id}
+          dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
         />
@@ -2309,6 +2313,8 @@ export default function TodayScreen() {
           context="stop_complete"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          tripId={trip?.id}
+          dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
         />

@@ -8282,6 +8282,91 @@ Return valid JSON only. No markdown.`;
     }
   });
 
+  // ─── Rescue: swap-options — real stop_library alternatives ─────────────────
+  // POST /api/travel/rescue/swap-options
+  app.post('/api/travel/rescue/swap-options', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId, dayIndex, swapStopId, filterIndoor } = req.body;
+      if (!tripId) return res.status(400).json({ message: 'tripId is required' });
+
+      const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+      const cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
+      if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
+
+      const todayStops = dayIndex != null
+        ? await db.select({ id: travelStops.id }).from(travelStops)
+            .where(and(eq(travelStops.tripId, tripId), eq(travelStops.dayIndex, dayIndex)))
+        : [];
+      const excludeIds = swapStopId
+        ? [...todayStops.map(s => s.id), swapStopId]
+        : todayStops.map(s => s.id);
+
+      const indoorTypes = ['museum', 'aquarium', 'science_center', 'indoor_attraction', 'theater', 'gallery'];
+      const excludedTypes = filterIndoor ? [] : ['restaurant', 'food', 'cafe', 'hotel'];
+
+      let query = db.select({
+        id: stopLibrary.id,
+        name: stopLibrary.name,
+        stopType: stopLibrary.stopType,
+        address: stopLibrary.address,
+        description: stopLibrary.description,
+      }).from(stopLibrary).where(ilike(stopLibrary.city, `%${cityRaw}%`));
+
+      const rows = await query.orderBy(asc(stopLibrary.serveCount)).limit(20);
+
+      const filtered = rows.filter(r => {
+        if (excludeIds.includes(r.id)) return false;
+        if (!filterIndoor && excludedTypes.includes(r.stopType ?? '')) return false;
+        if (filterIndoor && !indoorTypes.includes(r.stopType ?? '')) return false;
+        return true;
+      }).slice(0, 6);
+
+      return res.json({ options: filtered });
+    } catch (error) {
+      req.log?.error({ error }, '[Rescue] swap-options error');
+      return res.status(500).json({ message: 'Failed to load swap options' });
+    }
+  });
+
+  // ─── Rescue: food-options — restaurants from stop_library ────────────────────
+  // POST /api/travel/rescue/food-options
+  app.post('/api/travel/rescue/food-options', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.body;
+      if (!tripId) return res.status(400).json({ message: 'tripId is required' });
+
+      const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+      const cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
+      if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
+
+      const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food'];
+
+      const rows = await db.select({
+        id: stopLibrary.id,
+        name: stopLibrary.name,
+        stopType: stopLibrary.stopType,
+        address: stopLibrary.address,
+        description: stopLibrary.description,
+        city: stopLibrary.city,
+      }).from(stopLibrary)
+        .where(and(
+          ilike(stopLibrary.city, `%${cityRaw}%`),
+          inArray(stopLibrary.stopType, foodTypes),
+        ))
+        .orderBy(desc(stopLibrary.serveCount))
+        .limit(5);
+
+      return res.json({ options: rows, city: cityRaw });
+    } catch (error) {
+      req.log?.error({ error }, '[Rescue] food-options error');
+      return res.status(500).json({ message: 'Failed to load food options' });
+    }
+  });
+
   // ─── Weather Smart Rerouting — server-authoritative per-stop conflict check ──
   // GET /api/travel/trips/:tripId/weather-check?dayIndex=N
   // Fetches the trip's stops server-side for a given dayIndex, then runs conflict analysis.

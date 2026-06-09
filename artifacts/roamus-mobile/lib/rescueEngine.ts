@@ -5,6 +5,16 @@ export interface StopLike {
   durationMinutes?: number | null;
   travelMinsFromPrevious?: number | null;
   metadata?: Record<string, unknown> | null;
+  importanceLevel?: number | null;
+  timeLock?: boolean | null;
+}
+
+export interface TrimmedStop {
+  stop: StopLike;
+  trimBy: number;
+  newDuration: number;
+  note: string;
+  protected: boolean;
 }
 
 export type RescueOptionId =
@@ -29,6 +39,8 @@ export interface RescuePlan {
   headline: string;
   body: string;
   timeSavedMins?: number;
+  trimmedStops?: TrimmedStop[];
+  totalRecovered?: number;
 }
 
 export function getOptions(
@@ -43,9 +55,9 @@ export function getOptions(
         { id: 'food',    icon: '\uD83C\uDF54',  title: 'Need food first',     subtitle: 'Grab something before we go',   zone: 'primary' },
       ],
       secondary: [
-        { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',        subtitle: 'Find indoor options',         zone: 'secondary' },
-        { id: 'sick',    icon: '\uD83E\uDD12',       title: 'Someone is sick',        subtitle: 'Dial back the day',           zone: 'secondary' },
-        { id: 'skip',    icon: '\u2705',              title: 'Skipping today entirely', subtitle: 'Save stops for tomorrow',    zone: 'secondary' },
+        { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',         subtitle: 'Find indoor options',       zone: 'secondary' },
+        { id: 'sick',    icon: '\uD83E\uDD12',       title: 'Someone is sick',         subtitle: 'Get help & safety info',    zone: 'secondary' },
+        { id: 'skip',    icon: '\u2705',              title: 'Skipping today entirely', subtitle: 'Save stops for tomorrow',   zone: 'secondary' },
       ],
     };
   }
@@ -57,84 +69,141 @@ export function getOptions(
       { id: 'food',  icon: '\uD83C\uDF54',  title: 'Need food now',       subtitle: 'Find something close',      zone: 'primary' },
     ],
     secondary: [
-      { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',       subtitle: 'Find indoor options nearby', zone: 'secondary' },
+      { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',        subtitle: 'Find indoor options nearby', zone: 'secondary' },
       { id: 'done',    icon: '\u2705',              title: "We're done for the day", subtitle: 'Wrap up early',             zone: 'secondary' },
     ],
   };
+}
+
+function getImportanceLevel(s: StopLike): number {
+  if (s.importanceLevel != null) return s.importanceLevel;
+  const meta = s.metadata ?? {};
+  if (typeof meta.importanceLevel === 'number') return meta.importanceLevel;
+  return 3;
+}
+
+function isTimeLocked(s: StopLike): boolean {
+  if (s.timeLock != null) return s.timeLock;
+  const meta = s.metadata ?? {};
+  return meta.timeLock === true;
 }
 
 // ─── Pure compute functions ───────────────────────────────────────────────────
 
 const OUTDOOR_TYPES = new Set([
   'park', 'nature', 'landmark', 'zoo', 'theme_park', 'beach', 'hike', 'outdoor',
+  'playground', 'outdoor_attraction', 'garden',
 ]);
 
-const INDOOR_SUBS: Record<string, string> = {
-  park: 'Indoor play area or arcade',
-  nature: 'Natural history museum',
-  landmark: 'Visitor center or indoor exhibit',
-  zoo: 'Aquarium or indoor wildlife center',
-  theme_park: 'Indoor entertainment center',
-  beach: 'Aquarium or waterpark',
-  hike: 'Museum or indoor climbing',
-  outdoor: 'Indoor attraction nearby',
-};
+function getTrimNote(stopType: string): string {
+  const notes: Record<string, string> = {
+    aquarium:   'Focus on the main tank — skip the gift shop.',
+    museum:     'Top 2 galleries only.',
+    zoo:        'Main loop — big animals only.',
+    park:       'Quick walk, skip the playground.',
+    landmark:   'Photos + 10 min — then move.',
+    theme_park: 'Pick your 2 must-dos.',
+    beach:      '20 min on the sand — then keep moving.',
+    nature:     'Viewpoint stop only — skip the trail.',
+  };
+  return notes[stopType] ?? 'Hit the highlights, keep moving.';
+}
 
 export function computeTiredDay(stops: StopLike[], currentIdx: number): RescuePlan {
-  const remaining = stops.slice(currentIdx);
-  if (remaining.length === 0) {
-    return { type: 'tired', headline: 'No stops left to drop', body: "You've already covered all your stops today." };
+  const unvisited = stops.slice(currentIdx).filter(s => !(s as any).isSkipped && !(s as any).isVisited);
+
+  if (unvisited.length <= 1) {
+    return {
+      type: 'tired',
+      headline: 'No stops to drop',
+      body: "You only have one stop left — tough it out!",
+    };
   }
-  const dropStop = remaining[remaining.length - 1];
-  const keptStops = remaining.slice(0, remaining.length - 1);
-  const timeSaved = (dropStop.durationMinutes ?? 60) + (dropStop.travelMinsFromPrevious ?? 15);
+
+  const droppable = unvisited.filter(s => !isTimeLocked(s));
+
+  if (droppable.length === 0) {
+    return {
+      type: 'tired',
+      headline: "All stops are locked in",
+      body: "Your remaining stops have reservations or tickets — none can be dropped.",
+      keptStops: unvisited,
+    };
+  }
+
+  const sorted = [...droppable].sort(
+    (a, b) => getImportanceLevel(a) - getImportanceLevel(b),
+  );
+  const toDrop = sorted[0];
+  const toKeep = unvisited.filter(s => s.id !== toDrop.id);
+  const minutesSaved = toDrop.durationMinutes ?? 60;
+
   return {
-    type: 'tired', dropStop, keptStops, timeSavedMins: timeSaved,
-    headline: 'Drop your last stop',
-    body: `Dropping "${dropStop.name}" saves about ${timeSaved} min of travel and visiting.`,
+    type: 'tired',
+    dropStop: toDrop,
+    keptStops: toKeep,
+    timeSavedMins: minutesSaved,
+    headline: 'Lightened your day',
+    body: `Dropping "${toDrop.name}" saves about ${minutesSaved} min.`,
   };
 }
 
 export function computeLateDay(stops: StopLike[], currentIdx: number): RescuePlan {
-  const remaining = stops.slice(currentIdx);
-  if (remaining.length === 0) {
-    return { type: 'late', headline: 'No stops left', body: "You've already covered all your stops today." };
+  const unvisited = stops.slice(currentIdx).filter(s => !(s as any).isSkipped && !(s as any).isVisited);
+
+  if (unvisited.length === 0) {
+    return { type: 'late', headline: 'No stops left', body: "You've covered all your stops today." };
   }
-  const sorted = [...remaining].sort(
-    (a, b) => (b.travelMinsFromPrevious ?? 0) - (a.travelMinsFromPrevious ?? 0),
-  );
-  const dropStop = sorted[0];
-  const keptStops = remaining.filter(s => s.id !== dropStop.id);
-  const timeSaved = (dropStop.travelMinsFromPrevious ?? 15) + (dropStop.durationMinutes ?? 60);
+
+  const trimmed: TrimmedStop[] = unvisited.map(stop => {
+    if (isTimeLocked(stop)) {
+      return {
+        stop,
+        trimBy: 0,
+        newDuration: stop.durationMinutes ?? 60,
+        note: 'Protected — has reservation or ticket',
+        protected: true,
+      };
+    }
+    const original = stop.durationMinutes ?? 60;
+    const minimum = 30;
+    const maxTrim = Math.max(0, original - minimum);
+    const trimBy = Math.min(maxTrim, Math.round(original * 0.33));
+    return {
+      stop,
+      trimBy,
+      newDuration: original - trimBy,
+      note: getTrimNote(stop.stopType ?? ''),
+      protected: false,
+    };
+  });
+
+  const totalRecovered = trimmed.reduce((acc, t) => acc + t.trimBy, 0);
+
   return {
-    type: 'late', dropStop, keptStops, timeSavedMins: timeSaved,
-    headline: 'Cut the farthest stop',
-    body: `Cutting "${dropStop.name}" recovers the most time — about ${timeSaved} min.`,
+    type: 'late',
+    trimmedStops: trimmed,
+    totalRecovered,
+    headline: 'Tightened your schedule',
+    body: `Trim each stop to recover ~${totalRecovered} min.`,
   };
 }
 
 export function computeWeatherDay(stops: StopLike[], currentIdx: number): RescuePlan {
   const remaining = stops.slice(currentIdx);
   const outdoorStops = remaining.filter(s => OUTDOOR_TYPES.has(s.stopType ?? ''));
-  const swaps = outdoorStops.map(s => ({
-    from: s,
-    toLabel: INDOOR_SUBS[s.stopType ?? ''] ?? 'Indoor alternative nearby',
-  }));
+  const swaps = outdoorStops.map(s => ({ from: s, toLabel: '' }));
   if (swaps.length === 0) {
-    return { type: 'weather', swaps: [], headline: 'Already mostly indoors', body: "Good news — your remaining stops are mostly indoor-friendly." };
+    return {
+      type: 'weather', swaps: [],
+      headline: 'Already mostly indoors',
+      body: "Good news — your remaining stops are indoor-friendly.",
+    };
   }
   return {
     type: 'weather', swaps,
-    headline: `${swaps.length} outdoor stop${swaps.length !== 1 ? 's' : ''} to swap`,
-    body: "We'll suggest indoor alternatives for your outdoor stops.",
-  };
-}
-
-export function computeSickDay(): RescuePlan {
-  return {
-    type: 'sick',
-    headline: 'Take a rest day',
-    body: "Mark today as a rest day. Your itinerary is saved and ready for when you feel better.",
+    headline: `${swaps.length} outdoor stop${swaps.length !== 1 ? 's' : ''} to move indoors`,
+    body: "Loading indoor alternatives from your city…",
   };
 }
 
@@ -165,7 +234,7 @@ export function computeFunDay(stops: StopLike[], currentIdx: number): RescuePlan
     type: 'fun',
     headline: 'Swap a stop',
     body: swapStop
-      ? `We'll find something more fun near "${swapStop.name}".`
+      ? `Looking for alternatives near "${swapStop.name}"…`
       : 'No upcoming stops to swap right now.',
   };
 }
@@ -174,6 +243,6 @@ export function computeFoodStop(): RescuePlan {
   return {
     type: 'food',
     headline: 'Find food nearby',
-    body: "We'll look for family-friendly restaurants near your current location.",
+    body: "Loading family-friendly options in your area…",
   };
 }
