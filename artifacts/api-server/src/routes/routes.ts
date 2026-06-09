@@ -5287,22 +5287,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rate: DALL-E 3 standard tier → 5 images/min → 12s delay between images.
   async function generateStopImagesInBackground(tripId: string, destination: string) {
     try {
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) {
+        console.error("[img-gen] DEFAULT_OBJECT_STORAGE_BUCKET_ID not set — skipping image generation");
+        return;
+      }
       const stops = await db.select().from(travelStops).where(eq(travelStops.tripId, tripId));
       console.log(`[img-gen] Generating hero images for ${stops.length} stops (tripId=${tripId})`);
       const openai = getOpenAI();
+      const bucket = objectStorageClient.bucket(bucketId);
       for (const stop of stops) {
         try {
           const prompt = `Travel photo of ${stop.name} in ${stop.cityGroup ?? destination}. Daytime, no people, architectural or landscape shot, family friendly, vibrant colors, high quality.`;
           const response = await openai.images.generate({
-            model: 'dall-e-3',
+            model: "dall-e-3",
             prompt,
             n: 1,
-            size: '1792x1024',
-            quality: 'standard',
+            size: "1792x1024",
+            quality: "standard",
+            response_format: "b64_json",
           });
-          const imageUrl = response.data[0]?.url;
-          if (imageUrl) {
-            await db.update(travelStops).set({ heroImageUrl: imageUrl }).where(eq(travelStops.id, stop.id));
+          const b64 = response.data[0]?.b64_json;
+          if (b64) {
+            const buffer = Buffer.from(b64, "base64");
+            const fileName = `stop-images/${tripId}/${stop.id}.png`;
+            const file = bucket.file(fileName);
+            await file.save(buffer, { contentType: "image/png", public: true });
+            const url = `https://storage.googleapis.com/${bucketId}/${fileName}`;
+            await db.update(travelStops).set({ heroImageUrl: url }).where(eq(travelStops.id, stop.id));
           }
         } catch (stopErr) {
           console.error(`[img-gen] Failed for stop "${stop.name}":`, stopErr);
