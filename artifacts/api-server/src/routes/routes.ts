@@ -2663,6 +2663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: t.name ?? 'Traveler',
           isParent: Boolean(t.isParent),
           ...(t.age != null ? { age: Number(t.age) } : {}),
+          ...(t.avatar != null ? { avatar: t.avatar } : {}),
         }));
         await storage.updateTrip(activeTrip.id, { travelers: formatted as any });
       }
@@ -8383,7 +8384,8 @@ Return valid JSON only. No markdown.`;
       const [libStop] = await db.select().from(stopLibrary).where(eq(stopLibrary.id, toLibraryStopId));
       if (!libStop) return res.status(404).json({ message: 'Library stop not found' });
 
-      await db.update(travelStops).set({ isSkipped: true }).where(eq(travelStops.id, fromStopId));
+      // Delete the original stop so the replacement takes its position (not an addition)
+      await db.delete(travelStops).where(eq(travelStops.id, fromStopId));
 
       const [newStop] = await db.insert(travelStops).values({
         tripId,
@@ -8397,7 +8399,7 @@ Return valid JSON only. No markdown.`;
         displayOrder: fromStop.displayOrder ?? 0,
       }).returning();
 
-      return res.json({ newStop, skippedId: fromStopId });
+      return res.json({ newStop, removedId: fromStopId });
     } catch (error) {
       req.log?.error({ error }, '[Rescue] apply-swap error');
       return res.status(500).json({ message: 'Failed to apply swap' });

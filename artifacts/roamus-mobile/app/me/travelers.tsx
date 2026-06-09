@@ -274,9 +274,9 @@ export default function TravelersScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Crew rows */}
+          {/* Crew rows — kids only; parent is managed via Edit Profile */}
           <View style={s.crewList}>
-            {travelers.map(t => {
+            {travelers.filter(t => !t.isParent).map(t => {
               const isAdult = t.isParent;
               const isOnlyYou = isAdult && adults.length === 1 && t.name === "You";
               const editingThis = editingAvatarForId === t.id;

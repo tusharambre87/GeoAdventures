@@ -169,7 +169,10 @@ export default function MeScreen() {
         if (crewRes.ok) {
           const crewData = await crewRes.json();
           const all: any[] = crewData.travelers ?? [];
-          setCrewKids(all.filter((t: any) => !t.isParent && !t.is_parent));
+          setCrewKids(all.filter((t: any) =>
+            !t.isParent && !t.is_parent &&
+            t.age != null && Number(t.age) < 18
+          ));
         }
       } catch {}
     } catch (e: unknown) {
