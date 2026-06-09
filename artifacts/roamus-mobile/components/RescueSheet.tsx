@@ -51,6 +51,7 @@ interface Props {
   dayIndex?: number;
   onDropStop?: (stopId: string) => void;
   onWrapDay?: () => void;
+  onStopsChanged?: () => void;
 }
 
 const STOP_TYPE_EMOJI: Record<string, string> = {
@@ -85,6 +86,7 @@ export default function RescueSheet({
   dayIndex,
   onDropStop,
   onWrapDay,
+  onStopsChanged,
 }: Props) {
   const insets = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -109,6 +111,10 @@ export default function RescueSheet({
   const [weatherOptions, setWeatherOptions] = useState<LibraryStop[]>([]);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
+  // Apply state
+  const [applyingPlan, setApplyingPlan] = useState(false);
+  const [swappedToName, setSwappedToName] = useState<string | null>(null);
+
   useEffect(() => {
     if (visible) {
       setView('picker');
@@ -119,6 +125,8 @@ export default function RescueSheet({
       setFoodOptions([]);
       setFoodError(null);
       setWeatherOptions([]);
+      setApplyingPlan(false);
+      setSwappedToName(null);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -212,6 +220,63 @@ export default function RescueSheet({
     }
     if (plan.type === 'done' || plan.type === 'skip') {
       onWrapDay?.();
+    }
+    setView('applied');
+  }
+
+  async function applySwap() {
+    const chosen = swapOptions.find(o => o.id === selectedSwapId);
+    if (!chosen) return;
+    const fromStop = stops[currentStopIndex];
+    setSwappedToName(chosen.name);
+    if (tripId && fromStop) {
+      setApplyingPlan(true);
+      try {
+        await apiFetch('/api/travel/rescue/apply-swap', {
+          method: 'POST',
+          body: JSON.stringify({
+            tripId,
+            fromStopId: fromStop.id,
+            toLibraryStopId: chosen.id,
+            dayIndex: dayIndex ?? 0,
+          }),
+        });
+        onStopsChanged?.();
+      } catch { /* best-effort — plan still shown */ }
+      setApplyingPlan(false);
+    }
+    setView('applied');
+  }
+
+  async function applyWeather() {
+    if (!plan?.swaps?.length) { setView('applied'); return; }
+    if (tripId) {
+      setApplyingPlan(true);
+      await Promise.all(
+        plan.swaps.map(async (swap, idx) => {
+          const alt = weatherOptions[idx];
+          try {
+            if (alt) {
+              await apiFetch('/api/travel/rescue/apply-swap', {
+                method: 'POST',
+                body: JSON.stringify({
+                  tripId,
+                  fromStopId: swap.from.id,
+                  toLibraryStopId: alt.id,
+                  dayIndex: dayIndex ?? 0,
+                }),
+              });
+            } else {
+              await apiFetch(`/api/travel/stops/${swap.from.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ isSkipped: true }),
+              });
+            }
+          } catch { /* best-effort */ }
+        })
+      );
+      onStopsChanged?.();
+      setApplyingPlan(false);
     }
     setView('applied');
   }
@@ -367,17 +432,11 @@ export default function RescueSheet({
           <ResultView
             plan={plan}
             onBack={() => { setView('picker'); setSelectedSwapId(null); }}
-            onApply={() => {
-              const chosen = swapOptions.find(o => o.id === selectedSwapId);
-              if (chosen) {
-                setPlan(p => p ? { ...p, headline: `Swap in: ${chosen.name}`, body: `Head to ${chosen.name} instead.` } : p);
-              }
-              setView('applied');
-            }}
-            ctaLabel={selectedSwapId
+            onApply={applySwap}
+            ctaLabel={applyingPlan ? 'Swapping…' : selectedSwapId
               ? `Swap in ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? ''} \u2192`
               : 'Select a stop below'}
-            ctaColor={selectedSwapId ? '#E8692A' : '#C4C8D8'}
+            ctaColor={selectedSwapId && !applyingPlan ? '#E8692A' : '#C4C8D8'}
           >
             {swapLoading ? (
               <View style={s.centeredNote}>
@@ -469,13 +528,25 @@ export default function RescueSheet({
                   </>
                 )}
                 {foodOptions.length === 0 && !foodLoading && (
-                  <View style={s.centeredNote}>
-                    <Text style={s.centeredNoteText}>No restaurant data found for your city yet. Try Google Maps for options nearby.</Text>
-                  </View>
+                  <>
+                    <View style={s.centeredNote}>
+                      <Text style={s.centeredNoteText}>No restaurant data for your city yet.</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[s.ctaBtn, { backgroundColor: '#1A1F2E', marginHorizontal: 0, marginTop: 8, marginBottom: 4 }]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const city = foodCity || 'nearby';
+                        Linking.openURL(`https://maps.google.com/?q=family+restaurants+in+${encodeURIComponent(city)}`);
+                      }}
+                    >
+                      <Text style={s.ctaBtnText}>{'\uD83D\uDDFA\uFE0F'} Search restaurants on Maps</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
                 <View style={[s.infoBox, { backgroundColor: '#F5F2EE', marginTop: 16 }]}>
                   <Text style={[s.infoBoxText, { color: '#6B7280' }]}>
-                    Add as a lunch stop? We'll insert it after your current stop.
+                    Tap any row above to open it in Google Maps.
                   </Text>
                 </View>
               </>
@@ -488,9 +559,9 @@ export default function RescueSheet({
           <ResultView
             plan={plan}
             onBack={() => setView('picker')}
-            onApply={applyPlan}
-            ctaLabel={plan.swaps && plan.swaps.length > 0 ? 'Move indoors' : 'Got it'}
-            ctaColor={plan.swaps && plan.swaps.length > 0 ? '#1A1F2E' : '#8A8FA8'}
+            onApply={applyWeather}
+            ctaLabel={applyingPlan ? 'Moving indoors…' : plan.swaps && plan.swaps.length > 0 ? 'Move indoors' : 'Got it'}
+            ctaColor={plan.swaps && plan.swaps.length > 0 && !applyingPlan ? '#1A1F2E' : '#8A8FA8'}
           >
             {plan.swaps && plan.swaps.length > 0 ? (
               <>
@@ -603,13 +674,27 @@ export default function RescueSheet({
           <>
             <View style={s.appliedWrap}>
               <Text style={s.appliedEmoji}>{'\u2705'}</Text>
-              <Text style={s.appliedTitle}>{plan?.headline ?? 'Day adjusted'}</Text>
+              <Text style={s.appliedTitle}>
+                {plan?.type === 'fun' ? 'Stop swapped!' :
+                 plan?.type === 'weather' ? 'Moved indoors!' :
+                 plan?.type === 'tired' ? 'Day lightened!' :
+                 plan?.type === 'late' ? 'Schedule tightened!' :
+                 plan?.type === 'skip' ? 'Day skipped.' :
+                 plan?.type === 'done' ? 'Wrapping up!' :
+                 'Day adjusted!'}
+              </Text>
               <Text style={s.appliedSub}>
-                {plan?.type === 'fun' && selectedSwapId
-                  ? `Head to ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? 'your new stop'} instead.`
+                {plan?.type === 'fun'
+                  ? swappedToName
+                    ? `${stops[currentStopIndex]?.name ?? 'Old stop'} removed. Head to ${swappedToName} instead — it's now on your list.`
+                    : 'Your Today tab will refresh with the new stop.'
+                  : plan?.type === 'weather'
+                  ? 'Outdoor stops swapped for indoor alternatives. Your Today tab is updated.'
                   : plan?.type === 'late'
-                  ? 'Trim guide is set. Keep it moving!'
-                  : 'Your updated plan is live. Today tab reflects the changes.'}
+                  ? 'Use the trim guide above to recover time at each stop.'
+                  : plan?.type === 'tired' && plan?.dropStop
+                  ? `${plan.dropStop.name} removed from today. Rest of the day is yours.`
+                  : 'Your Today tab reflects the changes.'}
               </Text>
             </View>
             <TouchableOpacity style={s.appliedBtn} activeOpacity={0.85} onPress={handleClose}>

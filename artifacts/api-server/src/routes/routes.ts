@@ -8295,29 +8295,28 @@ Return valid JSON only. No markdown.`;
       const cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
       if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
 
-      const todayStops = dayIndex != null
-        ? await db.select({ id: travelStops.id }).from(travelStops)
-            .where(and(eq(travelStops.tripId, tripId), eq(travelStops.dayIndex, dayIndex)))
+      const todayStopNames: string[] = dayIndex != null
+        ? (await db.select({ name: travelStops.name }).from(travelStops)
+            .where(and(eq(travelStops.tripId, tripId), eq(travelStops.dayIndex, dayIndex))))
+            .map(s => s.name.toLowerCase().trim())
         : [];
-      const excludeIds = swapStopId
-        ? [...todayStops.map(s => s.id), swapStopId]
-        : todayStops.map(s => s.id);
 
       const indoorTypes = ['museum', 'aquarium', 'science_center', 'indoor_attraction', 'theater', 'gallery'];
       const excludedTypes = filterIndoor ? [] : ['restaurant', 'food', 'cafe', 'hotel'];
 
-      let query = db.select({
+      const rows = await db.select({
         id: stopLibrary.id,
         name: stopLibrary.name,
         stopType: stopLibrary.stopType,
         address: stopLibrary.address,
         description: stopLibrary.description,
-      }).from(stopLibrary).where(ilike(stopLibrary.city, `%${cityRaw}%`));
-
-      const rows = await query.orderBy(asc(stopLibrary.serveCount)).limit(20);
+      }).from(stopLibrary)
+        .where(ilike(stopLibrary.city, `%${cityRaw}%`))
+        .orderBy(asc(stopLibrary.serveCount))
+        .limit(30);
 
       const filtered = rows.filter(r => {
-        if (excludeIds.includes(r.id)) return false;
+        if (todayStopNames.includes(r.name.toLowerCase().trim())) return false;
         if (!filterIndoor && excludedTypes.includes(r.stopType ?? '')) return false;
         if (filterIndoor && !indoorTypes.includes(r.stopType ?? '')) return false;
         return true;
@@ -8343,7 +8342,7 @@ Return valid JSON only. No markdown.`;
       const cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
       if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
 
-      const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food'];
+      const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food', 'market'];
 
       const rows = await db.select({
         id: stopLibrary.id,
@@ -8364,6 +8363,44 @@ Return valid JSON only. No markdown.`;
     } catch (error) {
       req.log?.error({ error }, '[Rescue] food-options error');
       return res.status(500).json({ message: 'Failed to load food options' });
+    }
+  });
+
+  // ─── Rescue: apply-swap — skip old stop, insert library stop into trip ───────
+  // POST /api/travel/rescue/apply-swap
+  app.post('/api/travel/rescue/apply-swap', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId, fromStopId, toLibraryStopId, dayIndex } = req.body;
+      if (!tripId || !fromStopId || !toLibraryStopId) {
+        return res.status(400).json({ message: 'tripId, fromStopId, toLibraryStopId are required' });
+      }
+
+      const [fromStop] = await db.select().from(travelStops).where(
+        and(eq(travelStops.id, fromStopId), eq(travelStops.tripId, tripId))
+      );
+      if (!fromStop) return res.status(404).json({ message: 'Stop not found' });
+
+      const [libStop] = await db.select().from(stopLibrary).where(eq(stopLibrary.id, toLibraryStopId));
+      if (!libStop) return res.status(404).json({ message: 'Library stop not found' });
+
+      await db.update(travelStops).set({ isSkipped: true }).where(eq(travelStops.id, fromStopId));
+
+      const [newStop] = await db.insert(travelStops).values({
+        tripId,
+        name: libStop.name,
+        description: libStop.description,
+        stopType: libStop.stopType ?? 'landmark',
+        address: libStop.address,
+        latitude: libStop.latitude ? String(libStop.latitude) : null,
+        longitude: libStop.longitude ? String(libStop.longitude) : null,
+        dayIndex: fromStop.dayIndex ?? (dayIndex ?? 0),
+        displayOrder: fromStop.displayOrder ?? 0,
+      }).returning();
+
+      return res.json({ newStop, skippedId: fromStopId });
+    } catch (error) {
+      req.log?.error({ error }, '[Rescue] apply-swap error');
+      return res.status(500).json({ message: 'Failed to apply swap' });
     }
   });
 

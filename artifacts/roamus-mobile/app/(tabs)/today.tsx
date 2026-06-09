@@ -2081,6 +2081,7 @@ export default function TodayScreen() {
           dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
+          onStopsChanged={loadTrip}
         />
         {menuOverlay}
       </View>
@@ -2317,6 +2318,7 @@ export default function TodayScreen() {
           dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
+          onStopsChanged={loadTrip}
         />
       </View>
     );
