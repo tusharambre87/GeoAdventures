@@ -583,7 +583,15 @@ export default function AtStopScreen() {
     setMode('loading'); setLoadErr(null);
     try {
       const data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
-      const active = data.trips?.find(t => t.status === 'active') ?? data.trips?.[0];
+      // Mirror today.tsx trip resolution: status first, then date-range, then fallback
+      const todayMs = new Date().setHours(0, 0, 0, 0);
+      const active = data.trips?.find(t => {
+        if (t.status === 'active' || t.status === 'in_progress') return true;
+        if (!t.startDate || !t.endDate) return false;
+        const s = new Date(t.startDate); s.setHours(0, 0, 0, 0);
+        const e = new Date(t.endDate);   e.setHours(23, 59, 59, 999);
+        return todayMs >= s.getTime() && todayMs <= e.getTime();
+      }) ?? data.trips?.[0];
       if (!active) { setMode('noTrip'); return; }
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);

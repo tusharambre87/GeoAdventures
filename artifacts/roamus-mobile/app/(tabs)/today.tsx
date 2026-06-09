@@ -704,6 +704,7 @@ export default function TodayScreen() {
             await AsyncStorage.removeItem('atStopElapsed');
           }
           await AsyncStorage.removeItem('atStopFrozen');
+          await AsyncStorage.removeItem('atStopFrozenTripId');
           if (!devState) setTodayState('stop_complete');
         }
       }
@@ -793,10 +794,16 @@ export default function TodayScreen() {
         }
       }
 
-      // Restore AT_STOP_FROZEN when user returns to Today before completing
+      // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
       if (!devState && override !== 'stop_complete') {
-        const frozenFlag = await AsyncStorage.getItem('atStopFrozen');
-        if (frozenFlag === 'true') setTodayState('at_stop_frozen');
+        const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
+        const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
+        if (frozenFlag === 'true' && frozenTripId === tid) {
+          setTodayState('at_stop_frozen');
+        } else if (frozenFlag === 'true') {
+          // Stale frozen state from a different trip — discard it
+          await AsyncStorage.multiRemove(['atStopFrozen', 'atStopFrozenTripId']);
+        }
       }
     } finally {
       setLoading(false);
@@ -2151,6 +2158,7 @@ export default function TodayScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setTodayState('at_stop_frozen');
                 AsyncStorage.setItem('atStopFrozen', 'true');
+                AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
                 AsyncStorage.setItem('atStopStartTime', String(Date.now()));
                 router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
               }}
