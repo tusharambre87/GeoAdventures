@@ -8330,7 +8330,6 @@ Return valid JSON only. No markdown.`;
             name: travelStops.name,
             stopType: travelStops.stopType,
             dayIndex: travelStops.dayIndex,
-            durationMinutes: travelStops.durationMinutes,
           }).from(travelStops)
             .where(and(
               eq(travelStops.tripId, tripId),
