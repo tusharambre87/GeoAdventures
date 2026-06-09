@@ -49,9 +49,16 @@ interface Props {
   currentStopIndex: number;
   tripId?: string;
   dayIndex?: number;
-  onDropStop?: (stopId: string) => void;
-  onWrapDay?: () => void;
+  onDropStop?: (stopId: string) => Promise<void> | void;
+  onWrapDay?: () => Promise<void> | void;
   onStopsChanged?: () => void;
+}
+
+function getFoodLabel(hour: number): string {
+  if (hour < 11) return 'breakfast';
+  if (hour < 15) return 'lunch';
+  if (hour < 18) return 'snack break';
+  return 'dinner';
 }
 
 const STOP_TYPE_EMOJI: Record<string, string> = {
@@ -114,6 +121,11 @@ export default function RescueSheet({
   // Apply state
   const [applyingPlan, setApplyingPlan] = useState(false);
   const [swappedToName, setSwappedToName] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  // Food selection
+  const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
+  const mealLabel = getFoodLabel(new Date().getHours());
 
   useEffect(() => {
     if (visible) {
@@ -127,6 +139,8 @@ export default function RescueSheet({
       setWeatherOptions([]);
       setApplyingPlan(false);
       setSwappedToName(null);
+      setApplyError(null);
+      setSelectedFoodId(null);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -213,15 +227,23 @@ export default function RescueSheet({
     setView(id);
   }
 
-  function applyPlan() {
+  async function applyPlan() {
     if (!plan) return;
-    if (plan.type === 'tired' && plan.dropStop) {
-      onDropStop?.(plan.dropStop.id);
+    setApplyingPlan(true);
+    setApplyError(null);
+    try {
+      if (plan.type === 'tired' && plan.dropStop) {
+        await onDropStop?.(plan.dropStop.id);
+      }
+      if (plan.type === 'done' || plan.type === 'skip') {
+        await onWrapDay?.();
+      }
+      setView('applied');
+    } catch {
+      setApplyError('Something went wrong — your plan is unchanged.');
+    } finally {
+      setApplyingPlan(false);
     }
-    if (plan.type === 'done' || plan.type === 'skip') {
-      onWrapDay?.();
-    }
-    setView('applied');
   }
 
   async function applySwap() {
@@ -332,9 +354,10 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel={plan.dropStop ? `Drop "${plan.dropStop.name}"` : 'Nothing to drop'}
-            ctaColor={plan.dropStop ? '#E8692A' : '#8A8FA8'}
+            ctaLabel={applyingPlan ? 'Dropping stop…' : plan.dropStop ? `Drop "${plan.dropStop.name}"` : 'Nothing to drop'}
+            ctaColor={plan.dropStop && !applyingPlan ? '#E8692A' : '#8A8FA8'}
             headerColor="#2D6A4F"
+            applyError={applyError}
           >
             {plan.dropStop ? (
               <>
@@ -487,8 +510,11 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={() => setView('applied')}
-            ctaLabel="Add lunch stop to plan"
-            ctaColor="#E8692A"
+            ctaLabel={selectedFoodId
+              ? `Add ${mealLabel} stop \u2192 ${foodOptions.find(o => o.id === selectedFoodId)?.name ?? ''}`
+              : `Select a spot above`}
+            ctaColor={selectedFoodId ? '#E8692A' : '#C4C8D8'}
+            ctaDisabled={!selectedFoodId}
           >
             {foodLoading ? (
               <View style={s.centeredNote}>
@@ -504,27 +530,36 @@ export default function RescueSheet({
                 {foodOptions.length > 0 && (
                   <>
                     <Text style={s.sectionLabel}>NEARBY OPTIONS</Text>
-                    {foodOptions.map(opt => (
-                      <TouchableOpacity
-                        key={opt.id}
-                        style={s.foodRow}
-                        activeOpacity={0.75}
-                        onPress={() => {
-                          const q = encodeURIComponent(`${opt.name} ${opt.city ?? foodCity}`);
-                          Linking.openURL(`https://maps.google.com/?q=${q}`);
-                        }}
-                      >
-                        <Text style={s.foodRowIcon}>{stopEmoji(opt.stopType)}</Text>
-                        <View style={s.foodRowText}>
-                          <Text style={s.foodRowName} numberOfLines={1}>{opt.name}</Text>
-                          <Text style={s.foodRowMeta} numberOfLines={1}>
-                            {opt.stopType ?? 'restaurant'}
-                            {opt.address ? ` \u00B7 ${opt.address}` : ''}
-                          </Text>
-                        </View>
-                        <Text style={s.foodRowMap}>{'\uD83D\uDDFA'}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {foodOptions.map(opt => {
+                      const isSelected = opt.id === selectedFoodId;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          style={[s.foodRow, isSelected && s.foodRowSelected]}
+                          activeOpacity={0.75}
+                          onPress={() => setSelectedFoodId(opt.id === selectedFoodId ? null : opt.id)}
+                        >
+                          <Text style={s.foodRowIcon}>{stopEmoji(opt.stopType)}</Text>
+                          <View style={s.foodRowText}>
+                            <Text style={[s.foodRowName, isSelected && { color: '#E8692A' }]} numberOfLines={1}>{opt.name}</Text>
+                            <Text style={s.foodRowMeta} numberOfLines={1}>
+                              {opt.stopType ?? 'restaurant'}
+                              {opt.address ? ` \u00B7 ${opt.address}` : ''}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            onPress={e => {
+                              e.stopPropagation();
+                              const q = encodeURIComponent(`${opt.name} ${opt.city ?? foodCity}`);
+                              Linking.openURL(`https://maps.google.com/?q=${q}`);
+                            }}
+                          >
+                            <Text style={s.foodRowMap}>{'\u2197\uFE0F'}</Text>
+                          </TouchableOpacity>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </>
                 )}
                 {foodOptions.length === 0 && !foodLoading && (
@@ -546,7 +581,8 @@ export default function RescueSheet({
                 )}
                 <View style={[s.infoBox, { backgroundColor: '#F5F2EE', marginTop: 16 }]}>
                   <Text style={[s.infoBoxText, { color: '#6B7280' }]}>
-                    Tap any row above to open it in Google Maps.
+                    {`We\u2019ll add it after ${stops[currentStopIndex]?.name ?? 'your current stop'}.`}
+                    {' Tap \u2197 to open in Maps.'}
                   </Text>
                 </View>
               </>
@@ -609,8 +645,9 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel="Skip today"
-            ctaColor="#6B7280"
+            ctaLabel={applyingPlan ? 'Skipping…' : 'Skip today'}
+            ctaColor={applyingPlan ? '#8A8FA8' : '#6B7280'}
+            applyError={applyError}
           >
             {plan.keptStops && plan.keptStops.length > 0 ? (
               <>
@@ -643,8 +680,9 @@ export default function RescueSheet({
             plan={plan}
             onBack={() => setView('picker')}
             onApply={applyPlan}
-            ctaLabel="Wrap it up"
-            ctaColor="#3DAA6E"
+            ctaLabel={applyingPlan ? 'Wrapping up…' : 'Wrap it up'}
+            ctaColor={applyingPlan ? '#8A8FA8' : '#3DAA6E'}
+            applyError={applyError}
           >
             {plan.keptStops && plan.keptStops.length > 0 ? (
               <>
@@ -716,10 +754,12 @@ interface ResultViewProps {
   ctaLabel: string;
   ctaColor?: string;
   headerColor?: string;
+  ctaDisabled?: boolean;
+  applyError?: string | null;
   children: React.ReactNode;
 }
 
-function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', headerColor = '#1A1F2E', children }: ResultViewProps) {
+function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', headerColor = '#1A1F2E', ctaDisabled, applyError, children }: ResultViewProps) {
   return (
     <>
       <View style={s.resultHeader}>
@@ -733,14 +773,20 @@ function ResultView({ plan, onBack, onApply, ctaLabel, ctaColor = '#E8692A', hea
       >
         {children}
       </ScrollView>
+      {applyError && (
+        <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
+          <Text style={{ fontSize: 13, color: '#C0392B', fontFamily: F.regular, textAlign: 'center' }}>{applyError}</Text>
+        </View>
+      )}
       <View style={s.resultFooter}>
         <TouchableOpacity style={s.goBackBtn} onPress={onBack} activeOpacity={0.7}>
           <Text style={s.goBackText}>Go back</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[s.ctaBtn, { backgroundColor: ctaColor, flex: 1 }]}
-          activeOpacity={0.85}
-          onPress={onApply}
+          style={[s.ctaBtn, { backgroundColor: ctaColor, flex: 1, opacity: ctaDisabled ? 0.45 : 1 }]}
+          activeOpacity={ctaDisabled ? 1 : 0.85}
+          onPress={ctaDisabled ? undefined : onApply}
+          disabled={ctaDisabled}
         >
           <Text style={s.ctaBtnText}>{ctaLabel}</Text>
         </TouchableOpacity>
@@ -914,15 +960,20 @@ const s = StyleSheet.create({
   // ── Food rows ──
   foodRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 12, paddingHorizontal: 10,
+    borderRadius: 10, marginBottom: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(26,31,46,0.07)',
+  },
+  foodRowSelected: {
+    backgroundColor: 'rgba(232,105,42,0.08)',
+    borderBottomColor: 'rgba(232,105,42,0.2)',
   },
   foodRowIcon: { fontSize: 22 },
   foodRowText: { flex: 1 },
   foodRowName: { fontSize: 14, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
   foodRowMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular, textTransform: 'capitalize' },
-  foodRowMap:  { fontSize: 20 },
+  foodRowMap:  { fontSize: 18, color: '#8A8FA8' },
 
   // ── Weather swap rows ──
   swapRow: {

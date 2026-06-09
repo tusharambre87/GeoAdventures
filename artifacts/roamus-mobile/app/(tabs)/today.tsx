@@ -892,6 +892,11 @@ export default function TodayScreen() {
     await loadTrip();
   }, [trip, resolvedDayIndex, loadTrip]);
 
+  const handleRescueClose = useCallback(async () => {
+    setShowRescue(false);
+    try { await loadTrip(); } catch { /* best-effort */ }
+  }, [loadTrip]);
+
   // ── Submit day rating ──
   async function handleRating(rating: 'okay' | 'good' | 'amazing') {
     setDayRating(rating);
@@ -1837,7 +1842,7 @@ export default function TodayScreen() {
         />
         <RescueSheet
           visible={showRescue}
-          onClose={() => setShowRescue(false)}
+          onClose={handleRescueClose}
           context="morning"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
@@ -1845,6 +1850,7 @@ export default function TodayScreen() {
           dayIndex={resolvedDayIndex}
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
+          onStopsChanged={loadTrip}
         />
       </View>
     );
@@ -2073,7 +2079,7 @@ export default function TodayScreen() {
         />
         <RescueSheet
           visible={showRescue}
-          onClose={() => setShowRescue(false)}
+          onClose={handleRescueClose}
           context="en_route"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
@@ -2310,7 +2316,7 @@ export default function TodayScreen() {
         />
         <RescueSheet
           visible={showRescue}
-          onClose={() => setShowRescue(false)}
+          onClose={handleRescueClose}
           context="stop_complete"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
