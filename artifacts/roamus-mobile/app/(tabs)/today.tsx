@@ -866,6 +866,32 @@ export default function TodayScreen() {
     setTodayState('en_route');
   }
 
+  // ── Rescue: drop one stop (tired / late) ────────────────────────────────
+  const handleRescueDrop = useCallback(async (stopId: string) => {
+    if (!trip) return;
+    try {
+      await apiFetch(`/api/travel/stops/${stopId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isSkipped: true }),
+      });
+    } catch { /* best-effort */ }
+    await loadTrip();
+  }, [trip, loadTrip]);
+
+  // ── Rescue: wrap day early (done / skip) ────────────────────────────────
+  const handleRescueWrapDay = useCallback(async () => {
+    if (!trip) return;
+    try {
+      await apiFetch(`/api/travel/trips/${trip.id}/skip-day`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayIndex: resolvedDayIndex }),
+      });
+    } catch { /* best-effort */ }
+    await loadTrip();
+  }, [trip, resolvedDayIndex, loadTrip]);
+
   // ── Submit day rating ──
   async function handleRating(rating: 'okay' | 'good' | 'amazing') {
     setDayRating(rating);
@@ -1815,6 +1841,8 @@ export default function TodayScreen() {
           context="morning"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          onDropStop={handleRescueDrop}
+          onWrapDay={handleRescueWrapDay}
         />
       </View>
     );
@@ -2047,6 +2075,8 @@ export default function TodayScreen() {
           context="en_route"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          onDropStop={handleRescueDrop}
+          onWrapDay={handleRescueWrapDay}
         />
         {menuOverlay}
       </View>
@@ -2279,6 +2309,8 @@ export default function TodayScreen() {
           context="stop_complete"
           stops={dayStops}
           currentStopIndex={currentStopIndex}
+          onDropStop={handleRescueDrop}
+          onWrapDay={handleRescueWrapDay}
         />
       </View>
     );
