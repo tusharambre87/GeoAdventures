@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -77,7 +78,8 @@ type Props = {
 export default function InviteCoParentSheet({ visible, onClose, tripId, tripName, tripDestination }: Props) {
   const { token } = useAuth();
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(800)).current;
+  const translateY   = useRef(new Animated.Value(800)).current;
+  const keyboardShift = useRef(new Animated.Value(0)).current;
 
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
@@ -85,6 +87,7 @@ export default function InviteCoParentSheet({ visible, onClose, tripId, tripName
   const [members, setMembers] = useState<Member[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
+  // Slide sheet in/out
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: visible ? 0 : 800,
@@ -94,10 +97,34 @@ export default function InviteCoParentSheet({ visible, onClose, tripId, tripName
     }).start();
   }, [visible]);
 
+  // Load members when visible
   useEffect(() => {
     if (!visible || !tripId || !token) return;
     loadMembers();
   }, [visible, tripId, token]);
+
+  // Shift sheet up when keyboard appears so the email field stays visible
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardShift, {
+        toValue: -e.endCoordinates.height,
+        duration: Platform.OS === 'ios' ? e.duration ?? 250 : 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardShift, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? e.duration ?? 220 : 220,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => { onShow.remove(); onHide.remove(); };
+  }, []);
 
   function loadMembers() {
     setLoadingMembers(true);
@@ -164,22 +191,34 @@ export default function InviteCoParentSheet({ visible, onClose, tripId, tripName
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,30,0.48)' }]}
-        onPress={onClose}
+        onPress={() => { Keyboard.dismiss(); onClose(); }}
       />
-      <Animated.View style={[s.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[
+          s.sheet,
+          {
+            paddingBottom: insets.bottom + 16,
+            transform: [{ translateY: Animated.add(translateY, keyboardShift) }],
+          },
+        ]}
+      >
         {/* Grip */}
         <View style={s.grip} />
 
         {/* Header */}
         <View style={s.header}>
           <Text style={s.title}>Invite a co-parent</Text>
-          <Pressable style={s.closeBtn} onPress={onClose} hitSlop={8}>
+          <Pressable style={s.closeBtn} onPress={() => { Keyboard.dismiss(); onClose(); }} hitSlop={8}>
             <Text style={s.closeX}>&#x2715;</Text>
           </Pressable>
         </View>
-        <Text style={s.sub}>{tripName} · {tripDestination}</Text>
+        <Text style={s.sub}>{tripName} &middot; {tripDestination}</Text>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.body}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Share link */}
           <View style={s.section}>
             <Text style={s.sectionLabel}>SHARE INVITE LINK</Text>
