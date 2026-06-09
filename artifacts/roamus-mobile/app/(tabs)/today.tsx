@@ -894,8 +894,15 @@ export default function TodayScreen() {
 
   const handleRescueClose = useCallback(async () => {
     setShowRescue(false);
-    try { await loadTrip(); } catch { /* best-effort */ }
-  }, [loadTrip]);
+    const tid = resolvedTripId ?? trip?.id;
+    if (!tid) return;
+    try {
+      const updated = await apiFetch<any>(`/api/travel/trips/${tid}`);
+      setTrip(updated.trip ?? updated);
+    } catch {
+      try { await loadTrip(); } catch { /* best-effort */ }
+    }
+  }, [resolvedTripId, trip?.id, loadTrip]);
 
   // ── Submit day rating ──
   async function handleRating(rating: 'okay' | 'good' | 'amazing') {
@@ -1603,32 +1610,6 @@ export default function TodayScreen() {
                 {dayLabel || ''}
                 {dayStops.length > 0 ? ` · ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}` : ''}
               </Text>
-              {dayStops.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setShowDirections(true)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    backgroundColor: 'rgba(255,255,255,0.12)',
-                    borderRadius: 14,
-                    padding: 12,
-                    paddingHorizontal: 14,
-                    marginTop: 12,
-                  }}
-                >
-                  <Text style={{ fontSize: 18 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#E8692A' }}>
-                      Directions for today
-                    </Text>
-                    <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500', marginTop: 1 }}>
-                      All {dayStops.length} stops mapped in order
-                    </Text>
-                  </View>
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>{'\u203A'}</Text>
-                </TouchableOpacity>
-              )}
             </View>
           </ImageBackground>
           {/* Stop count + time pills — below hero in white content area (R2 fix) */}
@@ -1820,6 +1801,37 @@ export default function TodayScreen() {
               </TouchableOpacity>
             );
           })()}
+
+          {/* Directions card */}
+          {dayStops.length > 0 && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#1D4A42',
+                borderRadius: 14,
+                padding: 14,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                marginTop: 10,
+                marginHorizontal: 16,
+                marginBottom: 4,
+              }}
+              onPress={() => setShowDirections(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontSize: 20 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
+                  Directions to all stops
+                </Text>
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500', marginTop: 1 }}>
+                  Open full route in Google Maps
+                </Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>{'\u2197'}</Text>
+            </TouchableOpacity>
+          )}
 
           {/* SOS / Emergency button */}
           <TouchableOpacity
