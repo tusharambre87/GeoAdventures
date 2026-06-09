@@ -106,7 +106,7 @@ function getStopDuration(stop: TripPlanStop): number {
 
 function waitTimeForType(stopType?: string | null): string {
   const t = stopType?.toLowerCase() ?? '';
-  if (t.includes('zoo') || t.includes('aquarium') || t.includes('museum')) return '15\u201320 min weekends';
+  if (t.includes('zoo') || t.includes('aquarium') || t.includes('museum')) return '15–20 min weekends';
   if (t.includes('park') || t.includes('nature')) return 'No wait';
   return 'Varies';
 }
@@ -147,7 +147,7 @@ function Grip() {
 }
 
 function isReal(v: string | null | undefined): v is string {
-  return v != null && v !== '' && v !== '\u2014' && v !== '-';
+  return v != null && v !== '' && v !== '—' && v !== '-';
 }
 
 export default function TripPlanStopSheet({
@@ -318,7 +318,7 @@ export default function TripPlanStopSheet({
               >
                 <Text style={s.logisticsRowLabel}>Parking</Text>
                 <Text style={{ fontSize: 14, color: C.orange, fontWeight: '600' }}>
-                  Find parking nearby {'\u2192'}
+                  Find parking nearby {'→'}
                 </Text>
               </Pressable>
             </View>

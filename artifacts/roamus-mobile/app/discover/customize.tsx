@@ -412,8 +412,8 @@ export default function DiscoverCustomizeScreen() {
         >
           <Text style={s.ctaBtnTxt}>
             {showSecondCity && secondCity?.trim()
-              ? `Build my ${destination} + ${secondCity.trim()} trip \u2192`
-              : `Build my ${destination} trip \u2192`}
+              ? `Build my ${destination} + ${secondCity.trim()} trip →`
+              : `Build my ${destination} trip →`}
           </Text>
         </TouchableOpacity>
         <Text style={s.ctaNote}>Takes about 10 seconds · Personalised for your family</Text>

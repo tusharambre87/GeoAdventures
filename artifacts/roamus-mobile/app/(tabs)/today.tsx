@@ -1448,7 +1448,7 @@ export default function TodayScreen() {
                   })}
                 >
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#E8692A', fontFamily: F.semibold }}>
-                    Recap {'\u2192'}
+                    Recap {'→'}
                   </Text>
                 </TouchableOpacity>
               </View>

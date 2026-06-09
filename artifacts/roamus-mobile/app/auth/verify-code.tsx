@@ -120,7 +120,7 @@ export default function VerifyCode() {
   }
 
   const codeComplete = digits.every(d => d.length === 1);
-  const shortEmail   = email ? (email.length > 28 ? email.slice(0, 28) + "\u2026" : email) : "your inbox";
+  const shortEmail   = email ? (email.length > 28 ? email.slice(0, 28) + "…" : email) : "your inbox";
 
   return (
     <KeyboardAvoidingView
@@ -194,7 +194,7 @@ export default function VerifyCode() {
           ) : (
             <TouchableOpacity onPress={handleResend} activeOpacity={0.7} disabled={resending}>
               <Text style={styles.resendText}>
-                {resending ? "Resending\u2026" : "Didn\u2019t get it? Resend \u2192"}
+                {resending ? "Resending…" : "Didn’t get it? Resend →"}
               </Text>
             </TouchableOpacity>
           )}
@@ -210,7 +210,7 @@ export default function VerifyCode() {
           disabled={!codeComplete || loading}
         >
           <Text style={styles.verifyBtnText}>
-            {loading ? "Checking\u2026" : "Verify code \u2192"}
+            {loading ? "Checking…" : "Verify code →"}
           </Text>
         </TouchableOpacity>
       </View>

@@ -124,7 +124,7 @@ export default function ConfirmPhotoScreen() {
     >
       <Text style={cf.taggedIcon}>{stopIcon ?? '\uD83D\uDCF8'}</Text>
       <Text style={cf.taggedName} numberOfLines={1}>{stopName ?? 'General trip photo'}</Text>
-      <Text style={cf.taggedChange}>Change {'\u2192'}</Text>
+      <Text style={cf.taggedChange}>Change {'→'}</Text>
     </TouchableOpacity>
   );
 
@@ -158,7 +158,7 @@ export default function ConfirmPhotoScreen() {
           <TaggedRow />
           <TextInput
             style={cf.captionInput}
-            placeholder={'"That was amazing!" \u2014 what did the kids say?'}
+            placeholder={'"That was amazing!" — what did the kids say?'}
             placeholderTextColor="#D1D5E0"
             value={captions[0]}
             onChangeText={(t) => updateCaption(0, t)}
@@ -173,7 +173,7 @@ export default function ConfirmPhotoScreen() {
             {saving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={cf.saveBtnText}>Save to memories {'\u2192'}</Text>
+              <Text style={cf.saveBtnText}>Save to memories {'→'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -233,7 +233,7 @@ export default function ConfirmPhotoScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={cf.saveBtnText}>
-              Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'\u2192'}
+              Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'→'}
             </Text>
           )}
         </TouchableOpacity>

@@ -155,7 +155,7 @@ export default function IndoorAlternativesSheet({
                     )
                   }
                 >
-                  <Text style={s.switchBtnText}>{"Switch to this stop \u2192"}</Text>
+                  <Text style={s.switchBtnText}>{"Switch to this stop →"}</Text>
                 </TouchableOpacity>
               </View>
             ))

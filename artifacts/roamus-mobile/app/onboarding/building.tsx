@@ -65,15 +65,15 @@ export default function BuildingScreen() {
   const travelerCount = data.travelers.length;
 
   const MESSAGES = [
-    `Mapping ${city}\u2026`,
-    'Finding family-friendly stops\u2026',
-    'Checking ages & interests\u2026',
-    'Calculating travel times\u2026',
-    'Finding free-entry options\u2026',
-    'Scoring stops for your pace\u2026',
-    'Adding wonder moments for kids\u2026',
-    'Building your day-by-day plan\u2026',
-    'Almost ready\u2026',
+    `Mapping ${city}…`,
+    'Finding family-friendly stops…',
+    'Checking ages & interests…',
+    'Calculating travel times…',
+    'Finding free-entry options…',
+    'Scoring stops for your pace…',
+    'Adding wonder moments for kids…',
+    'Building your day-by-day plan…',
+    'Almost ready…',
   ];
 
   // ─ State ─

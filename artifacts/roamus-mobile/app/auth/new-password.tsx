@@ -92,7 +92,7 @@ export default function NewPassword() {
           <Text style={styles.successIcon}>{"\u2713"}</Text>
         </View>
         <Text style={styles.successHeading}>Password updated!</Text>
-        <Text style={styles.successSub}>Taking you to sign in{"\u2026"}</Text>
+        <Text style={styles.successSub}>Taking you to sign in{"…"}</Text>
       </View>
     );
   }
@@ -202,7 +202,7 @@ export default function NewPassword() {
         </View>
 
         {mismatch && (
-          <Text style={styles.mismatchText}>Passwords don{"\u2019"}t match</Text>
+          <Text style={styles.mismatchText}>Passwords don{"’"}t match</Text>
         )}
       </ScrollView>
 
@@ -215,7 +215,7 @@ export default function NewPassword() {
           disabled={!canSubmit}
         >
           <Text style={styles.saveBtnText}>
-            {loading ? "Saving\u2026" : "Save new password \u2192"}
+            {loading ? "Saving…" : "Save new password →"}
           </Text>
         </TouchableOpacity>
       </View>

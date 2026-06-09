@@ -49,11 +49,11 @@ const SHEET_PLANS = [
       'Step-by-step guide at every stop',
       'Kids missions + engagement layer',
       'Audio stories about each stop',
-      'Works offline \u2014 no signal needed',
+      'Works offline — no signal needed',
       'Auto-generated trip memory at the end',
       'Push notifications + smart reminders',
     ],
-    cta: 'Get RoamUs Pass \u2192',
+    cta: 'Get RoamUs Pass →',
   },
   {
     id: 'trippack',
@@ -64,9 +64,9 @@ const SHEET_PLANS = [
       'All stops unlocked',
       'Kids missions included',
       'Trip memory auto-generated',
-      'No subscription \u2014 one payment',
+      'No subscription — one payment',
     ],
-    cta: 'Unlock for {price} \u2192',
+    cta: 'Unlock for {price} →',
   },
 ];
 
@@ -80,9 +80,9 @@ const BUNDLE_PLAN = {
     'All stops unlocked on each trip',
     'Kids missions included',
     'Trip memory auto-generated',
-    'No subscription \u2014 one payment',
+    'No subscription — one payment',
   ],
-  cta: 'Unlock 3 Trips for $22.99 \u2192',
+  cta: 'Unlock 3 Trips for $22.99 →',
 };
 
 export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheetProps) {

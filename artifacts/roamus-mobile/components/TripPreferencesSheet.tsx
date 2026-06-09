@@ -223,7 +223,7 @@ export default function TripPreferencesSheet({
               disabled={applying}
             >
               <Text style={s.applyBtnText}>
-                {applying ? 'Applying…' : 'Apply changes \u2192'}
+                {applying ? 'Applying…' : 'Apply changes →'}
               </Text>
             </Pressable>
             <TouchableOpacity style={s.cancelBtn} onPress={onClose} activeOpacity={0.7}>

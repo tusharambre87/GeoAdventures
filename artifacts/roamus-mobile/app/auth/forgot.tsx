@@ -83,7 +83,7 @@ export default function ForgotPassword() {
 
         <Text style={styles.heading}>Reset your password</Text>
         <Text style={styles.subheading}>
-          Enter your email and we{"\u2019"}ll send a reset link. Check your inbox — it arrives in under a minute.
+          Enter your email and we{"’"}ll send a reset link. Check your inbox — it arrives in under a minute.
         </Text>
 
         {/* Email field */}
@@ -118,7 +118,7 @@ export default function ForgotPassword() {
           disabled={!emailFilled || loading}
         >
           <Text style={styles.sendBtnText}>
-            {loading ? "Sending…" : "Send reset link \u2192"}
+            {loading ? "Sending…" : "Send reset link →"}
           </Text>
         </TouchableOpacity>
 

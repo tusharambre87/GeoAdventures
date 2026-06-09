@@ -1380,7 +1380,7 @@ function DayDetail({
             <Text style={ww.icon}>{'\uD83C\uDF27'}</Text>
             <View style={ww.body}>
               <Text style={ww.title}>
-                {'Rain expected \u2014 '}{weatherWarning.precipProb}{'% chance'}
+                {'Rain expected — '}{weatherWarning.precipProb}{'% chance'}
               </Text>
               <Text style={ww.sub}>
                 {weatherWarning.impactedStops.length}{' outdoor stop'}
@@ -1479,7 +1479,7 @@ function DayDetail({
             <Text style={dd.emptyCardTitle}>Nothing planned for Day {selectedDay} yet</Text>
             <Text style={dd.emptyCardSub}>
               {isEditable
-                ? 'Add stops and we\u2019ll build a full guide — hours, tips, and what to expect.'
+                ? 'Add stops and we’ll build a full guide — hours, tips, and what to expect.'
                 : 'This day has no stops in the itinerary.'}
             </Text>
             {isEditable && (
@@ -2417,7 +2417,7 @@ function TripOptionsSheet({
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) { showToast('Sign in to download for offline'); return; }
-      showToast('Downloading for offline\u2026');
+      showToast('Downloading for offline…');
       await preCacheTrip(tripId, token);
       await AsyncStorage.setItem(`roamus_cache_status_${tripId}`, 'complete');
       setIsOfflineCached(true);
@@ -2436,7 +2436,7 @@ function TripOptionsSheet({
           icon: isOfflineCached ? <IconCheck /> : <IconDownload />,
           bg: '#EEF5F2',
           name: isOfflineCached ? 'Available offline' : 'Download for offline',
-          sub: isOfflineCached ? 'Trip saved \u2014 works without signal' : 'Save stops and stories for no-WiFi use',
+          sub: isOfflineCached ? 'Trip saved — works without signal' : 'Save stops and stories for no-WiFi use',
           onPress: isOfflineCached ? () => showToast('Already saved for offline') : downloadOffline,
         },
         {
@@ -2484,7 +2484,7 @@ function TripOptionsSheet({
                         )
                       );
                       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                      showToast('Today reset \u2014 all stops marked unvisited');
+                      showToast('Today reset — all stops marked unvisited');
                       onClose();
                     } catch {
                       Alert.alert('Error', 'Could not reset today. Please try again.');
@@ -3447,9 +3447,9 @@ function PositionPickerSheet({
         {rows.length === 0 && (
           <>
             {[
-              { label: 'Morning',   sub: '8\u201311am',  sentinel: '__MORNING__' },
-              { label: 'Afternoon', sub: '12\u20133pm',  sentinel: '__AFTERNOON__' },
-              { label: 'Evening',   sub: '4\u20137pm',   sentinel: '__EVENING__' },
+              { label: 'Morning',   sub: '8–11am',  sentinel: '__MORNING__' },
+              { label: 'Afternoon', sub: '12–3pm',  sentinel: '__AFTERNOON__' },
+              { label: 'Evening',   sub: '4–7pm',   sentinel: '__EVENING__' },
             ].map((slot, i) => (
               <View key={slot.sentinel}>
                 {i > 0 && <View style={pps.slotDivider} />}

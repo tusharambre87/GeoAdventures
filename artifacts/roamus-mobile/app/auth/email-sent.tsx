@@ -64,17 +64,17 @@ export default function EmailSent() {
 
         {/* Resend card */}
         <View style={styles.infoCard}>
-          <Text style={styles.cardLabel}>DIDN{"\u2019"}T GET IT?</Text>
+          <Text style={styles.cardLabel}>DIDN{"’"}T GET IT?</Text>
           {resent ? (
             <Text style={styles.cardBody}>
-              {"New code sent! Check spam if you still don\u2019t see it."}
+              {"New code sent! Check spam if you still don’t see it."}
             </Text>
           ) : (
             <TouchableOpacity onPress={handleResend} activeOpacity={0.75} disabled={resending}>
               <Text style={styles.cardBody}>
                 {"Check spam, or "}
                 <Text style={styles.cardLink}>
-                  {resending ? "resending\u2026" : "resend the code \u2192"}
+                  {resending ? "resending…" : "resend the code →"}
                 </Text>
               </Text>
             </TouchableOpacity>
@@ -92,7 +92,7 @@ export default function EmailSent() {
             router.push({ pathname: "/auth/verify-code" as any, params: { email } })
           }
         >
-          <Text style={styles.enterCodeBtnText}>Enter code {"\u2192"}</Text>
+          <Text style={styles.enterCodeBtnText}>Enter code {"→"}</Text>
         </TouchableOpacity>
 
         {/* Ghost: back to sign in */}

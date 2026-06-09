@@ -333,7 +333,7 @@ export default function TravelersScreen() {
               <Text style={s.infoBannerCheck}>{"\u2713"}</Text>
               <Text style={s.infoBannerText}>
                 <Text style={{ color: "#3DAA6E", fontFamily: F.bold }}>Trips adapt to your crew</Text>
-                {agesStr ? ` \u2014 content tuned for ${agesStr}.` : "."}
+                {agesStr ? ` — content tuned for ${agesStr}.` : "."}
               </Text>
             </View>
           )}
@@ -401,8 +401,8 @@ export default function TravelersScreen() {
                 >
                   <Text style={s.confirmText}>
                     {newName.trim()
-                      ? `Add ${newName.trim()} \u2192`
-                      : addingType === "child" ? "Add child \u2192" : "Add adult \u2192"}
+                      ? `Add ${newName.trim()} →`
+                      : addingType === "child" ? "Add child →" : "Add adult →"}
                   </Text>
                 </Pressable>
               </View>
@@ -428,7 +428,7 @@ export default function TravelersScreen() {
                   </View>
                   <View>
                     <Text style={[s.addBtnTitle, { color: G.deep }]}>Add an adult</Text>
-                    <Text style={s.addBtnSub}>Partner, grandparent\u2026</Text>
+                    <Text style={s.addBtnSub}>Partner, grandparent…</Text>
                   </View>
                 </Pressable>
               )}
@@ -444,7 +444,7 @@ export default function TravelersScreen() {
             onPress={handleSave}
             disabled={saving}
           >
-            <Text style={s.saveBtnText}>{saving ? "Saving\u2026" : "Save changes"}</Text>
+            <Text style={s.saveBtnText}>{saving ? "Saving…" : "Save changes"}</Text>
           </Pressable>
         </View>
       )}

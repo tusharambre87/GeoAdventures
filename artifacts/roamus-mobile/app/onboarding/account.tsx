@@ -336,7 +336,7 @@ export default function AccountScreen() {
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={s.btnText}>Create free account {"\u2192"}</Text>}
+              : <Text style={s.btnText}>Create free account {"→"}</Text>}
           </Pressable>
 
           <Text style={s.termsNote}>

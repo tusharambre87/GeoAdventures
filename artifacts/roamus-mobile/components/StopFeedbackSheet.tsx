@@ -37,7 +37,7 @@ const OPTIONS: {
 }[] = [
   { id: 'big_hit',        emoji: '\uD83C\uDF1F',  label: 'Big Hit',        sub: 'Kids loved it',        border: '#F59E0B', bg: '#FFFBEB' },
   { id: 'good',           emoji: '\uD83D\uDC4D',      label: 'Good',           sub: 'Worth the time',             border: '#10B981', bg: '#ECFDF5' },
-  { id: 'skip_next_time', emoji: '⏭\uFE0F',      label: 'Skip next time', sub: 'Wouldn\u2019t return', border: '#7C3AED', bg: '#F5F3FF' },
+  { id: 'skip_next_time', emoji: '⏭\uFE0F',      label: 'Skip next time', sub: 'Wouldn’t return', border: '#7C3AED', bg: '#F5F3FF' },
 ];
 
 export default function StopFeedbackSheet({
@@ -151,7 +151,7 @@ export default function StopFeedbackSheet({
         style={s.quoteInput}
         value={kidQuote}
         onChangeText={setKidQuote}
-        placeholder={'Type a quote\u2026'}
+        placeholder={'Type a quote…'}
         placeholderTextColor={'#9CA3AF'}
         multiline
         numberOfLines={2}
@@ -165,7 +165,7 @@ export default function StopFeedbackSheet({
         disabled={saving}
         activeOpacity={0.85}
       >
-        <Text style={s.saveBtnText}>{'Save & continue \u2192'}</Text>
+        <Text style={s.saveBtnText}>{'Save & continue →'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onComplete} style={s.skipBtn} activeOpacity={0.7}>

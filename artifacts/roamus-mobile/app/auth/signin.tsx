@@ -163,7 +163,7 @@ export default function SignIn() {
           disabled={!canSubmit}
         >
           <Text style={styles.signinBtnText}>
-            {loading ? "Signing in…" : "Sign in \u2192"}
+            {loading ? "Signing in…" : "Sign in →"}
           </Text>
         </TouchableOpacity>
       </View>

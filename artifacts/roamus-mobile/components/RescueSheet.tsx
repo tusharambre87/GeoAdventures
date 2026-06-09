@@ -371,7 +371,7 @@ export default function RescueSheet({
                         ? plan.dropStop.stopType.charAt(0).toUpperCase() + plan.dropStop.stopType.slice(1)
                         : 'Stop'}
                       {plan.dropStop.durationMinutes ? ` · ${plan.dropStop.durationMinutes} min` : ''}
-                      {' \u2014 lowest importance'}
+                      {' — lowest importance'}
                     </Text>
                   </View>
                 </View>
@@ -432,7 +432,7 @@ export default function RescueSheet({
                       ) : t.trimBy > 0 ? (
                         <>
                           <Text style={s.trimFrom}>{t.stop.durationMinutes ?? 60} min</Text>
-                          <Text style={s.trimArrow}>{'\u2192'}</Text>
+                          <Text style={s.trimArrow}>{'→'}</Text>
                           <Text style={s.trimTo}>{t.newDuration} min</Text>
                         </>
                       ) : (
@@ -457,7 +457,7 @@ export default function RescueSheet({
             onBack={() => { setView('picker'); setSelectedSwapId(null); }}
             onApply={applySwap}
             ctaLabel={applyingPlan ? 'Swapping…' : selectedSwapId
-              ? `Swap in ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? ''} \u2192`
+              ? `Swap in ${swapOptions.find(o => o.id === selectedSwapId)?.name ?? ''} →`
               : 'Select a stop below'}
             ctaColor={selectedSwapId && !applyingPlan ? '#E8692A' : '#C4C8D8'}
           >
@@ -493,7 +493,7 @@ export default function RescueSheet({
                           {opt.stopType ?? 'attraction'}
                         </Text>
                         <Text style={[s.swapCardCta, selected && { color: '#E8692A' }]}>
-                          {selected ? '\u2713 Selected' : 'Swap in \u2192'}
+                          {selected ? '\u2713 Selected' : 'Swap in →'}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -511,7 +511,7 @@ export default function RescueSheet({
             onBack={() => setView('picker')}
             onApply={() => setView('applied')}
             ctaLabel={selectedFoodId
-              ? `Add ${mealLabel} stop \u2192 ${foodOptions.find(o => o.id === selectedFoodId)?.name ?? ''}`
+              ? `Add ${mealLabel} stop → ${foodOptions.find(o => o.id === selectedFoodId)?.name ?? ''}`
               : `Select a spot above`}
             ctaColor={selectedFoodId ? '#E8692A' : '#C4C8D8'}
             ctaDisabled={!selectedFoodId}
@@ -581,7 +581,7 @@ export default function RescueSheet({
                 )}
                 <View style={[s.infoBox, { backgroundColor: '#F5F2EE', marginTop: 16 }]}>
                   <Text style={[s.infoBoxText, { color: '#6B7280' }]}>
-                    {`We\u2019ll add it after ${stops[currentStopIndex]?.name ?? 'your current stop'}.`}
+                    {`We’ll add it after ${stops[currentStopIndex]?.name ?? 'your current stop'}.`}
                     {' Tap \u2197 to open in Maps.'}
                   </Text>
                 </View>
@@ -614,7 +614,7 @@ export default function RescueSheet({
                           {swap.from.stopType ?? 'Outdoor'}
                         </Text>
                       </View>
-                      <Text style={s.swapArrow}>{'\u2192'}</Text>
+                      <Text style={s.swapArrow}>{'→'}</Text>
                       <View style={s.swapTo}>
                         {weatherLoading ? (
                           <Text style={[s.swapToName, { color: '#B0ADA8', fontStyle: 'italic' }]}>Finding indoor alternative…</Text>
@@ -736,7 +736,7 @@ export default function RescueSheet({
               </Text>
             </View>
             <TouchableOpacity style={s.appliedBtn} activeOpacity={0.85} onPress={handleClose}>
-              <Text style={s.appliedBtnText}>Got it {'\u2014'} continue day</Text>
+              <Text style={s.appliedBtnText}>Got it {'—'} continue day</Text>
             </TouchableOpacity>
           </>
         )}

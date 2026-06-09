@@ -68,7 +68,7 @@ export default function AuthSplash() {
             activeOpacity={0.88}
             onPress={() => router.push("/auth/signin")}
           >
-            <Text style={styles.signinBtnText}>Sign in {"\u2192"}</Text>
+            <Text style={styles.signinBtnText}>Sign in {"→"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -850,7 +850,7 @@ export default function AtStopScreen() {
                 style={{ borderWidth: 1.5, borderColor: '#E8692A', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24 }}
               >
                 <Text style={{ color: '#E8692A', fontSize: 15, fontWeight: '600' }}>
-                  Go to Today {'\u2192'}
+                  Go to Today {'→'}
                 </Text>
               </TouchableOpacity>
             </View>

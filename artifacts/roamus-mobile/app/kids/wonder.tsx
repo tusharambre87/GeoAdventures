@@ -181,7 +181,7 @@ export default function WonderTime() {
               router.push("/kids/mission-1");
             }}
           >
-            <Text style={s.nextBtnText}>{"On to missions \u2192"}</Text>
+            <Text style={s.nextBtnText}>{"On to missions →"}</Text>
           </Pressable>
         </View>
         <Pressable

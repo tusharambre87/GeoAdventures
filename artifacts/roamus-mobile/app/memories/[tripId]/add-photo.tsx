@@ -96,7 +96,7 @@ export default function AddPhotoScreen() {
         <Text style={sc.promptIcon}>{'\uD83D\uDCF8'}</Text>
         <Text style={sc.promptTitle}>{'How do you want\nto add photos?'}</Text>
         <Text style={sc.promptSub}>
-          Take a new photo or pick from your library{'\u00a0\u2014'} you can select multiple from library
+          Take a new photo or pick from your library{'\u00a0—'} you can select multiple from library
         </Text>
       </View>
 

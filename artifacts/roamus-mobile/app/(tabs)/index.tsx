@@ -124,7 +124,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
             <ActivityIndicator size="small" color="#E8692A" style={{ marginRight: 4 }} />
           ) : null}
           <Text style={s.offlinePillEmptyTxt}>
-            {isDownloading ? "Downloading\u2026" : "Download for offline \u2192"}
+            {isDownloading ? "Downloading…" : "Download for offline →"}
           </Text>
         </Pressable>
       )}
@@ -135,7 +135,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
         onPress={handleContinue}>
         <Text style={s.continueBtnText}>
           {trip.status === 'completed'
-            ? 'View memories \u2192'
+            ? 'View memories →'
             : isActiveNow && activeDay > 1
               ? `\u25B6 Continue Day ${activeDay}`
               : '\u25B6 Start Day 1'}
@@ -147,7 +147,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
         <Pressable
           style={({ pressed }) => [s.viewPlanLink, { opacity: pressed ? 0.7 : 1 }]}
           onPress={handleViewPlan}>
-          <Text style={s.viewPlanLinkText}>{"View full plan \u2192"}</Text>
+          <Text style={s.viewPlanLinkText}>{"View full plan →"}</Text>
         </Pressable>
       )}
     </View>

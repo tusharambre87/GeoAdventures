@@ -379,7 +379,7 @@ export default function StoryScreen() {
             style={{ backgroundColor: '#E8692A', borderRadius: 24, paddingHorizontal: 32, paddingVertical: 14 }}
             onPress={() => setUpgradeVisible(true)}
           >
-            <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Unlock story {'\u2192'}</Text>
+            <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Unlock story {'→'}</Text>
           </Pressable>
         </View>
       )}

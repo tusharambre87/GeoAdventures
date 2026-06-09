@@ -182,7 +182,7 @@ export default function Mission2() {
               router.push("/kids/mission-3");
             }}
           >
-            <Text style={s.nextBtnText}>{"Next \u2192"}</Text>
+            <Text style={s.nextBtnText}>{"Next →"}</Text>
           </Pressable>
         </View>
         <Pressable

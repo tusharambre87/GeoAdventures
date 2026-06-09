@@ -118,7 +118,7 @@ function MiniCalendar({
       {start && (
         <View style={cal.summary}>
           <Text style={cal.summaryTxt}>
-            {fmt(start)}{end ? ` \u2013 ${fmt(end)}` : ' \u2192 tap end date'}
+            {fmt(start)}{end ? ` – ${fmt(end)}` : ' → tap end date'}
             {end && nights > 0 ? `  \u00b7  ${nights} night${nights > 1 ? 's' : ''}` : ''}
           </Text>
         </View>
@@ -232,7 +232,7 @@ export default function TripDateEditorSheet({
   const currentLabel = [
     currentStart ? fmt(currentStart) : null,
     currentEnd   ? fmt(currentEnd)   : null,
-  ].filter(Boolean).join(' \u2013 ');
+  ].filter(Boolean).join(' – ');
 
   return (
     <View style={{ flex: 1 }}>

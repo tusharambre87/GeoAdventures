@@ -219,7 +219,7 @@ export default function CommunityShareSheet({ visible, onClose, trip }: Communit
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={s.publishBtnTxt}>Publish to community \u2192</Text>
+            <Text style={s.publishBtnTxt}>Publish to community →</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity style={s.privateBtn} onPress={handlePrivateShare} activeOpacity={0.7}>
