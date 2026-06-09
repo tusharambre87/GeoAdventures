@@ -5,12 +5,12 @@ import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
-import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache } from "@workspace/db";
+import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, sql as drizzleSql } from "drizzle-orm";
-import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification } from "../email";
+import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { seedDailyQuestCities, updateCityCoordinates } from "../seedDailyQuestCities";
@@ -6010,6 +6010,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contentDepth: 'preview',
       });
 
+      // Insert an owner membership row for the guest trip (userId will be bound on claim)
+      // status='accepted' because the guest session has full trip ownership from creation
+      try {
+        const { randomUUID: _ruuid } = await import('node:crypto');
+        await db.insert(tripMembers).values({
+          tripId: trip.id,
+          userId: null,
+          inviteToken: _ruuid().replace(/-/g, ''),
+          role: 'owner',
+          status: 'accepted',
+        });
+      } catch { /* non-fatal — trip was created successfully */ }
+
       res.json({ ...trip, stops: [], guestToken, _generatingStops: true });
 
       if (autoGenerateStops !== false && (city || destination)) {
@@ -6091,10 +6104,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startTime = Date.now();
       const userId = req.user.claims.sub;
       
-      const [trips, counts] = await Promise.all([
+      // Owned trips + accepted co-parent memberships in parallel
+      const [ownedTrips, sharedMemberships, counts] = await Promise.all([
         storage.getTripsByUserId(userId),
+        db.select({ tripId: tripMembers.tripId }).from(tripMembers).where(
+          and(eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'), drizzleSql`${tripMembers.role} != 'owner'`)
+        ),
         storage.getTripCountsByUserId(userId),
       ]);
+
+      // Fetch shared trips not already in owned list
+      const ownedIds = new Set(ownedTrips.map(t => t.id));
+      const sharedTripIds = sharedMemberships.map(m => m.tripId).filter(id => id && !ownedIds.has(id)) as string[];
+      const sharedTrips = sharedTripIds.length > 0
+        ? await Promise.all(sharedTripIds.map(id => storage.getTripById(id)))
+        : [];
+      const validSharedTrips = sharedTrips.filter(Boolean) as typeof ownedTrips;
+
+      const trips = [
+        ...ownedTrips,
+        ...validSharedTrips.map(t => ({ ...t, isShared: true })),
+      ];
       console.log(`⏱️ [Trips] getTripsByUserId + counts: ${Date.now() - startTime}ms`);
       
       const tripIds = trips.map(t => t.id);
@@ -6452,6 +6482,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Increment lifetime trip counter to prevent deletion bypass
       await storage.incrementLifetimeTripCount(userId, context);
 
+      // Insert owner row into trip_members so co-parent checks work from day one
+      const { randomUUID: _uuid } = await import('node:crypto');
+      db.insert(tripMembers).values({
+        tripId: trip.id,
+        userId,
+        role: 'owner',
+        status: 'accepted',
+        inviteToken: _uuid(),
+      }).catch(err => console.error('[TripMembers] Owner insert failed:', err));
+
       // Respond IMMEDIATELY with the created trip so the client is never blocked
       // Stop generation runs in the background — ParentPlanView polls for stops via ?generating=true
       res.json({ ...trip, stops: [], _generatingStops: true });
@@ -6744,6 +6784,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Co-parent invite: create / manage members ────────────────────────────────
+
+  // POST /api/travel/trips/:tripId/invite — create a pending invite, optionally send email
+  app.post('/api/travel/trips/:tripId/invite', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      // Only the trip owner may send invites
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      if (trip.userId !== userId) return res.status(403).json({ message: "Only the trip owner can invite co-parents" });
+
+      const { email } = req.body;
+      const invitedEmail = typeof email === 'string' ? email.trim().toLowerCase() : null;
+
+      const { randomUUID } = await import('node:crypto');
+
+      let inviteToken: string;
+      let inviteUrl: string;
+
+      if (invitedEmail) {
+        // Check if a row already exists for this email on this trip
+        const [existing] = await db.select({ id: tripMembers.id, status: tripMembers.status, inviteToken: tripMembers.inviteToken }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, tripId), eq(tripMembers.invitedEmail, invitedEmail))
+        ).limit(1);
+
+        if (existing) {
+          if (existing.status === 'accepted') {
+            // Already a collaborator — never downgrade; just report success
+            inviteToken = existing.inviteToken ?? randomUUID().replace(/-/g, '');
+            inviteUrl = `https://roamus.app/join/${inviteToken}`;
+            return res.json({ success: true, inviteToken, inviteUrl, message: `${invitedEmail} is already a collaborator on this trip` });
+          }
+          // Pending invite — regenerate token for re-invite
+          inviteToken = randomUUID().replace(/-/g, '');
+          inviteUrl = `https://roamus.app/join/${inviteToken}`;
+          await db.update(tripMembers).set({ inviteToken, status: 'pending' }).where(eq(tripMembers.id, existing.id));
+        } else {
+          inviteToken = randomUUID().replace(/-/g, '');
+          inviteUrl = `https://roamus.app/join/${inviteToken}`;
+          await db.insert(tripMembers).values({
+            tripId,
+            invitedEmail,
+            inviteToken,
+            role: 'collaborator',
+            status: 'pending',
+          });
+        }
+
+        // Fire-and-forget invite email
+        const inviter = await storage.getUser(userId);
+        const inviterName = inviter?.name?.split(' ')[0] || inviter?.name || 'Someone';
+        sendCoParentInviteEmail(
+          inviterName,
+          invitedEmail,
+          trip.name,
+          trip.destination || trip.city || '',
+          inviteUrl,
+        ).catch(err => console.error('[InviteEmail] Failed:', err));
+      } else {
+        // No email — generate a shareable link-only invite token
+        inviteToken = randomUUID().replace(/-/g, '');
+        inviteUrl = `https://roamus.app/join/${inviteToken}`;
+        await db.insert(tripMembers).values({
+          tripId,
+          inviteToken,
+          role: 'collaborator',
+          status: 'pending',
+        });
+      }
+
+      res.json({ success: true, inviteToken, inviteUrl, message: invitedEmail ? `Invite sent to ${invitedEmail}` : 'Invite link created' });
+    } catch (err: any) {
+      console.error('[Invite] Error:', err.message);
+      res.status(500).json({ message: "Failed to create invite" });
+    }
+  });
+
+  // GET /api/travel/trips/:tripId/members — list all members (owner only)
+  app.get('/api/travel/trips/:tripId/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      // Only trip owner or accepted members can see the list
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      if (trip.userId !== userId) {
+        const [memberRow] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, tripId), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!memberRow) return res.status(403).json({ message: "Access denied" });
+      }
+
+      const rawMembers = await db.select({
+        id: tripMembers.id,
+        userId: tripMembers.userId,
+        invitedEmail: tripMembers.invitedEmail,
+        role: tripMembers.role,
+        status: tripMembers.status,
+        createdAt: tripMembers.createdAt,
+      }).from(tripMembers).where(eq(tripMembers.tripId, tripId)).orderBy(tripMembers.createdAt);
+
+      // For accepted members with a userId, enrich with their profile (name, email)
+      const memberList = await Promise.all(rawMembers.map(async m => {
+        if (m.userId && m.status === 'accepted') {
+          const profile = await storage.getUser(m.userId).catch(() => null);
+          return {
+            ...m,
+            name: profile?.name ?? null,
+            email: profile?.email ?? m.invitedEmail,
+          };
+        }
+        return { ...m, name: null, email: m.invitedEmail };
+      }));
+
+      res.json({ members: memberList });
+    } catch (err: any) {
+      console.error('[Members] Error:', err.message);
+      res.status(500).json({ message: "Failed to fetch members" });
+    }
+  });
+
+  // POST /api/travel/join/:token — authenticated user accepts an invite
+  app.post('/api/travel/join/:token', isAuthenticated, async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      const [invite] = await db.select().from(tripMembers).where(eq(tripMembers.inviteToken, token)).limit(1);
+      if (!invite) return res.status(404).json({ message: "Invite not found or expired" });
+
+      // Owner tokens must never be used to join
+      if (invite.role === 'owner') return res.status(400).json({ message: "This invite link is not valid" });
+
+      if (invite.status === 'accepted') {
+        // Same user re-joining their own accepted invite — idempotent success
+        if (invite.userId === userId) return res.json({ success: true, tripId: invite.tripId, alreadyJoined: true });
+        // Different user trying to use someone else's already-accepted token
+        return res.status(409).json({ message: "This invite has already been used" });
+      }
+
+      // Bind the invite to this user
+      await db.update(tripMembers).set({ userId, status: 'accepted' }).where(eq(tripMembers.id, invite.id));
+
+      res.json({ success: true, tripId: invite.tripId });
+    } catch (err: any) {
+      console.error('[JoinTrip] Error:', err.message);
+      res.status(500).json({ message: "Failed to join trip" });
+    }
+  });
+
+  // GET /join/:token — browser-facing redirect: UA detect → App Store / Play Store / web
+  // This path is served directly (not under /api) so it matches universal links / intentFilters
+  app.get('/join/:token', async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const ua = (req.headers['user-agent'] || '').toLowerCase();
+
+      // Verify token exists before redirecting
+      const [invite] = await db.select({ id: tripMembers.id, tripId: tripMembers.tripId }).from(tripMembers).where(eq(tripMembers.inviteToken, token)).limit(1);
+      if (!invite) {
+        return res.status(404).send('<html><body style="font-family:sans-serif;text-align:center;padding:60px 20px;background:#F5F2EE;"><h2 style="color:#E8692A;">Invite not found or expired</h2><p>This invite link may have already been used or has expired.</p></body></html>');
+      }
+
+      const deepLink = `roamus://join/${token}`;
+
+      // Platform-specific App Store / Play Store URLs
+      const isIos = /iphone|ipad|ipod/.test(ua);
+      const isAndroid = /android/.test(ua);
+      const storeUrl = isIos
+        ? 'https://apps.apple.com/app/roamus/id6748000000' // placeholder — replace with real App Store ID post-submission
+        : isAndroid
+        ? 'https://play.google.com/store/apps/details?id=com.roamus.app' // placeholder — replace post-submission
+        : 'https://roamus.app';
+
+      // Use a meta-redirect page that attempts the deep link then falls back to store
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Joining RoamUs trip...</title>
+  <meta http-equiv="refresh" content="3;url=${storeUrl}">
+  <script>
+    window.location.href = "${deepLink}";
+    setTimeout(function() { window.location.href = "${storeUrl}"; }, 2500);
+  </script>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:60px 20px;background:#F5F2EE;">
+  <h2 style="color:#E8692A;">Opening RoamUs...</h2>
+  <p style="color:#374151;">If the app doesn't open automatically, <a href="${storeUrl}" style="color:#E8692A;">download RoamUs here</a>.</p>
+</body>
+</html>`);
+    } catch (err: any) {
+      console.error('[JoinRedirect] Error:', err.message);
+      res.status(500).send('Error processing invite');
+    }
+  });
+
   // ── My Travel Journal ──────────────────────────────────────────────────────
   // Returns all saved trip stories for the authenticated user
   app.get('/api/travel/journal', isAuthenticated, async (req: any, res) => {
@@ -6829,7 +7073,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`❌ [Trip v2] Trip ${tripId} not found`);
         return res.status(404).json({ message: "Trip not found" });
       }
-      if (result.trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      // Allow trip owner OR any accepted co-parent member
+      if (result.trip.userId !== userId) {
+        const [memberRow] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, tripId), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!memberRow) return res.status(403).json({ message: "Access denied" });
+      }
       
       const { trip, stops, moments, memoryStarsData, journeyPacks } = result;
       
@@ -7026,6 +7276,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const elapsed = Date.now() - startTime;
       console.log(`✅ [Trip v2] Returning ${stopsWithPackStatus.length} stops in ${elapsed}ms`);
+
+      // Check if this trip is shared with a co-parent
+      let isShared = false;
+      try {
+        const [coMember] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, tripId), eq(tripMembers.status, 'accepted'), drizzleSql`${tripMembers.role} != 'owner'`)
+        ).limit(1);
+        isShared = !!coMember;
+      } catch { /* non-fatal */ }
       
       // Add API version to response for debugging cache issues
       res.json({ 
@@ -7034,6 +7293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         moments, 
         memoryStars: memoryStarsData,
         plannerTripDays,
+        isShared,
         _apiVersion: 'v2-20241228'
       });
     } catch (error: any) {
@@ -8675,7 +8935,12 @@ Return ONLY valid JSON in this exact format:
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const addStopTrip = await storage.getTripById(tripId);
       if (!addStopTrip) return res.status(404).json({ message: "Trip not found" });
-      if (addStopTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      if (addStopTrip.userId !== userId) {
+        const [_m] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, tripId), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!_m) return res.status(403).json({ message: "Access denied" });
+      }
       const { name, stopType, address, cityGroup, insertAtOrder, latitude, longitude, durationMinutes, dayIndex } = req.body;
       
       // Content Safety Check
@@ -9033,7 +9298,13 @@ Return ONLY valid JSON in this exact format:
       const existingStop = await storage.getStopById(stopId);
       if (!existingStop) return res.status(404).json({ message: "Stop not found" });
       const patchTrip = await storage.getTripById(existingStop.tripId);
-      if (!patchTrip || patchTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      if (!patchTrip) return res.status(404).json({ message: "Trip not found" });
+      if (patchTrip.userId !== userId) {
+        const [_m] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, patchTrip.id), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!_m) return res.status(403).json({ message: "Access denied" });
+      }
       const updates = req.body;
       
       const stop = await storage.updateStop(stopId, updates);
@@ -9059,7 +9330,13 @@ Return ONLY valid JSON in this exact format:
       const visitStop = await storage.getStopById(stopId);
       if (!visitStop) return res.status(404).json({ message: "Stop not found" });
       const visitTrip = await storage.getTripById(visitStop.tripId);
-      if (!visitTrip || visitTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      if (!visitTrip) return res.status(404).json({ message: "Trip not found" });
+      if (visitTrip.userId !== userId) {
+        const [_m] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, visitTrip.id), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!_m) return res.status(403).json({ message: "Access denied" });
+      }
       const mode: "completed" | "skipped" = req.body?.mode === "skip" ? "skipped" : "completed";
       const stop = await storage.markStopVisited(stopId, mode);
 
@@ -9965,7 +10242,13 @@ Return ONLY valid JSON in this exact format:
       const delStop = await storage.getStopById(stopId);
       if (!delStop) return res.status(404).json({ message: "Stop not found" });
       const delTrip = await storage.getTripById(delStop.tripId);
-      if (!delTrip || delTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+      if (!delTrip) return res.status(404).json({ message: "Trip not found" });
+      if (delTrip.userId !== userId) {
+        const [_m] = await db.select({ id: tripMembers.id }).from(tripMembers).where(
+          and(eq(tripMembers.tripId, delTrip.id), eq(tripMembers.userId, userId), eq(tripMembers.status, 'accepted'))
+        ).limit(1);
+        if (!_m) return res.status(403).json({ message: "Access denied" });
+      }
       await storage.deleteStop(stopId);
       res.json({ success: true });
     } catch (error) {

@@ -49,6 +49,11 @@
               "scheme": "https",
               "host": "roamus.app",
               "pathPrefix": "/story"
+            },
+            {
+              "scheme": "https",
+              "host": "roamus.app",
+              "pathPrefix": "/join"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

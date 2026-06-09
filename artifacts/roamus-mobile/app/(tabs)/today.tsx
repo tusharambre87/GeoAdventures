@@ -803,6 +803,13 @@ export default function TodayScreen() {
 
   useFocusEffect(useCallback(() => { loadTrip(); }, [loadTrip]));
 
+  // ── 30-second sync polling for shared trips ──
+  useEffect(() => {
+    if (!(trip as any)?.isShared || !resolvedTripId) return;
+    const interval = setInterval(() => { loadTrip(); }, 30_000);
+    return () => clearInterval(interval);
+  }, [(trip as any)?.isShared, resolvedTripId, loadTrip]);
+
   // ── Start Day handler ──
   async function handleStartDay() {
     if (!trip) return;

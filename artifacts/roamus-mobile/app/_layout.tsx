@@ -45,7 +45,15 @@ const persistOptions = {
   maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
 
-function handleDeepLink(url: string) {
+function handleDeepLink(url: string, token?: string | null) {
+  // Co-parent join invite link
+  const joinMatch = url.match(/\/join\/([^/?#]+)/);
+  if (joinMatch) {
+    const joinToken = joinMatch[1];
+    // Navigate to the join handler screen — it will call POST /api/travel/join/:token
+    router.push(`/join/${joinToken}` as any);
+    return;
+  }
   const itineraryMatch = url.match(/\/itinerary\/([^/?#]+)/);
   if (itineraryMatch) {
     router.push(`/memories/shared/${itineraryMatch[1]}`);
@@ -87,8 +95,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inTabPreview = __DEV__ && (segments[1] === 'today' || segments[1] === 'atstop');
     // Shared itinerary is public — no auth required
     const inSharedItinerary = segments[0] === 'memories' && segments[1] === 'shared';
+    // Join invite link — let the join screen handle auth redirect with token preserved
+    const inJoin = segments[0] === 'join';
 
-    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview && !inSharedItinerary) {
+    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview && !inSharedItinerary && !inJoin) {
       router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
       if (inLegacyLogin || inAuth) router.replace("/(tabs)");
@@ -117,6 +127,7 @@ function RootLayoutNav() {
       <Stack.Screen name="atstop" options={{ headerShown: false }} />
       <Stack.Screen name="me" options={{ headerShown: false }} />
       <Stack.Screen name="discover" options={{ headerShown: false }} />
+      <Stack.Screen name="join/[token]" options={{ headerShown: false }} />
     </Stack>
   );
 }

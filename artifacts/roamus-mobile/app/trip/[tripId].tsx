@@ -47,6 +47,7 @@ import TripPreferencesSheet from "@/components/TripPreferencesSheet";
 import TripDateEditorSheet from "@/components/TripDateEditorSheet";
 import TripPlanStopSheet from "@/components/TripPlanStopSheet";
 import CommunityShareSheet from "@/components/CommunityShareSheet";
+import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 
 const TAB_BAR_H = 49;
@@ -165,6 +166,7 @@ type TripData = {
   stops: Stop[];
   totalStops?: number;
   visitedStops?: number;
+  isShared?: boolean;
   coverImageUrl?: string | null;
   cityDates?: Record<string, { start: string; end: string }> | null;
   stayLocations?: Array<{ cityName: string; address?: string; lat?: number; lng?: number }> | null;
@@ -1007,7 +1009,14 @@ function TripOverview({
             <IconChevronLeft />
           </Pressable>
           <View style={ov.titleWrap}>
-            <Text style={ov.tripTitle} numberOfLines={1}>{trip.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text style={ov.tripTitle} numberOfLines={1}>{trip.name}</Text>
+              {trip.isShared && (
+                <View style={{ backgroundColor: '#FDF0E9', borderRadius: 6, paddingVertical: 2, paddingHorizontal: 7, borderWidth: 1, borderColor: '#E8692A22' }}>
+                  <Text style={{ fontSize: 10, fontFamily: F.semibold, color: C.orange, letterSpacing: 0.4 }}>Shared trip</Text>
+                </View>
+              )}
+            </View>
             <Text style={ov.tripSub}>
               {totalDays} day{totalDays !== 1 ? 's' : ''}
               {dateRange ? ` · ${dateRange}` : ''}
@@ -2294,6 +2303,7 @@ function TripOptionsSheet({
   onOpenPreferences,
   onOpenDateEditor,
   onCommunityShare,
+  onInvite,
   queryClient,
 }: {
   trip: TripData;
@@ -2305,6 +2315,7 @@ function TripOptionsSheet({
   onOpenPreferences: () => void;
   onOpenDateEditor: () => void;
   onCommunityShare?: () => void;
+  onInvite?: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const insets = useSafeAreaInsets();
@@ -2402,6 +2413,11 @@ function TripOptionsSheet({
           icon: <IconShare />, bg: '#FDF0E9', name: 'Share with family',
           sub: 'Send the itinerary to your travel partners',
           onPress: () => { onClose(); onCommunityShare?.(); },
+        },
+        {
+          icon: <IconShare />, bg: '#FDF0E9', name: 'Invite co-parent',
+          sub: 'Let your partner view and update this trip together',
+          onPress: () => { onClose(); setTimeout(() => onInvite?.(), 300); },
         },
         { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => { onClose(); setTimeout(() => onOpenChecklist(), 350); } },
         { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
@@ -3471,6 +3487,7 @@ export default function TripPlanScreen() {
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('food');
   const [showCommunityShare, setShowCommunityShare] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   const [localStops, setLocalStops]     = useState<Stop[]>([]);
@@ -3496,7 +3513,10 @@ export default function TripPlanScreen() {
     refetchInterval: (query) => {
       const t = query.state.data as TripData | undefined;
       if (!t) return false;
-      return (t.stops?.length ?? 0) === 0 ? 4000 : false;
+      // Poll every 4s while stops are generating, every 30s when trip is shared
+      if ((t.stops?.length ?? 0) === 0) return 4000;
+      if (t.isShared) return 30_000;
+      return false;
     },
   });
 
@@ -3828,6 +3848,7 @@ export default function TripPlanScreen() {
             onOpenPreferences={() => setActiveSheet('preferences')}
             onOpenDateEditor={() => setActiveSheet('dateEditor')}
             onCommunityShare={() => { closeSheet(); setShowCommunityShare(true); }}
+            onInvite={() => setShowInviteSheet(true)}
             queryClient={queryClient}
           />
         </SheetModal>
@@ -3838,6 +3859,16 @@ export default function TripPlanScreen() {
           visible={showCommunityShare}
           onClose={() => setShowCommunityShare(false)}
           trip={trip}
+        />
+      )}
+
+      {trip && (
+        <InviteCoParentSheet
+          visible={showInviteSheet}
+          onClose={() => setShowInviteSheet(false)}
+          tripId={trip.id}
+          tripName={trip.name}
+          tripDestination={trip.destination ?? trip.city ?? ''}
         />
       )}
 

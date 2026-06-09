@@ -3805,3 +3805,26 @@ export const shareReports = pgTable('share_reports', {
 });
 export type ShareReport = typeof shareReports.$inferSelect;
 export type InsertShareReport = typeof shareReports.$inferInsert;
+
+// ── TRIP MEMBERS (co-parent sharing) ──────────────────────────────────────────
+export const tripMembers = pgTable("trip_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tripId: varchar("trip_id").notNull().references(() => travelTrips.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").references(() => users.id),
+  invitedEmail: varchar("invited_email"),
+  inviteToken: varchar("invite_token").unique(),
+  role: varchar("role").default("collaborator"), // 'owner' | 'collaborator'
+  status: varchar("status").default("pending"),  // 'pending' | 'accepted'
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_trip_members_trip_id").on(table.tripId),
+  index("idx_trip_members_user_id").on(table.userId),
+  index("idx_trip_members_invite_token").on(table.inviteToken),
+]);
+
+export const insertTripMemberSchema = createInsertSchema(tripMembers).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTripMember = z.infer<typeof insertTripMemberSchema>;
+export type TripMember = typeof tripMembers.$inferSelect;

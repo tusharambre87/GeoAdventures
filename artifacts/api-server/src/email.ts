@@ -2614,3 +2614,58 @@ export async function sendWaitlistEmail(waitlist: {
     html,
   });
 }
+
+// ── Co-parent invite email ─────────────────────────────────────────────────────
+
+export async function sendCoParentInviteEmail(
+  inviterName: string,
+  invitedEmail: string,
+  tripName: string,
+  tripDestination: string,
+  inviteUrl: string,
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #F5F2EE; font-family: 'Helvetica Neue', Arial, sans-serif;">
+      <div style="max-width: 560px; margin: 40px auto; padding: 0 16px;">
+        <div style="background-color: #E8692A; padding: 28px 32px; border-radius: 12px 12px 0 0; text-align: center;">
+          <p style="margin: 0 0 4px 0; color: rgba(255,255,255,0.8); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;">RoamUs</p>
+          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; line-height: 1.2;">You've been invited!</h1>
+        </div>
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 0 0 12px 12px;">
+          <p style="margin: 0 0 16px 0; color: #1A1F2E; font-size: 16px; line-height: 1.6;">
+            <strong>${inviterName}</strong> has invited you to co-plan a trip:
+          </p>
+          <div style="background-color: #FDF0E9; border-left: 4px solid #E8692A; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+            <p style="margin: 0 0 4px 0; font-size: 18px; font-weight: 700; color: #1A1F2E;">${tripName}</p>
+            <p style="margin: 0; font-size: 14px; color: #8A8FA8;">${tripDestination}</p>
+          </div>
+          <p style="margin: 0 0 24px 0; color: #374151; font-size: 15px; line-height: 1.6;">
+            Tap the button below to join the trip, view the itinerary, and start planning together.
+          </p>
+          <div style="text-align: center; margin-bottom: 24px;">
+            <a href="${inviteUrl}" style="display: inline-block; background-color: #E8692A; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700;">Join the trip</a>
+          </div>
+          <p style="margin: 0; color: #9CA3AF; font-size: 13px; line-height: 1.5; text-align: center;">
+            Or copy this link: <a href="${inviteUrl}" style="color: #E8692A;">${inviteUrl}</a>
+          </p>
+        </div>
+        <p style="text-align: center; color: #9CA3AF; font-size: 12px; margin-top: 20px;">
+          RoamUs — Family Travel, Together. If you didn't expect this invite, you can ignore this email.
+        </p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: invitedEmail,
+    subject: `${inviterName} invited you to plan "${tripName}" on RoamUs`,
+    html,
+  });
+}
