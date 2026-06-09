@@ -26,6 +26,20 @@ import { objectStorageClient } from "./lib/objectStorage.js";
 const DELAY_MS = 12_000;
 const MAX_STOPS = 1_200; // safety ceiling — re-run if there are more
 
+/**
+ * Stops that must never be sent to the image API because they are licensed IP.
+ * The image safety system rejects them every time, burning API credits on retries.
+ * Each entry maps the exact stop name (as stored in the DB) to a GCS path for a
+ * placeholder landmark image. The backfill will write that path to hero_image_url
+ * so the stop won't appear in future runs.
+ *
+ * To add a new licensed-IP stop: add its DB name and a suitable placeholder path.
+ */
+const SKIP_STOPS: Record<string, string> = {
+  "Shrek's Adventure! London":
+    "stop-images/f6ceb352-af3f-4f75-a6f1-e96f1e191d16/49391052-1082-40e2-aa52-e8214d7d978a.png",
+};
+
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -58,6 +72,16 @@ async function main() {
   const start = Date.now();
 
   for (const stop of stops) {
+    const placeholder = SKIP_STOPS[stop.name];
+    if (placeholder !== undefined) {
+      await db
+        .update(travelStops)
+        .set({ heroImageUrl: placeholder })
+        .where(eq(travelStops.id, stop.id));
+      console.log(`[skip] ${stop.name} — licensed IP, assigned placeholder image`);
+      continue;
+    }
+
     try {
       const location = stop.cityGroup ?? "the destination";
       const prompt = `Travel photo of ${stop.name} in ${location}. Daytime, no people, architectural or landscape shot, family friendly, vibrant colors, high quality.`;
