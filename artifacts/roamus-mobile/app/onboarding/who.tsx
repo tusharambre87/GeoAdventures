@@ -26,7 +26,7 @@ const FALLBACK_COLORS = [
 
 function isUrl(s: string | null | undefined): boolean {
   if (!s) return false;
-  return s.startsWith("http") || s.startsWith("/");
+  return s.startsWith("http") || s.startsWith("/") || s.startsWith("file:");
 }
 
 function isEmoji(s: string | null | undefined): boolean {

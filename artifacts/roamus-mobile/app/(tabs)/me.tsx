@@ -443,8 +443,8 @@ export default function MeScreen() {
             <>
               <View style={s.crewPillStrip}>
                 {crewKids.map((c: any, i: number) => {
-                  const hasEmoji = c.avatar && !c.avatar.startsWith("http") && !c.avatar.startsWith("/");
-                  const hasPhoto = c.avatar && (c.avatar.startsWith("http") || c.avatar.startsWith("/"));
+                  const hasPhoto = c.avatar && (c.avatar.startsWith("http") || c.avatar.startsWith("/") || c.avatar.startsWith("file:"));
+                  const hasEmoji = c.avatar && !hasPhoto;
                   const fallbackColor = FALLBACK_CREW_COLORS[i % FALLBACK_CREW_COLORS.length];
                   return (
                     <View key={String(c.id ?? i)} style={s.crewPill}>
