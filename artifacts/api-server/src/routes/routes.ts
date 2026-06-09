@@ -9,7 +9,7 @@ import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, ins
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
-import { eq, and, lte, gt, desc, asc, or, ilike, inArray, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, lte, gt, desc, asc, or, ilike, inArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -730,13 +730,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!trip) {
         return res.redirect(301, 'https://roamus.app');
       }
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers['host'] || 'roamus.app';
-      const baseUrl = `${protocol}://${host}`;
-      const shareUrl = `${baseUrl}/s/${trip.id}`;
+      // Fix 3: og:url always points to the canonical roamus.app domain
+      const shareUrl = `https://roamus.app/s/${trip.id}`;
       const title = `${trip.name ?? trip.destination} — RoamUs Family Adventure`;
       const description = `Explore ${trip.destination ?? 'this destination'} with the family. Tap to see the full trip story.`;
-      const imageUrl = trip.heroImageUrl || `${baseUrl}/favicon.png`;
+      // Fix 2: fallback chain — trip hero → first stop hero → generic RoamUs OG image
+      let imageUrl: string = trip.heroImageUrl ?? '';
+      if (!imageUrl) {
+        const [firstStop] = await db
+          .select({ heroImageUrl: travelStops.heroImageUrl })
+          .from(travelStops)
+          .where(and(eq(travelStops.tripId, trip.id), isNotNull(travelStops.heroImageUrl)))
+          .orderBy(asc(travelStops.dayIndex), asc(travelStops.displayOrder))
+          .limit(1);
+        imageUrl = firstStop?.heroImageUrl ?? '';
+      }
+      // Last resort: well-known city image so og:image is never a favicon
+      imageUrl = imageUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Southwest_corner_of_Central_Park%2C_looking_east%2C_NYC.jpg/1280px-Southwest_corner_of_Central_Park%2C_looking_east%2C_NYC.jpg';
       const userAgent = req.headers['user-agent'] || '';
       if (!isSocialCrawler(userAgent)) {
         return res.redirect(302, 'https://roamus.app');
