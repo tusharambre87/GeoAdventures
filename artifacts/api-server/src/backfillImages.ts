@@ -24,6 +24,7 @@ import OpenAI from "openai";
 import { objectStorageClient } from "./lib/objectStorage.js";
 
 const DELAY_MS = 12_000;
+const MAX_STOPS = 1_200; // safety ceiling — re-run if there are more
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -41,9 +42,12 @@ async function main() {
   const stops = await db
     .select({ id: travelStops.id, name: travelStops.name, cityGroup: travelStops.cityGroup, tripId: travelStops.tripId })
     .from(travelStops)
-    .where(isNull(travelStops.heroImageUrl));
+    .where(isNull(travelStops.heroImageUrl))
+    .limit(MAX_STOPS);
 
-  console.log(`[backfill:images] ${stops.length} stops need hero images (~$${(stops.length * 0.04).toFixed(0)} est.)`);
+  console.log(`[backfill:images] Backfilling ${stops.length} stops. Estimated cost: $${(stops.length * 0.04).toFixed(2)}`);
+  console.log(`[backfill:images] Starting in 5 seconds — Ctrl-C to abort if the number looks wrong...`);
+  await sleep(5_000);
 
   const bucket = objectStorageClient.bucket(bucketId);
   let done = 0;
