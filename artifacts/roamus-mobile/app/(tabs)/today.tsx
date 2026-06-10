@@ -1371,6 +1371,15 @@ export default function TodayScreen() {
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
+        <IndoorAlternativesSheet
+          visible={indoorSheetVisible}
+          onClose={() => setIndoorSheetVisible(false)}
+          stopId={currentStop?.id ?? ''}
+          stopName={currentStop?.name ?? ''}
+          tripId={trip?.id ?? ''}
+          todayStopNames={dayStops.map(s => s.name ?? '')}
+          onSwitchSuccess={() => { void loadTrip(); }}
+        />
         <AddHotelSheet
           visible={showHotelSheet}
           tripId={trip?.id ?? ''}
@@ -1581,7 +1590,6 @@ export default function TodayScreen() {
     }
 
     const moHeroUrl = CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
-    console.log('hero image url:', moHeroUrl);
     const handleAddStop = () =>
       router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex } } as never);
     const handleQuickAdd = (category: string) => {
@@ -1607,7 +1615,7 @@ export default function TodayScreen() {
             {/* Weather pill — anchored below status bar */}
             {currentTemp !== null && (
               <View style={[mo.weatherPill, { top: insets.top + 8 }]}>
-                <Text style={{ fontSize: 14 }}>{'\uD83C\uDF24'}</Text>
+                <Text style={{ fontSize: 14 }}>{rainAlert ? '\uD83C\uDF27' : '\uD83C\uDF24'}</Text>
                 <Text style={mo.weatherText}>{currentTemp}°F</Text>
               </View>
             )}
@@ -1881,6 +1889,20 @@ export default function TodayScreen() {
             />
           )}
 
+          {!!rainAlert && currentStop && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}
+              activeOpacity={0.85}
+              onPress={() => setIndoorSheetVisible(true)}
+            >
+              <Text style={{ fontSize: 20 }}>{'\uD83C\uDF27'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain likely this morning ({rainAlert.chance}%)</Text>
+                <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>A stop may be affected by rain</Text>
+                <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>{'See indoor alternatives \u2192'}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           <Pressable style={[mo.startBtn, starting && { opacity: 0.7 }]} onPress={handleStartDay} disabled={starting}>
             {starting
               ? <ActivityIndicator color="#fff" />
@@ -1893,6 +1915,15 @@ export default function TodayScreen() {
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
+        <IndoorAlternativesSheet
+          visible={indoorSheetVisible}
+          onClose={() => setIndoorSheetVisible(false)}
+          stopId={currentStop?.id ?? ''}
+          stopName={currentStop?.name ?? ''}
+          tripId={trip?.id ?? ''}
+          todayStopNames={dayStops.map(s => s.name ?? '')}
+          onSwitchSuccess={() => { void loadTrip(); }}
+        />
         <AddHotelSheet
           visible={showHotelSheet}
           tripId={trip?.id ?? ''}
@@ -1990,7 +2021,7 @@ export default function TodayScreen() {
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
     const afterStops = dayStops.slice(currentStopIndex + 1);
-    const didYouKnow = stop.enrichment?.whyNow ?? null;
+    const didYouKnow = typeof stop.enrichment?.whyNow === 'string' ? stop.enrichment.whyNow : null;
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -2184,6 +2215,9 @@ export default function TodayScreen() {
           onClose={() => setIndoorSheetVisible(false)}
           stopId={stop.id}
           stopName={stop.name ?? ''}
+          tripId={trip?.id ?? ''}
+          todayStopNames={dayStops.map(s => s.name ?? '')}
+          onSwitchSuccess={() => { void loadTrip(); setIndoorSheetVisible(false); }}
         />
         <UpgradeSheet
           visible={upgradeVisible}

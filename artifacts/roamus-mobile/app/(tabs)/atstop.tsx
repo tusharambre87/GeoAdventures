@@ -156,6 +156,7 @@ type TripData = {
   city?: string | null;
   country?: string | null;
   startDate?: string | null;
+  endDate?: string | null;
   plannerTripDays?: number | null;
   tripDays?: number | null;
   currentDayIndex?: number | null;

@@ -8785,7 +8785,8 @@ Return ONLY real, well-known indoor places in ${destination}. Return valid JSON 
           stopType: newStop.stopType || "museum",
           durationMinutes: newStop.durationMinutes || 60,
           description: newStop.description || null,
-          displayOrder: newStop.displayOrder || 0,
+          dayIndex: toDelete?.dayIndex ?? 0,
+          displayOrder: toDelete?.displayOrder ?? newStop.displayOrder ?? 0,
         });
 
         const undoSnapshot = {

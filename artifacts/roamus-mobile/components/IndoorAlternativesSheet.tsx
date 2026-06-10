@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { F } from "@/lib/tokens";
@@ -22,10 +23,13 @@ const C = {
 };
 
 export interface IndoorAlternativesSheetProps {
-  visible:  boolean;
-  onClose:  () => void;
-  stopId:   string;
-  stopName: string;
+  visible:         boolean;
+  onClose:         () => void;
+  stopId:          string;
+  stopName:        string;
+  tripId:          string;
+  todayStopNames?: string[];
+  onSwitchSuccess?: () => void;
 }
 
 interface KidsNearbyItem {
@@ -61,19 +65,50 @@ async function fetchNearby(stopId: string): Promise<KidsNearbyItem[]> {
   return data.kids ?? [];
 }
 
+async function applySwitch(tripId: string, deleteStopId: string, newItem: KidsNearbyItem): Promise<void> {
+  const token = await AsyncStorage.getItem("auth_token");
+  const res = await fetch(`${API_BASE}/api/travel/trips/${tripId}/weather-apply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      proposalType: "replace",
+      operations: {
+        deleteStopId,
+        newStop: {
+          name: newItem.name,
+          stopType: "museum",
+          durationMinutes: 90,
+          description: newItem.description || null,
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { message?: string };
+    throw new Error(err.message ?? `HTTP ${res.status}`);
+  }
+}
+
 export default function IndoorAlternativesSheet({
   visible,
   onClose,
   stopId,
   stopName,
+  tripId,
+  todayStopNames = [],
+  onSwitchSuccess,
 }: IndoorAlternativesSheetProps) {
-  const anim     = useRef(new Animated.Value(0)).current;
-  const mounted  = useRef(false);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const anim         = useRef(new Animated.Value(0)).current;
+  const mounted      = useRef(false);
+  const closeRef     = useRef(onClose);
+  closeRef.current   = onClose;
 
-  const [options, setOptions]   = useState<KidsNearbyItem[]>([]);
-  const [loading, setLoading]   = useState(false);
+  const [options,    setOptions]    = useState<KidsNearbyItem[]>([]);
+  const [loading,    setLoading]    = useState(false);
+  const [switching,  setSwitching]  = useState<string | null>(null);
 
   const pan = useRef(
     PanResponder.create({
@@ -97,10 +132,51 @@ export default function IndoorAlternativesSheet({
     if (!visible || !stopId) return;
     setLoading(true);
     fetchNearby(stopId)
-      .then(setOptions)
+      .then(items => {
+        const lowerToday = todayStopNames.map(n => n.toLowerCase().trim());
+        const filtered = items.filter(item => {
+          const name = item.name.toLowerCase().trim();
+          return !lowerToday.some(existing =>
+            existing === name ||
+            existing.includes(name) ||
+            name.includes(existing)
+          );
+        });
+        setOptions(filtered);
+      })
       .catch(() => setOptions([]))
       .finally(() => setLoading(false));
   }, [visible, stopId]);
+
+  const handleSwitch = (item: KidsNearbyItem) => {
+    if (!tripId) {
+      Alert.alert("Error", "Trip ID missing — cannot switch stop.");
+      return;
+    }
+    Alert.alert(
+      `Switch to ${item.name}?`,
+      `This will replace ${stopName} in your plan.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Switch",
+          onPress: async () => {
+            setSwitching(item.name);
+            try {
+              await applySwitch(tripId, stopId, item);
+              onSwitchSuccess?.();
+              onClose();
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : "Unknown error";
+              Alert.alert("Couldn't switch stop", msg);
+            } finally {
+              setSwitching(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (!mounted.current) return null;
 
@@ -116,7 +192,6 @@ export default function IndoorAlternativesSheet({
           transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [520, 0] }) }],
         }]}
       >
-        {/* Drag handle */}
         <View {...pan.panHandlers} style={s.handle} />
 
         <Text style={s.title}>Indoor alternatives nearby</Text>
@@ -136,7 +211,7 @@ export default function IndoorAlternativesSheet({
                     <Text style={s.cardName} numberOfLines={1}>{item.name}</Text>
                     <Text style={s.cardMeta}>
                       {item.agesNote ?? "All ages"}
-                      {item.distance ? `  ·  ~${item.distance}` : ""}
+                      {item.distance ? `  \u00B7  ~${item.distance}` : ""}
                     </Text>
                     {!!item.description && (
                       <Text style={s.cardDesc} numberOfLines={2}>{item.description}</Text>
@@ -145,17 +220,16 @@ export default function IndoorAlternativesSheet({
                 </View>
 
                 <TouchableOpacity
-                  style={s.switchBtn}
+                  style={[s.switchBtn, switching === item.name && s.switchBtnBusy]}
                   activeOpacity={0.85}
-                  onPress={() =>
-                    Alert.alert(
-                      `Switch to ${item.name}?`,
-                      `This will replace ${stopName} in your plan.`,
-                      [{ text: "Cancel", style: "cancel" }, { text: "OK" }]
-                    )
-                  }
+                  disabled={switching !== null}
+                  onPress={() => handleSwitch(item)}
                 >
-                  <Text style={s.switchBtnText}>{"Switch to this stop →"}</Text>
+                  {switching === item.name ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={s.switchBtnText}>{"Switch to this stop \u2192"}</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             ))
@@ -260,6 +334,9 @@ const s = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: "center",
+  },
+  switchBtnBusy: {
+    opacity: 0.7,
   },
   switchBtnText: {
     fontFamily: F.bold,

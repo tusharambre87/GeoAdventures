@@ -18,7 +18,7 @@ export function SpeakButton({ text, isSpeaking, onPress, size = 'md', color = '#
       accessibilityLabel={isSpeaking ? 'Stop reading aloud' : 'Read aloud'}
     >
       <Text style={{ fontSize: size === 'sm' ? 15 : 18, color }}>
-        {isSpeaking ? '🔇' : '🔊'}
+        {isSpeaking ? '\uD83D\uDD07' : '\uD83D\uDD0A'}
       </Text>
     </TouchableOpacity>
   );
