@@ -16,6 +16,8 @@ import { kidsAPI } from "@/lib/apiClient";
 import { useSpeechToText } from "@/lib/useSpeechToText";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
+import { useSpeech } from "@/lib/useSpeech";
+import { SpeakButton } from "@/components/SpeakButton";
 
 const K = {
   purple: "#7C3AED",
@@ -45,6 +47,7 @@ export default function WonderTime() {
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { isListening, start, stop } = useSpeechToText();
+  const { speak, isSpeaking } = useSpeech();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -110,9 +113,18 @@ export default function WonderTime() {
 
         {/* ── White card ── */}
         <View style={s.card}>
-          <Text style={s.question}>
-            {"What's one thing you're wondering about this place?"}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <Text style={[s.question, { flex: 1, marginRight: 8 }]}>
+              {"What's one thing you're wondering about this place?"}
+            </Text>
+            <SpeakButton
+              text={"What's one thing you're wondering about this place?"}
+              isSpeaking={isSpeaking}
+              onPress={speak}
+              size="sm"
+              color="#7C3AED"
+            />
+          </View>
           {/* Topic chips */}
           <View style={s.chips}>
             {topicChips.map((chip) => {

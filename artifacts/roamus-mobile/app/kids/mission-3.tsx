@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
+import { useSpeech } from "@/lib/useSpeech";
+import { SpeakButton } from "@/components/SpeakButton";
 
 const K = {
   purple: "#7C3AED",
@@ -37,6 +39,7 @@ const MOCK_PHOTO = {
 export default function Mission3() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+  const { speak, isSpeaking } = useSpeech();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const instruction =
@@ -104,7 +107,10 @@ export default function Mission3() {
         {/* ── White card ── */}
         <View style={s.card}>
           <Text style={s.typeLabel}>{"\uD83D\uDCF8 PHOTO · +5 XP"}</Text>
-          <Text style={s.question}>{instruction}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={[s.question, { flex: 1, marginRight: 8 }]}>{instruction}</Text>
+            <SpeakButton text={instruction} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#7C3AED" />
+          </View>
 
           {photoUri ? (
             <View style={s.photoPreview}>

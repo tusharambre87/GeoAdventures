@@ -16,6 +16,8 @@ import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { useSpeechToText } from "@/lib/useSpeechToText";
 import { F } from "@/lib/tokens";
+import { useSpeech } from "@/lib/useSpeech";
+import { SpeakButton } from "@/components/SpeakButton";
 
 const K = {
   purple: "#7C3AED",
@@ -37,6 +39,7 @@ const MOCK_OBS = {
 export default function Mission2() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+  const { speak, isSpeaking } = useSpeech();
   const [obs, setObs] = useState("");
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -132,7 +135,10 @@ export default function Mission2() {
         {/* ── White card ── */}
         <View style={s.card}>
           <Text style={s.typeLabel}>{"\uD83D\uDC41 OBSERVATION · +5 XP"}</Text>
-          <Text style={s.question}>{instruction}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={[s.question, { flex: 1, marginRight: 8 }]}>{instruction}</Text>
+            <SpeakButton text={instruction ?? ""} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#7C3AED" />
+          </View>
           <TextInput
             style={[s.textarea, focused && s.textareaFocused]}
             placeholder="Describe what you notice…"

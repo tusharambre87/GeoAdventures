@@ -43,6 +43,8 @@ import StopPickerSheet from '@/components/StopPickerSheet';
 import { useAuth } from '@/lib/authContext';
 import { isFreePlan } from '@/lib/subscription';
 import UpgradeSheet from '@/components/UpgradeSheet';
+import { useSpeech } from '@/lib/useSpeech';
+import { SpeakButton } from '@/components/SpeakButton';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 

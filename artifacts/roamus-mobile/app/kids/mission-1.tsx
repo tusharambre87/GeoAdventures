@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { kidsAPI } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
+import { useSpeech } from "@/lib/useSpeech";
+import { SpeakButton } from "@/components/SpeakButton";
 
 const K = {
   purple: "#7C3AED",
@@ -48,6 +50,7 @@ const LETTERS = ["A", "B", "C", "D"];
 export default function Mission1() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
+  const { speak, isSpeaking } = useSpeech();
   const [selected, setSelected] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -186,7 +189,10 @@ export default function Mission1() {
         {/* ── White card ── */}
         <View style={s.card}>
           <Text style={s.typeLabel}>{"\uD83E\uDDE0 KNOWLEDGE · +5 XP"}</Text>
-          <Text style={s.question}>{quiz.question}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={[s.question, { flex: 1, marginRight: 8 }]}>{quiz.question}</Text>
+            <SpeakButton text={quiz.question} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#7C3AED" />
+          </View>
           <View style={s.opts}>
             {quiz.options.map((opt, i) => (
               <Pressable

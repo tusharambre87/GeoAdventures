@@ -232,7 +232,7 @@ export default function StoryPlayer() {
 
   // Auto-play for very young children (age ≤ 5): speak the transcript on load
   useEffect(() => {
-    if (minChildAge > 5 || !transcript || storyIdx !== 0) return;
+    if (minChildAge > 4 || !transcript || storyIdx !== 0) return;
     const timer = setTimeout(() => {
       Speech.speak(stripEmojis(transcript), { language: 'en', rate: 0.85 });
     }, 600);

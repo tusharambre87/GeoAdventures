@@ -55,6 +55,8 @@ import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
 import UpgradeSheet from "@/components/UpgradeSheet";
 import { isFreePlan } from "@/lib/subscription";
+import { useSpeech } from "@/lib/useSpeech";
+import { SpeakButton } from "@/components/SpeakButton";
 const MO_STOP_BG: Record<string, string> = {
   park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2',
   landmark: '#E1BEE7', nature: '#DCEDC8', culture: '#FFF3E0',
