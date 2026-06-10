@@ -602,12 +602,14 @@ export default function AtStopScreen() {
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);
       let di = 0;
-      if (tripData.currentDayIndex != null) {
-        di = tripData.currentDayIndex;
-      } else if (tripData.startDate) {
+      if (tripData.startDate) {
         const diff = Math.floor((Date.now() - new Date(tripData.startDate).getTime()) / 86400000);
-        const total = tripData.tripDays ?? 1;
-        di = Math.max(0, Math.min(diff, total - 1));
+        // Cap against the highest dayIndex actually present in the stops — don't trust
+        // tripDays/plannerTripDays/currentDayIndex which may be stale or null.
+        const maxDayIdx = (tripData.stops ?? []).reduce(
+          (m: number, s: { dayIndex?: number | null }) => Math.max(m, s.dayIndex ?? 0), 0
+        );
+        di = Math.max(0, Math.min(diff, maxDayIdx));
       }
       setDayIndex(di);
       const ts = (tripData.stops ?? []).filter(s => (s.dayIndex ?? 0) === di)
