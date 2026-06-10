@@ -263,10 +263,18 @@ function parseEnrichment(raw: Stop['enrichment']): StopEnrichment {
 
 function isStopVisited(s: Stop): boolean { return !!(s.isVisited || s.visited); }
 
+/** Parse a date string as LOCAL midnight (strips time/timezone so UTC offset never shifts the date). */
+function parseLocalDate(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const ymd = s.split('T')[0].split('-').map(Number);
+  if (ymd.length !== 3 || ymd.some(isNaN)) return new Date(s);
+  return new Date(ymd[0], ymd[1] - 1, ymd[2]);
+}
+
 function formatDayDate(trip: TripData, di: number): string {
   if (!trip.startDate) return '';
   try {
-    const d = new Date(trip.startDate); d.setDate(d.getDate() + di);
+    const d = parseLocalDate(trip.startDate)!; d.setDate(d.getDate() + di);
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return ''; }
 }
@@ -504,12 +512,12 @@ export default function AtStopScreen() {
   const { user, isLoading: authLoading } = useAuth();
   const isUserFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const tripNotStarted = !!trip?.startDate && (() => {
-    const s = new Date(trip!.startDate!); s.setHours(0, 0, 0, 0);
+    const s = parseLocalDate(trip!.startDate!)!; s.setHours(0, 0, 0, 0);
     const t = new Date(); t.setHours(0, 0, 0, 0);
     return s > t;
   })();
   const tripStartLabel = trip?.startDate
-    ? new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    ? parseLocalDate(trip.startDate)!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : '';
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   useEffect(() => {
@@ -594,8 +602,8 @@ export default function AtStopScreen() {
       const active = data.trips?.find(t => {
         if (t.status === 'active' || t.status === 'in_progress') return true;
         if (!t.startDate || !t.endDate) return false;
-        const s = new Date(t.startDate); s.setHours(0, 0, 0, 0);
-        const e = new Date(t.endDate);   e.setHours(23, 59, 59, 999);
+        const s = parseLocalDate(t.startDate)!; s.setHours(0, 0, 0, 0);
+        const e = parseLocalDate(t.endDate)!;   e.setHours(23, 59, 59, 999);
         return todayMs >= s.getTime() && todayMs <= e.getTime();
       }) ?? data.trips?.[0];
       if (!active) { setMode('noTrip'); return; }
@@ -603,7 +611,7 @@ export default function AtStopScreen() {
       setTrip(tripData);
       let di = 0;
       if (tripData.startDate) {
-        const diff = Math.floor((Date.now() - new Date(tripData.startDate).getTime()) / 86400000);
+        const diff = Math.floor((Date.now() - parseLocalDate(tripData.startDate)!.getTime()) / 86400000);
         // Cap against the highest dayIndex actually present in the stops — don't trust
         // tripDays/plannerTripDays/currentDayIndex which may be stale or null.
         const maxDayIdx = (tripData.stops ?? []).reduce(

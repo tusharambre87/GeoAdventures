@@ -460,6 +460,14 @@ function haversineDistMi(lat1: number, lon1: number, lat2: number, lon2: number)
 }
 
 
+/** Parse date string as LOCAL midnight — strips UTC offset so June 10 00:00Z stays June 10 on any device timezone. */
+function parseLocalDate(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const ymd = s.split('T')[0].split('-').map(Number);
+  if (ymd.length !== 3 || ymd.some(isNaN)) return new Date(s);
+  return new Date(ymd[0], ymd[1] - 1, ymd[2]);
+}
+
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const { user, isLoading: authLoading } = useAuth();
@@ -490,7 +498,7 @@ export default function TodayScreen() {
   // Always auto-advance to today's day — no user override
   const todayDayIndex = useMemo(() => {
     if (!trip?.startDate) return 0;
-    const start = new Date(trip.startDate);
+    const start = parseLocalDate(trip.startDate)!;
     const today = new Date();
     start.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
@@ -730,8 +738,8 @@ export default function TodayScreen() {
         const active = data.trips?.find(t => {
           if (t.status === 'active' || t.status === 'in_progress') return true;
           if (!t.startDate || !t.endDate) return false;
-          const s = new Date(t.startDate); s.setHours(0,0,0,0);
-          const e = new Date(t.endDate);   e.setHours(23,59,59,999);
+          const s = parseLocalDate(t.startDate)!; s.setHours(0,0,0,0);
+          const e = parseLocalDate(t.endDate)!;   e.setHours(23,59,59,999);
           return todayMs >= s.getTime() && todayMs <= e.getTime();
         }) ?? data.trips?.[0];
         if (!active) {
