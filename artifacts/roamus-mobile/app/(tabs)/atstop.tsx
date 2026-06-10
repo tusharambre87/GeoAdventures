@@ -451,6 +451,7 @@ function SheetModal({ visible, onClose, children }: {
 
 export default function AtStopScreen() {
   const insets = useSafeAreaInsets();
+  const { speak, isSpeaking } = useSpeech();
   const params = useLocalSearchParams<{ stopId?: string; mode?: string }>();
   const devMode = __DEV__ ? (params.mode as AtStopMode | undefined) : undefined;
 
@@ -569,7 +570,9 @@ export default function AtStopScreen() {
   // ── Load on focus ──
   useFocusEffect(
     useCallback(() => {
-      if (keepDetailOnFocus.current) { keepDetailOnFocus.current = false; return; }
+      // Only skip reload when returning from a sub-screen (no new stopId from today.tsx)
+      if (keepDetailOnFocus.current && !params.stopId) { keepDetailOnFocus.current = false; return; }
+      keepDetailOnFocus.current = false;
       if (__DEV__ && devMode && devMode !== 'loading') {
         const ts = MOCK_TRIP.stops.filter(s => (s.dayIndex ?? 0) === 0);
         setTrip(MOCK_TRIP); setDayStops(ts);
@@ -972,7 +975,10 @@ export default function AtStopScreen() {
         {/* ── Why This Stop card ───────────────────────────────────────────── */}
         {!!doThisFirst && (
           <View style={dt.card}>
-            <Text style={dt.cardLabelOrange}>DO THIS FIRST</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={dt.cardLabelOrange}>DO THIS FIRST</Text>
+              <SpeakButton text={doThisFirst} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#8A8FA8" />
+            </View>
             <Text style={dt.cardText}>{doThisFirst}</Text>
           </View>
         )}

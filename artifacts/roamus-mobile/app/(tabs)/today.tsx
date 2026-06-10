@@ -465,6 +465,7 @@ export default function TodayScreen() {
   const { user, isLoading: authLoading } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const { speak, isSpeaking } = useSpeech();
   useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
   const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
 
@@ -2072,7 +2073,10 @@ export default function TodayScreen() {
                 <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Did you know</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase' }}>Did you know</Text>
+                  <SpeakButton text={didYouKnow} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#8A8FA8" />
+                </View>
                 <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{didYouKnow}</Text>
               </View>
             </View>
