@@ -1385,6 +1385,7 @@ export default function TodayScreen() {
           stopId={currentStop?.id ?? ''}
           stopName={currentStop?.name ?? ''}
           tripId={trip?.id ?? ''}
+          dayIndex={resolvedDayIndex}
           todayStopNames={dayStops.map(s => s.name ?? '')}
           onSwitchSuccess={() => { void loadTrip(); }}
         />
@@ -1929,6 +1930,7 @@ export default function TodayScreen() {
           stopId={currentStop?.id ?? ''}
           stopName={currentStop?.name ?? ''}
           tripId={trip?.id ?? ''}
+          dayIndex={resolvedDayIndex}
           todayStopNames={dayStops.map(s => s.name ?? '')}
           onSwitchSuccess={() => { void loadTrip(); }}
         />
@@ -2224,6 +2226,7 @@ export default function TodayScreen() {
           stopId={stop.id}
           stopName={stop.name ?? ''}
           tripId={trip?.id ?? ''}
+          dayIndex={resolvedDayIndex}
           todayStopNames={dayStops.map(s => s.name ?? '')}
           onSwitchSuccess={() => { void loadTrip(); setIndoorSheetVisible(false); }}
         />
@@ -2476,6 +2479,7 @@ export default function TodayScreen() {
           stopId={stop.id}
           stopName={stop.name ?? ''}
           tripId={trip?.id ?? ''}
+          dayIndex={resolvedDayIndex}
           todayStopNames={dayStops.map(s => s.name ?? '')}
           onSwitchSuccess={() => { void loadTrip(); setIndoorSheetVisible(false); }}
         />
