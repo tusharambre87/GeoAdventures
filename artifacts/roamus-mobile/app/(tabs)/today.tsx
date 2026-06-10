@@ -2042,7 +2042,7 @@ export default function TodayScreen() {
               style={StyleSheet.absoluteFill}
             />
             {/* HEADING THERE badge — top left */}
-            <View style={er.headingBadge}>
+            <View style={[er.headingBadge, { top: insets.top + 12 }]}>
               <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
               <Text style={er.headingText}>HEADING THERE</Text>
             </View>
@@ -2242,8 +2242,8 @@ export default function TodayScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // STATE: AT_STOP_FROZEN — dimmed EN_ROUTE hero + green banner only
-  // ─────────────────────────────────────────────────────────────────────────────
+  // STATE: AT_STOP_FROZEN — full EN_ROUTE content + green ‘you’re here’ banner
+  // ─────────────────────────────────────────────────────────────────────────────────
   if (todayState === 'at_stop_frozen') {
     const stop = currentStop;
     if (!stop) {
@@ -2251,67 +2251,81 @@ export default function TodayScreen() {
         <View style={[misc.center, { paddingTop: insets.top }]}>
           <Text style={misc.errorText}>No current stop.</Text>
           <Pressable style={misc.stubBtn} onPress={() => setTodayState('morning')}>
-            <Text style={misc.stubBtnText}>← Back</Text>
+            <Text style={misc.stubBtnText}>{'\u2190'} Back</Text>
           </Pressable>
         </View>
       );
     }
-    const meta      = parseMetadata(stop.metadata);
+    const meta       = parseMetadata(stop.metadata);
+    const doFirst    = stop.enrichment?.whyNow ?? meta.doThisFirst;
+    const parking    = stop.enrichment?.parkingNotes ?? null;
+    const restrooms  = meta.restroomConfidence ?? null;
     const travelMins = stop.travelMinsFromPrevious ?? meta.travelMinutes;
     const stopLabel  = stop.stopType
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
+    const afterStops = dayStops.slice(currentStopIndex + 1);
+    const didYouKnow = typeof stop.enrichment?.whyNow === 'string' ? stop.enrichment.whyNow : null;
+    const heroImageUrl = trip?.firstPhotoUrl
+      ?? CITY_IMGS[city]
+      ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
+
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Dimmed EN_ROUTE hero — exact same structure at opacity 0.55 */}
-          <View style={{ opacity: 0.55 }}>
-            <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
-              <LinearGradient
-                colors={['#1D4A42', '#163830', '#0E2820']}
-                start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Text style={er.heroBgEmoji}>{STOP_TYPE_EMOJI[stop.stopType ?? ''] ?? '\uD83D\uDCCD'}</Text>
-              <View style={er.headingBadge}>
-                <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
-                <Text style={er.headingText}>HEADING THERE</Text>
+          {/* Hero — same as EN_ROUTE, not dimmed */}
+          <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
+            <Image
+              source={{ uri: heroImageUrl || (meta.imageUrl as string) ||
+                CITY_IMGS[(stop as { cityGroup?: string | null }).cityGroup ?? ''] ||
+                CITY_IMGS[city] ||
+                'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80' }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(10,28,22,0.30)', 'rgba(10,28,22,0.62)', 'rgba(10,28,22,0.90)']}
+              start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[er.headingBadge, { top: insets.top + 12 }]}>
+              <Animated.View style={[er.headingDot, { opacity: pulseAnim }]} />
+              <Text style={er.headingText}>HEADING THERE</Text>
+            </View>
+            <View style={er.stopInfoBlock}>
+              <Text style={er.stopNum}>Stop {currentStopIndex + 1} of {dayStops.length}</Text>
+              <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
+              <Text style={er.stopSub}>{stopLabel}</Text>
+            </View>
+            <View style={er.etaRow}>
+              <View style={er.etaPill}>
+                <Text style={er.etaIcon}>{'\uD83D\uDE97'}</Text>
+                <View>
+                  <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
+                  <Text style={er.etaLbl}>ETA</Text>
+                </View>
               </View>
-              <View style={er.stopInfoBlock}>
-                <Text style={er.stopNum}>Stop {currentStopIndex + 1} of {dayStops.length}</Text>
-                <Text style={er.stopName} numberOfLines={2}>{stop.name}</Text>
-                <Text style={er.stopSub}>{stopLabel}</Text>
-              </View>
-              <View style={er.etaRow}>
+              {userDistMi !== null ? (
                 <View style={er.etaPill}>
-                  <Text style={er.etaIcon}>{'\uD83D\uDE97'}</Text>
+                  <Text style={er.etaIcon}>{'\uD83D\uDCCD'}</Text>
                   <View>
-                    <Text style={er.etaVal}>{travelMins ? `~${travelMins} min` : '~12 min'}</Text>
-                    <Text style={er.etaLbl}>ETA</Text>
+                    <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
+                    <Text style={er.etaLbl}>Away</Text>
                   </View>
                 </View>
-                {userDistMi !== null ? (
-              <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'📍'}</Text>
-                <View>
-                  <Text style={er.etaVal}>{`~${userDistMi} mi`}</Text>
-                  <Text style={er.etaLbl}>Away</Text>
+              ) : travelMins ? (
+                <View style={er.etaPill}>
+                  <Text style={er.etaIcon}>{'\uD83D\uDCCD'}</Text>
+                  <View>
+                    <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
+                    <Text style={er.etaLbl}>Away</Text>
+                  </View>
                 </View>
-              </View>
-            ) : travelMins ? (
-              <View style={er.etaPill}>
-                <Text style={er.etaIcon}>{'📍'}</Text>
-                <View>
-                  <Text style={er.etaVal}>{`~${travelMins} min`}</Text>
-                  <Text style={er.etaLbl}>Away</Text>
-                </View>
-              </View>
-            ) : null}
-              </View>
+              ) : null}
             </View>
           </View>
 
-          {/* Green arrival banner — no action buttons in AT_STOP_FROZEN */}
+          {/* Green banner — tap to return to At Stop tab */}
           <TouchableOpacity
             style={asf.greenBanner}
             activeOpacity={0.85}
@@ -2319,12 +2333,161 @@ export default function TodayScreen() {
           >
             <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
             <View style={{ flex: 1 }}>
-              <Text style={asf.greenBannerTitle}>You’re at {stop.name}</Text>
+              <Text style={asf.greenBannerTitle}>You're at {stop.name}</Text>
               <Text style={asf.greenBannerSub}>Tap to go back to your stop</Text>
             </View>
-            <Text style={asf.greenBannerArrow}>›</Text>
+            <Text style={asf.greenBannerArrow}>{'\u203A'}</Text>
+          </TouchableOpacity>
+
+          {/* Rain alert */}
+          {!!rainAlert && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}
+              activeOpacity={0.85}
+              onPress={() => setIndoorSheetVisible(true)}
+            >
+              <Text style={{ fontSize: 20 }}>{'\uD83C\uDF27'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain likely in the next 3 hours ({rainAlert.chance}%)</Text>
+                <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Outdoor stop may be affected</Text>
+                <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>{'See indoor alternatives \u2192'}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Did you know */}
+          {!!didYouKnow && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+              <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase' }}>Did you know</Text>
+                  <SpeakButton text={didYouKnow} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#8A8FA8" />
+                </View>
+                <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{didYouKnow}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Kids strip */}
+          <TouchableOpacity
+            style={er.kidsStrip} activeOpacity={0.85}
+            onPress={() => router.push({
+              pathname: '/kids' as never,
+              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' },
+            })}
+          >
+            <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>
+            <View style={{ flex: 1 }}>
+              <Text style={er.kidsTitle}>Let kids explore</Text>
+              <Text style={er.kidsSub}>Missions for the ride over</Text>
+            </View>
+            <Text style={er.kidsArrow}>{'\u203A'}</Text>
+          </TouchableOpacity>
+
+          {!!doFirst && (
+            <View style={er.infoCard}>
+              <Text style={er.infoCardLabel}>DO THIS FIRST</Text>
+              <Text style={er.infoCardText}>{doFirst}</Text>
+            </View>
+          )}
+
+          {!!(parking || restrooms) && (
+            <View style={er.twoCol}>
+              <View style={er.halfCard}>
+                <Text style={er.halfLabel}>PARKING</Text>
+                <Text style={er.halfVal}>{parking ?? '\u2014'}</Text>
+              </View>
+              <View style={er.halfCard}>
+                <Text style={er.halfLabel}>RESTROOMS</Text>
+                <Text style={er.halfVal}>{restrooms ?? '\u2014'}</Text>
+              </View>
+            </View>
+          )}
+
+          {afterStops.length > 0 && (
+            <View style={er.afterSection}>
+              <Text style={er.afterLabel}>AFTER THIS</Text>
+              {afterStops.map((s, idx) => {
+                const sMeta  = parseMetadata(s.metadata);
+                const imgUrl = (sMeta.imageUrl as string | undefined)
+                  ?? CITY_IMGS[(s as { cityGroup?: string | null }).cityGroup ?? '']
+                  ?? CITY_IMGS[city]
+                  ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
+                const stopNum = currentStopIndex + 2 + idx;
+                return (
+                  <View key={s.id} style={er.afterRow}>
+                    <View style={er.afterThumb}>
+                      <Image source={{ uri: imgUrl }} style={er.afterThumbImg} />
+                      <View style={er.afterThumbBadge}>
+                        <Text style={er.afterThumbBadgeText}>{stopNum}</Text>
+                      </View>
+                    </View>
+                    <Text style={er.afterName} numberOfLines={1}>{s.name}</Text>
+                    {hasTicketSignal(s.metadata) && (
+                      <View style={er.afterTicket}><Text style={er.afterTicketText}>{'\uD83C\uDFAB'}</Text></View>
+                    )}
+                    <Text style={er.afterDur}>{getStopDuration(s)} min</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Directions + Go to stop */}
+          <View style={er.dualBtnRow}>
+            <TouchableOpacity
+              style={er.dirBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const addr = (stop as { address?: string }).address ?? stop.name;
+                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+              }}
+            >
+              <Text style={er.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={er.hereBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
+            >
+              <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
+            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? \u203A'}</Text>
           </TouchableOpacity>
         </ScrollView>
+        <IndoorAlternativesSheet
+          visible={indoorSheetVisible}
+          onClose={() => setIndoorSheetVisible(false)}
+          stopId={stop.id}
+          stopName={stop.name ?? ''}
+          tripId={trip?.id ?? ''}
+          todayStopNames={dayStops.map(s => s.name ?? '')}
+          onSwitchSuccess={() => { void loadTrip(); setIndoorSheetVisible(false); }}
+        />
+        <UpgradeSheet
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          context="run_day"
+        />
+        <RescueSheet
+          visible={showRescue}
+          onClose={handleRescueClose}
+          context="en_route"
+          stops={dayStops}
+          currentStopIndex={currentStopIndex}
+          tripId={trip?.id}
+          dayIndex={resolvedDayIndex}
+          onDropStop={handleRescueDrop}
+          onWrapDay={handleRescueWrapDay}
+          onStopsChanged={loadTrip}
+        />
         {menuOverlay}
       </View>
     );

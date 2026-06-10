@@ -602,9 +602,11 @@ export default function AtStopScreen() {
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);
       let di = 0;
-      if (tripData.startDate) {
+      if (tripData.currentDayIndex != null) {
+        di = tripData.currentDayIndex;
+      } else if (tripData.startDate) {
         const diff = Math.floor((Date.now() - new Date(tripData.startDate).getTime()) / 86400000);
-        const total = tripData.plannerTripDays ?? tripData.tripDays ?? 1;
+        const total = tripData.tripDays ?? 1;
         di = Math.max(0, Math.min(diff, total - 1));
       }
       setDayIndex(di);

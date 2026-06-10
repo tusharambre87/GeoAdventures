@@ -1304,7 +1304,7 @@ function DayDetail({
             const s    = getDayStatus(d);
             const isOn = d === selectedDay;
             const isPast = s === 'past';
-            const isToday = s === 'today';
+            const isToday = d === activeTripDay;
             return (
               <Pressable
                 key={d}
