@@ -311,6 +311,7 @@ export default function TripPlanStopSheet({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  paddingHorizontal: 13,
                   paddingVertical: 12,
                   borderBottomWidth: 0.5,
                   borderBottomColor: '#F0EDE8',
