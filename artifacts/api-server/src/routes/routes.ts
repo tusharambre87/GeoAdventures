@@ -6217,11 +6217,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rawStyle = rawAdventureStyle ?? style;
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
 
-      const stops = await generateCityStops(city, null, country, 6, adventureStyle);
-
       const SESSION_TIMES = ['9:30 AM', '12:30 PM', '3:00 PM', '10:00 AM', '1:30 PM', '4:00 PM'];
       const CHUNK = 3;
       const days: { label: string; stops: { name: string; description: string; stopType: string; time: string }[] }[] = [];
+
+      // ── Pool shortcut: skip GPT entirely if a warm pool exists for this city ──
+      const poolCityName = city.split(',')[0].trim();
+      const cachedPool = await storage.getCityStopPool(poolCityName, country);
+      let stops: { name: string; description: string; stopType: string }[];
+      if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
+        req.log
+          ? req.log.info({ city: poolCityName }, '[Preview] pool hit — skipping GPT')
+          : console.log(`[Preview] pool hit for ${poolCityName} — skipping GPT`);
+        const plannerInput: PlannerInput = {
+          destination: city,
+          tripDays: 2,
+          childrenAges: [],
+          pace: 'moderate',
+          interests: [],
+        };
+        const poolStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
+        stops = poolStops.slice(0, 6).map((s: any) => ({
+          name: s.name,
+          description: s.description ?? '',
+          stopType: s.type ?? s.stopType ?? 'landmark',
+        }));
+      } else {
+        stops = await generateCityStops(city, null, country, 6, adventureStyle);
+      }
+
       for (let d = 0; d < Math.ceil(stops.length / CHUNK); d++) {
         const chunk = stops.slice(d * CHUNK, (d + 1) * CHUNK);
         days.push({
