@@ -1332,20 +1332,36 @@ export default function TodayScreen() {
           </TouchableOpacity>
 
           {/* Hotel / start point card */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
-            activeOpacity={0.85}
-            onPress={() => setShowHotelSheet(true)}
-          >
-            <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
-              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with directions and timing</Text>
-            </View>
-            <Text style={{ color: C.orange, fontSize: 20, fontWeight: '700' }}>+</Text>
-          </TouchableOpacity>
+          {(() => {
+            const savedHotel = localSavedHotel
+              ?? (trip?.stayLocations ?? []).find(s => !s.cityName || s.cityName === (trip?.destination ?? (trip as any)?.city))?.address
+              ?? null;
+            return (
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
+                activeOpacity={0.85}
+                onPress={() => setShowHotelSheet(true)}
+              >
+                <View style={{ width: 40, height: 40, backgroundColor: '#EBF5F1', borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Text style={{ fontSize: 20 }}>{'\uD83C\uDFE8'}</Text>
+                </View>
+                {savedHotel ? (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }} numberOfLines={1}>{savedHotel}</Text>
+                    <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Starting point · tap to edit</Text>
+                  </View>
+                ) : (
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Add hotel / start point</Text>
+                    <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Helps with directions and timing</Text>
+                  </View>
+                )}
+                <Text style={{ color: savedHotel ? C.muted : C.orange, fontSize: savedHotel ? 13 : 20, fontWeight: '700' }}>
+                  {savedHotel ? 'Edit' : '+'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
 
           <View style={ptt.card}>
             <Text style={ptt.cardLabel}>TOMORROW'S STOPS</Text>
@@ -1404,7 +1420,14 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
-          onSaved={() => setShowHotelSheet(false)}
+          onSaved={(name, addr) => {
+            const resolvedAddr = addr || name;
+            setShowHotelSheet(false);
+            setLocalSavedHotel(resolvedAddr);
+            if (trip?.id) {
+              AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+            }
+          }}
         />
       </View>
     );

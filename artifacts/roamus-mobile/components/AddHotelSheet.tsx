@@ -315,7 +315,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
-  kav:   { justifyContent: 'flex-end' },
+  kav:   { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: C.card,
     borderTopLeftRadius: 24,
