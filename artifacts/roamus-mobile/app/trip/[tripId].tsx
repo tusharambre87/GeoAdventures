@@ -2335,6 +2335,8 @@ function TripOptionsSheet({
   onCommunityShare,
   onInvite,
   queryClient,
+  isFree,
+  onShowUpgrade,
 }: {
   trip: TripData;
   tripId: string;
@@ -2347,6 +2349,8 @@ function TripOptionsSheet({
   onCommunityShare?: () => void;
   onInvite?: () => void;
   queryClient: ReturnType<typeof useQueryClient>;
+  isFree: boolean;
+  onShowUpgrade: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [isOfflineCached, setIsOfflineCached] = useState(false);
@@ -2414,6 +2418,7 @@ function TripOptionsSheet({
   }
 
   async function downloadOffline() {
+    if (isFree) { onClose(); setTimeout(() => onShowUpgrade(), 300); return; }
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) { showToast('Sign in to download for offline'); return; }
@@ -2500,7 +2505,7 @@ function TripOptionsSheet({
     {
       label: 'UTILITIES',
       items: [
-        { icon: <IconCopy />, bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => showToast('Coming soon') },
+        { icon: <IconCopy />, bg: C.bg, name: 'Copy this trip', sub: 'Create a copy to plan a similar adventure', onPress: () => Alert.alert('Coming soon', "We're working on this.") },
         { icon: <IconArchive />, bg: C.bg, name: 'Archive trip', sub: 'Move this trip to your past adventures', onPress: archiveTrip },
         { icon: <IconTrash color='#DC2626' />, bg: '#FFF0F0', name: 'Delete trip', sub: 'Permanently remove this trip and all data', destructive: true, onPress: deleteTrip },
       ],
@@ -3880,6 +3885,8 @@ export default function TripPlanScreen() {
             onCommunityShare={() => { closeSheet(); setShowCommunityShare(true); }}
             onInvite={() => setShowInviteSheet(true)}
             queryClient={queryClient}
+            isFree={isFree}
+            onShowUpgrade={() => { setUpgradeContext('run_day'); setUpgradeVisible(true); }}
           />
         </SheetModal>
       )}
