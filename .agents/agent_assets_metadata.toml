@@ -17,3 +17,9 @@ id = "qZMaOBXQ7TwtxFl1onNSv"
 uri = "file://roamus-ts-source.zip"
 type = "unspecified"
 title = "RoamUs TypeScript Source Files"
+
+[[outputs]]
+id = "MAb4EsipT_JQD4wIEn5om"
+uri = "file://reports/chicago-qa-audit-2026-06-11.md"
+type = "text"
+title = "Chicago QA Audit — 2026-06-11"
