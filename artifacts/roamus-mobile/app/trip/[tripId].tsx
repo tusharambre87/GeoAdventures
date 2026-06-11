@@ -2903,21 +2903,27 @@ function AddStopSheet({
     setLoading(true);
     setOptions([]);
     try {
-      const body: Record<string, unknown> = { destination: city };
-      const todayNames = getStopsForDay(selectedDay).map(s => s.name).filter(Boolean);
-      if (todayNames.length > 0) body.todayStopNames = todayNames;
       if (cat === 'food') {
-        body.stopTypes = ['restaurant', 'food'];
-      } else if (cat === 'kids') {
-        body.context = 'fun';
+        const result = await apiFetch<{ options?: StopOption[] }>(
+          '/api/travel/rescue/food-options',
+          { method: 'POST', body: JSON.stringify({ tripId, cityRaw: city }) }
+        );
+        setOptions(result.options ?? []);
       } else {
-        body.stopTypes = ['landmark', 'museum', 'park', 'zoo', 'aquarium', 'attraction', 'theme_park', 'nature', 'adventure', 'other'];
+        const body: Record<string, unknown> = { destination: city };
+        const todayNames = getStopsForDay(selectedDay).map(s => s.name).filter(Boolean);
+        if (todayNames.length > 0) body.todayStopNames = todayNames;
+        if (cat === 'kids') {
+          body.context = 'fun';
+        } else {
+          body.stopTypes = ['landmark', 'museum', 'park', 'zoo', 'aquarium', 'attraction', 'theme_park', 'nature', 'adventure', 'other'];
+        }
+        const result = await apiFetch<{ nearby?: StopOption[]; popular?: StopOption[] }>(
+          '/api/travel/stops/smart-suggestions',
+          { method: 'POST', body: JSON.stringify(body) }
+        );
+        setOptions([...(result.nearby ?? []), ...(result.popular ?? [])]);
       }
-      const result = await apiFetch<{ nearby?: StopOption[]; popular?: StopOption[] }>(
-        '/api/travel/stops/smart-suggestions',
-        { method: 'POST', body: JSON.stringify(body) }
-      );
-      setOptions([...(result.nearby ?? []), ...(result.popular ?? [])]);
     } catch {
       setOptions([]);
     } finally {
