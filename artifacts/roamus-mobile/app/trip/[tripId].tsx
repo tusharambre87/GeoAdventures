@@ -1017,6 +1017,7 @@ function TripOverview({
   onRunToday,
   onOpenOptions,
   onOpenChecklist,
+  checklistCloseCount,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1029,6 +1030,7 @@ function TripOverview({
   onRunToday: () => void;
   onOpenOptions: () => void;
   onOpenChecklist: () => void;
+  checklistCloseCount: number;
 }) {
   const insets = useSafeAreaInsets();
   const totalTickets  = stops.filter(s => needsTicket(s)).length;
@@ -1040,7 +1042,7 @@ function TripOverview({
 
   useEffect(() => {
     loadChecklistCounts(trip.id, stops).then(setClCounts);
-  }, [trip.id]);
+  }, [trip.id, checklistCloseCount]);
 
   const firstStop = [...stops]
     .sort((a, b) => {
@@ -3600,6 +3602,7 @@ export default function TripPlanScreen() {
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   const [localStops, setLocalStops]     = useState<Stop[]>([]);
   const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistCloseCount, setChecklistCloseCount] = useState(0);
   const { user, isLoading: authLoading } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
@@ -3607,6 +3610,7 @@ export default function TripPlanScreen() {
 
   function handleChecklistClose() {
     setChecklistOpen(false);
+    setChecklistCloseCount(n => n + 1);
   }
 
   // ── Data ──
@@ -3868,6 +3872,7 @@ export default function TripPlanScreen() {
           onRunToday={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
           onOpenChecklist={() => setChecklistOpen(true)}
+          checklistCloseCount={checklistCloseCount}
         />
       ) : (
         <DayDetail
