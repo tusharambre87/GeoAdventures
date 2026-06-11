@@ -1038,10 +1038,10 @@ function isMealStop(t?: string | null): boolean {
             <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#E8692A' }}>Add →</Text>
           </TouchableOpacity>
 
-          {stopMoments.length > 0 && (
-            <View style={{ marginTop: 12, marginHorizontal: 16 }}>
+          {stopMoments.length > 0 ? (
+            <View style={{ marginTop: 16, marginHorizontal: 16 }}>
               <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8',
-                letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>Photos</Text>
+                letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>Your moments</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
                 {stopMoments.map(m => (
@@ -1051,6 +1051,18 @@ function isMealStop(t?: string | null): boolean {
                 ))}
               </ScrollView>
             </View>
+          ) : (
+            <TouchableOpacity
+              style={{ margin: 16, marginBottom: 0, backgroundColor: '#F8F6F3', borderRadius: 14,
+                borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)', padding: 16,
+                flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              activeOpacity={0.7}
+              onPress={handleAddPhoto}>
+              <Text style={{ fontSize: 22 }}>📷</Text>
+              <Text style={{ fontFamily: F.regular, fontSize: 13, color: '#8A8FA8', flex: 1 }}>
+                Add a photo or note from this stop
+              </Text>
+            </TouchableOpacity>
           )}
 
           {mealDone && (
@@ -1082,20 +1094,27 @@ function isMealStop(t?: string | null): boolean {
         </ScrollView>
 
         {/* CTA */}
-        <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 12, paddingTop: 8 }}>
           {mealDone ? (
-            <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+            <TouchableOpacity
+              style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
+                alignItems: 'center', justifyContent: 'center' }}
+              activeOpacity={0.88}
               onPress={() => { AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
-              <Text style={{...dt.ctaPrimaryText}}>✓ Done—back to today</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>✓ Done — back to today</Text>
             </TouchableOpacity>
           ) : tripNotStarted ? (
-            <View style={[dt.ctaPrimary, { opacity: 0.4 }]}>
-              <Text style={{...dt.ctaPrimaryText}}>🚫 Starts {tripStartLabel}</Text>
+            <View style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
+              alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>
+              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>Starts {tripStartLabel}</Text>
             </View>
           ) : (
-            <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+            <TouchableOpacity
+              style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
+                alignItems: 'center', justifyContent: 'center' }}
+              activeOpacity={0.88}
               onPress={handleMarkMealDone}>
-              <Text style={{...dt.ctaPrimaryText}}>🍽 We're done eating</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>✓ We're done eating — move on</Text>
             </TouchableOpacity>
           )}
         </View>
