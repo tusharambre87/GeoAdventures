@@ -138,10 +138,12 @@ export default function ChecklistSheet({
   const [customDraft,  setCustomDraft]  = useState('');
 
   useEffect(() => {
-    if (addingCustom) {
-      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 320);
-      return () => clearTimeout(t);
-    }
+    if (!addingCustom) return;
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => { clearTimeout(t); sub.remove(); };
   }, [addingCustom]);
   const [loaded,       setLoaded]       = useState(false);
   const checkAnimRefs = useRef<Map<string, Animated.Value>>(new Map());

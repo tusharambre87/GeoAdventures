@@ -84,7 +84,7 @@ export function rateLimit(options: RateLimitOptions) {
 
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 20,
   message: "Too many login attempts. Please try again in 15 minutes.",
 });
 

@@ -8009,6 +8009,8 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
 
   // Smart suggestions for the Add Stop discover screen
   app.post('/api/travel/stops/smart-suggestions', async (req: any, res) => {
+    let libNearby: any[] = [];
+    let libPopular: any[] = [];
     try {
       const { destination, stopTypes, context, todayStopNames, routeContext, userLat, userLng } = req.body;
       if (!destination) return res.status(400).json({ message: "destination is required" });
@@ -8023,6 +8025,61 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       const isDessertContext = isFoodContext && stopTypes.some((t: string) => ["dessert", "ice_cream", "bakery", "cafe"].includes(t)) && !stopTypes.includes("restaurant");
       const isBreakContext = context === "break" || (stopTypes && stopTypes.includes("park_bench"));
       const isFunContext = context === "fun";
+
+      // ── Library-first: query stop_library for kids / landmark contexts ──────────
+      // Ensures results even if the AI call fails; returns early when library is rich.
+      if (isFunContext || (!isFoodContext && !isDessertContext && !isBreakContext)) {
+        const cityFirst = (destination as string).split(',')[0].trim();
+        const cityWord  = cityFirst.split(' ')[0];
+        const libTypes = isFunContext
+          ? ['playground', 'park', 'zoo', 'aquarium', 'adventure', 'kid_attraction', 'nature', 'anchor', 'support', 'other', 'attraction']
+          : ['landmark', 'museum', 'park', 'zoo', 'aquarium', 'nature', 'anchor', 'historic', 'attraction', 'art', 'support', 'other'];
+
+        type LibRow = { id: string; name: string; stopType: string | null; address: string | null; description: string | null; city: string | null };
+        const libSelect = {
+          id:          stopLibrary.id,
+          name:        stopLibrary.name,
+          stopType:    stopLibrary.stopType,
+          address:     stopLibrary.address,
+          description: stopLibrary.description,
+          city:        stopLibrary.city,
+        };
+
+        let libRows: LibRow[] = await db.select(libSelect).from(stopLibrary)
+          .where(and(
+            ilike(stopLibrary.city, `%${cityFirst}%`),
+            inArray(stopLibrary.stopType, libTypes),
+          ))
+          .orderBy(desc(stopLibrary.serveCount))
+          .limit(20);
+
+        // Broaden to first word of city if not enough results (e.g. "Washington" for "Washington DC")
+        if (libRows.length < 4 && cityWord.length >= 3 && cityWord !== cityFirst) {
+          libRows = await db.select(libSelect).from(stopLibrary)
+            .where(and(
+              ilike(stopLibrary.city, `%${cityWord}%`),
+              inArray(stopLibrary.stopType, libTypes),
+            ))
+            .orderBy(desc(stopLibrary.serveCount))
+            .limit(20);
+        }
+
+        if (libRows.length > 0) {
+          const shuffled = [...libRows].sort(() => Math.random() - 0.5);
+          const toStop = (r: LibRow) => ({
+            name:        r.name,
+            stopType:    r.stopType ?? 'other',
+            duration:    '45–60 min',
+            description: r.description ?? '',
+            address:     r.address ?? '',
+          });
+          libNearby  = shuffled.slice(0, 4).map(toStop);
+          libPopular = shuffled.slice(4, 8).map(toStop);
+          if (libRows.length >= 4) {
+            return res.json({ nearby: libNearby, popular: libPopular });
+          }
+        }
+      }
 
       const stopContext = todayStopNames && todayStopNames.length > 0
         ? `\nThe family's stops today are: ${todayStopNames.join(", ")}. For each suggestion, add a "closestStopName" field (string) with the name of the stop from this list that is geographically closest to the suggestion. Use your knowledge of city geography.`
@@ -8122,10 +8179,11 @@ Example structure:
           { role: "system", content: systemPrompt },
           { role: "user", content: `City: "${destination}"` },
         ],
-        response_format: { type: "json_object" },
         max_completion_tokens: 1200,
       });
-      const data = JSON.parse(response.choices[0].message.content || "{}");
+      const rawText = response.choices[0].message.content || "{}";
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      const data = JSON.parse(jsonMatch ? jsonMatch[0] : "{}");
 
       if (isFoodContext || isDessertContext) {
         res.json({ nearby: data.nearby || [], popular: data.popular || [] });
@@ -8183,6 +8241,9 @@ Example structure:
         });
       }
     } catch (error) {
+      if (libNearby.length > 0 || libPopular.length > 0) {
+        return res.json({ nearby: libNearby, popular: libPopular });
+      }
       console.error("[Travel] Smart suggestions error:", error);
       res.status(500).json({ message: "Failed to load suggestions" });
     }
