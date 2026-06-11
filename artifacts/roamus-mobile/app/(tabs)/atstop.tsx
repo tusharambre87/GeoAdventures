@@ -1124,7 +1124,7 @@ function isMealStop(t?: string | null): boolean {
 
   return (
     <View style={sc.screen}>
-      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
+      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}>
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -1434,32 +1434,34 @@ function isMealStop(t?: string | null): boolean {
           )}
         </View>
 
-
-        {/* ── CTA: We visited + Didn’t make it ────────────────────────────────────────────────────────────────── */}
-        <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
-          {tripNotStarted ? (
-            <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.7}
-              onPress={() => router.back()}>
-              <Text style={dt.ctaSecondaryText}>Got it</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-                onPress={() => openSheet('feedback')}>
-                <Text style={dt.ctaPrimaryText}>{'✓'} We visited — mark complete</Text>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.7}
-                onPress={() => openSheet('didnt')}
-                style={{ alignItems: 'center', paddingVertical: 10 }}>
-                <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
-                  Didn’t make it → didn’t visit
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
       </ScrollView>
+
+
+      {/* ── CTA: We visited + Didn’t make it (fixed footer) ────────── */}
+      <View style={{ backgroundColor: C.bg, paddingHorizontal: 20, paddingTop: 10,
+        paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
+        {tripNotStarted ? (
+          <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.7}
+            onPress={() => router.back()}>
+            <Text style={dt.ctaSecondaryText}>Got it</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+              onPress={() => openSheet('feedback')}>
+              <Text style={dt.ctaPrimaryText}>{'✓'} We visited — mark complete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7}
+              onPress={() => openSheet('didnt')}
+              style={{ alignItems: 'center', paddingVertical: 10 }}>
+              <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>
+                Didn’t make it → didn’t visit
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
 
       {/* ── SHEET: Change Stop ───────────────────────────────────────────── */}
       <SheetModal visible={activeSheet === 'change'} onClose={() => setActiveSheet('none')}>
