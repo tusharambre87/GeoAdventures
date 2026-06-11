@@ -14,7 +14,8 @@
     "backfill:explore": "tsx src/planner/backfillExploreContent.ts",
     "backfill:images": "tsx src/backfillImages.ts",
     "backfill:psi-cities": "tsx src/planner/runPsiCities.ts",
-    "backfill:dc-stops": "tsx src/planner/addDcStops.ts"
+    "backfill:dc-stops": "tsx src/planner/addDcStops.ts",
+    "backfill:psi-scores": "tsx src/planner/backfillPsiScores.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
