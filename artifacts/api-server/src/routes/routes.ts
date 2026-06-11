@@ -8405,7 +8405,18 @@ Return valid JSON only. No markdown.`;
 
       const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food', 'market'];
 
-      const rows = await db.select({
+      // Exclude names the caller already has (e.g. stops on the current day)
+      const excludeNames: string[] = Array.isArray(req.body.excludeNames) ? req.body.excludeNames : [];
+
+      // Also exclude stop names already in the trip so suggestions don't repeat
+      const tripStops = await db.query.travelStops.findMany({ where: eq(travelStops.tripId, tripId) });
+      const usedNames = new Set([
+        ...tripStops.map((s: any) => (s.name ?? '').toLowerCase()),
+        ...excludeNames.map((n: string) => n.toLowerCase()),
+      ]);
+
+      // Fetch a wider pool sorted by popularity, then shuffle so each day gets variety
+      const pool = await db.select({
         id: stopLibrary.id,
         name: stopLibrary.name,
         stopType: stopLibrary.stopType,
@@ -8418,7 +8429,15 @@ Return valid JSON only. No markdown.`;
           inArray(stopLibrary.stopType, foodTypes),
         ))
         .orderBy(desc(stopLibrary.serveCount))
-        .limit(5);
+        .limit(30);
+
+      // Filter out already-used stops, then shuffle for day-to-day variety
+      const candidates = pool.filter((r: any) => !usedNames.has((r.name ?? '').toLowerCase()));
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      const rows = candidates.slice(0, 5);
 
       return res.json({ options: rows, city: cityRaw });
     } catch (error) {

@@ -3338,7 +3338,7 @@ function AddStopSheet({
       {positionOpt != null && (
         <PositionPickerSheet
           opt={positionOpt}
-          dayStops={getStopsForDay(selectedDay)}
+          dayStops={getStopsForDay(selectedDay).filter(s => !isMealStop(s.stopType))}
           category={category}
           adding={adding}
           insets={insets}
