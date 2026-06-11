@@ -2128,6 +2128,7 @@ export async function generateCityStopPool(
       afterLunchFitScore: plannerStopIntelligence.afterLunchFitScore,
       lateDayFitScore: plannerStopIntelligence.lateDayFitScore,
       anchorStopFitScore: plannerStopIntelligence.anchorStopFitScore,
+      familyAnchorType: plannerStopIntelligence.familyAnchorType,
       strollerEaseScore: plannerStopIntelligence.strollerEaseScore,
       age2to4Fit: plannerStopIntelligence.age2to4Fit,
       age5to7Fit: plannerStopIntelligence.age5to7Fit,
@@ -2136,8 +2137,12 @@ export async function generateCityStopPool(
     })
     .from(stopLibrary)
     .leftJoin(
+      plannerPlaces,
+      sql`LOWER(TRIM(planner_places.name)) = LOWER(TRIM(${stopLibrary.name})) AND LOWER(TRIM(planner_places.city)) = LOWER(TRIM(${stopLibrary.city}))`,
+    )
+    .leftJoin(
       plannerStopIntelligence,
-      sql`planner_stop_intelligence.stop_library_id = ${stopLibrary.id}`,
+      sql`planner_stop_intelligence.place_id = planner_places.id`,
     )
     .where(
       and(
@@ -2219,7 +2224,7 @@ export async function generateCityStopPool(
       effortLevel,
       indoorOutdoor,
       sensoryLoad,
-      familyAnchorType: anchorTypeByStopType(stopType),
+      familyAnchorType: (row.familyAnchorType as CachedStopCandidate["familyAnchorType"] | null) ?? anchorTypeByStopType(stopType),
       minAge,
       whyNow,
       morningFitScore: row.morningFitScore ?? undefined,
@@ -2553,9 +2558,10 @@ export function selectStopsFromPool(
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)
   let zonesInCurrentDay = new Set<string>();
-  // Track stop-types selected today (max 1 per type; hard cap for museums)
+  // Track stop-types selected today (max 1 per type; hard cap for museums and anchors)
   let typesInCurrentDay = new Set<string>();
   let museumsInCurrentDay = 0;
+  let anchorsInCurrentDay = 0;
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
@@ -2577,6 +2583,7 @@ export function selectStopsFromPool(
       zonesInCurrentDay = new Set<string>();
       typesInCurrentDay = new Set<string>();
       museumsInCurrentDay = 0;
+      anchorsInCurrentDay = 0;
       dailyDurationMins = 0;
       dailyTravelKm = 0;
       dailyTravelMins = 0;
@@ -2605,6 +2612,8 @@ export function selectStopsFromPool(
       if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
       // Museum hard cap: exactly 1 museum per day regardless of pool size
       if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
+      // Anchor hard cap: exactly 1 anchor per day — prevents two big-ticket stops competing
+      if (c.familyAnchorType === 'anchor' && anchorsInCurrentDay >= 1) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Toddler nap rule: meal stops cannot be the first activity of the day (must come after nap at ~1pm)
       const isMealType = ["restaurant", "meal", "food", "cafe"].includes(c.type ?? "");
@@ -2699,6 +2708,7 @@ export function selectStopsFromPool(
     }
     typesInCurrentDay.add(bestCandidate.type);
     if (bestCandidate.type === 'museum') museumsInCurrentDay++;
+    if (bestCandidate.familyAnchorType === 'anchor') anchorsInCurrentDay++;
     dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
   }
 
