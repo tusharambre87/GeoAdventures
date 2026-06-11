@@ -2518,6 +2518,10 @@ export function selectStopsFromPool(
       }
     }
 
+    // PSI quality nudge: breaks alphabetical ties in favour of higher-quality stops
+    // (0–2 pts, normalised from anchorStopFitScore 0–100; never overrides categorical weights)
+    if (stop.anchorStopFitScore != null) score += Math.round((stop.anchorStopFitScore / 100) * 2);
+
     return score;
   }
 
