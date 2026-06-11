@@ -795,41 +795,168 @@ function StopCard({
   );
 }
 
-// ─── MealCard ─────────────────────────────────────────────────────────────────
+// ─── MealSuggestionCard ───────────────────────────────────────────────────────
 
-function MealCard({ stop, onAdd }: { stop: Stop; onAdd?: () => Promise<void> }) {
+type MealRec = {
+  id: string;
+  name: string;
+  type: string;
+  cuisine?: string;
+  priceLevel?: number;
+  travelTimeMinutes?: number;
+  kidFriendlyNote?: string;
+  chips?: string[];
+  description?: string;
+  goNowMapsUrl?: string;
+};
+
+function MealSuggestionCard({
+  tripId,
+  destination,
+  beforeStopName,
+  dayIndex,
+  cityGroup,
+  confirmedStop,
+  onAdded,
+}: {
+  tripId: string;
+  destination: string;
+  beforeStopName: string;
+  dayIndex: number;
+  cityGroup: string | null;
+  confirmedStop?: Stop;
+  onAdded: () => void;
+}) {
+  const [rec, setRec] = useState<MealRec | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [excluded, setExcluded] = useState<string[]>([]);
   const [addState, setAddState] = useState<'idle' | 'adding' | 'added'>('idle');
-  const emoji = stop.stopType?.toLowerCase().includes('cafe') ? '\u2615' : '\uD83C\uDF55';
+  const isConfirmed = addState === 'added' || !!confirmedStop;
+
+  useEffect(() => {
+    if (confirmedStop) return;
+    loadRec([]);
+  }, []);
+
+  async function loadRec(excludedNames: string[]) {
+    setLoading(true);
+    setRec(null);
+    try {
+      const data = await apiFetch<{ suggestions: MealRec[] }>('/api/travel/need-recs', {
+        method: 'POST',
+        body: JSON.stringify({
+          destination,
+          nearStopName: beforeStopName,
+          beforeStopName,
+          needType: 'food',
+          excludedNames,
+        }),
+      });
+      setRec(data.suggestions?.[0] ?? null);
+    } catch {
+      setRec(null);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleAdd() {
-    if (addState !== 'idle') return;
+    if (!rec || addState !== 'idle') return;
     setAddState('adding');
     try {
-      await onAdd?.();
+      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: rec.name,
+          stopType: rec.type || 'restaurant',
+          durationMinutes: 60,
+          dayIndex,
+          cityGroup,
+        }),
+      });
       setAddState('added');
+      onAdded();
     } catch {
       setAddState('idle');
     }
   }
 
-  return (
-    <View style={meal.card}>
-      <View style={meal.left}>
-        <Text style={meal.emoji}>{emoji}</Text>
-        <View>
-          <Text style={meal.name} numberOfLines={1}>{stop.name}</Text>
-          <Text style={meal.sub}>{stop.stopType?.replace(/_/g, ' ')} · {getStopDuration(stop)} min</Text>
+  function handleOtherOptions() {
+    if (!rec) return;
+    const newExcluded = [...excluded, rec.name];
+    setExcluded(newExcluded);
+    loadRec(newExcluded);
+  }
+
+  if (isConfirmed) {
+    const name = confirmedStop?.name ?? rec?.name ?? 'Meal stop';
+    const sub = confirmedStop?.stopType ?? rec?.type ?? 'restaurant';
+    return (
+      <View style={meal.confirmedCard}>
+        <Text style={meal.confirmedEmoji}>{'\uD83C\uDF7D'}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={meal.confirmedName} numberOfLines={1}>{name}</Text>
+          <Text style={meal.confirmedSub}>{sub.replace(/_/g, ' ')} {'\u00B7'} In your plan</Text>
+        </View>
+        <View style={meal.confirmedBadge}>
+          <Text style={meal.confirmedBadgeText}>{'\u2713'} Added</Text>
         </View>
       </View>
-      <Pressable
-        style={[meal.addBtn, addState === 'added' && { backgroundColor: C.green }]}
-        onPress={handleAdd}
-        disabled={addState !== 'idle'}
-      >
-        <Text style={meal.addBtnText}>
-          {addState === 'added' ? '\u2713' : addState === 'adding' ? '\u22EF' : 'Add'}
-        </Text>
-      </Pressable>
+    );
+  }
+
+  return (
+    <View style={meal.suggCard}>
+      <View style={meal.suggHeader}>
+        <Text style={meal.suggLabel}>LUNCH SUGGESTION</Text>
+        {loading && <ActivityIndicator size="small" color={C.orange} />}
+      </View>
+      {loading ? (
+        <View style={meal.suggLoadWrap}>
+          <Text style={meal.suggLoadText}>Finding family-friendly spots...</Text>
+        </View>
+      ) : rec ? (
+        <>
+          <View style={meal.suggBody}>
+            <Text style={meal.suggName} numberOfLines={2}>{rec.name}</Text>
+            <Text style={meal.suggSub}>
+              {rec.cuisine ?? rec.type?.replace(/_/g, ' ')}
+              {rec.travelTimeMinutes ? ' \u00B7 ' + rec.travelTimeMinutes + ' min away' : ''}
+              {rec.priceLevel ? ' \u00B7 ' + '$'.repeat(rec.priceLevel) : ''}
+            </Text>
+            {!!rec.kidFriendlyNote && (
+              <Text style={meal.suggNote}>{rec.kidFriendlyNote}</Text>
+            )}
+            {Array.isArray(rec.chips) && rec.chips.length > 0 && (
+              <View style={meal.chipRow}>
+                {rec.chips.slice(0, 3).map((chip, i) => (
+                  <View key={i} style={meal.chip}>
+                    <Text style={meal.chipText}>{chip}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+          <View style={meal.suggActions}>
+            <Pressable
+              style={[meal.addPlanBtn, addState !== 'idle' && { opacity: 0.55 }]}
+              onPress={handleAdd}
+              disabled={addState !== 'idle'}
+            >
+              <Text style={meal.addPlanBtnText}>
+                {addState === 'adding' ? 'Adding...' : '+ Add to plan'}
+              </Text>
+            </Pressable>
+            <Pressable style={meal.otherBtn} onPress={handleOtherOptions} disabled={loading}>
+              <Text style={meal.otherBtnText}>Other options {'\u2192'}</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <Pressable style={meal.suggLoadWrap} onPress={() => loadRec(excluded)}>
+          <Text style={meal.suggLoadText}>Tap to find lunch options nearby</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -1475,35 +1602,16 @@ function DayDetail({
                 drag={isEditable ? drag : undefined}
                 isActive={isActive}
               />
-              {i === 0 && (
-                <>
-                  {mealStops.map(ms => (
-                    <MealCard
-                      key={ms.id}
-                      stop={ms}
-                      onAdd={async () => {
-                        if (localContentStops.length > 0) {
-                          const newOrder: Array<{ stopId: string; displayOrder: number; dayIndex: number }> = [];
-                          localContentStops.forEach((cs, idx) => {
-                            newOrder.push({ stopId: cs.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 });
-                            if (idx === 0) newOrder.push({ stopId: ms.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 });
-                          });
-                          mealStops.filter(m => m.id !== ms.id).forEach(m => newOrder.push({ stopId: m.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 }));
-                          await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ stopOrders: newOrder }),
-                          });
-                          queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                        }
-                      }}
-                    />
-                  ))}
-                  {isEditable && (
-                    <Pressable style={meal.foodOptionsBtn} onPress={() => onAddStop('food')}>
-                      <Text style={meal.foodOptionsBtnText}>{'\uD83C\uDF54'} Food options</Text>
-                    </Pressable>
-                  )}
-                </>
+              {i === 0 && isEditable && (
+                <MealSuggestionCard
+                  tripId={tripId}
+                  destination={trip?.destination ?? trip?.city ?? ''}
+                  beforeStopName={localContentStops[0]?.name ?? ''}
+                  dayIndex={selectedDay - 1}
+                  cityGroup={localContentStops[0]?.cityGroup ?? null}
+                  confirmedStop={mealStops[0]}
+                  onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+                />
               )}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
@@ -1513,30 +1621,17 @@ function DayDetail({
         }}
         ListFooterComponent={
           <>
-        {/* Meal cards for days with no content stops */}
-        {localContentStops.length === 0 && (
-          <>
-            {mealStops.map(stop => (
-              <MealCard
-                key={stop.id}
-                stop={stop}
-                onAdd={async () => {
-                  await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                      stopOrders: [{ stopId: stop.id, displayOrder: 0, dayIndex: selectedDay - 1 }],
-                    }),
-                  });
-                  queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                }}
-              />
-            ))}
-            {isEditable && mealStops.length > 0 && (
-              <Pressable style={meal.foodOptionsBtn} onPress={() => onAddStop('food')}>
-                <Text style={meal.foodOptionsBtnText}>{'\uD83C\uDF54'} Food options</Text>
-              </Pressable>
-            )}
-          </>
+        {/* Meal suggestion for days with no content stops */}
+        {localContentStops.length === 0 && isEditable && (
+          <MealSuggestionCard
+            tripId={tripId}
+            destination={trip?.destination ?? trip?.city ?? ''}
+            beforeStopName={''}
+            dayIndex={selectedDay - 1}
+            cityGroup={null}
+            confirmedStop={mealStops[0]}
+            onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+          />
         )}
 
         {/* Empty day */}
@@ -4334,15 +4429,29 @@ const sc = StyleSheet.create({
 });
 
 const meal = StyleSheet.create({
-  card: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#A8D8BF', backgroundColor: C.greenLt, borderRadius: 14, padding: 10, paddingHorizontal: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
-  emoji: { fontSize: 22 },
-  name: { fontFamily: F.bold, fontSize: 13, color: '#1B5E39' },
-  sub:  { fontFamily: F.regular, fontSize: 10, color: C.sage, marginTop: 1 },
-  addBtn: { backgroundColor: '#1B7D46', borderRadius: 9, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
-  addBtnText: { fontFamily: F.bold, fontSize: 11, color: '#fff' },
-  foodOptionsBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, backgroundColor: C.greenLt, borderWidth: 1, borderColor: '#A8D8BF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
-  foodOptionsBtnText: { fontFamily: F.semibold, fontSize: 12, color: '#1B5E39' },
+  confirmedCard: { borderWidth: 1, borderColor: '#A8D8BF', backgroundColor: C.greenLt, borderRadius: 14, padding: 12, paddingHorizontal: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  confirmedEmoji: { fontSize: 20 },
+  confirmedName: { fontFamily: F.bold, fontSize: 13, color: '#1B5E39' },
+  confirmedSub: { fontFamily: F.regular, fontSize: 11, color: C.sage, marginTop: 2 },
+  confirmedBadge: { backgroundColor: '#1B7D46', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 0 },
+  confirmedBadgeText: { fontFamily: F.bold, fontSize: 11, color: '#fff' },
+  suggCard: { borderWidth: 1, borderColor: 'rgba(232,105,42,0.22)', backgroundColor: C.orangeLt, borderRadius: 16, padding: 14, marginBottom: 10 },
+  suggHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  suggLabel: { fontFamily: F.bold, fontSize: 9, color: C.orange, letterSpacing: 0.8, textTransform: 'uppercase' },
+  suggLoadWrap: { paddingVertical: 12, alignItems: 'center' },
+  suggLoadText: { fontFamily: F.regular, fontSize: 13, color: C.muted },
+  suggBody: { marginBottom: 12 },
+  suggName: { fontFamily: F.bold, fontSize: 15, color: C.deep, marginBottom: 3 },
+  suggSub: { fontFamily: F.regular, fontSize: 12, color: C.muted, marginBottom: 4 },
+  suggNote: { fontFamily: F.regular, fontSize: 12, color: '#5C7A6E', lineHeight: 17, marginBottom: 6 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  chip: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,105,42,0.18)' },
+  chipText: { fontFamily: F.regular, fontSize: 11, color: C.orange },
+  suggActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  addPlanBtn: { flex: 1, backgroundColor: C.orange, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  addPlanBtnText: { fontFamily: F.bold, fontSize: 13, color: '#fff' },
+  otherBtn: { paddingVertical: 10, paddingHorizontal: 4 },
+  otherBtnText: { fontFamily: F.semibold, fontSize: 12, color: C.orange },
 });
 
 const dd = StyleSheet.create({

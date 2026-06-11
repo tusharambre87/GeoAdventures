@@ -907,6 +907,13 @@ export default function AtStopScreen() {
   }
 
   // ── Screen C — Stop Detail ────────────────────────────────────────────────
+
+function isMealStop(t?: string | null): boolean {
+  if (!t) return false;
+  const s = t.toLowerCase();
+  return ['restaurant','food','cafe','market','meal','street_food','diner','eatery'].some(k => s.includes(k));
+}
+
   if (!currentStop) return null;
   const meta        = parseMetadata(currentStop.metadata);
   const enrichment  = parseEnrichment(currentStop.enrichment);
@@ -933,6 +940,112 @@ export default function AtStopScreen() {
   // Lat/lon for directions
   const stopLat      = currentStop.latitude ? parseFloat(currentStop.latitude) : null;
   const stopLon      = currentStop.longitude ? parseFloat(currentStop.longitude) : null;
+
+  if (isMealStop(currentStop.stopType)) {
+    return (
+      <View style={sc.screen}>
+        <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}>
+
+          {/* Hero */}
+          <View style={[dt.hero, { height: 170 }]}>
+            {heroImageUrl ? (
+              <Image source={{ uri: heroImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: bgColor }]} />
+            )}
+            <LinearGradient
+              colors={['transparent', 'rgba(26,31,46,0.08)', 'rgba(26,31,46,0.75)']}
+              locations={[0, 0.45, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={dt.heroBottom}>
+              <Text style={dt.heroType}>{stopTypeLabel} {`·`} Stop {stopOrderNum} of {totalStops}</Text>
+              <Text style={dt.heroName} numberOfLines={2}>{currentStop.name}</Text>
+            </View>
+          </View>
+
+          {/* Action row: kid-friendly + directions */}
+          <View style={{ flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 0 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+              backgroundColor: '#E8F7EF', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+              borderWidth: 1, borderColor: '#A8D8BF' }}>
+              <Text style={{ fontSize: 14 }}>👍</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#16A34A' }}>Kid-friendly</Text>
+            </View>
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+                backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
+                borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)' }}
+              activeOpacity={0.8}
+              onPress={() => {
+                const url = stopLat && stopLon
+                  ? (Platform.OS === 'ios'
+                      ? `maps://app?daddr=${stopLat},${stopLon}&dirflg=d`
+                      : `google.navigation:q=${stopLat},${stopLon}`)
+                  : address ? `https://www.google.com/maps/search/${encodeURIComponent(address)}` : null;
+                if (url) Linking.openURL(url);
+              }}>
+              <Text style={{ fontSize: 14 }}>↗️</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' }}>Directions</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Capture moment */}
+          <TouchableOpacity
+            style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
+              borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16,
+              flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            activeOpacity={0.8}
+            onPress={handleAddPhoto}>
+            <View style={{ width: 44, height: 44, backgroundColor: '#FDF0E9', borderRadius: 12,
+              alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 20 }}>📸</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#1A1F2E' }}>Capture the moment</Text>
+              <Text style={{ fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>Photo, note, or kid quote</Text>
+            </View>
+            <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#E8692A' }}>Add →</Text>
+          </TouchableOpacity>
+
+          {/* Micro feedback */}
+          <View style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
+            borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16 }}>
+            <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.7,
+              textTransform: 'uppercase', marginBottom: 10 }}>How was the meal?</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {([
+                { val: 'big_hit' as FeedbackRating, label: 'Loved it', icon: '🌟' },
+                { val: 'good' as FeedbackRating, label: 'Good', icon: '👍' },
+                { val: 'skip_next_time' as FeedbackRating, label: 'Skip next time', icon: '🙄' },
+              ]).map(opt => (
+                <TouchableOpacity
+                  key={opt.val}
+                  style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: feedbackRating === opt.val ? '#E8692A' : 'rgba(26,31,46,0.09)',
+                    backgroundColor: feedbackRating === opt.val ? '#FDF0E9' : 'transparent' }}
+                  onPress={() => setFeedbackRating(opt.val)}>
+                  <Text style={{ fontSize: 18, marginBottom: 3 }}>{opt.icon}</Text>
+                  <Text style={{ fontFamily: F.semibold, fontSize: 10, textAlign: 'center',
+                    color: feedbackRating === opt.val ? '#E8692A' : '#8A8FA8' }}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* CTA */}
+        <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
+          <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+            onPress={() => openSheet('feedback')}>
+            <Text style={{...dt.ctaPrimaryText}}>🍽 We're done eating</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={sc.screen}>

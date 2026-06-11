@@ -5368,7 +5368,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (template.latitude && template.longitude) {
             await storage.updateTrip(tripId, { latitude: template.latitude, longitude: template.longitude });
           }
+          // Meal stops are NEVER auto-inserted — they must be user-confirmed
+          const AUTO_MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery', 'dining', 'bakery', 'dessert', 'lunch']);
           for (const stop of templateStops) {
+            if (AUTO_MEAL_TYPES.has((stop.stopType || '').toLowerCase()) || (stop as any).familyAnchorType === 'meal') continue;
             await storage.createStop({
               tripId,
               name: stop.name,
@@ -5566,6 +5569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             for (let i = 0; i < distributedPoolStops.length; i++) {
               const stop = distributedPoolStops[i];
+              if (AUTO_MEAL_TYPES.has((stop.type || '').toLowerCase())) continue;
               await storage.createStop({
                 tripId,
                 name: stop.name,
@@ -5692,6 +5696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             effectivePerDay,
           );
           for (const stop of distributedAIStops) {
+            if (AUTO_MEAL_TYPES.has((stop.stopType || '').toLowerCase())) continue;
             await storage.createStop({
               tripId,
               name: stop.name,
@@ -13654,7 +13659,7 @@ Respond with JSON only, no markdown:
   // Need-recs: quick suggestions for "need a break" or "need food" near current stop
   app.post('/api/travel/need-recs', isAuthenticated, async (req: any, res) => {
     try {
-      const { destination, nearStopName, needType, locationMode, lat, lng } = req.body;
+      const { destination, nearStopName, needType, locationMode, lat, lng, excludedNames, beforeStopName } = req.body;
       if (!destination) return res.status(400).json({ message: "destination required" });
       const openai = getOpenAI();
       const isBreak = needType === 'break';
@@ -13706,29 +13711,24 @@ Return JSON only with max 3 suggestions:
     }
   ]
 }`
-        : `You are a family travel expert. A family with young children is ${locationContext} and needs a quick ${isBreak ? 'rest/break spot' : 'food stop'}.
+        : isBreak
+        ? `You are a family travel expert. A family with young children is ${locationContext} and needs a quick rest/break spot.
 
 Suggest 3 REAL, nearby options that are:
-${isBreak
-  ? '- Shaded parks, playgrounds, benches, plazas, quiet public spaces\n- Coffee shops or cafes with seating (great for parents to recharge)\n- Must be walk-in friendly, no tickets required\n- Within 5–15 min ideally'
-  : '- Kid-friendly restaurants, cafes, food courts, or casual eateries\n- Quick service preferred\n- Within 5-15 min'}
+- Shaded parks, playgrounds, benches, plazas, quiet public spaces
+- Coffee shops or cafes with seating (great for parents to recharge)
+- Must be walk-in friendly, no tickets required
+- Within 5–15 min ideally
 - Must actually exist near this location
 - IMPORTANT: Be conservative with travel time estimates. Use driving time, not straight-line distance. Round UP, not down. A place 1 mile away is at least 8-12 min drive in a city with traffic and parking. Never say under 5 min unless it's truly next door.
 
-${isBreak ? `Scoring criteria (apply internally, don't show scores):
+Scoring criteria (apply internally, don't show scores):
 - Distance/accessibility: 25%
 - Comfort & shade: 20%
 - Restroom availability: 15%
 - Sensory relief (quiet, calm): 15%
 - Flexibility (no booking, just walk in): 15%
-- Energy release for kids: 10%` : `Scoring criteria (apply internally, don't show scores):
-- Distance/accessibility: 25%
-- Speed of service: 20%
-- Kid-friendliness: 20%
-- Restroom availability: 10%
-- Seating/comfort: 10%
-- Budget-friendliness: 10%
-- Route fit: 5%`}
+- Energy release for kids: 10%
 
 For the Maps URL, construct it as: https://www.google.com/maps/search/?api=1&query=PLACE_NAME+CITY
 
@@ -13738,15 +13738,61 @@ Return JSON only with max 3 suggestions:
     {
       "id": "uuid-like-string-1",
       "name": "Place name",
-      "type": "${isBreak ? 'park|plaza|cafe|bench|shade' : 'restaurant|cafe|food_court|bakery'}",
+      "type": "park|plaza|cafe|bench|shade",
       "travelTimeMinutes": 5,
       "whyThisWorks": "One sentence — specific reason this works for this family right now",
-      "chips": ${isBreak ? '["🌿 Low effort", "🚻 Has restrooms"]' : '["🍔 Kid menu", "⚡ Quick serve"]'},
+      "chips": ["Low effort", "Has restrooms"],
       "goNowMapsUrl": "https://www.google.com/maps/search/?api=1&query=Place+Name+City",
       "canAddToToday": true,
-      "isFree": ${isBreak ? 'true' : 'false'},
+      "isFree": true,
       "description": "One short sentence — what it is and why it works for families",
       "kidNote": "One short sentence for parents"
+    }
+  ]
+}`
+        : `You are a family travel expert. A family with young children is ${locationContext} and needs a meal stop${beforeStopName ? ` before heading to "${beforeStopName}"` : ''}.
+
+STRICT FAMILY FILTER — NEVER suggest:
+- Bars, pubs, taverns, breweries, cocktail lounges, wine bars
+- Nightclubs, cabarets, adult entertainment venues
+- Any place where alcohol is the primary offering
+
+Suggest 3 REAL, nearby family-friendly restaurants or eateries that are:
+- Casual, kid-welcoming (high chairs or booster seats a plus)
+- Quick or counter service preferred; sit-down fine if relaxed
+- Within 5–15 min travel
+- Must actually exist near this location
+${Array.isArray(excludedNames) && excludedNames.length > 0 ? `- Do NOT suggest any of these (already shown): ${excludedNames.join(', ')}` : ''}
+- IMPORTANT: Be conservative with travel time estimates. Use driving time, not straight-line distance. Round UP. Never say under 5 min unless it's truly next door.
+
+Scoring criteria (apply internally, don't show scores):
+- Distance/accessibility: 25%
+- Kid-friendliness & family atmosphere: 20%
+- Speed of service: 20%
+- Restroom availability: 10%
+- Seating/comfort: 10%
+- Budget-friendliness: 10%
+- Route fit: 5%
+
+For the Maps URL, construct it as: https://www.google.com/maps/search/?api=1&query=PLACE_NAME+CITY
+
+Return JSON only with max 3 suggestions:
+{
+  "suggestions": [
+    {
+      "id": "uuid-like-string-1",
+      "name": "Place name",
+      "type": "restaurant|cafe|food_court|bakery|diner",
+      "cuisine": "American|Italian|Mexican|Asian|etc",
+      "priceLevel": 1,
+      "travelTimeMinutes": 8,
+      "kidFriendlyNote": "One short sentence why it works for kids (e.g. Kids menu, crayons, friendly staff)",
+      "whyThisWorks": "One sentence — specific reason this works for this family right now",
+      "chips": ["Kid menu", "Quick serve"],
+      "goNowMapsUrl": "https://www.google.com/maps/search/?api=1&query=Place+Name+City",
+      "canAddToToday": true,
+      "isFree": false,
+      "description": "One short sentence — what it is and why it works for families"
     }
   ]
 }`;
@@ -13754,8 +13800,7 @@ Return JSON only with max 3 suggestions:
       const completion = await openai.chat.completions.create({
         model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
-        max_completion_tokens: 800,
+        max_completion_tokens: 900,
         response_format: { type: "json_object" },
       });
 
