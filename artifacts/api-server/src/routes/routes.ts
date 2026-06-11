@@ -10251,16 +10251,24 @@ Return ONLY valid JSON in this exact format:
       const userId = req.user?.claims?.sub;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-      // Check in-memory cache first
-      if (heroImageCache[stopId]) {
-        return res.json({ url: heroImageCache[stopId] });
-      }
-
       const stop = await storage.getStopById(stopId);
       if (!stop) return res.status(404).json({ message: "Stop not found" });
 
       const trip = await storage.getTripById(stop.tripId);
       if (!trip || trip.userId !== userId) return res.status(403).json({ message: "Access denied" });
+
+      // Check DB hero_image_url first — backfilled images take priority over cache and AI generation
+      if (stop.heroImageUrl?.startsWith('stop-images/')) {
+        const baseUrl = process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : `${req.protocol}://${req.get('host')}`;
+        return res.json({ url: `${baseUrl}/api/travel/stops/${stop.id}/hero-img` });
+      }
+
+      // Check in-memory cache
+      if (heroImageCache[stopId]) {
+        return res.json({ url: heroImageCache[stopId] });
+      }
 
       // Check if already cached in journey pack
       const journeyPack = await storage.getJourneyPackByStopId(stopId);
