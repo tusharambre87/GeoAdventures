@@ -9298,7 +9298,9 @@ Return ONLY valid JSON in this exact format:
 
       // ── Confirmed — perform the insert ──────────────────────────────────────
       const stopTypeMap: Record<string, string> = {
-        food: 'restaurant', break: 'park', kid_attraction: 'landmark',
+        food: 'restaurant', restaurant: 'restaurant', cafe: 'cafe',
+        street_food: 'restaurant', dessert: 'dessert', bakery: 'cafe',
+        break: 'park', kid_attraction: 'landmark',
       };
 
       let insertDayIdx = refDayIdx;
@@ -9339,7 +9341,7 @@ Return ONLY valid JSON in this exact format:
         dayIndex: insertDayIdx,
         address: place.address || null,
         durationMinutes: estDuration,
-        isMealStop: place.type === 'food',
+        isMealStop: ['food', 'restaurant', 'cafe', 'meal', 'street_food', 'dessert', 'bakery'].includes(place.type),
         cityGroup: refStop.cityGroup || null,
       } as any);
 
