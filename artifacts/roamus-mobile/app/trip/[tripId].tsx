@@ -3614,7 +3614,7 @@ export default function TripPlanScreen() {
   }
 
   // ── Data ──
-  const { data: rawTrip, isLoading, isError, refetch } = useQuery({
+  const { data: rawTrip, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ['trip', tripId],
     queryFn: async () => {
       if (!tripId) throw new Error('No tripId');
@@ -3845,10 +3845,11 @@ export default function TripPlanScreen() {
   }
 
   if (isError || !trip) {
+    const errMsg = queryError instanceof Error ? queryError.message : (queryError ? String(queryError) : (!trip && !isLoading ? 'No trip data (tripId=' + tripId + ')' : ''));
     return (
       <View style={root.center}>
         <Text style={root.errorTitle}>Couldn't load trip</Text>
-        <Text style={root.errorSub}>Check your connection and try again.</Text>
+        <Text style={root.errorSub}>{errMsg || 'Check your connection and try again.'}</Text>
         <Pressable style={root.retryBtn} onPress={() => refetch()}>
           <Text style={root.retryText}>Retry</Text>
         </Pressable>
