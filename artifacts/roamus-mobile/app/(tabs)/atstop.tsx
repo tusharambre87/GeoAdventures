@@ -597,18 +597,24 @@ export default function AtStopScreen() {
     setMode('loading'); setLoadErr(null);
     try {
       const data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
-      // Mirror today.tsx trip resolution: status first, then date-range, then fallback
+      // Pick the trip furthest into its run among all whose date range includes today.
+      // No status preference — status can be stale; date arithmetic is the truth.
       const todayMs = new Date().setHours(0, 0, 0, 0);
-      const candidates = data.trips?.filter(t => {
-        if (t.status === 'active' || t.status === 'in_progress') return true;
+      const candidates = (data.trips ?? []).filter(t => {
         if (!t.startDate || !t.endDate) return false;
         const s = parseLocalDate(t.startDate)!; s.setHours(0, 0, 0, 0);
         const e = parseLocalDate(t.endDate)!;   e.setHours(23, 59, 59, 999);
         return todayMs >= s.getTime() && todayMs <= e.getTime();
       });
-      const active = candidates?.sort((a, b) =>
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-      )[0] ?? data.trips?.[0];
+      // Sort by elapsed dayIndex descending (most days in = furthest into run),
+      // then by startDate ascending as tiebreaker.
+      candidates.sort((a, b) => {
+        const dayA = a.startDate ? Math.floor((todayMs - parseLocalDate(a.startDate)!.setHours(0,0,0,0)) / 86400000) : 0;
+        const dayB = b.startDate ? Math.floor((todayMs - parseLocalDate(b.startDate)!.setHours(0,0,0,0)) / 86400000) : 0;
+        if (dayB !== dayA) return dayB - dayA;
+        return new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime();
+      });
+      const active = candidates[0] ?? data.trips?.[0];
       if (!active) { setMode('noTrip'); return; }
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);
