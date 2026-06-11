@@ -60,6 +60,7 @@ interface Props {
   onDropStop?: (stopId: string) => Promise<void> | void;
   onWrapDay?: () => Promise<void> | void;
   onStopsChanged?: () => void;
+  initialOption?: SheetView;
 }
 
 function getFoodLabel(hour: number): string {
@@ -102,6 +103,7 @@ export default function RescueSheet({
   onDropStop,
   onWrapDay,
   onStopsChanged,
+  initialOption,
 }: Props) {
   const insets = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -109,6 +111,11 @@ export default function RescueSheet({
 
   const [view, setView] = useState<SheetView>('picker');
   const [plan, setPlan] = useState<RescuePlan | null>(null);
+
+  useEffect(() => {
+    if (visible && initialOption) setView(initialOption);
+    if (!visible) setView('picker');
+  }, [visible]);
 
   // Swap / fun
   const [swapLoading, setSwapLoading]           = useState(false);

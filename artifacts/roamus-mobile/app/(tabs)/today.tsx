@@ -532,6 +532,7 @@ export default function TodayScreen() {
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [showDirections, setShowDirections]      = useState(false);
   const [showRescue, setShowRescue]              = useState(false);
+  const [rescueInitialOption, setRescueInitialOption] = useState<'weather' | undefined>(undefined);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
   // Persist hotel across navigation — load on mount/trip change
@@ -922,6 +923,7 @@ export default function TodayScreen() {
 
   const handleRescueClose = useCallback(async () => {
     setShowRescue(false);
+    setRescueInitialOption(undefined);
     const tid = resolvedTripId ?? trip?.id;
     if (!tid) return;
     try {
@@ -1943,7 +1945,7 @@ export default function TodayScreen() {
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: 'rgba(59,130,246,0.2)', borderRadius: 13, padding: 12, marginHorizontal: 16, marginBottom: 10 }}
               activeOpacity={0.85}
-              onPress={() => setIndoorSheetVisible(true)}
+              onPress={() => { setRescueInitialOption('weather'); setShowRescue(true); }}
             >
               <Text style={{ fontSize: 20 }}>{'\uD83C\uDF27'}</Text>
               <View style={{ flex: 1 }}>
@@ -2042,6 +2044,7 @@ export default function TodayScreen() {
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
+          initialOption={rescueInitialOption}
         />
       </View>
     );
