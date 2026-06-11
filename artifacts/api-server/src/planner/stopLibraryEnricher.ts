@@ -258,6 +258,14 @@ export function startEnrichmentQueue(country?: string): void {
       }
 
       console.log(`[StopLibraryEnricher] Queue complete — ${totalProcessed} total stops processed`);
+
+      // Auto-seed PSI for all stops that now have storyPack but no intelligence record.
+      // Fire-and-forget — failures are logged internally but never crash the enricher.
+      if (totalProcessed > 0) {
+        import("./psiTrigger.js")
+          .then(({ runPsiBackfill }) => runPsiBackfill().catch(() => {}))
+          .catch(() => {});
+      }
     } catch (err) {
       console.error("[StopLibraryEnricher] Queue error:", err);
     } finally {

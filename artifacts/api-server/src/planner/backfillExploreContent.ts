@@ -27,10 +27,11 @@ async function backfillExploreContent() {
 
   const stops = await db
     .select({
-      id:       stopLibrary.id,
-      name:     stopLibrary.name,
-      stopType: stopLibrary.stopType,
-      city:     stopLibrary.city,
+      id:             stopLibrary.id,
+      name:           stopLibrary.name,
+      normalizedName: stopLibrary.normalizedName,
+      stopType:       stopLibrary.stopType,
+      city:           stopLibrary.city,
     })
     .from(stopLibrary)
     .where(
@@ -53,9 +54,10 @@ async function backfillExploreContent() {
     const stop = stops[i];
 
     try {
-      // Skip if already in explore_cache
+      // Skip if already in explore_cache — use pre-computed normalizedName as join key
+      const lookupName = stop.normalizedName || stop.name;
       const existing = await getExploreCacheByStop(
-        stop.name,
+        lookupName,
         stop.city ?? '',
       );
 
@@ -77,7 +79,7 @@ async function backfillExploreContent() {
       );
 
       await upsertExploreCache(
-        stop.name,
+        lookupName,
         stop.city ?? '',
         stop.stopType ?? '',
         content,

@@ -3,13 +3,14 @@
  *
  * Reads city_stop_pool_cache and city_adventure_templates rows,
  * expands JSON stop blobs, and upserts them into stop_library.
- * Idempotent — safe to run on every startup; duplicate (normalizedKey, name)
- * rows are silently skipped via ON CONFLICT DO NOTHING.
+ * Idempotent — safe to run on every startup; duplicate (normalizedName, normalizedKey)
+ * rows are updated in-place via ON CONFLICT DO UPDATE.
  */
 
 import { db } from "../db";
 import { cityStopPoolCache, cityAdventureTemplates, stopLibrary } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { normalizeStopName, normalizeStopType } from "../storage.js";
 
 function normalizeKey(city: string, country: string): string {
   return `${city.toLowerCase().trim()}:${country.toLowerCase().trim()}`;
@@ -26,19 +27,23 @@ export async function seedStopLibrary(): Promise<void> {
     for (const pool of pools) {
       if (!pool.stopPool || !Array.isArray(pool.stopPool) || pool.stopPool.length === 0) continue;
       const nk = normalizeKey(pool.city, pool.country ?? "");
-      const rows = (pool.stopPool as any[]).map((s: any) => ({
-        city: pool.city,
-        country: pool.country ?? "",
-        normalizedKey: nk,
-        name: String(s.name ?? "").trim(),
-        address: s.address ?? null,
-        latitude: s.latitude != null ? String(s.latitude) : null,
-        longitude: s.longitude != null ? String(s.longitude) : null,
-        stopType: s.stopType ?? s.type ?? "landmark",
-        description: s.description ?? null,
-        stopMissions: s.stopMissions ?? null,
-        source: "seeded" as const,
-      })).filter(r => r.name.length > 0);
+      const rows = (pool.stopPool as any[]).map((s: any) => {
+        const name = String(s.name ?? "").trim();
+        return {
+          city: pool.city,
+          country: pool.country ?? "",
+          normalizedKey: nk,
+          normalizedName: normalizeStopName(name),
+          name,
+          address: s.address ?? null,
+          latitude: s.latitude != null ? String(s.latitude) : null,
+          longitude: s.longitude != null ? String(s.longitude) : null,
+          stopType: normalizeStopType(s.stopType ?? s.type),
+          description: s.description ?? null,
+          stopMissions: s.stopMissions ?? null,
+          source: "seeded" as const,
+        };
+      }).filter(r => r.name.length > 0);
 
       if (rows.length === 0) continue;
 
@@ -46,7 +51,17 @@ export async function seedStopLibrary(): Promise<void> {
         const result = await db
           .insert(stopLibrary)
           .values(rows)
-          .onConflictDoNothing()
+          .onConflictDoUpdate({
+            target: [stopLibrary.normalizedName, stopLibrary.normalizedKey],
+            set: {
+              address: sql`EXCLUDED.address`,
+              latitude: sql`EXCLUDED.latitude`,
+              longitude: sql`EXCLUDED.longitude`,
+              description: sql`EXCLUDED.description`,
+              stopType: sql`EXCLUDED.stop_type`,
+              stopMissions: sql`EXCLUDED.stop_missions`,
+            },
+          })
           .returning({ id: stopLibrary.id });
         totalInserted += result.length;
         totalSkipped += rows.length - result.length;
@@ -77,19 +92,23 @@ export async function seedStopLibrary(): Promise<void> {
 
       if (rawStops.length === 0) continue;
 
-      const rows = rawStops.map((s: any) => ({
-        city,
-        country,
-        normalizedKey: nk,
-        name: String(s.name ?? "").trim(),
-        address: s.address ?? null,
-        latitude: s.latitude != null ? String(s.latitude) : null,
-        longitude: s.longitude != null ? String(s.longitude) : null,
-        stopType: s.stopType ?? s.type ?? "landmark",
-        description: s.description ?? null,
-        stopMissions: s.stopMissions ?? null,
-        source: "canonical" as const,
-      })).filter(r => r.name.length > 0);
+      const rows = rawStops.map((s: any) => {
+        const name = String(s.name ?? "").trim();
+        return {
+          city,
+          country,
+          normalizedKey: nk,
+          normalizedName: normalizeStopName(name),
+          name,
+          address: s.address ?? null,
+          latitude: s.latitude != null ? String(s.latitude) : null,
+          longitude: s.longitude != null ? String(s.longitude) : null,
+          stopType: normalizeStopType(s.stopType ?? s.type),
+          description: s.description ?? null,
+          stopMissions: s.stopMissions ?? null,
+          source: "canonical" as const,
+        };
+      }).filter(r => r.name.length > 0);
 
       if (rows.length === 0) continue;
 
@@ -97,7 +116,17 @@ export async function seedStopLibrary(): Promise<void> {
         const result = await db
           .insert(stopLibrary)
           .values(rows)
-          .onConflictDoNothing()
+          .onConflictDoUpdate({
+            target: [stopLibrary.normalizedName, stopLibrary.normalizedKey],
+            set: {
+              address: sql`EXCLUDED.address`,
+              latitude: sql`EXCLUDED.latitude`,
+              longitude: sql`EXCLUDED.longitude`,
+              description: sql`EXCLUDED.description`,
+              stopType: sql`EXCLUDED.stop_type`,
+              stopMissions: sql`EXCLUDED.stop_missions`,
+            },
+          })
           .returning({ id: stopLibrary.id });
         totalInserted += result.length;
         totalSkipped += rows.length - result.length;

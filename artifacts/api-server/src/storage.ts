@@ -5733,11 +5733,18 @@ export class DatabaseStorage implements IStorage {
 
   async saveStopLibraryEntries(entries: InsertStopLibrary[]): Promise<StopLibrary[]> {
     if (entries.length === 0) return [];
+
+    const normalized = entries.map((e) => ({
+      ...e,
+      normalizedName: normalizeStopName(e.name),
+      stopType: normalizeStopType(e.stopType),
+    }));
+
     const result = await db
       .insert(stopLibrary)
-      .values(entries)
+      .values(normalized)
       .onConflictDoUpdate({
-        target: [stopLibrary.normalizedKey, stopLibrary.name],
+        target: [stopLibrary.normalizedName, stopLibrary.normalizedKey],
         set: {
           address: sql`EXCLUDED.address`,
           latitude: sql`EXCLUDED.latitude`,
@@ -6199,12 +6206,43 @@ export class DatabaseStorage implements IStorage {
 // Used by the backfill script and by the explore-content route to avoid
 // regenerating identical content for the same real-world stop across trips.
 
-function normalizeStopName(name: string): string {
+/** Normalize a stop name to a stable key: lowercase, strip punctuation, collapse spaces. */
+export function normalizeStopName(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const STOP_TYPE_NORMALIZATION_MAP: Record<string, string> = {
+  food: "restaurant",
+  meal: "restaurant",
+  dining: "restaurant",
+  eatery: "restaurant",
+  lunch: "restaurant",
+  "café": "cafe",
+  cultural: "culture",
+  "cultural experience": "culture",
+  historical: "landmark",
+  city: "landmark",
+  "entertainment district": "neighborhood",
+  village: "neighborhood",
+  "wildlife reserve": "nature",
+  volcano: "nature",
+  educational: "museum",
+  "theme park": "activity",
+  spiritual: "temple",
+};
+
+/**
+ * Map a raw stop_type string to a canonical value.
+ * Falls back to the input value if it is already canonical.
+ * Callers must apply this before every stop_library insert.
+ */
+export function normalizeStopType(type: string | null | undefined): string {
+  const t = (type ?? "landmark").toLowerCase().trim();
+  return STOP_TYPE_NORMALIZATION_MAP[t] ?? t;
 }
 
 export async function getExploreCacheByStop(

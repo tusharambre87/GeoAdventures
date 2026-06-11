@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   uniqueIndex,
   integer,
@@ -3732,11 +3733,22 @@ export type GuideSubscriber = typeof guideSubscribers.$inferSelect;
 // All generated stops land here so future trips serve them in <200ms.
 // ============================================================================
 
+// Canonical stop_type values. normalizeStopType() in storage.ts maps variants to these.
+// The check constraint below enforces this at the DB level after normalization at insert.
+export const CANONICAL_STOP_TYPES = [
+  "landmark", "museum", "park", "nature", "beach", "market", "neighborhood",
+  "restaurant", "cafe", "street_food", "street", "zoo", "aquarium", "garden",
+  "temple", "palace", "bridge", "viewpoint", "culture", "activity", "adventure",
+  "mountain", "waterfall", "lake", "shopping", "plaza", "other",
+  "anchor", "support", "filler", "reset", "bakery", "dessert",
+] as const;
+
 export const stopLibrary = pgTable("stop_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   city: varchar("city").notNull(),
   country: varchar("country").notNull().default(""),
   normalizedKey: varchar("normalized_key").notNull(), // "city:country" lowercase
+  normalizedName: varchar("normalized_name").notNull().default(""), // lowercase, stripped punctuation — join key to explore_cache
   name: varchar("name").notNull(),
   address: text("address"),
   latitude: varchar("latitude"),
@@ -3755,7 +3767,13 @@ export const stopLibrary = pgTable("stop_library", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_stop_library_normalized_key").on(table.normalizedKey),
-  uniqueIndex("UQ_stop_library_city_name").on(table.normalizedKey, table.name),
+  // Dedup key: same normalized stop name in same city → update, not duplicate insert
+  uniqueIndex("UQ_stop_library_normalized").on(table.normalizedName, table.normalizedKey),
+  // Enforce canonical stop types (normalizeStopType() must run before every insert)
+  check(
+    "chk_stop_library_stop_type",
+    sql`${table.stopType} IN (${sql.raw(CANONICAL_STOP_TYPES.map(t => `'${t}'`).join(", "))})`,
+  ),
 ]);
 
 export const insertStopLibrarySchema = createInsertSchema(stopLibrary).omit({

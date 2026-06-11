@@ -6,3 +6,4 @@
 - [AuthGate onboarding redirect](authgate-onboarding-redirect.md) — Authenticated users navigating to /onboarding/* are bounced to home unless onboardingInProgress=true; put auth-required standalone screens in me/ or another non-onboarding group.
 - [stop_library dedup safety order](stop-library-dedup-safety.md) — Reassign live trip FK references BEFORE deleting any duplicate stop_library row; never delete first.
 - [JSX whitespace text node](jsx-whitespace-text-node.md) — space before {/* comment */} on same line as </Tag> becomes a real string child; crashes RN Fabric in non-Text parent.
+- [stop_library pipeline](stop-library-pipeline.md) — 4 correctness invariants: normalized_name column, stop_type CHECK, dedup key (UQ_stop_library_normalized), PSI auto-seeding via psiTrigger.ts.
