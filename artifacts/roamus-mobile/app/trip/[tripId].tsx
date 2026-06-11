@@ -818,6 +818,7 @@ function MealSuggestionCard({
   cityGroup,
   confirmedStop,
   onAdded,
+  onOtherOptions,
 }: {
   tripId: string;
   destination: string;
@@ -826,6 +827,7 @@ function MealSuggestionCard({
   cityGroup: string | null;
   confirmedStop?: Stop;
   onAdded: () => void;
+  onOtherOptions: () => void;
 }) {
   const [rec, setRec] = useState<MealRec | null>(null);
   const [loading, setLoading] = useState(false);
@@ -880,10 +882,7 @@ function MealSuggestionCard({
   }
 
   function handleOtherOptions() {
-    if (!rec) return;
-    const newExcluded = [...excluded, rec.name];
-    setExcluded(newExcluded);
-    loadRec(newExcluded);
+    onOtherOptions();
   }
 
   if (isConfirmed) {
@@ -896,8 +895,13 @@ function MealSuggestionCard({
           <Text style={meal.confirmedName} numberOfLines={1}>{name}</Text>
           <Text style={meal.confirmedSub}>{sub.replace(/_/g, ' ')} {'\u00B7'} In your plan</Text>
         </View>
-        <View style={meal.confirmedBadge}>
-          <Text style={meal.confirmedBadgeText}>{'\u2713'} Added</Text>
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <View style={meal.confirmedBadge}>
+            <Text style={meal.confirmedBadgeText}>{'\u2713'} Added</Text>
+          </View>
+          <Pressable onPress={onOtherOptions}>
+            <Text style={meal.otherBtnText}>Other options {'\u2192'}</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -1609,6 +1613,7 @@ function DayDetail({
                   cityGroup={localContentStops[0]?.cityGroup ?? null}
                   confirmedStop={mealStops[0]}
                   onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+                  onOtherOptions={() => onAddStop('food')}
                 />
               )}
               {!isLast && (
@@ -1629,6 +1634,7 @@ function DayDetail({
             cityGroup={null}
             confirmedStop={mealStops[0]}
             onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+            onOtherOptions={() => onAddStop('food')}
           />
         )}
 
