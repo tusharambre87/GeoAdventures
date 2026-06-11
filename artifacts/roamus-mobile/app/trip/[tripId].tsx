@@ -838,21 +838,19 @@ function MealSuggestionCard({
     loadRec([]);
   }, []);
 
-  async function loadRec(excludedNames: string[]) {
+  async function loadRec(_excludedNames: string[]) {
     setLoading(true);
     setRec(null);
     try {
-      const data = await apiFetch<{ suggestions: MealRec[] }>('/api/travel/need-recs', {
-        method: 'POST',
-        body: JSON.stringify({
-          destination,
-          nearStopName: beforeStopName,
-          beforeStopName,
-          needType: 'food',
-          excludedNames,
-        }),
-      });
-      setRec(data.suggestions?.[0] ?? null);
+      const data = await apiFetch<{ options: Array<{ id: string; name: string; stopType: string; description?: string }> }>(
+        '/api/travel/rescue/food-options',
+        {
+          method: 'POST',
+          body: JSON.stringify({ tripId, city: destination }),
+        },
+      );
+      const first = data.options?.[0] ?? null;
+      setRec(first ? { id: first.id, name: first.name, type: first.stopType, description: first.description } : null);
     } catch {
       setRec(null);
     } finally {
