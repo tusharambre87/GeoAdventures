@@ -797,8 +797,21 @@ function StopCard({
 
 // ─── MealCard ─────────────────────────────────────────────────────────────────
 
-function MealCard({ stop }: { stop: Stop }) {
+function MealCard({ stop, onAdd }: { stop: Stop; onAdd?: () => Promise<void> }) {
+  const [addState, setAddState] = useState<'idle' | 'adding' | 'added'>('idle');
   const emoji = stop.stopType?.toLowerCase().includes('cafe') ? '\u2615' : '\uD83C\uDF55';
+
+  async function handleAdd() {
+    if (addState !== 'idle') return;
+    setAddState('adding');
+    try {
+      await onAdd?.();
+      setAddState('added');
+    } catch {
+      setAddState('idle');
+    }
+  }
+
   return (
     <View style={meal.card}>
       <View style={meal.left}>
@@ -808,8 +821,14 @@ function MealCard({ stop }: { stop: Stop }) {
           <Text style={meal.sub}>{stop.stopType?.replace(/_/g, ' ')} · {getStopDuration(stop)} min</Text>
         </View>
       </View>
-      <Pressable style={meal.addBtn}>
-        <Text style={meal.addBtnText}>Add</Text>
+      <Pressable
+        style={[meal.addBtn, addState === 'added' && { backgroundColor: C.green }]}
+        onPress={handleAdd}
+        disabled={addState !== 'idle'}
+      >
+        <Text style={meal.addBtnText}>
+          {addState === 'added' ? '\u2713' : addState === 'adding' ? '\u22EF' : 'Add'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -1454,9 +1473,36 @@ function DayDetail({
                 drag={isEditable ? drag : undefined}
                 isActive={isActive}
               />
-              {i === 0 && mealStops.map(ms => (
-                <MealCard key={ms.id} stop={ms} />
-              ))}
+              {i === 0 && (
+                <>
+                  {mealStops.map(ms => (
+                    <MealCard
+                      key={ms.id}
+                      stop={ms}
+                      onAdd={async () => {
+                        if (localContentStops.length > 0) {
+                          const newOrder: Array<{ stopId: string; displayOrder: number; dayIndex: number }> = [];
+                          localContentStops.forEach((cs, idx) => {
+                            newOrder.push({ stopId: cs.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 });
+                            if (idx === 0) newOrder.push({ stopId: ms.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 });
+                          });
+                          mealStops.filter(m => m.id !== ms.id).forEach(m => newOrder.push({ stopId: m.id, displayOrder: newOrder.length, dayIndex: selectedDay - 1 }));
+                          await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ stopOrders: newOrder }),
+                          });
+                          queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                        }
+                      }}
+                    />
+                  ))}
+                  {isEditable && (
+                    <Pressable style={meal.foodOptionsBtn} onPress={() => onAddStop('food')}>
+                      <Text style={meal.foodOptionsBtnText}>{'\uD83C\uDF54'} Food options</Text>
+                    </Pressable>
+                  )}
+                </>
+              )}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
               )}
@@ -1466,9 +1512,24 @@ function DayDetail({
         ListFooterComponent={
           <>
         {/* Meal cards for days with no content stops */}
-        {localContentStops.length === 0 && mealStops.map(stop => (
-          <MealCard key={stop.id} stop={stop} />
-        ))}
+        {localContentStops.length === 0 && (
+          <>
+            {mealStops.map(stop => (
+              <MealCard
+                key={stop.id}
+                stop={stop}
+                onAdd={async () => {
+                  queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                }}
+              />
+            ))}
+            {isEditable && mealStops.length > 0 && (
+              <Pressable style={meal.foodOptionsBtn} onPress={() => onAddStop('food')}>
+                <Text style={meal.foodOptionsBtnText}>{'\uD83C\uDF54'} Food options</Text>
+              </Pressable>
+            )}
+          </>
+        )}
 
         {/* Empty day */}
         {dayStops.length === 0 && (
@@ -4262,6 +4323,8 @@ const meal = StyleSheet.create({
   sub:  { fontFamily: F.regular, fontSize: 10, color: C.sage, marginTop: 1 },
   addBtn: { backgroundColor: '#1B7D46', borderRadius: 9, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
   addBtnText: { fontFamily: F.bold, fontSize: 11, color: '#fff' },
+  foodOptionsBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, backgroundColor: C.greenLt, borderWidth: 1, borderColor: '#A8D8BF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
+  foodOptionsBtnText: { fontFamily: F.semibold, fontSize: 12, color: '#1B5E39' },
 });
 
 const dd = StyleSheet.create({
