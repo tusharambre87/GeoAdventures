@@ -2444,6 +2444,10 @@ export function selectStopsFromPool(
       if (stop.familyAnchorType === "support") score += 1;
     }
 
+    // Meal/food stops: give a baseline boost so they compete with parks and support stops.
+    // Without this they always score 0 and are crowded out by any typed bonus.
+    if (stop.familyAnchorType === "meal") score += 3;
+
     // Default anchor preference
     if (!input.tripStyle) {
       if (stop.familyAnchorType === "anchor") score += 3;
@@ -2794,6 +2798,31 @@ export function selectStopsFromPool(
           }
         }
         console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept "${daySlice[keepIdx].name}" as anchor, demoted ${anchorIndices.length - 1} extra(s) to support.`);
+      }
+    }
+  }
+
+  // ── Meal stop minimum guarantee ───────────────────────────────────────────
+  // Every trip should include at least one food/meal stop (familyAnchorType === 'meal').
+  // If greedy selection produced none (meal stops scored below competing parks/activities),
+  // swap the lowest-priority non-anchor, non-meal stop with the best meal candidate
+  // from the full pool. Skipped for trips of 1 stop or fewer per day (no room to add food).
+  if (effectiveStopsPerDay >= 2) {
+    const hasMeal = selected.some(s => s.familyAnchorType === "meal");
+    if (!hasMeal) {
+      const mealCandidates = pool
+        .filter(c => c.familyAnchorType === "meal" && !usedNormNames.has(normStopName(c.name)))
+        .sort((a, b) => (baseScores.get(b) ?? 0) - (baseScores.get(a) ?? 0));
+      const bestMeal = mealCandidates[0];
+      if (bestMeal) {
+        // Prefer swapping the last stop of the last day (least prominent position)
+        const swapIdx = selected.length - 1;
+        // Don't swap out an anchor stop
+        if (selected[swapIdx]?.familyAnchorType !== "anchor") {
+          const displaced = selected[swapIdx]?.name ?? "??";
+          selected[swapIdx] = bestMeal;
+          console.log(`[MealGuarantee] Swapped out "${displaced}" → inserted meal stop "${bestMeal.name}".`);
+        }
       }
     }
   }

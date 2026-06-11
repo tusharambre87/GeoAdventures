@@ -599,7 +599,8 @@ export interface IStorage {
  * Canonical choices match what the existing 60 USA pool entries were stored with
  * ("usa"), so no DB migration is required.
  */
-function normalizeCountryKey(country: string): string {
+function normalizeCountryKey(country: string | undefined | null): string {
+  if (!country) return "";
   const lower = country.toLowerCase().trim();
   if (lower === "united states" || lower === "us" || lower === "united states of america") return "usa";
   if (lower === "united kingdom" || lower === "great britain") return "uk";

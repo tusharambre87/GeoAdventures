@@ -5498,7 +5498,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ── Try pool first (zero AI calls for cached cities) ──────────────────
         let usedPool = false;
         try {
-          const cachedPool = await storage.getCityStopPool(cityName, country);
+          // Pool is keyed by bare city name — strip country suffix if cityName is the full destination
+          const poolCityName = cityName.split(",")[0].trim();
+          const cachedPool = await storage.getCityStopPool(poolCityName, country);
           if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
             console.log(`🎯 [Travel] [bg] Pool hit for ${cityName}`);
             const firstWithCoords = (cachedPool.stopPool as any[]).find(s => s.latitude && s.longitude);
@@ -6528,15 +6530,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })();
 
       // Auto-generate stops in the background — trip is already returned to client
+      // Derive country from destination string when not explicitly provided (e.g. "Washington DC, USA")
+      const resolvedCountry = country || destination.split(",").pop()?.trim() || "";
       if (autoGenerateStops !== false && (city || destination)) {
         if (templateSlug && typeof templateSlug === 'string') {
           generateStopsFromTemplate(
             trip.id, templateSlug, computedTripDays || null,
-            adventureStyle, city || destination, country ?? ''
+            adventureStyle, city || destination, resolvedCountry
           );
         } else {
           generateStopsInBackground(
-            trip.id, city || destination, isHomeAdventure, country,
+            trip.id, city || destination, isHomeAdventure, resolvedCountry,
             state, stopCount, adventureStyle, destination, city,
             meals || null, computedTripDays || null, pace || 'balanced'
           );
