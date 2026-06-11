@@ -864,6 +864,15 @@ export default function TodayScreen() {
     try {
       await apiFetch(`/api/travel/stops/${stop.id}/visit`, { method: 'POST' });
     } catch { /* best-effort */ }
+    // Send dwell time signal — fire-and-forget, never blocks the UI
+    if (elapsed != null && elapsed > 0) {
+      const signalType = elapsed >= 15 ? 'long_dwell' : 'short_dwell';
+      apiFetch(`/api/travel/stops/${stop.id}/quality-signal`, {
+        method: 'POST',
+        headers: { 'x-adventure-parent': '1' },
+        body: JSON.stringify({ signalType, signalValue: elapsed }),
+      }).catch(() => {});
+    }
     setMarkingVisited(false);
     setVisitedElapsed(elapsed);
     bounceAnim.setValue(0);
@@ -933,6 +942,7 @@ export default function TodayScreen() {
       await Promise.all(visitedStops.map(s =>
         apiFetch(`/api/travel/stops/${s.id}/quality-signal`, {
           method: 'POST',
+          headers: { 'x-adventure-parent': '1' },
           body: JSON.stringify({ signal: rating }),
         })
       ));

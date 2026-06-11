@@ -3243,6 +3243,14 @@ export const plannerStopIntelligence = pgTable("planner_stop_intelligence", {
   cautionLabel: varchar("caution_label"),
   whyWorthItLabel: varchar("why_worth_it_label"),
   goodMomentLabel: varchar("good_moment_label"),
+  // Logistics fields — migrated from planner_places / GeoAdventures
+  familyAnchorType: varchar("family_anchor_type"), // 'anchor', 'support', 'filler', 'meal', 'reset'
+  effortLevel: varchar("effort_level"), // 'low', 'moderate', 'high'
+  sensoryLoad: varchar("sensory_load"), // 'low', 'moderate', 'high'
+  indoorOutdoor: varchar("indoor_outdoor"), // 'indoor', 'outdoor', 'both'
+  minAge: integer("min_age"),
+  maxAge: integer("max_age"),
+  durationMinutes: integer("duration_minutes"),
   // Cache freshness — used by serve-then-refresh TTL system
   cachedAt: timestamp("cached_at").defaultNow(),
   invalidatedAt: timestamp("invalidated_at"),

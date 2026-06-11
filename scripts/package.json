@@ -6,7 +6,12 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "test:multi-city-itinerary": "tsx ./src/test-multi-city-itinerary.ts",
+    "backfill-psi-logistics": "tsx ./src/backfill-psi-logistics.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -2742,6 +2742,52 @@ export function selectStopsFromPool(
     }
   }
 
+  // ── Anchor constraint enforcement ─────────────────────────────────────────
+  // Each day must have exactly 1 stop with familyAnchorType === 'anchor'.
+  // - If a day has zero anchors: promote the highest-baseScore stop to 'anchor'.
+  // - If a day has multiple anchors: demote all but the highest-scored one to 'support'.
+  // Applied after must-do enforcement so both constraints co-exist cleanly.
+  // Skipped for canonical trips (their template already encodes the right roles).
+  if (!isCanonicalTripForSelection) {
+    for (let dayIdx = 0; dayIdx < input.tripDays; dayIdx++) {
+      const start = dayIdx * effectiveStopsPerDay;
+      const end = Math.min(start + effectiveStopsPerDay, selected.length);
+      const daySlice = selected.slice(start, end);
+      if (daySlice.length === 0) continue;
+
+      const anchorIndices = daySlice
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => s.familyAnchorType === "anchor");
+
+      if (anchorIndices.length === 0) {
+        // No anchor in this day — promote the highest-scored stop
+        let bestIdx = 0;
+        let bestScore = baseScores.get(daySlice[0]) ?? 0;
+        for (let i = 1; i < daySlice.length; i++) {
+          const sc = baseScores.get(daySlice[i]) ?? 0;
+          if (sc > bestScore) { bestScore = sc; bestIdx = i; }
+        }
+        // Mutate the candidate in-place (selected array holds object references)
+        (daySlice[bestIdx] as any).familyAnchorType = "anchor";
+        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: promoted "${daySlice[bestIdx].name}" to anchor (no anchor in pool).`);
+      } else if (anchorIndices.length > 1) {
+        // Multiple anchors — keep the highest-scored one, demote the rest
+        let keepIdx = anchorIndices[0].i;
+        let keepScore = baseScores.get(anchorIndices[0].s) ?? 0;
+        for (const { s, i } of anchorIndices) {
+          const sc = baseScores.get(s) ?? 0;
+          if (sc > keepScore) { keepScore = sc; keepIdx = i; }
+        }
+        for (const { s, i } of anchorIndices) {
+          if (i !== keepIdx) {
+            (s as any).familyAnchorType = "support";
+          }
+        }
+        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept "${daySlice[keepIdx].name}" as anchor, demoted ${anchorIndices.length - 1} extra(s) to support.`);
+      }
+    }
+  }
+
   // ── Assign day numbers following energy arc (mirrors ENERGY ARC rule) ─────
   // Per day: sequence by time-of-day fit scores from Stop Intelligence.
   // Primary key: numeric SI scores (morningFitScore / afterLunchFitScore / lateDayFitScore)

@@ -661,6 +661,15 @@ export default function AtStopScreen() {
       const elapsed = Math.round((Date.now() - parseInt(startStr, 10)) / 60000);
       await AsyncStorage.setItem('atStopElapsed', String(elapsed > 0 ? elapsed : 0));
       await AsyncStorage.removeItem('atStopStartTime');
+      // Send dwell time signal — fire-and-forget, never blocks the UI
+      if (elapsed > 0) {
+        const signalType = elapsed >= 15 ? 'long_dwell' : 'short_dwell';
+        apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
+          method: 'POST',
+          headers: { 'x-adventure-parent': '1' },
+          body: JSON.stringify({ signalType, signalValue: elapsed }),
+        }).catch(() => {});
+      }
     }
     await AsyncStorage.removeItem('atStopFrozen');
     setAtStopFrozen(false);
@@ -670,6 +679,7 @@ export default function AtStopScreen() {
       if (!skipFeedback) {
         await apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
           method: 'POST',
+          headers: { 'x-adventure-parent': '1' },
           body: JSON.stringify({ rating: feedbackRating, notes: feedbackText || undefined }),
         });
       }
@@ -1381,7 +1391,7 @@ export default function AtStopScreen() {
           <TouchableOpacity key={row.signal} style={sh.row} activeOpacity={0.8}
             onPress={async () => {
               try { await apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`,
-                { method: 'POST', body: JSON.stringify({ signal: row.signal }) }); } catch {}
+                { method: 'POST', headers: { 'x-adventure-parent': '1' }, body: JSON.stringify({ signal: row.signal }) }); } catch {}
               setDayStops(prev => prev.filter(s => s.id !== currentStop.id));
               setActiveSheet('none'); setMode('picker'); setCurrentStop(null);
             }}>

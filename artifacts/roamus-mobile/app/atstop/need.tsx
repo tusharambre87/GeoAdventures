@@ -131,6 +131,7 @@ export default function NeedScreen() {
       try {
         await apiFetch(`/api/travel/stops/${stopId}/quality-signal`, {
           method: 'POST',
+          headers: { 'x-adventure-parent': '1' },
           body: JSON.stringify({ signal: 'skip_next_time' }),
         });
         await apiFetch(`/api/travel/stops/${stopId}`, { method: 'DELETE' });

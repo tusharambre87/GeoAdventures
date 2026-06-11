@@ -9605,11 +9605,11 @@ Return ONLY valid JSON in this exact format:
             explorerAges,
           });
         } catch (e) {
-          console.error("[FamilySignals] Background signal update failed:", e);
+          req.log.error({ err: e }, "[FamilySignals] Background signal update failed");
         }
       })();
     } catch (error) {
-      console.error("Error marking stop visited:", error);
+      req.log.error({ err: error }, "Error marking stop visited");
       res.status(500).json({ message: "Failed to mark stop visited" });
     }
   });
