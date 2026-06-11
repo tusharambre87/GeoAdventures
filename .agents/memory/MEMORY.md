@@ -5,3 +5,4 @@
 - [Animated.Text in RN 0.76 Fabric](animated-text-fabric.md) — Animated.Text HOC does not propagate isInAParentText context; use Animated.View + Text instead.
 - [AuthGate onboarding redirect](authgate-onboarding-redirect.md) — Authenticated users navigating to /onboarding/* are bounced to home unless onboardingInProgress=true; put auth-required standalone screens in me/ or another non-onboarding group.
 - [stop_library dedup safety order](stop-library-dedup-safety.md) — Reassign live trip FK references BEFORE deleting any duplicate stop_library row; never delete first.
+- [JSX whitespace text node](jsx-whitespace-text-node.md) — space before {/* comment */} on same line as </Tag> becomes a real string child; crashes RN Fabric in non-Text parent.

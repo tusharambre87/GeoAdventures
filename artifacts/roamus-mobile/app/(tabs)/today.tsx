@@ -2090,7 +2090,7 @@ export default function TodayScreen() {
               </View>
             ) : null}
             </View>
-          </View> {/* heroWrap */}
+          </View>
 
           {/* Rain alert — powered by Open-Meteo (real data) */}
           {!!rainAlert && (
