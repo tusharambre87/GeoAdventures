@@ -102,7 +102,6 @@ Return JSON in this exact format:
         }
       ],
       max_completion_tokens: 500,
-      temperature: 0.7,
       response_format: { type: "json_object" }
     });
 
@@ -174,7 +173,6 @@ Return JSON in this exact format:
         }
       ],
       max_completion_tokens: 200,
-      temperature: 0.7,
       response_format: { type: "json_object" }
     });
 
@@ -389,7 +387,6 @@ Return JSON:
         }
       ],
       max_completion_tokens: 400,
-      temperature: 0.4,
       response_format: { type: "json_object" }
     });
     const factsContent = factsCompletion.choices[0]?.message?.content;
@@ -1393,7 +1390,6 @@ Return JSON:
         }
       ],
       max_completion_tokens: stopCount > 12 ? 16000 : 8000,
-      temperature: 0.7,
       response_format: { type: "json_object" }
     });
 
@@ -1559,7 +1555,6 @@ Return exactly ${stops.length} artifacts, one per stop. Use the exact stop names
         }
       ],
       max_completion_tokens: 1500,
-      temperature: 0.8,
       response_format: { type: "json_object" }
     });
 
@@ -1649,7 +1644,6 @@ Return ONLY valid JSON, no markdown:
         },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
     });
 
     const raw = JSON.parse(completion.choices[0].message.content || "{}");

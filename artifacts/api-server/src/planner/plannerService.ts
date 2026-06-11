@@ -2553,6 +2553,9 @@ export function selectStopsFromPool(
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)
   let zonesInCurrentDay = new Set<string>();
+  // Track stop-types selected today (max 1 per type; hard cap for museums)
+  let typesInCurrentDay = new Set<string>();
+  let museumsInCurrentDay = 0;
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
@@ -2572,6 +2575,8 @@ export function selectStopsFromPool(
     // Reset per-day trackers at the start of each new day
     if (dayPosition === 0) {
       zonesInCurrentDay = new Set<string>();
+      typesInCurrentDay = new Set<string>();
+      museumsInCurrentDay = 0;
       dailyDurationMins = 0;
       dailyTravelKm = 0;
       dailyTravelMins = 0;
@@ -2595,6 +2600,11 @@ export function selectStopsFromPool(
       // Hard constraints: skip entirely
       if (isLearningHeavy && learningHeavyCount >= learningLimit) continue;
       if (typeCount >= 2 && remaining.size > 5) continue;
+      // Per-day stop-type diversity: max 1 stop per type per day
+      // Waived when pool is nearly exhausted to avoid deadlock
+      if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
+      // Museum hard cap: exactly 1 museum per day regardless of pool size
+      if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Toddler nap rule: meal stops cannot be the first activity of the day (must come after nap at ~1pm)
       const isMealType = ["restaurant", "meal", "food", "cafe"].includes(c.type ?? "");
@@ -2687,6 +2697,8 @@ export function selectStopsFromPool(
     if (bestCandidate.neighborhoodZone) {
       zonesInCurrentDay.add(bestCandidate.neighborhoodZone);
     }
+    typesInCurrentDay.add(bestCandidate.type);
+    if (bestCandidate.type === 'museum') museumsInCurrentDay++;
     dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
   }
 
