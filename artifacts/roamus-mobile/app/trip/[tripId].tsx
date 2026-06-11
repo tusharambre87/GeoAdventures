@@ -1519,6 +1519,12 @@ function DayDetail({
                 key={stop.id}
                 stop={stop}
                 onAdd={async () => {
+                  await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                      stopOrders: [{ stopId: stop.id, displayOrder: 0, dayIndex: selectedDay - 1 }],
+                    }),
+                  });
                   queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
                 }}
               />
