@@ -1429,6 +1429,14 @@ export default function TodayScreen() {
             }
           }}
         />
+        {trip && (
+          <ChecklistSheet
+            visible={checklistOpen}
+            onClose={() => setChecklistOpen(false)}
+            tripId={trip.id}
+            stops={tomorrowStops}
+          />
+        )}
       </View>
     );
   }
