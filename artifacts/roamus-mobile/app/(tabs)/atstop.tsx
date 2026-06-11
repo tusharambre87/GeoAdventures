@@ -532,6 +532,7 @@ export default function AtStopScreen() {
   const [addingStop, setAddingStop]     = useState<string | null>(null);
   const [stopMoments, setStopMoments]   = useState<Moment[]>([]);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+  const [mealDone, setMealDone] = useState(false);
 
   // Prevents useFocusEffect from resetting mode when returning from a sub-screen
   const keepDetailOnFocus = useRef(false);
@@ -575,6 +576,12 @@ export default function AtStopScreen() {
         .catch(() => {});
     }
   }, [currentStop?.id, trip?.id]);
+
+  // Sync mealDone when switching stops
+  useEffect(() => {
+    if (currentStop) setMealDone(isStopVisited(currentStop));
+    else setMealDone(false);
+  }, [currentStop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load on focus ──
   useFocusEffect(
@@ -694,6 +701,15 @@ export default function AtStopScreen() {
   }
 
   // ── Skip stop ──
+  async function handleMarkMealDone() {
+    if (!currentStop) return;
+    try {
+      await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
+      setDayStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s));
+      setMealDone(true);
+    } catch { /* best effort */ }
+  }
+
   async function handleSkipStop() {
     if (!currentStop) return;
     try { await apiFetch(`/api/travel/stops/${currentStop.id}`, { method: 'DELETE' }); } catch {}
@@ -1009,39 +1025,47 @@ function isMealStop(t?: string | null): boolean {
             <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#E8692A' }}>Add →</Text>
           </TouchableOpacity>
 
-          {/* Micro feedback */}
-          <View style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
-            borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16 }}>
-            <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.7,
-              textTransform: 'uppercase', marginBottom: 10 }}>How was the meal?</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {([
-                { val: 'big_hit' as FeedbackRating, label: 'Loved it', icon: '🌟' },
-                { val: 'good' as FeedbackRating, label: 'Good', icon: '👍' },
-                { val: 'skip_next_time' as FeedbackRating, label: 'Skip next time', icon: '🙄' },
-              ]).map(opt => (
-                <TouchableOpacity
-                  key={opt.val}
-                  style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10,
-                    borderWidth: 1.5,
-                    borderColor: feedbackRating === opt.val ? '#E8692A' : 'rgba(26,31,46,0.09)',
-                    backgroundColor: feedbackRating === opt.val ? '#FDF0E9' : 'transparent' }}
-                  onPress={() => setFeedbackRating(opt.val)}>
-                  <Text style={{ fontSize: 18, marginBottom: 3 }}>{opt.icon}</Text>
-                  <Text style={{ fontFamily: F.semibold, fontSize: 10, textAlign: 'center',
-                    color: feedbackRating === opt.val ? '#E8692A' : '#8A8FA8' }}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
+          {mealDone && (
+            <View style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
+              borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16 }}>
+              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.7,
+                textTransform: 'uppercase', marginBottom: 10 }}>How was the meal?</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {([
+                  { val: 'big_hit' as FeedbackRating, label: 'Loved it', icon: '🌟' },
+                  { val: 'good' as FeedbackRating, label: 'Good', icon: '👍' },
+                  { val: 'skip_next_time' as FeedbackRating, label: 'Skip next time', icon: '🙄' },
+                ]).map(opt => (
+                  <TouchableOpacity
+                    key={opt.val}
+                    style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderColor: feedbackRating === opt.val ? '#E8692A' : 'rgba(26,31,46,0.09)',
+                      backgroundColor: feedbackRating === opt.val ? '#FDF0E9' : 'transparent' }}
+                    onPress={() => setFeedbackRating(opt.val)}>
+                    <Text style={{ fontSize: 18, marginBottom: 3 }}>{opt.icon}</Text>
+                    <Text style={{ fontFamily: F.semibold, fontSize: 10, textAlign: 'center',
+                      color: feedbackRating === opt.val ? '#E8692A' : '#8A8FA8' }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
         </ScrollView>
 
         {/* CTA */}
         <View style={[dt.ctaGroup, { paddingBottom: insets.bottom + 8 }]}>
-          <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
-            onPress={() => openSheet('feedback')}>
-            <Text style={{...dt.ctaPrimaryText}}>🍽 We're done eating</Text>
-          </TouchableOpacity>
+          {mealDone ? (
+            <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+              onPress={() => { AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
+              <Text style={{...dt.ctaPrimaryText}}>✓ Done—back to today</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+              onPress={handleMarkMealDone}>
+              <Text style={{...dt.ctaPrimaryText}}>🍽 We're done eating</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
