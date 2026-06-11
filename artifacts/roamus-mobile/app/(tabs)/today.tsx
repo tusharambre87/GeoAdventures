@@ -1313,7 +1313,9 @@ export default function TodayScreen() {
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: C.deep }}>Rain expected tomorrow 2–4pm</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Plan ahead for outdoor stops</Text>
-              <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>See indoor alternatives →</Text>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => setIndoorSheetVisible(true)}>
+                <Text style={{ fontSize: 12, color: C.orange, fontWeight: '700', marginTop: 4 }}>See indoor alternatives →</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -2153,7 +2155,7 @@ export default function TodayScreen() {
           )}
 
           {!!didYouKnow && (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' }}>
               <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                 <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
               </View>
@@ -2412,7 +2414,7 @@ export default function TodayScreen() {
 
           {/* Did you know */}
           {!!didYouKnow && (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 11, backgroundColor: '#fff', borderRadius: 14, padding: 13, paddingHorizontal: 15, marginHorizontal: 16, marginBottom: 10, shadowColor: '#1A1F2E', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' }}>
               <View style={{ width: 34, height: 34, backgroundColor: '#FEF0E6', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                 <Text style={{ fontSize: 16 }}>{'\u2728'}</Text>
               </View>
