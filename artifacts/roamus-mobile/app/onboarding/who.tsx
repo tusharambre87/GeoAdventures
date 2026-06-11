@@ -463,7 +463,7 @@ export default function WhoScreen() {
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         {isEditMode
           ? <BigBtn label={saving ? "Saving…" : "Save changes"} onPress={handleSave} />
-          : <BigBtn label={'Continue →'} onPress={handleContinue} />
+          : <BigBtn label={'Continue →'} onPress={handleContinue} disabled={addingType !== null} style={addingType !== null ? { opacity: 0.4 } : {}} />
         }
       </View>
     </View>
