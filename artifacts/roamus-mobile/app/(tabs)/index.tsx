@@ -138,7 +138,9 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
             ? 'View memories →'
             : isActiveNow && activeDay > 1
               ? `\u25B6 Continue Day ${activeDay}`
-              : '\u25B6 Start Day 1'}
+              : isActiveNow
+                ? '\u25B6 Start Day 1'
+                : 'View trip plan \u2192'}
         </Text>
       </Pressable>
 
