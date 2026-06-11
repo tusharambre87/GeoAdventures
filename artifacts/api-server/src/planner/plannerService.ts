@@ -2956,6 +2956,21 @@ export function selectStopsFromPool(
       }
     }
 
+    // ── Meal-at-slot-0 guard ─────────────────────────────────────────────────
+    // SI-score slot assignment can place a high-morningFitScore restaurant first.
+    // Ensure no meal stop leads the day (families need an activity anchor first).
+    if (
+      !isCanonicalTrip &&
+      orderedSlice.length > 1 &&
+      orderedSlice[0].familyAnchorType === "meal"
+    ) {
+      const firstNonMeal = orderedSlice.findIndex(s => s.familyAnchorType !== "meal");
+      if (firstNonMeal > 0) {
+        const [meal] = orderedSlice.splice(0, 1);
+        orderedSlice.splice(firstNonMeal, 0, meal);
+      }
+    }
+
     orderedSlice.forEach((stop, idx) => {
       result.push(candidateToGeneratedStop(stop, day, idx, isCanonicalTrip));
     });
