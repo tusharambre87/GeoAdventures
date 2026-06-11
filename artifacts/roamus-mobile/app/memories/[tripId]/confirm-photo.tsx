@@ -106,7 +106,7 @@ export default function ConfirmPhotoScreen() {
         );
       }
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-      router.replace(`/memories/${tripId}` as never);
+      router.replace('/(tabs)/atstop' as never);
     } catch (err: any) {
       console.error('Save photos failed:', err);
       const msg = err?.message ?? 'Something went wrong. Please try again.';

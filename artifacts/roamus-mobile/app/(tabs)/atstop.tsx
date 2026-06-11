@@ -600,6 +600,19 @@ export default function AtStopScreen() {
     }, [devMode, params.stopId])
   );
 
+  // Reload moments when focus returns (e.g. after adding a photo)
+  useFocusEffect(
+    useCallback(() => {
+      const tid = trip?.id;
+      const sid = currentStop?.id;
+      if (!tid || !sid) return;
+      apiFetch<{ moments?: Moment[] }>(`/api/travel/trips/${tid}/moments?stopId=${sid}`)
+        .then(d => setStopMoments(d.moments ?? []))
+        .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trip?.id, currentStop?.id])
+  );
+
   async function load() {
     setMode('loading'); setLoadErr(null);
     try {
@@ -964,7 +977,7 @@ function isMealStop(t?: string | null): boolean {
           showsVerticalScrollIndicator={false}>
 
           {/* Hero */}
-          <View style={[dt.hero, { height: 170 }]}>
+          <View style={[dt.hero, { height: 220, overflow: 'hidden' }]}>
             {heroImageUrl ? (
               <Image source={{ uri: heroImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             ) : (
@@ -1025,6 +1038,21 @@ function isMealStop(t?: string | null): boolean {
             <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#E8692A' }}>Add →</Text>
           </TouchableOpacity>
 
+          {stopMoments.length > 0 && (
+            <View style={{ marginTop: 12, marginHorizontal: 16 }}>
+              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8',
+                letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>Photos</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
+                {stopMoments.map(m => (
+                  <Image key={m.id} source={{ uri: m.photoUrl }}
+                    style={{ width: 90, height: 90, borderRadius: 12 }}
+                    resizeMode='cover' />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {mealDone && (
             <View style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
               borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16 }}>
@@ -1060,6 +1088,10 @@ function isMealStop(t?: string | null): boolean {
               onPress={() => { AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
               <Text style={{...dt.ctaPrimaryText}}>✓ Done—back to today</Text>
             </TouchableOpacity>
+          ) : tripNotStarted ? (
+            <View style={[dt.ctaPrimary, { opacity: 0.4 }]}>
+              <Text style={{...dt.ctaPrimaryText}}>🚫 Starts {tripStartLabel}</Text>
+            </View>
           ) : (
             <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
               onPress={handleMarkMealDone}>
