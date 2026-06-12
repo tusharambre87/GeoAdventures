@@ -5,13 +5,16 @@ import { NotifContent } from './notificationContent'
 
 // ── Foreground handler: show banner instead of OS notification ──
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: false,
-    shouldShowList: false,
-  }),
+  handleNotification: async (notification) => {
+    console.log('[NotifEngine] Received:', notification.request.content.title)
+    return {
+      shouldShowAlert: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: false,
+      shouldShowList: false,
+    }
+  },
 })
 
 export interface NotifPayload {
@@ -99,6 +102,7 @@ export async function scheduleLocalNotification(
   seconds: number,
 ): Promise<void> {
   if (Platform.OS === 'web') return
+  console.log('[NotifEngine] Scheduling:', type, title)
   await Notifications.scheduleNotificationAsync({
     content: { title, body, data },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, repeats: false },

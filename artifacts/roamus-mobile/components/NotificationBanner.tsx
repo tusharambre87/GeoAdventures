@@ -64,6 +64,7 @@ export default function NotificationBanner({ onPress }: Props) {
 
   useEffect(() => {
     const unsub = subscribeForegroundNotifications((n: Notifications.Notification) => {
+      console.log('[Banner] Listener fired:', n.request.content.title)
       const payload = n.request.content.data as unknown as NotifPayload | undefined
       if (!payload?.type) return
       showBanner({
