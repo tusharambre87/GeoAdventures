@@ -1439,6 +1439,19 @@ function DayDetail({
   const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
   useEffect(() => { setLocalContentStops(contentStops); }, [contentKey]);
 
+  // Dynamic insertion index for the meal card: computed from the combined
+  // displayOrder sort so the card visually moves after each swap + refetch.
+  let mealInsertAfterIdx = 0;
+  if (mealStops[0]) {
+    const _allSorted = [...localContentStops, ...mealStops]
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const _mealIdx = _allSorted.findIndex(s => s.id === mealStops[0].id);
+    if (_mealIdx > 0) {
+      const _contentBefore = _allSorted.slice(0, _mealIdx).filter(s => !isMealStop(s.stopType)).length;
+      mealInsertAfterIdx = Math.max(0, _contentBefore - 1);
+    }
+  }
+
   const [weatherWarning, setWeatherWarning] = useState<{
     precipProb: number;
     impactedStops: string[];
@@ -1693,7 +1706,7 @@ function DayDetail({
                 onMoveUp={isEditable ? () => handleMoveStop(stop.id, 'up') : undefined}
                 onMoveDown={isEditable ? () => handleMoveStop(stop.id, 'down') : undefined}
               />
-              {i === 0 && isEditable && (() => {
+              {i === mealInsertAfterIdx && isEditable && (() => {
                 const mealSorted = [...localContentStops, ...mealStops]
                   .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
                 const mealPos   = mealStops[0] ? mealSorted.findIndex(s => s.id === mealStops[0].id) : -1;
@@ -1701,9 +1714,9 @@ function DayDetail({
                   <MealSuggestionCard
                     tripId={tripId}
                     destination={trip?.destination ?? trip?.city ?? ''}
-                    beforeStopName={localContentStops[0]?.name ?? ''}
+                    beforeStopName={localContentStops[mealInsertAfterIdx]?.name ?? ''}
                     dayIndex={selectedDay - 1}
-                    cityGroup={localContentStops[0]?.cityGroup ?? null}
+                    cityGroup={localContentStops[mealInsertAfterIdx]?.cityGroup ?? null}
                     confirmedStop={mealStops[0]}
                     onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
                     onOtherOptions={() => onAddStop('food')}
