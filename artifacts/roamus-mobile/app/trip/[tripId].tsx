@@ -1439,11 +1439,22 @@ function DayDetail({
   const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
   useEffect(() => { setLocalContentStops(contentStops); }, [contentKey]);
 
-  // Dynamic insertion index for the meal card: computed from the combined
-  // displayOrder sort so the card visually moves after each swap + refetch.
+  // Local optimistic meal display order — updated immediately on ↑/↓ tap,
+  // synced from server data after each refetch.
+  const [localMealDisplayOrder, setLocalMealDisplayOrder] = useState<number>(
+    mealStops[0]?.displayOrder ?? 0
+  );
+  useEffect(() => {
+    if (mealStops[0]) setLocalMealDisplayOrder(mealStops[0].displayOrder ?? 0);
+  }, [mealStops[0]?.id, mealStops[0]?.displayOrder]);
+
+  // Dynamic insertion index for the meal card: re-computed each render from
+  // localContentStops + localMealDisplayOrder so the card moves immediately
+  // on tap without waiting for the server refetch.
   let mealInsertAfterIdx = 0;
   if (mealStops[0]) {
-    const _allSorted = [...localContentStops, ...mealStops]
+    const _mealProxy = { ...mealStops[0], displayOrder: localMealDisplayOrder };
+    const _allSorted = [...localContentStops, _mealProxy]
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const _mealIdx = _allSorted.findIndex(s => s.id === mealStops[0].id);
     if (_mealIdx > 0) {
@@ -1498,7 +1509,12 @@ function DayDetail({
 
   async function handleMoveStop(stopId: string, direction: 'up' | 'down') {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const allStops = [...localContentStops, ...mealStops]
+    // Build combined list using the optimistic meal display order so the sort
+    // reflects the current visual state rather than stale server values.
+    const mealProxy = mealStops[0]
+      ? { ...mealStops[0], displayOrder: localMealDisplayOrder }
+      : null;
+    const allStops = [...localContentStops, ...(mealProxy ? [mealProxy] : [])]
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const idx = allStops.findIndex(s => s.id === stopId);
     if (idx === -1) return;
@@ -1506,10 +1522,24 @@ function DayDetail({
     if (targetIdx < 0 || targetIdx >= allStops.length) return;
     const swapped = [...allStops];
     [swapped[idx], swapped[targetIdx]] = [swapped[targetIdx], swapped[idx]];
-    const newContent = swapped.filter(s => !isMealStop(s.stopType));
+    // Assign fresh sequential display orders so the mealInsertAfterIdx
+    // computation works correctly with no ties.
+    const stopOrders = swapped.map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex ?? 0 }));
+    // Build new content stops WITH updated displayOrders so mealInsertAfterIdx
+    // re-computes correctly on the same render cycle.
+    const newContent = swapped
+      .filter(s => !isMealStop(s.stopType))
+      .map(s => {
+        const order = stopOrders.find(o => o.stopId === s.id);
+        return order ? { ...s, displayOrder: order.displayOrder } : s;
+      });
+    // Optimistically update meal display order when the meal stop itself moved.
+    if (mealProxy && stopId === mealProxy.id) {
+      const newMealOrder = stopOrders.find(o => o.stopId === mealProxy.id)?.displayOrder ?? localMealDisplayOrder;
+      setLocalMealDisplayOrder(newMealOrder);
+    }
     const prev = localContentStops;
     setLocalContentStops(newContent);
-    const stopOrders = swapped.map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex ?? 0 }));
     try {
       await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
         method: 'PATCH',
@@ -1517,6 +1547,8 @@ function DayDetail({
       });
       queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
     } catch {
+      // Roll back optimistic updates
+      if (mealProxy && stopId === mealProxy.id) setLocalMealDisplayOrder(localMealDisplayOrder);
       setLocalContentStops(prev);
     }
   }
@@ -1580,6 +1612,7 @@ function DayDetail({
       <DraggableFlatList
         data={localContentStops}
         keyExtractor={s => s.id}
+        extraData={mealInsertAfterIdx}
         onDragEnd={handleDragEnd}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
