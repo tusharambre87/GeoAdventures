@@ -171,7 +171,7 @@ type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'big_hit' | 'good' | 'skip_next_time';
 type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
 type ExtraPlace     = { name: string; distance: string; description: string; stopType: string; ages?: string };
-type Moment         = { id: string; photoUrl: string };
+type Moment         = { id: string; photoUrl: string | null; photoUrls?: string[] | null };
 
 // ─── Dev mock data ────────────────────────────────────────────────────────────
 
@@ -1045,7 +1045,7 @@ function isMealStop(t?: string | null): boolean {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
                 {stopMoments.map(m => (
-                  <Image key={m.id} source={{ uri: m.photoUrl }}
+                  <Image key={m.id} source={{ uri: m.photoUrls?.[0] ?? m.photoUrl ?? '' }}
                     style={{ width: 90, height: 90, borderRadius: 12 }}
                     resizeMode='cover' />
                 ))}
@@ -1093,15 +1093,16 @@ function isMealStop(t?: string | null): boolean {
           )}
         </ScrollView>
 
-        {/* CTA */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 12, paddingTop: 8 }}>
+        {/* CTA — fixed footer */}
+        <View style={{ backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 10,
+          paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
           {mealDone ? (
             <TouchableOpacity
               style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
                 alignItems: 'center', justifyContent: 'center' }}
               activeOpacity={0.88}
               onPress={() => { AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
-              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>✓ Done — back to today</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>{'✓'} Done — back to today</Text>
             </TouchableOpacity>
           ) : tripNotStarted ? (
             <View style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
@@ -1114,7 +1115,7 @@ function isMealStop(t?: string | null): boolean {
                 alignItems: 'center', justifyContent: 'center' }}
               activeOpacity={0.88}
               onPress={handleMarkMealDone}>
-              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>✓ We're done eating — move on</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>{'✓'} We're done eating — move on</Text>
             </TouchableOpacity>
           )}
         </View>

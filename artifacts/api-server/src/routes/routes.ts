@@ -11690,15 +11690,17 @@ Return ONLY valid JSON in this exact format:
   app.get('/api/travel/trips/:tripId/moments', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { tripId } = req.params;
+      const { stopId } = req.query as { stopId?: string };
       const userId = req.user?.claims?.sub;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const momentTrip = await storage.getTripById(tripId);
       if (!momentTrip) return res.status(404).json({ message: "Trip not found" });
       if (momentTrip.userId !== userId) return res.status(403).json({ message: "Access denied" });
-      const moments = await storage.getMomentsByTripId(tripId);
-      res.json(moments);
+      let moments = await storage.getMomentsByTripId(tripId);
+      if (stopId) moments = moments.filter((m: any) => m.stopId === stopId);
+      res.json({ moments });
     } catch (error) {
-      console.error("Error fetching moments:", error);
+      req.log?.error({ error }, "Error fetching moments");
       res.status(500).json({ message: "Failed to fetch moments" });
     }
   });
