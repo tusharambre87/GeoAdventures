@@ -23,7 +23,7 @@ import NotificationBanner from "@/components/NotificationBanner";
 import { AuthProvider, useAuth } from "@/lib/authContext";
 import { OnboardingProvider, useOnboarding } from "@/lib/onboardingContext";
 import { drainAllPhotoQueues } from "@/lib/photoQueue";
-import { type NotifPayload } from "@/services/notifications/notificationEngine";
+import { NotifPayload } from "@/services/notifications/notificationEngine";
 import { NotifType } from "@/services/notifications/notificationPrefs";
 
 SplashScreen.preventAutoHideAsync();

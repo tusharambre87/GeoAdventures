@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import type * as Notifications from 'expo-notifications'
-import { subscribeForegroundNotifications, type NotifPayload } from '@/services/notifications/notificationEngine'
+import * as Notifications from 'expo-notifications'
+import { subscribeForegroundNotifications, NotifPayload } from '@/services/notifications/notificationEngine'
 import { NotifType } from '@/services/notifications/notificationPrefs'
 
 interface BannerData {
