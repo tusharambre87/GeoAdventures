@@ -5,6 +5,14 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Redirect geoquestgame.live to game.geoquestgame.com (301 permanent)
+app.use((req, res, next) => {
+  if (req.hostname === 'geoquestgame.live') {
+    return res.redirect(301, `https://game.geoquestgame.com${req.originalUrl}`);
+  }
+  next();
+});
+
 app.use(
   pinoHttp({
     logger,
