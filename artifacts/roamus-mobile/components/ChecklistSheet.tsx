@@ -136,25 +136,17 @@ export default function ChecklistSheet({
   const [addingCustom, setAddingCustom] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const [customDraft,  setCustomDraft]  = useState('');
-  const keyboardOffset = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      Animated.timing(keyboardOffset, {
-        toValue: e.endCoordinates.height,
-        duration: Platform.OS === 'ios' ? e.duration ?? 250 : 200,
-        useNativeDriver: false,
-      }).start();
+      setKeyboardHeight(e.endCoordinates.height);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     });
-    const hideSub = Keyboard.addListener(hideEvent, (e) => {
-      Animated.timing(keyboardOffset, {
-        toValue: 0,
-        duration: Platform.OS === 'ios' ? e.duration ?? 250 : 200,
-        useNativeDriver: false,
-      }).start();
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
     });
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
@@ -386,7 +378,7 @@ export default function ChecklistSheet({
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
       </Animated.View>
 
-      <Animated.View style={[s.sheet, { position: 'absolute', bottom: keyboardOffset, left: 0, right: 0, transform: [{ translateY }] }]}>
+      <Animated.View style={[s.sheet, { position: 'absolute', bottom: keyboardHeight, left: 0, right: 0, transform: [{ translateY }] }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
