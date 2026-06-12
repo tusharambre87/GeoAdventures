@@ -40,6 +40,7 @@ import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
 import StopFeedbackSheet from "@/components/StopFeedbackSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import DirectionsSheet from "@/components/DirectionsSheet";
+import DirectionsToAllStopsCard from "@/components/DirectionsToAllStopsCard";
 import RescueSheet from "@/components/RescueSheet";
 import { F, CITY_IMGS } from "@/lib/tokens";
 
@@ -1998,33 +1999,7 @@ export default function TodayScreen() {
 
           {/* Directions card */}
           {dayStops.length > 0 && (
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#1D4A42',
-                borderRadius: 14,
-                padding: 14,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                marginTop: 10,
-                marginHorizontal: 16,
-                marginBottom: 4,
-              }}
-              onPress={() => setShowDirections(true)}
-              activeOpacity={0.85}
-            >
-              <Text style={{ fontSize: 20 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
-                  Directions to all stops
-                </Text>
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500', marginTop: 1 }}>
-                  Open full route in Google Maps
-                </Text>
-              </View>
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 16 }}>{'\u2197'}</Text>
-            </TouchableOpacity>
+            <DirectionsToAllStopsCard onPress={() => setShowDirections(true)} />
           )}
 
           {/* SOS / Emergency button */}

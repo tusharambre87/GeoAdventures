@@ -41,6 +41,7 @@ import { travelAPI } from "@/lib/apiClient";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { isFreePlan } from "@/lib/subscription";
 import UpgradeSheet, { type UpgradeContext } from "@/components/UpgradeSheet";
+import DirectionsToAllStopsCard, { openDirections } from "@/components/DirectionsToAllStopsCard";
 import { F } from "@/lib/tokens";
 import ChecklistSheet, { loadChecklistCounts } from "@/components/ChecklistSheet";
 import TripPreferencesSheet from "@/components/TripPreferencesSheet";
@@ -1830,6 +1831,23 @@ function DayDetail({
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
         )}
+
+        {/* Directions to all stops card — shown whenever there are stops */}
+        {dayStops.length > 0 && (() => {
+          const dayCity = trip.destination ?? trip.city ?? '';
+          const loc =
+            trip.stayLocations?.find(s => !s.cityName || s.cityName === dayCity) ??
+            trip.stayLocations?.[0];
+          const hotel = loc ? { lat: loc.lat ?? null, lng: loc.lng ?? null, address: loc.address ?? null } : null;
+          return (
+            <DirectionsToAllStopsCard
+              onPress={() => openDirections(dayStops, hotel)}
+              marginTop={12}
+              marginBottom={8}
+            />
+          );
+        })()}
+
         <Pressable
           onPress={() => setDisclaimerExpanded(!disclaimerExpanded)}
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 16, paddingHorizontal: 24 }}
