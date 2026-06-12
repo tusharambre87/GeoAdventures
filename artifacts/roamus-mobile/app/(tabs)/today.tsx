@@ -1278,6 +1278,8 @@ export default function TodayScreen() {
     const tomorrowStops = (trip?.stops ?? [])
       .filter(s => (s.dayIndex ?? 0) === 0)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const tomorrowContent = tomorrowStops.filter(s => !isMealStop(s.stopType));
+    const tomorrowMeals   = tomorrowStops.filter(s => isMealStop(s.stopType));
     const ticketCount = tomorrowStops.filter(s => hasTicketSignal(s.metadata)).length;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1294,7 +1296,7 @@ export default function TodayScreen() {
             </View>
             <Text style={ptt.heroTitle}>{trip?.name ?? city}</Text>
             <Text style={ptt.heroSub}>
-              {tomorrowStops.length} stop{tomorrowStops.length !== 1 ? 's' : ''} planned{city ? ` in ${city}` : ''}
+              {tomorrowContent.length} stop{tomorrowContent.length !== 1 ? 's' : ''} planned{city ? ` in ${city}` : ''}{tomorrowMeals.length > 0 ? ` + ${tomorrowMeals.length} meal${tomorrowMeals.length !== 1 ? 's' : ''}` : ''}
             </Text>
           </LinearGradient>
 
@@ -1369,7 +1371,7 @@ export default function TodayScreen() {
 
           <View style={ptt.card}>
             <Text style={ptt.cardLabel}>TOMORROW'S STOPS</Text>
-            {tomorrowStops.map((s, i) => (
+            {tomorrowContent.map((s, i) => (
               <View key={s.id} style={ptt.stopRow}>
                 <View style={ptt.stopNum}><Text style={ptt.stopNumText}>{i + 1}</Text></View>
                 <View style={{ flex: 1 }}>
@@ -1383,6 +1385,20 @@ export default function TodayScreen() {
                 )}
               </View>
             ))}
+            {tomorrowMeals.length > 0 && (
+              <View style={{ marginTop: tomorrowContent.length > 0 ? 10 : 0,
+                borderTopWidth: tomorrowContent.length > 0 ? 1 : 0,
+                borderTopColor: 'rgba(26,31,46,0.07)', paddingTop: tomorrowContent.length > 0 ? 10 : 0 }}>
+                <Text style={[ptt.cardLabel, { fontSize: 10, marginBottom: 6 }]}>MEALS</Text>
+                {tomorrowMeals.map(s => (
+                  <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 14 }}>{'🍽️'}</Text>
+                    <Text style={[ptt.stopName, { flex: 1 }]} numberOfLines={1}>{s.name}</Text>
+                    <Text style={ptt.stopMeta}>~{getStopDuration(s)} min</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           <View style={ptt.packCard}>
