@@ -81,12 +81,15 @@ export default function NotificationsSettings() {
                       <Text style={s.alwaysPillText}>{'Always on'}</Text>
                     </View>
                   ) : row.type ? (
-                    <Switch
-                      value={prefs[row.type] ?? true}
-                      onValueChange={v => { if (row.type) handleToggle(row.type, v) }}
-                      trackColor={{ false: '#C8C5BF', true: '#E8692A' }}
-                      thumbColor={'#fff'}
-                    />
+                    <View style={(prefs[row.type] ?? true) ? s.switchWrapOn : s.switchWrapOff}>
+                      <Switch
+                        value={prefs[row.type] ?? true}
+                        onValueChange={v => { if (row.type) handleToggle(row.type, v) }}
+                        trackColor={{ false: '#FDF0E9', true: '#E8692A' }}
+                        thumbColor={'#fff'}
+                        ios_backgroundColor={'#FDF0E9'}
+                      />
+                    </View>
                   ) : null}
                 </View>
                 {!isLastRow && <View style={s.divider} />}
@@ -191,6 +194,12 @@ const s = StyleSheet.create({
   rowTitle:  { fontSize: 14, fontFamily: F.semi, color: '#1A1F2E' },
   rowSub:    { fontSize: 12, fontFamily: F.regular, color: '#8A8FA8', marginTop: 2, lineHeight: 16 },
   divider:   { height: 1, backgroundColor: '#F0EDE8', marginLeft: 66 },
+  switchWrapOff: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E8692A',
+  },
+  switchWrapOn: {},
   alwaysPill: {
     backgroundColor: 'rgba(232,105,42,0.10)',
     borderRadius: 20,
