@@ -2036,6 +2036,19 @@ export default function TodayScreen() {
           <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
             <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
           </TouchableOpacity>
+          {__DEV__ && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={{ alignItems: 'center', paddingVertical: 10, marginTop: 4 }}
+              onPress={async () => {
+                await AsyncStorage.removeItem('@roamus_notif_permission_asked');
+                await AsyncStorage.removeItem('@roamus_notif_prefs');
+                Alert.alert('Debug', 'Notification state cleared — tap Start Day to re-trigger permission modal.');
+              }}
+            >
+              <Text style={{ fontSize: 11, color: '#E8692A', fontFamily: F.medium }}>{'[DEV] Reset notification state'}</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
         {menuOverlay}
         {showPermissionModal && (
