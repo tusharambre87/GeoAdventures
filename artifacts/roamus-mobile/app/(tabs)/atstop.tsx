@@ -166,7 +166,7 @@ type TripData = {
 };
 
 type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
-type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food' | 'break' | 'kidExtras';
+type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food' | 'break' | 'kidExtras' | 'mealFeedback';
 type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'big_hit' | 'good' | 'skip_next_time';
 type FoodPlace      = { id: string; name: string; cuisine: string; lat: number; lon: number };
@@ -533,6 +533,7 @@ export default function AtStopScreen() {
   const [stopMoments, setStopMoments]   = useState<Moment[]>([]);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [mealDone, setMealDone] = useState(false);
+  const [mealFeedbackDone, setMealFeedbackDone] = useState(false);
 
   // Prevents useFocusEffect from resetting mode when returning from a sub-screen
   const keepDetailOnFocus = useRef(false);
@@ -581,6 +582,7 @@ export default function AtStopScreen() {
   useEffect(() => {
     if (currentStop) setMealDone(isStopVisited(currentStop));
     else setMealDone(false);
+    setMealFeedbackDone(false);
   }, [currentStop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load on focus ──
@@ -713,14 +715,14 @@ export default function AtStopScreen() {
     router.push('/(tabs)/today');
   }
 
-  // ── Skip stop ──
-  async function handleMarkMealDone() {
+  async function handleMealComplete() {
     if (!currentStop) return;
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
       setDayStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s));
       setMealDone(true);
     } catch { /* best effort */ }
+    openSheet('mealFeedback');
   }
 
   async function handleSkipStop() {
@@ -971,10 +973,15 @@ function isMealStop(t?: string | null): boolean {
   const stopLon      = currentStop.longitude ? parseFloat(currentStop.longitude) : null;
 
   if (isMealStop(currentStop.stopType)) {
+    const tileStyle = {
+      flex: 1, backgroundColor: '#fff', borderRadius: 12,
+      padding: 16, minHeight: 100,
+      borderWidth: 1, borderColor: 'rgba(26,31,46,0.07)',
+      shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
+    };
     return (
-      <View style={sc.screen}>
-        <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 40 }}
-          showsVerticalScrollIndicator={false}>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
 
           {/* Hero */}
           <View style={[dt.hero, { height: 220, overflow: 'hidden' }]}>
@@ -989,17 +996,17 @@ function isMealStop(t?: string | null): boolean {
               style={StyleSheet.absoluteFill}
             />
             <View style={dt.heroBottom}>
-              <Text style={dt.heroType}>{stopTypeLabel} {`·`} Stop {stopOrderNum} of {totalStops}</Text>
+              <Text style={dt.heroType}>{stopTypeLabel} {'\u00B7'} Stop {stopOrderNum} of {totalStops}</Text>
               <Text style={dt.heroName} numberOfLines={2}>{currentStop.name}</Text>
             </View>
           </View>
 
-          {/* Action row: kid-friendly + directions */}
+          {/* Kid-friendly + Directions */}
           <View style={{ flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 0 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
               backgroundColor: '#E8F7EF', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14,
               borderWidth: 1, borderColor: '#A8D8BF' }}>
-              <Text style={{ fontSize: 14 }}>👍</Text>
+              <Text style={{ fontSize: 14 }}>{'\uD83D\uDC4D'}</Text>
               <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#16A34A' }}>Kid-friendly</Text>
             </View>
             <TouchableOpacity
@@ -1015,117 +1022,114 @@ function isMealStop(t?: string | null): boolean {
                   : address ? `https://www.google.com/maps/search/${encodeURIComponent(address)}` : null;
                 if (url) Linking.openURL(url);
               }}>
-              <Text style={{ fontSize: 14 }}>↗️</Text>
+              <Text style={{ fontSize: 14 }}>{'\u2197\uFE0F'}</Text>
               <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' }}>Directions</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Capture moment */}
-          <TouchableOpacity
-            style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
-              borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16,
-              flexDirection: 'row', alignItems: 'center', gap: 12 }}
-            activeOpacity={0.8}
-            onPress={handleAddPhoto}>
-            <View style={{ width: 44, height: 44, backgroundColor: '#FDF0E9', borderRadius: 12,
-              alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 20 }}>📸</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#1A1F2E' }}>Capture the moment</Text>
-              <Text style={{ fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>Photo, note, or kid quote</Text>
-            </View>
-            <Text style={{ fontFamily: F.semibold, fontSize: 13, color: '#E8692A' }}>Add →</Text>
-          </TouchableOpacity>
+          {/* 2-tile grid */}
+          <View style={{ flexDirection: 'row', gap: 12, margin: 16 }}>
+            <TouchableOpacity
+              style={tileStyle} activeOpacity={0.8}
+              onPress={() => {
+                keepDetailOnFocus.current = true;
+                router.push({ pathname: '/kids/games' as never, params: { stopId: currentStop.id, stopName: currentStop.name } });
+              }}>
+              <Text style={{ fontSize: 28, marginBottom: 8 }}>{'\uD83E\uDDED'}</Text>
+              <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#1A1F2E', marginBottom: 4 }}>Kids Zone</Text>
+              <Text style={{ fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' }}>Travel games for the table</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={tileStyle} activeOpacity={0.8}
+              onPress={handleAddPhoto}>
+              <Text style={{ fontSize: 28, marginBottom: 8 }}>{'\uD83D\uDCF8'}</Text>
+              <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#1A1F2E', marginBottom: 4 }}>Capture moment</Text>
+              <Text style={{ fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' }}>Photo, note, kid quote</Text>
+            </TouchableOpacity>
+          </View>
 
-          {stopMoments.length > 0 ? (
-            <View style={{ marginTop: 16, marginHorizontal: 16 }}>
+          {stopMoments.length > 0 && (
+            <View style={{ marginHorizontal: 16, marginBottom: 8 }}>
               <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8',
                 letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>Your moments</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
                 {stopMoments.map(m => (
                   <Image key={m.id} source={{ uri: m.photoUrls?.[0] ?? m.photoUrl ?? '' }}
-                    style={{ width: 90, height: 90, borderRadius: 12 }}
-                    resizeMode='cover' />
+                    style={{ width: 90, height: 90, borderRadius: 12 }} resizeMode="cover" />
                 ))}
               </ScrollView>
             </View>
-          ) : (
-            <TouchableOpacity
-              style={{ margin: 16, marginBottom: 0, backgroundColor: '#F8F6F3', borderRadius: 14,
-                borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)', padding: 16,
-                flexDirection: 'row', alignItems: 'center', gap: 12 }}
-              activeOpacity={0.7}
-              onPress={handleAddPhoto}>
-              <Text style={{ fontSize: 22 }}>📷</Text>
-              <Text style={{ fontFamily: F.regular, fontSize: 13, color: '#8A8FA8', flex: 1 }}>
-                Add a photo or note from this stop
-              </Text>
-            </TouchableOpacity>
           )}
 
-          {mealDone && (
-            <View style={{ margin: 16, marginBottom: 0, backgroundColor: '#fff', borderRadius: 16,
-              borderWidth: 1, borderColor: 'rgba(26,31,46,0.09)', padding: 16 }}>
-              <Text style={{ fontFamily: F.bold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.7,
-                textTransform: 'uppercase', marginBottom: 10 }}>How was the meal?</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {([
-                  { val: 'big_hit' as FeedbackRating, label: 'Loved it', icon: '🌟' },
-                  { val: 'good' as FeedbackRating, label: 'Good', icon: '👍' },
-                  { val: 'skip_next_time' as FeedbackRating, label: 'Skip next time', icon: '🙄' },
-                ]).map(opt => (
-                  <TouchableOpacity
-                    key={opt.val}
-                    style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10,
-                      borderWidth: 1.5,
-                      borderColor: feedbackRating === opt.val ? '#E8692A' : 'rgba(26,31,46,0.09)',
-                      backgroundColor: feedbackRating === opt.val ? '#FDF0E9' : 'transparent' }}
-                    onPress={() => setFeedbackRating(opt.val)}>
-                    <Text style={{ fontSize: 18, marginBottom: 3 }}>{opt.icon}</Text>
-                    <Text style={{ fontFamily: F.semibold, fontSize: 10, textAlign: 'center',
-                      color: feedbackRating === opt.val ? '#E8692A' : '#8A8FA8' }}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
         </ScrollView>
 
-        {/* CTA — fixed footer */}
-        <View style={{ backgroundColor: C.bg, paddingHorizontal: 16, paddingTop: 10,
-          paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
-          {mealDone ? (
+        {/* Pinned CTA */}
+        <View style={{ position: 'absolute', bottom: 90, left: 16, right: 16 }}>
+          {mealFeedbackDone && nextStop ? (
             <TouchableOpacity
-              style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
-                alignItems: 'center', justifyContent: 'center' }}
+              style={{ backgroundColor: C.orange, height: 56, borderRadius: 12,
+                justifyContent: 'center', alignItems: 'center' }}
               activeOpacity={0.88}
-              onPress={() => { AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
-              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>{'✓'} Done — back to today</Text>
+              onPress={() => setCurrentStop(nextStop)}>
+              <Text style={{ color: '#fff', fontFamily: F.semibold, fontSize: 15 }}>
+                Head to {nextStop.name} {'\u2192'}
+              </Text>
             </TouchableOpacity>
-          ) : tripNotStarted ? (
-            <View style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
-              alignItems: 'center', justifyContent: 'center', opacity: 0.4 }}>
-              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>Starts {tripStartLabel}</Text>
-            </View>
+          ) : mealFeedbackDone ? (
+            <TouchableOpacity
+              style={{ backgroundColor: '#1A1F2E', height: 56, borderRadius: 12,
+                justifyContent: 'center', alignItems: 'center' }}
+              activeOpacity={0.88}
+              onPress={async () => { await AsyncStorage.setItem('today_state_override', 'stop_complete'); router.push('/(tabs)/today'); }}>
+              <Text style={{ color: '#fff', fontFamily: F.semibold, fontSize: 15 }}>{'✓'} Done — back to today</Text>
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={{ backgroundColor: '#1A1F2E', borderRadius: 12, height: 56,
-                alignItems: 'center', justifyContent: 'center' }}
+              style={{ backgroundColor: '#1A1F2E', height: 56, borderRadius: 12,
+                justifyContent: 'center', alignItems: 'center' }}
               activeOpacity={0.88}
-              onPress={handleMarkMealDone}>
-              <Text style={{ fontFamily: F.semibold, fontSize: 15, color: '#fff' }}>{'✓'} We're done eating — move on</Text>
+              onPress={handleMealComplete}>
+              <Text style={{ color: '#fff', fontFamily: F.semibold, fontSize: 15 }}>{'✓'} We're done eating — move on</Text>
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Meal feedback sheet */}
+        <SheetModal visible={activeSheet === 'mealFeedback'} onClose={() => setActiveSheet('none')}>
+          <Text style={sh.title}>How was the meal?</Text>
+          <Text style={sh.sub}>Quick rating — helps us suggest better next time.</Text>
+          {([
+            { label: 'Loved it',       icon: '\u2B50',       signal: 'meal_loved' },
+            { label: 'Good',           icon: '\uD83D\uDC4D', signal: 'meal_good'  },
+            { label: 'Skip next time', icon: '\uD83D\uDE44', signal: 'meal_skip'  },
+          ] as const).map(opt => (
+            <TouchableOpacity key={opt.signal} style={sh.row} activeOpacity={0.8}
+              onPress={async () => {
+                apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
+                  method: 'POST',
+                  headers: { 'x-adventure-parent': '1' },
+                  body: JSON.stringify({ signalType: opt.signal, signalValue: 1 }),
+                }).catch(() => {});
+                setActiveSheet('none');
+                setMealFeedbackDone(true);
+              }}>
+              <View style={[sh.rowIcon, { backgroundColor: C.bg }]}><Text style={{ fontSize: 18 }}>{opt.icon}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={sh.rowName}>{opt.label}</Text>
+              </View>
+              <Text style={sh.rowChev}>{'\u203A'}</Text>
+            </TouchableOpacity>
+          ))}
+        </SheetModal>
+
       </View>
     );
   }
 
   return (
     <View style={sc.screen}>
-      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 140 }}
+      <ScrollView style={sc.scroll} contentContainerStyle={{ paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}>
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
