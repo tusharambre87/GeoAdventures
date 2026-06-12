@@ -1443,10 +1443,38 @@ export default function TodayScreen() {
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
-            setLocalSavedHotel(resolvedAddr);
-            if (trip?.id) {
-              AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
-            }
+            const saveForDay = () => {
+              setLocalSavedHotel(resolvedAddr);
+              if (trip?.id) {
+                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+              }
+            };
+            const saveForAllDays = async () => {
+              setLocalSavedHotel(resolvedAddr);
+              if (trip?.id) {
+                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+              }
+              if (!trip) return;
+              const cities: string[] = (trip as any).cities?.length > 0
+                ? (trip as any).cities
+                : [trip.destination ?? (trip as any).city ?? ''].filter(Boolean);
+              const allLocs = cities.map((c: string) => ({ cityName: c, address: resolvedAddr }));
+              try {
+                await apiFetch(`/api/travel/trips/${trip.id}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ stayLocations: allLocs }),
+                });
+                setTrip(prev => prev ? { ...prev, stayLocations: allLocs } : prev);
+              } catch {}
+            };
+            Alert.alert(
+              'Use for all days?',
+              `Use "${name || addr}" as the starting point for every day of your trip?`,
+              [
+                { text: 'This day only', style: 'cancel', onPress: saveForDay },
+                { text: 'All days', onPress: () => { void saveForAllDays(); } },
+              ]
+            );
           }}
         />
         {trip && (
