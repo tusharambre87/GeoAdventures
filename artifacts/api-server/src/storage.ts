@@ -2854,14 +2854,35 @@ export class DatabaseStorage implements IStorage {
   async deleteStop(stopId: string): Promise<boolean> {
     // Use a transaction to ensure atomicity
     await db.transaction(async (tx) => {
-      // Delete related records first to avoid FK violations
+      // 1. Delete leaf rows that reference trailTalesRiddles (which references travelStops)
+      const riddleIds = await tx.select({ id: trailTalesRiddles.id })
+        .from(trailTalesRiddles)
+        .where(eq(trailTalesRiddles.stopId, stopId));
+      if (riddleIds.length > 0) {
+        await tx.delete(trailTalesAttempts).where(
+          inArray(trailTalesAttempts.riddleId, riddleIds.map(r => r.id))
+        );
+      }
+      await tx.delete(trailTalesRiddles).where(eq(trailTalesRiddles.stopId, stopId));
+
+      // 2. Delete other NOT NULL FK child rows
+      await tx.delete(stopQualitySignals).where(eq(stopQualitySignals.stopId, stopId));
+      await tx.delete(explorerCollectedArtifacts).where(eq(explorerCollectedArtifacts.stopId, stopId));
+      await tx.delete(journeyPackProgress).where(eq(journeyPackProgress.stopId, stopId));
       await tx.delete(journeyGamePrompts).where(eq(journeyGamePrompts.stopId, stopId));
       await tx.delete(journeyPacks).where(eq(journeyPacks.stopId, stopId));
       await tx.delete(travelWonderResponses).where(eq(travelWonderResponses.stopId, stopId));
       await tx.delete(memoryStars).where(eq(memoryStars.stopId, stopId));
-      // Update moments to remove stop reference (but keep the moment)
+
+      // 3. Null-out optional FK references (keep the parent row, just clear the stop link)
       await tx.update(travelMoments).set({ stopId: null }).where(eq(travelMoments.stopId, stopId));
-      // Now delete the stop
+      await tx.update(reflectionGameCache).set({ stopId: null }).where(eq(reflectionGameCache.stopId, stopId));
+      await tx.update(reflectionGameResponses).set({ stopId: null }).where(eq(reflectionGameResponses.stopId, stopId));
+      await tx.update(geoRelicPuzzles).set({ stopId: null }).where(eq(geoRelicPuzzles.stopId, stopId));
+      await tx.update(travelKeepsakes).set({ stopId: null }).where(eq(travelKeepsakes.stopId, stopId));
+      await tx.update(tripWalletItems).set({ stopId: null }).where(eq(tripWalletItems.stopId, stopId));
+
+      // 4. Now delete the stop
       await tx.delete(travelStops).where(eq(travelStops.id, stopId));
     });
     return true;
