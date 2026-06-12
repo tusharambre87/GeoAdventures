@@ -119,7 +119,14 @@ export default function DirectionsSheet({ stops, trip, currentDayIndex, onClose,
     // Return to hotel / start (loop route)
     if (startingPoint) waypoints.push(encodeURIComponent(startingPoint));
 
-    const googleUrl    = `https://www.google.com/maps/dir/${waypoints.join('/')}`;
+    const [wpOrigin, ...wpRest] = waypoints;
+    const wpDest   = wpRest[wpRest.length - 1] ?? wpOrigin;
+    const wpMiddle = wpRest.slice(0, -1);
+    const googleUrl =
+      'https://www.google.com/maps/dir/?api=1' +
+      (wpOrigin            ? `&origin=${wpOrigin}`                      : '') +
+      (wpDest              ? `&destination=${wpDest}`                   : '') +
+      (wpMiddle.length > 0 ? `&waypoints=${wpMiddle.join('%7C')}`       : '');
     const googleAppUrl = `comgooglemaps://?waypoints=${waypoints.join('|')}`;
 
     Linking.canOpenURL('comgooglemaps://').then(supported => {
