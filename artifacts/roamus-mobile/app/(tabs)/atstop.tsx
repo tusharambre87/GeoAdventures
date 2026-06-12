@@ -1086,11 +1086,14 @@ function isMealStop(t?: string | null): boolean {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={{ backgroundColor: '#1A1F2E', height: 56, borderRadius: 12,
+              style={{ backgroundColor: tripNotStarted ? 'rgba(26,31,46,0.3)' : '#1A1F2E', height: 56, borderRadius: 12,
                 justifyContent: 'center', alignItems: 'center' }}
-              activeOpacity={0.88}
+              activeOpacity={tripNotStarted ? 1 : 0.88}
+              disabled={tripNotStarted}
               onPress={handleMealComplete}>
-              <Text style={{ color: '#fff', fontFamily: F.semibold, fontSize: 15 }}>{'✓'} We're done eating — move on</Text>
+              <Text style={{ color: tripNotStarted ? 'rgba(255,255,255,0.5)' : '#fff', fontFamily: F.semibold, fontSize: 15 }}>
+                {tripNotStarted ? 'Trip hasn\'t started yet' : '\u2713 We\'re done eating \u2014 move on'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>

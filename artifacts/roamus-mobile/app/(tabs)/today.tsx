@@ -1276,10 +1276,10 @@ export default function TodayScreen() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'pre_trip_tomorrow') {
     const tomorrowStops = (trip?.stops ?? [])
-      .filter(s => (s.dayIndex ?? 0) === 0)
+      .filter(s => s.dayIndex === 0)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const tomorrowContent = tomorrowStops.filter(s => !isMealStop(s.stopType));
-    const tomorrowMeals   = tomorrowStops.filter(s => isMealStop(s.stopType));
+    const tomorrowMeals   = tomorrowStops.filter(s => isMealStop(s.stopType) && !s.isVisited);
     const ticketCount = tomorrowStops.filter(s => hasTicketSignal(s.metadata)).length;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>

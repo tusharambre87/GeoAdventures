@@ -176,7 +176,14 @@ export default function IndoorAlternativesSheet({
             name.includes(existing)
           );
         });
-        setOptions(filtered);
+        const seen = new Set<string>();
+        const deduped = filtered.filter(item => {
+          const key = item.name.toLowerCase().trim();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setOptions(deduped);
       })
       .catch(() => setOptions([]))
       .finally(() => setLoading(false));

@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -106,7 +108,7 @@ export default function ConfirmPhotoScreen() {
         );
       }
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-      router.replace('/(tabs)/atstop' as never);
+      router.navigate('/(tabs)/atstop' as never);
     } catch (err: any) {
       console.error('Save photos failed:', err);
       const msg = err?.message ?? 'Something went wrong. Please try again.';
@@ -131,7 +133,11 @@ export default function ConfirmPhotoScreen() {
   // ── Single photo layout ──────────────────────────────────────────────────
   if (!isMulti) {
     return (
-      <View style={[cf.screen, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={[cf.screen, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
         {/* Nav */}
         <View style={cf.nav}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
@@ -158,7 +164,7 @@ export default function ConfirmPhotoScreen() {
           <TaggedRow />
           <TextInput
             style={cf.captionInput}
-            placeholder={'"That was amazing!" — what did the kids say?'}
+            placeholder={'"That was amazing!" \u2014 what did the kids say?'}
             placeholderTextColor="#D1D5E0"
             value={captions[0]}
             onChangeText={(t) => updateCaption(0, t)}
@@ -173,11 +179,11 @@ export default function ConfirmPhotoScreen() {
             {saving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={cf.saveBtnText}>Save to memories {'→'}</Text>
+              <Text style={cf.saveBtnText}>Save to memories {'\u2192'}</Text>
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 

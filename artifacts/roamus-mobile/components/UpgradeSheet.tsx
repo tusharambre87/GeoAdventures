@@ -289,7 +289,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
         </ScrollView>
 
         {/* CTA */}
-        <View style={s.cta}>
+        <View style={[s.cta, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Pressable
             style={({ pressed }) => [s.ctaBtn, { opacity: pressed ? 0.88 : 1 }]}
             onPress={handleCta}

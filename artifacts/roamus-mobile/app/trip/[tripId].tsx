@@ -1428,6 +1428,31 @@ function DayDetail({
     }
   }
 
+  async function handleMoveStop(stopId: string, direction: 'up' | 'down') {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const allStops = [...localContentStops, ...mealStops]
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const idx = allStops.findIndex(s => s.id === stopId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= allStops.length) return;
+    const swapped = [...allStops];
+    [swapped[idx], swapped[targetIdx]] = [swapped[targetIdx], swapped[idx]];
+    const newContent = swapped.filter(s => !isMealStop(s.stopType));
+    const prev = localContentStops;
+    setLocalContentStops(newContent);
+    const stopOrders = swapped.map((s, i) => ({ stopId: s.id, displayOrder: i, dayIndex: s.dayIndex ?? 0 }));
+    try {
+      await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stopOrders }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+    } catch {
+      setLocalContentStops(prev);
+    }
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Header */}
@@ -1591,6 +1616,11 @@ function DayDetail({
         renderItem={({ item: stop, drag, isActive, getIndex }: RenderItemParams<Stop>) => {
           const i      = getIndex() ?? 0;
           const isLast = i === localContentStops.length - 1;
+          const allSorted = [...localContentStops, ...mealStops]
+            .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+          const posInAll = allSorted.findIndex(s => s.id === stop.id);
+          const canMoveUp   = isEditable && posInAll > 0;
+          const canMoveDown = isEditable && posInAll < allSorted.length - 1;
           return (
             <ScaleDecorator activeScale={0.97}>
               <StopCard
@@ -1604,6 +1634,24 @@ function DayDetail({
                 drag={isEditable ? drag : undefined}
                 isActive={isActive}
               />
+              {isEditable && (
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 6, marginTop: -6, marginBottom: 2, paddingHorizontal: 16 }}>
+                  <Pressable
+                    onPress={() => handleMoveStop(stop.id, 'up')}
+                    disabled={!canMoveUp}
+                    style={{ backgroundColor: canMoveUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                  >
+                    <Text style={{ fontSize: 13, color: canMoveUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'} Up</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleMoveStop(stop.id, 'down')}
+                    disabled={!canMoveDown}
+                    style={{ backgroundColor: canMoveDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                  >
+                    <Text style={{ fontSize: 13, color: canMoveDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>Down {'\u2193'}</Text>
+                  </Pressable>
+                </View>
+              )}
               {i === 0 && isEditable && (
                 <MealSuggestionCard
                   tripId={tripId}

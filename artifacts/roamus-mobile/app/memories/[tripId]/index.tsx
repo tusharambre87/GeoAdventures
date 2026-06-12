@@ -65,12 +65,15 @@ export default function TripMemoryIndex() {
     retry: 1,
   });
 
-  const { data: moments = [], isLoading: momentsLoading, isError: momentsError } = useQuery({
+  const { data: momentsRaw, isLoading: momentsLoading, isError: momentsError } = useQuery({
     queryKey: ['moments', tripId],
     queryFn: () => memoriesAPI.getMoments(tripId),
     enabled: !!tripId,
     retry: 1,
   });
+  const moments: Moment[] = Array.isArray(momentsRaw)
+    ? momentsRaw
+    : ((momentsRaw as any)?.moments ?? []);
 
   const { visitedStops, momentsByStop, allPhotos } = useMemo(() => {
     const visitedStops = ((trip?.stops ?? []) as any[])
@@ -78,13 +81,13 @@ export default function TripMemoryIndex() {
       .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
 
     const momentsByStop: Record<string, Moment[]> = {};
-    for (const m of moments as Moment[]) {
+    for (const m of moments) {
       const key = m.stopId ?? '__none__';
       if (!momentsByStop[key]) momentsByStop[key] = [];
       momentsByStop[key].push(m);
     }
 
-    const allPhotos = (moments as Moment[]).flatMap(m =>
+    const allPhotos = moments.flatMap(m =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
 

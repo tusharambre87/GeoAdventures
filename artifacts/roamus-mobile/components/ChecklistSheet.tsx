@@ -136,14 +136,33 @@ export default function ChecklistSheet({
   const [addingCustom, setAddingCustom] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const [customDraft,  setCustomDraft]  = useState('');
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: e.endCoordinates.height,
+        duration: Platform.OS === 'ios' ? e.duration ?? 250 : 200,
+        useNativeDriver: false,
+      }).start();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? e.duration ?? 250 : 200,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (!addingCustom) return;
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    const sub = Keyboard.addListener('keyboardDidShow', () => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    });
-    return () => { clearTimeout(t); sub.remove(); };
+    return () => clearTimeout(t);
   }, [addingCustom]);
   const [loaded,       setLoaded]       = useState(false);
   const checkAnimRefs = useRef<Map<string, Animated.Value>>(new Map());
@@ -367,7 +386,7 @@ export default function ChecklistSheet({
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissable ? onClose : undefined} />
       </Animated.View>
 
-      <Animated.View style={[s.sheet, { position: 'absolute', bottom: 0, left: 0, right: 0, transform: [{ translateY }] }]}>
+      <Animated.View style={[s.sheet, { position: 'absolute', bottom: keyboardOffset, left: 0, right: 0, transform: [{ translateY }] }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
