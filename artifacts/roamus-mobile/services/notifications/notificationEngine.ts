@@ -90,6 +90,22 @@ export async function cancelNotification(identifier: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(identifier)
 }
 
+// ── Public test helper — bypasses pref check, fires in `seconds` ──
+export async function scheduleLocalNotification(
+  type: NotifType,
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+  seconds: number,
+): Promise<void> {
+  if (Platform.OS === 'web') return
+  await Notifications.scheduleNotificationAsync({
+    content: { title, body, data },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, repeats: false },
+    identifier: `test_${type}_${Date.now()}`,
+  })
+}
+
 // ── Listen for foreground notifications (show in-app banner) ──
 export function subscribeForegroundNotifications(
   onReceive: (n: Notifications.Notification) => void,

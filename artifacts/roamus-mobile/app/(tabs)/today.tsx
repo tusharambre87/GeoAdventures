@@ -2049,6 +2049,26 @@ export default function TodayScreen() {
               <Text style={{ fontSize: 11, color: '#E8692A', fontFamily: F.medium }}>{'[DEV] Reset notification state'}</Text>
             </TouchableOpacity>
           )}
+          {__DEV__ && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={{ alignItems: 'center', paddingVertical: 10 }}
+              onPress={async () => {
+                const { scheduleLocalNotification } = await import('@/services/notifications/notificationEngine');
+                const { NotifType: NT } = await import('@/services/notifications/notificationPrefs');
+                await scheduleLocalNotification(
+                  NT.KIDS_ZONE_ENROUTE,
+                  '18 min to Air & Space \uD83C\uDFAE',
+                  'Travel games loaded \u2014 keep the kids busy.',
+                  { type: NT.KIDS_ZONE_ENROUTE, tripId: 'test-123', dayIndex: 0 },
+                  5,
+                );
+                Alert.alert('Debug', 'Test notification scheduled — fires in 5 seconds.');
+              }}
+            >
+              <Text style={{ fontSize: 11, color: '#7C3AED', fontFamily: F.medium }}>{'[DEV] Fire test notification (5s)'}</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
         {menuOverlay}
         {showPermissionModal && (
