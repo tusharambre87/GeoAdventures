@@ -922,8 +922,11 @@ export default function TodayScreen() {
           onPress: async () => {
             try {
               await apiFetch(`/api/travel/stops/${stop.id}`, { method: 'DELETE' });
-            } catch { /* best-effort */ }
-            setDayStops(prev => prev.filter(s => s.id !== stop.id));
+              setDayStops(prev => prev.filter(s => s.id !== stop.id));
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Could not remove stop.';
+              Alert.alert('Remove failed', msg);
+            }
           },
         },
       ],
