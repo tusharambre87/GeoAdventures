@@ -657,6 +657,30 @@ function KidFitTag({ bias }: { bias: string | null | undefined }) {
   );
 }
 
+function StopReorderControls({
+  canMoveUp = true,
+  canMoveDown = true,
+  onMoveUp,
+  onMoveDown,
+}: {
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: '#F5F2EE', borderWidth: 1, borderColor: '#E0DDD8', borderRadius: 10, overflow: 'hidden' }}>
+      <Pressable onPress={onMoveUp} disabled={!canMoveUp} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: canMoveUp ? '#1A1F2E' : '#8A8FA8' }}>{'\u2191'}</Text>
+      </Pressable>
+      <View style={{ width: 1, backgroundColor: '#E0DDD8' }} />
+      <Pressable onPress={onMoveDown} disabled={!canMoveDown} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: canMoveDown ? '#1A1F2E' : '#8A8FA8' }}>{'\u2193'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function StopCard({
   stop,
   isEditable,
@@ -667,6 +691,10 @@ function StopCard({
   onDelete,
   drag,
   isActive,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
 }: {
   stop: Stop;
   isEditable: boolean;
@@ -677,6 +705,10 @@ function StopCard({
   onDelete: (stopId: string) => Promise<void>;
   drag?: () => void;
   isActive?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const heroImg  = useStopHeroImage(stop.id);
   const heroBg   = stopHeroBg(stop.stopType);
@@ -713,7 +745,12 @@ function StopCard({
       >
         <Text style={sc.detailsBtnText}>Details →</Text>
       </Pressable>
-      {!isEditable && <Text style={sc.viewOnlyText}>View only</Text>}
+      {!isEditable
+        ? <Text style={sc.viewOnlyText}>View only</Text>
+        : onMoveUp && onMoveDown
+          ? <StopReorderControls canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />
+          : null
+      }
     </View>
   );
 
@@ -819,6 +856,10 @@ function MealSuggestionCard({
   confirmedStop,
   onAdded,
   onOtherOptions,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
 }: {
   tripId: string;
   destination: string;
@@ -828,6 +869,10 @@ function MealSuggestionCard({
   confirmedStop?: Stop;
   onAdded: () => void;
   onOtherOptions: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const [rec, setRec] = useState<MealRec | null>(null);
   const [loading, setLoading] = useState(false);
@@ -896,8 +941,18 @@ function MealSuggestionCard({
           <Text style={meal.confirmedSub}>{sub.replace(/_/g, ' ')} {'\u00B7'} In your plan</Text>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 6 }}>
-          <View style={meal.confirmedBadge}>
-            <Text style={meal.confirmedBadgeText}>{'\u2713'} Added</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={meal.confirmedBadge}>
+              <Text style={meal.confirmedBadgeText}>{'\u2713'} Added</Text>
+            </View>
+            {onMoveUp && onMoveDown && (
+              <StopReorderControls
+                canMoveUp={canMoveUp}
+                canMoveDown={canMoveDown}
+                onMoveUp={onMoveUp}
+                onMoveDown={onMoveDown}
+              />
+            )}
           </View>
           <Pressable onPress={onOtherOptions}>
             <Text style={meal.otherBtnText}>Other options {'\u2192'}</Text>
@@ -1633,27 +1688,16 @@ function DayDetail({
                 onDelete={onDelete}
                 drag={isEditable ? drag : undefined}
                 isActive={isActive}
+                canMoveUp={canMoveUp}
+                canMoveDown={canMoveDown}
+                onMoveUp={isEditable ? () => handleMoveStop(stop.id, 'up') : undefined}
+                onMoveDown={isEditable ? () => handleMoveStop(stop.id, 'down') : undefined}
               />
-              {isEditable && (
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 6, marginTop: -6, marginBottom: 2, paddingHorizontal: 16 }}>
-                  <Pressable
-                    onPress={() => handleMoveStop(stop.id, 'up')}
-                    disabled={!canMoveUp}
-                    style={{ backgroundColor: canMoveUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
-                  >
-                    <Text style={{ fontSize: 15, color: canMoveUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'}</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleMoveStop(stop.id, 'down')}
-                    disabled={!canMoveDown}
-                    style={{ backgroundColor: canMoveDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
-                  >
-                    <Text style={{ fontSize: 15, color: canMoveDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2193'}</Text>
-                  </Pressable>
-                </View>
-              )}
-              {i === 0 && isEditable && (
-                <>
+              {i === 0 && isEditable && (() => {
+                const mealSorted = [...localContentStops, ...mealStops]
+                  .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+                const mealPos   = mealStops[0] ? mealSorted.findIndex(s => s.id === mealStops[0].id) : -1;
+                return (
                   <MealSuggestionCard
                     tripId={tripId}
                     destination={trip?.destination ?? trip?.city ?? ''}
@@ -1663,34 +1707,13 @@ function DayDetail({
                     confirmedStop={mealStops[0]}
                     onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
                     onOtherOptions={() => onAddStop('food')}
+                    canMoveUp={mealPos > 0}
+                    canMoveDown={mealPos >= 0 && mealPos < mealSorted.length - 1}
+                    onMoveUp={mealStops[0] ? () => handleMoveStop(mealStops[0].id, 'up') : undefined}
+                    onMoveDown={mealStops[0] ? () => handleMoveStop(mealStops[0].id, 'down') : undefined}
                   />
-                  {mealStops[0] && (() => {
-                    const mealSorted = [...localContentStops, ...mealStops]
-                      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-                    const mealPos   = mealSorted.findIndex(s => s.id === mealStops[0].id);
-                    const mealUp    = mealPos > 0;
-                    const mealDown  = mealPos < mealSorted.length - 1;
-                    return (
-                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 6, marginTop: 2, marginBottom: 2, paddingHorizontal: 16 }}>
-                        <Pressable
-                          onPress={() => handleMoveStop(mealStops[0].id, 'up')}
-                          disabled={!mealUp}
-                          style={{ backgroundColor: mealUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
-                        >
-                          <Text style={{ fontSize: 15, color: mealUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'}</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => handleMoveStop(mealStops[0].id, 'down')}
-                          disabled={!mealDown}
-                          style={{ backgroundColor: mealDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
-                        >
-                          <Text style={{ fontSize: 15, color: mealDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2193'}</Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })()}
-                </>
-              )}
+                );
+              })()}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
               )}
