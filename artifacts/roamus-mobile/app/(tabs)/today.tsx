@@ -1366,6 +1366,7 @@ export default function TodayScreen() {
           {(() => {
             const savedHotel = localSavedHotel
               ?? (trip?.stayLocations ?? []).find(s => !s.cityName || s.cityName === (trip?.destination ?? (trip as any)?.city))?.address
+              ?? (trip?.stayLocations ?? [])[0]?.address
               ?? null;
             return (
               <TouchableOpacity
@@ -1477,7 +1478,10 @@ export default function TodayScreen() {
             const saveForAllDays = async () => {
               setLocalSavedHotel(resolvedAddr);
               if (trip?.id) {
-                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+                const totalDays = (trip as any).tripDays ?? (trip as any).plannerTripDays ?? 1;
+                for (let d = 0; d < totalDays; d++) {
+                  AsyncStorage.setItem(`hotel_${trip.id}_day${d}`, resolvedAddr).catch(() => {});
+                }
               }
               if (!trip) return;
               const cities: string[] = (trip as any).cities?.length > 0
@@ -1916,6 +1920,7 @@ export default function TodayScreen() {
           {(() => {
             const savedHotel = localSavedHotel
               ?? (trip?.stayLocations ?? []).find(s => !s.cityName || s.cityName === (trip?.destination ?? (trip as any)?.city))?.address
+              ?? (trip?.stayLocations ?? [])[0]?.address
               ?? null;
             return (
               <TouchableOpacity
@@ -2101,7 +2106,10 @@ export default function TodayScreen() {
             const saveForAllDays = async () => {
               setLocalSavedHotel(resolvedAddr);
               if (trip?.id) {
-                AsyncStorage.setItem(`hotel_${trip.id}_day${resolvedDayIndex}`, resolvedAddr).catch(() => {});
+                const totalDays = (trip as any).tripDays ?? (trip as any).plannerTripDays ?? 1;
+                for (let d = 0; d < totalDays; d++) {
+                  AsyncStorage.setItem(`hotel_${trip.id}_day${d}`, resolvedAddr).catch(() => {});
+                }
               }
               if (!trip) return;
               const cities: string[] = (trip as any).cities?.length > 0
