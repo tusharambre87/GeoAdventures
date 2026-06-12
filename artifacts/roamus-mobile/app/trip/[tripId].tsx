@@ -1639,30 +1639,57 @@ function DayDetail({
                   <Pressable
                     onPress={() => handleMoveStop(stop.id, 'up')}
                     disabled={!canMoveUp}
-                    style={{ backgroundColor: canMoveUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                    style={{ backgroundColor: canMoveUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
                   >
-                    <Text style={{ fontSize: 13, color: canMoveUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'} Up</Text>
+                    <Text style={{ fontSize: 15, color: canMoveUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => handleMoveStop(stop.id, 'down')}
                     disabled={!canMoveDown}
-                    style={{ backgroundColor: canMoveDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                    style={{ backgroundColor: canMoveDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
                   >
-                    <Text style={{ fontSize: 13, color: canMoveDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>Down {'\u2193'}</Text>
+                    <Text style={{ fontSize: 15, color: canMoveDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2193'}</Text>
                   </Pressable>
                 </View>
               )}
               {i === 0 && isEditable && (
-                <MealSuggestionCard
-                  tripId={tripId}
-                  destination={trip?.destination ?? trip?.city ?? ''}
-                  beforeStopName={localContentStops[0]?.name ?? ''}
-                  dayIndex={selectedDay - 1}
-                  cityGroup={localContentStops[0]?.cityGroup ?? null}
-                  confirmedStop={mealStops[0]}
-                  onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
-                  onOtherOptions={() => onAddStop('food')}
-                />
+                <>
+                  <MealSuggestionCard
+                    tripId={tripId}
+                    destination={trip?.destination ?? trip?.city ?? ''}
+                    beforeStopName={localContentStops[0]?.name ?? ''}
+                    dayIndex={selectedDay - 1}
+                    cityGroup={localContentStops[0]?.cityGroup ?? null}
+                    confirmedStop={mealStops[0]}
+                    onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+                    onOtherOptions={() => onAddStop('food')}
+                  />
+                  {mealStops[0] && (() => {
+                    const mealSorted = [...localContentStops, ...mealStops]
+                      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+                    const mealPos   = mealSorted.findIndex(s => s.id === mealStops[0].id);
+                    const mealUp    = mealPos > 0;
+                    const mealDown  = mealPos < mealSorted.length - 1;
+                    return (
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 6, marginTop: 2, marginBottom: 2, paddingHorizontal: 16 }}>
+                        <Pressable
+                          onPress={() => handleMoveStop(mealStops[0].id, 'up')}
+                          disabled={!mealUp}
+                          style={{ backgroundColor: mealUp ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
+                        >
+                          <Text style={{ fontSize: 15, color: mealUp ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2191'}</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleMoveStop(mealStops[0].id, 'down')}
+                          disabled={!mealDown}
+                          style={{ backgroundColor: mealDown ? '#F0EDE8' : 'rgba(240,237,232,0.4)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
+                        >
+                          <Text style={{ fontSize: 15, color: mealDown ? '#1A1F2E' : 'rgba(26,31,46,0.3)', fontWeight: '700' }}>{'\u2193'}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })()}
+                </>
               )}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
