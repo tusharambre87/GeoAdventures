@@ -31,6 +31,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fraunces_900Black, useFonts as useFrauncesFonts } from "@expo-google-fonts/fraunces";
 import * as Haptics from "expo-haptics";
 import * as FileSystem from "expo-file-system/legacy";
+import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
 
 import { API_BASE, kidsAPI, memoriesAPI } from "@/lib/apiClient";
 import { SpeechTextInput } from "@/components/SpeechTextInput";
@@ -906,6 +907,27 @@ export default function TodayScreen() {
     setTodayState('stop_complete');
     setFeedbackStop(stop);
     setShowFeedback(true);
+  }
+
+  // ── Remove stop from morning list (swipe-left) ──
+  function handleRemoveStop(stop: { id: string; name: string }) {
+    Alert.alert(
+      'Remove Stop',
+      `You are removing the ${stop.name} from your trip.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove Stop',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiFetch(`/api/travel/stops/${stop.id}`, { method: 'DELETE' });
+            } catch { /* best-effort */ }
+            setDayStops(prev => prev.filter(s => s.id !== stop.id));
+          },
+        },
+      ],
+    );
   }
 
   // ── Skip / delete stop ──
@@ -1863,39 +1885,61 @@ export default function TodayScreen() {
               const isLast    = i === dayStops.length - 1;
               return (
                 <React.Fragment key={stop.id}>
-                  <View style={[mo.stopCard, isRemoved && mo.stopRowRemoved]}>
-                    <View style={mo.stopCardRow}>
-                      <View style={[mo.stopIconBox, { backgroundColor: TODAY_STOP_BG[stop.stopType ?? ''] ?? TODAY_STOP_BG.default }]}>
-                        <Text style={mo.stopIconText}>{TODAY_STOP_EMOJI[stop.stopType ?? ''] ?? TODAY_STOP_EMOJI.default}</Text>
-                      </View>
-                      <View style={mo.stopInfo}>
-                        <Text style={[mo.stopName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
-                        <Text style={mo.stopMeta}>
-                          {stopTimes[i]} · {dispDur} min
-                          {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
-                            <Text style={mo.stopMetaSaved}> (was {getStopDuration(stop)} min)</Text>
-                          )}
-                        </Text>
-                        <View style={mo.tagRow}>
-                          {isRemoved && (
-                            <View style={mo.tagRemoved}><Text style={mo.tagRemovedText}>Removed · Easier mode</Text></View>
-                          )}
-                          {hasTicket && !isRemoved && (
-                            <TouchableOpacity style={mo.tagTicket} onPress={() => openTicketSearch(stop.name)} hitSlop={6} activeOpacity={0.7}>
-                              <Text style={mo.tagTicketText}>{'\uD83C\uDFAB'} Ticket needed</Text>
-                            </TouchableOpacity>
-                          )}
-                          {isFreeStop && !isRemoved && (
-                            <View style={mo.tagFree}><Text style={mo.tagFreeText}>Free entry</Text></View>
-                          )}
-                          {isAnchor && !isRemoved && (
-                            <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>Kid friendly</Text></View>
-                          )}
+                  <Swipeable
+                    renderRightActions={isRemoved ? undefined : () => (
+                      <GHTouchable
+                        style={{
+                          backgroundColor: '#C0392B',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          width: 90,
+                          borderRadius: 14,
+                          marginVertical: 4,
+                          marginRight: 4,
+                        }}
+                        onPress={() => handleRemoveStop(stop)}
+                      >
+                        <Text style={{ fontSize: 20 }}>{'\uD83D\uDDD1'}</Text>
+                        <Text style={{ color: 'white', fontSize: 11, fontWeight: '800', marginTop: 3, letterSpacing: 0.3 }}>Remove</Text>
+                      </GHTouchable>
+                    )}
+                    overshootRight={false}
+                    friction={2}
+                  >
+                    <View style={[mo.stopCard, isRemoved && mo.stopRowRemoved]}>
+                      <View style={mo.stopCardRow}>
+                        <View style={[mo.stopIconBox, { backgroundColor: TODAY_STOP_BG[stop.stopType ?? ''] ?? TODAY_STOP_BG.default }]}>
+                          <Text style={mo.stopIconText}>{TODAY_STOP_EMOJI[stop.stopType ?? ''] ?? TODAY_STOP_EMOJI.default}</Text>
                         </View>
+                        <View style={mo.stopInfo}>
+                          <Text style={[mo.stopName, isRemoved && mo.stopNameStruck]} numberOfLines={1}>{stop.name}</Text>
+                          <Text style={mo.stopMeta}>
+                            {stopTimes[i]} · {dispDur} min
+                            {selectedPace === 'faster' && dispDur < getStopDuration(stop) && (
+                              <Text style={mo.stopMetaSaved}> (was {getStopDuration(stop)} min)</Text>
+                            )}
+                          </Text>
+                          <View style={mo.tagRow}>
+                            {isRemoved && (
+                              <View style={mo.tagRemoved}><Text style={mo.tagRemovedText}>Removed · Easier mode</Text></View>
+                            )}
+                            {hasTicket && !isRemoved && (
+                              <TouchableOpacity style={mo.tagTicket} onPress={() => openTicketSearch(stop.name)} hitSlop={6} activeOpacity={0.7}>
+                                <Text style={mo.tagTicketText}>{'\uD83C\uDFAB'} Ticket needed</Text>
+                              </TouchableOpacity>
+                            )}
+                            {isFreeStop && !isRemoved && (
+                              <View style={mo.tagFree}><Text style={mo.tagFreeText}>Free entry</Text></View>
+                            )}
+                            {isAnchor && !isRemoved && (
+                              <View style={mo.tagAnchor}><Text style={mo.tagAnchorText}>Kid friendly</Text></View>
+                            )}
+                          </View>
+                        </View>
+                        <View style={mo.stopNumBadgeAlt}><Text style={mo.stopNumBadgeAltText}>{i + 1}</Text></View>
                       </View>
-                      <View style={mo.stopNumBadgeAlt}><Text style={mo.stopNumBadgeAltText}>{i + 1}</Text></View>
                     </View>
-                  </View>
+                  </Swipeable>
                   {!isLast && (
                     <View style={mo.travelConnector}>
                       <View style={mo.travelLine} />
