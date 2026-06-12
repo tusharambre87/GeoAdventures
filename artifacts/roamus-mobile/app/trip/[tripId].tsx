@@ -2703,6 +2703,8 @@ function TripOptionsSheet({
           style: 'destructive',
           onPress: async () => {
             try {
+              const { cancelAllNotificationsForTrip } = await import('@/services/notifications/notificationTriggers');
+              await cancelAllNotificationsForTrip(tripId).catch(() => {});
               await apiFetch(`/api/travel/trips/${tripId}`, { method: 'DELETE' });
               onClose();
               router.replace('/(tabs)/' as any);

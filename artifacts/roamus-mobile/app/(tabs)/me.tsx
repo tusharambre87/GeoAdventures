@@ -537,6 +537,13 @@ export default function MeScreen() {
             title="Account"
             subtitle="Profile & settings"
             onPress={() => router.push("/me/account" as never)}
+          />
+          <MenuRow
+            icon={"\uD83D\uDD14"}
+            iconBg="#FDF0E9"
+            title="Notifications"
+            subtitle="Manage your notification preferences"
+            onPress={() => router.push("/settings/notifications" as never)}
             noDivider
           />
         </View>

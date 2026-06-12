@@ -57,6 +57,9 @@ import UpgradeSheet from "@/components/UpgradeSheet";
 import { isFreePlan } from "@/lib/subscription";
 import { useSpeech } from "@/lib/useSpeech";
 import { SpeakButton } from "@/components/SpeakButton";
+import { hasAskedPermission } from "@/services/notifications/notificationPermission";
+import { onEnRoute, onDayComplete, onWeatherAlert } from "@/services/notifications/notificationTriggers";
+import NotificationPermissionModal from "@/components/NotificationPermissionModal";
 const MO_STOP_BG: Record<string, string> = {
   park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2',
   landmark: '#E1BEE7', nature: '#DCEDC8', culture: '#FFF3E0',
@@ -523,6 +526,7 @@ export default function TodayScreen() {
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
   const [showMenu, setShowMenu]                 = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
   const [currentTemp, setCurrentTemp]           = useState<number | null>(null);
@@ -619,6 +623,13 @@ export default function TodayScreen() {
         const nextThree = probs.slice(now.getHours(), now.getHours() + 3);
         const maxChance = Math.max(...nextThree, 0);
         setRainAlert(maxChance > 40 ? { chance: maxChance } : null);
+        if (maxChance > 40 && resolvedTripId) {
+          onWeatherAlert({
+            tripId: resolvedTripId,
+            dayIndex: resolvedDayIndex,
+            condition: 'Rain',
+          }).catch(() => {});
+        }
       })
       .catch(() => setRainAlert(null));
   }, [dayStops, currentStopIndex]);
@@ -836,6 +847,11 @@ export default function TodayScreen() {
   async function handleStartDay() {
     if (!trip) return;
     if (isFree) { setUpgradeVisible(true); return; }
+    const asked = await hasAskedPermission();
+    if (!asked) {
+      setShowPermissionModal(true);
+      return;
+    }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (selectedPace === 'easier') {
       setStarting(true);
@@ -852,6 +868,15 @@ export default function TodayScreen() {
     }
     setCurrentStopIndex(0);
     setTodayState('en_route');
+    if (resolvedTripId && dayStops[0]) {
+      onEnRoute({
+        tripId: resolvedTripId,
+        dayIndex: resolvedDayIndex,
+        stopId: dayStops[0].id,
+        nextStopName: dayStops[0].name,
+        driveMinutes: dayStops[0].travelMinsFromPrevious ?? 15,
+      }).catch(() => {});
+    }
   }
 
   // ── Mark stop visited (from at_stop_frozen) ──
@@ -2013,6 +2038,9 @@ export default function TodayScreen() {
           </TouchableOpacity>
         </ScrollView>
         {menuOverlay}
+        {showPermissionModal && (
+          <NotificationPermissionModal onClose={() => setShowPermissionModal(false)} />
+        )}
         <IndoorAlternativesSheet
           visible={indoorSheetVisible}
           onClose={() => setIndoorSheetVisible(false)}
@@ -2675,6 +2703,16 @@ export default function TodayScreen() {
               <TouchableOpacity style={sc.wrapBtn} activeOpacity={0.85} onPress={() => {
                 setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
                 setTodayState('day_complete');
+                if (resolvedTripId) {
+                  const photoCount = visitedPhotos.length + wrapPhotos.length;
+                  onDayComplete({
+                    tripId: resolvedTripId,
+                    dayIndex: resolvedDayIndex,
+                    stopNames: dayStops.filter(s => s.isVisited || s.visited).map(s => s.name),
+                    photoCount,
+                    dayNum: resolvedDayIndex + 1,
+                  }).catch(() => {});
+                }
               }}>
                 <Text style={sc.wrapBtnText}>Wrap up Day {resolvedDayIndex + 1} →</Text>
               </TouchableOpacity>

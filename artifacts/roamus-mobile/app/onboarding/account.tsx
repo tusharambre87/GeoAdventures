@@ -10,6 +10,7 @@ import { BackBtn, Wordmark } from "@/lib/onboardingAtoms";
 import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/tokens";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { onTripDayStart } from "@/services/notifications/notificationTriggers";
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
@@ -132,6 +133,23 @@ export default function AccountScreen() {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}` },
         }).catch(() => {});
+        // Schedule morning brief notifications for each trip day
+        const totalDays = data.tripDays ?? 1;
+        const startDateStr = data.startDate;
+        if (startDateStr) {
+          for (let dayIndex = 0; dayIndex < totalDays; dayIndex++) {
+            const tripDate = new Date(startDateStr);
+            tripDate.setDate(tripDate.getDate() + dayIndex);
+            onTripDayStart({
+              tripId: trip.id,
+              dayIndex,
+              tripDate,
+              firstStopName: data.cities[dayIndex] ?? data.cities[0] ?? city,
+              weather: 'Check the forecast!',
+              dayNum: dayIndex + 1,
+            }).catch(() => {});
+          }
+        }
       }
     } catch {
       // Trip creation is best-effort here; user is already registered

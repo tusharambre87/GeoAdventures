@@ -19,9 +19,12 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import NotificationBanner from "@/components/NotificationBanner";
 import { AuthProvider, useAuth } from "@/lib/authContext";
 import { OnboardingProvider, useOnboarding } from "@/lib/onboardingContext";
 import { drainAllPhotoQueues } from "@/lib/photoQueue";
+import { type NotifPayload } from "@/services/notifications/notificationEngine";
+import { NotifType } from "@/services/notifications/notificationPrefs";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -111,24 +114,45 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayoutNav() {
+  function handleBannerTap(payload: NotifPayload) {
+    switch (payload.type) {
+      case NotifType.MORNING_BRIEF:
+      case NotifType.DEPARTURE_REMINDER:
+      case NotifType.KIDS_ZONE_ENROUTE:
+      case NotifType.AT_STOP_ARRIVAL:
+      case NotifType.DAY_COMPLETE:
+      case NotifType.WEATHER_ALERT:
+        router.push('/(tabs)/today' as never);
+        break;
+      case NotifType.MEMORY_RECAP:
+      case NotifType.TRIP_SUMMARY:
+        router.push('/(tabs)/memories' as never);
+        break;
+    }
+  }
+
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
-      <Stack.Screen name="memories/[tripId]" options={{ headerShown: false }} />
-      <Stack.Screen name="memories/shared/[slug]" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="kids"
-        options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
-      />
-      <Stack.Screen name="atstop" options={{ headerShown: false }} />
-      <Stack.Screen name="me" options={{ headerShown: false }} />
-      <Stack.Screen name="discover" options={{ headerShown: false }} />
-      <Stack.Screen name="join/[token]" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <NotificationBanner onPress={handleBannerTap} />
+      <Stack screenOptions={{ headerBackTitle: "Back" }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
+        <Stack.Screen name="memories/[tripId]" options={{ headerShown: false }} />
+        <Stack.Screen name="memories/shared/[slug]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="kids"
+          options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="atstop" options={{ headerShown: false }} />
+        <Stack.Screen name="me" options={{ headerShown: false }} />
+        <Stack.Screen name="discover" options={{ headerShown: false }} />
+        <Stack.Screen name="join/[token]" options={{ headerShown: false }} />
+        <Stack.Screen name="settings/notifications" options={{ headerShown: false }} />
+      </Stack>
+    </>
   );
 }
 
