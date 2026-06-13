@@ -176,7 +176,6 @@ Provide 4-6 real nearby attractions, 4-5 real restaurants, 3-4 kid-friendly spot
 The reviews must mention specific real details about ${stopName} — exhibits, features, or experiences that actually exist there.`,
       },
     ],
-    temperature: 0.3,
     response_format: { type: "json_object" },
   });
 
@@ -200,7 +199,58 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
   };
 }
 
-// ─── Two-step story generation — same proven approach as GeoAdventures ────────
+// ─── Story generation — one call per track, run in parallel ──────────────────
+
+const STORY_SYSTEM_PROMPT = `You are a brilliant storyteller creating audio narration for families visiting a real place on a trip.
+
+Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller who earns every sentence.
+
+WHAT MAKES GREAT TRAVEL AUDIO:
+- Every sentence is specific to THIS place. A listener immediately knows which place is being described.
+- It builds genuine curiosity about real things they will see with their own eyes.
+- It treats every listener as intelligent.
+- It tells human stories — real people, real decisions, real struggles, real stakes.
+- It has rhythm and pace. Some sentences are short. Some breathe longer.
+- Nothing is filler.
+
+ABSOLUTE RULES — violating these ruins the experience:
+- NO emojis. Not one.
+- NO markdown. No asterisks, hashes, bullet symbols, or dashes introducing items.
+- NO narrator stage directions or bracket cues of any kind.
+- NO phrases like "imagine you are" or "close your eyes".
+- NO generic content that could describe ANY place. Every sentence must be specific.
+- NO "Welcome to..." or "Today we are visiting..." openings. Drop the listener straight into the story.
+- Plain, natural spoken prose only.
+
+${GEOQUEST_SAFETY_PROMPT}`;
+
+async function generateTrackText(prompt: string, minWords: number, trackName: string): Promise<string> {
+  const callOnce = async (): Promise<string> => {
+    const completion = await openai.chat.completions.create({
+      model: STORY_MODEL,
+      messages: [
+        { role: "system", content: STORY_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      max_completion_tokens: 2500,
+      temperature: 0.72,
+    });
+    return (completion.choices[0]?.message?.content ?? "").trim();
+  };
+
+  let text = await callOnce();
+  const wordCount = text.trim().split(/\s+/).length;
+  console.log(`[Story] ${trackName} first pass: ${wordCount} words`);
+
+  if (wordCount < minWords) {
+    console.warn(`[Story] ${trackName} too short (${wordCount} < ${minWords}), retrying...`);
+    text = await callOnce();
+    const retryCount = text.trim().split(/\s+/).length;
+    console.log(`[Story] ${trackName} retry: ${retryCount} words`);
+  }
+
+  return text;
+}
 
 async function generateStories(
   stopName: string,
@@ -244,7 +294,6 @@ Return JSON:
         },
       ],
       max_completion_tokens: 600,
-      temperature: 0.3,
       response_format: { type: "json_object" },
     });
 
@@ -260,119 +309,66 @@ Return JSON:
   }
 
   const factsContext = realFacts.length > 0
-    ? `\n\nReal, verified facts about ${stopName} — YOU MUST use these as the foundation of your stories:\n${realFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n\nDo NOT write generic content that could apply to any place. Every sentence should be specific to ${stopName}.`
-    : `\nNote: Draw on your knowledge of ${stopName} to write stories that are specific to this place only.`;
+    ? `\n\nReal, verified facts about ${stopName} — YOU MUST use these as the foundation of your story:\n${realFacts.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n\nDo NOT write generic content that could apply to any place. Every sentence should be specific to ${stopName}.`
+    : `\nDraw on your knowledge of ${stopName} to write content that is specific to this place only.`;
 
-  // ── Step 2: Write all three tracks using those facts ──────────────────────
-  try {
-    const completion = await openai.chat.completions.create({
-      model: STORY_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `You are a brilliant storyteller creating audio tracks for families visiting a real place on a trip.
-
-Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller who earns every sentence.
-
-WHAT MAKES GREAT TRAVEL AUDIO:
-- Every sentence is specific to THIS place. A listener immediately knows which place is being described.
-- It builds genuine curiosity about real things they will see with their own eyes.
-- It treats every listener as intelligent.
-- It tells human stories — real people, real decisions, real struggles, real stakes.
-- It has rhythm and pace. Some sentences are short. Some breathe longer.
-- Nothing is filler.
-
-ABSOLUTE RULES — violating these ruins the experience:
-- NO emojis. Not one.
-- NO markdown. No asterisks, hashes, bullet symbols, or dashes introducing items.
-- NO narrator stage directions or bracket cues of any kind — no [pause], [warm voice], [mysterious tone], [slowly], or anything in square brackets. These appear in the written transcript and look terrible.
-- NO phrases like "imagine you are" or "close your eyes" — overused clichés.
-- NO generic content that could describe ANY place. Every sentence must be specific.
-- NO "Welcome to..." or "Today we are visiting..." openings. Drop the listener straight into the story.
-- Plain, natural spoken prose only — write as if speaking naturally, not reading a script.
-
-${GEOQUEST_SAFETY_PROMPT}`,
-        },
-        {
-          role: "user",
-          content: `Write three narrated audio tracks for kids visiting ${stopName} (a ${stopType} in ${destination}).
+  // ── Step 2: Three separate calls in parallel — one track each ─────────────
+  const mainPrompt = `Write a narrated audio story for kids visiting ${stopName} (a ${stopType} in ${destination}).
 ${factsContext}
 
-──────────────────────────────────────────────────────
-TRACK 1: MAIN STORY — target 900 to 1200 words (about 7 to 8 minutes spoken at 130 words per minute)
-──────────────────────────────────────────────────────
-This is the primary experience. Write it as one flowing narrative.
+STRICT LENGTH REQUIREMENT: Write EXACTLY 950 to 1100 words. Count your words before finishing. Do not stop before 950 words. This will be read aloud at 130 words per minute — it must fill 7 to 8 minutes of audio.
 
-Opening (about 150 words): Start with something specific and vivid about THIS place — a striking fact, a human detail, or a moment in history. Drop the listener straight into the story. Do not open with generic phrases.
+Structure:
+- Opening (about 150 words): Drop the listener straight into a vivid, specific scene. A striking fact, a real person, or a moment in history — specific to ${stopName} only.
+- Middle (about 750 words): Full human narrative. Weave in the real facts. Include at least two genuine surprises. Include who made this, why, what they struggled with, who the key people were. Connect the past to what the child will see with their own eyes today. Let it breathe.
+- Close (about 150 words): End with one specific, compelling thing they can look for or test while exploring right now.
 
-Middle (about 900 words): Weave every real fact into a narrative that builds. Include at least two moments of genuine surprise. Include the full human story: who made this, why, what challenges they faced, what was hard about it, who the key people were. Connect the past to what the child will see with their own eyes today. Let the story breathe — not every sentence needs to carry new information. Some sentences should pause on an idea.
+Return ONLY the story text. No JSON. No labels. No track heading. Just the story.`;
 
-Close (about 150 words): End with one specific, compelling observation they can test while exploring. Make it connected to something real they will actually see.
+  const quickHitsPrompt = `Write 6 to 8 surprising facts about ${stopName} (a ${stopType} in ${destination}) for kids, as flowing spoken paragraphs.
+${factsContext}
 
-──────────────────────────────────────────────────────
-TRACK 2: QUICK HITS — target 260 to 390 words (about 2 to 3 minutes spoken)
-──────────────────────────────────────────────────────
-Six to eight surprising facts about ${stopName}, written as spoken paragraphs.
-Each fact gets two to four natural sentences. Write them as flowing speech, NOT as a list.
-Each one should be a genuine "wait, I did not know that" moment.
-Each should connect to something the child can actually see or look for at the stop.
-Transition naturally between facts — use phrases like "And here is something even more surprising..." or "But that is not all...".
+STRICT LENGTH REQUIREMENT: Write EXACTLY 280 to 350 words. This must fill 2 to 3 minutes of audio at 130 words per minute.
 
-──────────────────────────────────────────────────────
-TRACK 3: HISTORY — target 260 to 390 words (about 2 to 3 minutes spoken)
-──────────────────────────────────────────────────────
-The human story behind ${stopName}. Focus on real people and the decisions they made.
-Include: who had the original idea and why, at least one specific challenge or setback they faced, and one moment where a person's choice changed what this place became.
-Write it as a story, not a summary. Use the facts gathered to make it specific.
-End by connecting that history to the child standing there today — why does it still matter?
+Each fact gets 2 to 4 natural sentences. Write as flowing speech — NOT a list. Each one should be a genuine "wait, I did not know that" moment. Each should connect to something the child can actually see or look for at the stop. Transition naturally between facts.
 
-──────────────────────────────────────────────────────
+Return ONLY the text. No JSON. No labels. No track heading. Just the facts.`;
 
-Return JSON with exactly these three fields. Every field is a single string of plain prose:
-{
-  "main": "The main story text. Plain prose only. No narrator cues, no emojis, no markdown. 900 to 1200 words.",
-  "quickHits": "The quick hits text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words.",
-  "history": "The history text. Spoken paragraphs. No emojis. No markdown. 260 to 390 words."
-}`,
-        },
-      ],
-      max_completion_tokens: 9000,
-      temperature: 0.72,
-      response_format: { type: "json_object" },
-    });
+  const historyPrompt = `Write the human story of ${stopName} (a ${stopType} in ${destination}) for kids — focus on real people and the decisions they made.
+${factsContext}
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) throw new Error("No stories content");
+STRICT LENGTH REQUIREMENT: Write EXACTLY 280 to 350 words. This must fill 2 to 3 minutes of audio at 130 words per minute.
 
-    const data = JSON.parse(content);
+Include: who had the original idea and why, at least one specific challenge or setback they faced, and one moment where a person's choice changed what this place became. Write it as a story, not a summary. End by connecting that history to the child standing there today.
 
-    // Primary guard: GEOQUEST_SAFETY_PROMPT on the model call.
-    // Backstop: isProhibitedStoryContent checks only truly explicit terms
-    // (sexual content, real profanity, slurs) — NOT historical words like
-    // "terrorism" or "violence" that appear in legitimate kids' history stories.
-    const mainRaw = (data.main || "").trim();
-    const quickHitsRaw = (data.quickHits || "").trim();
-    const historyRaw = (data.history || "").trim();
+Return ONLY the text. No JSON. No labels. No track heading. Just the story.`;
 
-    if (!mainRaw || !quickHitsRaw || !historyRaw) {
-      throw new Error("Missing story tracks in response");
-    }
+  try {
+    const [mainRaw, quickHitsRaw, historyRaw] = await Promise.all([
+      generateTrackText(mainPrompt, 700, "main"),
+      generateTrackText(quickHitsPrompt, 220, "quickHits"),
+      generateTrackText(historyPrompt, 220, "history"),
+    ]);
 
-    for (const [key, val] of [["main", mainRaw], ["quickHits", quickHitsRaw], ["history", historyRaw]]) {
+    for (const [key, val] of [["main", mainRaw], ["quickHits", quickHitsRaw], ["history", historyRaw]] as [string, string][]) {
+      if (!val) throw new Error(`Empty response for story track: ${key}`);
       if (isProhibitedStoryContent(val)) {
-        console.error(`[generateStories] Prohibited content detected in "${key}" track — discarding`);
+        console.error(`[generateStories] Prohibited content in "${key}" — discarding`);
         throw new Error(`Prohibited content in story track: ${key}`);
       }
     }
 
-    const mainText = stripForTTS(mainRaw);
+    const mainText      = stripForTTS(mainRaw);
     const quickHitsText = stripForTTS(quickHitsRaw);
-    const historyText = stripForTTS(historyRaw);
+    const historyText   = stripForTTS(historyRaw);
+
+    const mainWords = mainText.trim().split(/\s+/).length;
+    console.log(`[Story] Final word counts — main: ${mainWords}, quickHits: ${quickHitsText.trim().split(/\s+/).length}, history: ${historyText.trim().split(/\s+/).length}`);
 
     return {
-      main: { text: mainText, durationSeconds: estimateDuration(mainText) },
+      main:      { text: mainText,      durationSeconds: estimateDuration(mainText) },
       quickHits: { text: quickHitsText, durationSeconds: estimateDuration(quickHitsText) },
-      history: { text: historyText, durationSeconds: estimateDuration(historyText) },
+      history:   { text: historyText,   durationSeconds: estimateDuration(historyText) },
     };
 
   } catch (error) {
