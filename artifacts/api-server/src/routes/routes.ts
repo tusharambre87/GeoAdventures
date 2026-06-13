@@ -5651,6 +5651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Save parent suggestions: assign each to the day whose planned stops are
             // geographically nearest (proximity-based, not all under day 0).
+            console.log('[PMAL] poolParentSuggestions count:', poolParentSuggestions.length)
             if (poolParentSuggestions.length > 0) {
               const parentSuggestionsMap = assignSuggestionsByProximity(
                 selectedStops,
@@ -5658,6 +5659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 plannerTripDays,
               );
 
+              console.log('[PMAL] writing map:', JSON.stringify(parentSuggestionsMap))
               await storage.updateTrip(tripId, { parentSuggestions: parentSuggestionsMap });
               const daysWithSuggestions = Object.values(parentSuggestionsMap).filter(a => a.length > 0).length;
               console.log(`[Travel] [bg] Saved ${poolParentSuggestions.length} parent suggestion(s) across ${daysWithSuggestions} day(s)`);
