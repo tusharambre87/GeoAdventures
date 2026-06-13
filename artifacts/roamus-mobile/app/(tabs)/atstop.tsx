@@ -9,6 +9,8 @@
  *   5. Feedback sheet + Rescue sheets (4 variants)
  */
 
+const TAB_BAR_H = 49;
+
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -1065,7 +1067,7 @@ function isMealStop(t?: string | null): boolean {
         </ScrollView>
 
         {/* Pinned CTA */}
-        <View style={{ position: 'absolute', bottom: 90, left: 16, right: 16 }}>
+        <View style={{ position: 'absolute', bottom: TAB_BAR_H + insets.bottom + 12, left: 16, right: 16 }}>
           {mealFeedbackDone && nextStop ? (
             <TouchableOpacity
               style={{ backgroundColor: C.orange, height: 56, borderRadius: 12,
@@ -1447,7 +1449,7 @@ function isMealStop(t?: string | null): boolean {
 
       {/* ── CTA: We visited + Didn’t make it (fixed footer) ────────── */}
       <View style={{ backgroundColor: C.bg, paddingHorizontal: 20, paddingTop: 10,
-        paddingBottom: insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
+        paddingBottom: TAB_BAR_H + insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
         {tripNotStarted ? (
           <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.7}
             onPress={() => router.back()}>
