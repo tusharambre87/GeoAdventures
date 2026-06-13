@@ -93,12 +93,13 @@ function estimateDuration(text: string): number {
 export async function getExploreContent(
   stopName: string,
   stopType: string,
-  destination: string
+  destination: string,
+  youngestChildAge?: number
 ): Promise<ExploreData> {
   try {
     const [practical, stories] = await Promise.all([
       generatePracticalContent(stopName, stopType, destination),
-      generateStories(stopName, stopType, destination),
+      generateStories(stopName, stopType, destination, youngestChildAge),
     ]);
     return { ...practical, stories };
   } catch (error) {
@@ -255,7 +256,8 @@ async function generateTrackText(prompt: string, minWords: number, trackName: st
 async function generateStories(
   stopName: string,
   stopType: string,
-  destination: string
+  destination: string,
+  youngestChildAge?: number
 ): Promise<{ main: StoryTrack; quickHits: StoryTrack; history: StoryTrack }> {
 
   // ── Step 1: Gather real, specific facts about this exact place ──────────────
@@ -313,33 +315,54 @@ Return JSON:
     : `\nDraw on your knowledge of ${stopName} to write content that is specific to this place only.`;
 
   // ── Step 2: Three separate calls in parallel — one track each ─────────────
+
+  // Age-calibrated audience instruction
+  const age = youngestChildAge ?? 8;
+  const ageInstruction = age <= 6
+    ? `AUDIENCE: The youngest child in this family is ${age} years old. Use short sentences, simple everyday vocabulary, and lead with wonder. Explain every unfamiliar concept immediately as if the child has never heard of it. Never assume prior knowledge.`
+    : age <= 8
+    ? `AUDIENCE: The youngest child in this family is ${age} years old. Mix wonder with mild complexity. One interesting word per paragraph is fine — explain it in the very next sentence. Keep sentences varied but not long.`
+    : `AUDIENCE: The youngest child in this family is ${age} years old. Nuanced vocabulary is welcome. Treat them as smart, curious people who can handle real complexity and layered ideas.`;
+
   const mainPrompt = `Write a narrated audio story for kids visiting ${stopName} (a ${stopType} in ${destination}).
 ${factsContext}
+
+${ageInstruction}
+
+SPECIFICITY RULE: Every paragraph must contain at least one detail that is specific to ${stopName} only — a real name, date, measurement, person, or event. Zero paragraphs may contain generic tourism language that could describe any similar place.
 
 STRICT LENGTH REQUIREMENT: Write EXACTLY 950 to 1100 words. Count your words before finishing. Do not stop before 950 words. This will be read aloud at 130 words per minute — it must fill 7 to 8 minutes of audio.
 
 Structure:
 - Opening (about 150 words): Drop the listener straight into a vivid, specific scene. A striking fact, a real person, or a moment in history — specific to ${stopName} only.
 - Middle (about 750 words): Full human narrative. Weave in the real facts. Include at least two genuine surprises. Include who made this, why, what they struggled with, who the key people were. Connect the past to what the child will see with their own eyes today. Let it breathe.
-- Close (about 150 words): End with one specific, compelling thing they can look for or test while exploring right now.
+- Close (about 150 words): End with a specific physical challenge the child can do RIGHT NOW — something to touch, find, count, or observe at ${stopName}. This must be a concrete action, not a reflection prompt. ("See if you can find…", "Try counting…", "Put your hand on…")
 
 Return ONLY the story text. No JSON. No labels. No track heading. Just the story.`;
 
   const quickHitsPrompt = `Write 6 to 8 surprising facts about ${stopName} (a ${stopType} in ${destination}) for kids, as flowing spoken paragraphs.
 ${factsContext}
 
+${ageInstruction}
+
+SPECIFICITY RULE: Every fact must be specific to ${stopName}. No fact may be the kind of thing that shows up as the first result when you search the place's name online. Aim for "no way!" moments — things that genuinely surprise even adults who know the place.
+
 STRICT LENGTH REQUIREMENT: Write EXACTLY 280 to 350 words. This must fill 2 to 3 minutes of audio at 130 words per minute.
 
-Each fact gets 2 to 4 natural sentences. Write as flowing speech — NOT a list. Each one should be a genuine "wait, I did not know that" moment. Each should connect to something the child can actually see or look for at the stop. Transition naturally between facts.
+Each fact gets 2 to 4 natural sentences. Write as flowing speech — NOT a list. Each one should connect to something the child can actually see or look for at the stop. Transition naturally between facts.
 
 Return ONLY the text. No JSON. No labels. No track heading. Just the facts.`;
 
-  const historyPrompt = `Write the human story of ${stopName} (a ${stopType} in ${destination}) for kids — focus on real people and the decisions they made.
+  const historyPrompt = `Write the human story of ${stopName} (a ${stopType} in ${destination}) for kids — focus on a specific person making a specific decision, not a timeline of events.
 ${factsContext}
+
+${ageInstruction}
+
+PERSON-AND-DECISION RULE: Tell the story through the eyes of a real individual who shaped this place. Name them. Show one moment where their choice changed what ${stopName} became. The child should feel like they're watching it happen — not reading a Wikipedia article. Do not summarise a list of events.
 
 STRICT LENGTH REQUIREMENT: Write EXACTLY 280 to 350 words. This must fill 2 to 3 minutes of audio at 130 words per minute.
 
-Include: who had the original idea and why, at least one specific challenge or setback they faced, and one moment where a person's choice changed what this place became. Write it as a story, not a summary. End by connecting that history to the child standing there today.
+End by connecting that person's decision to what the child is standing next to today.
 
 Return ONLY the text. No JSON. No labels. No track heading. Just the story.`;
 

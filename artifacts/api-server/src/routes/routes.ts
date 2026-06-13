@@ -5253,6 +5253,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`📚 [StoryPreload] Starting preload for ${stops.length} stops (trip: ${tripId})`);
     const { getExploreContent } = await import('../exploreContentService');
 
+    // Derive youngest child age from trip travelers
+    let youngestChildAge: number | undefined;
+    try {
+      const fullTrip = await storage.getTripById(tripId);
+      const childrenAges = ((fullTrip?.travelers ?? []) as any[])
+        .filter(t => !t.isParent && t.age)
+        .map(t => parseInt(t.age ?? "0", 10))
+        .filter(n => n > 0 && n < 18);
+      if (childrenAges.length > 0) youngestChildAge = Math.min(...childrenAges);
+    } catch { /* non-fatal */ }
+    console.log(`📚 [StoryPreload] youngestChildAge: ${youngestChildAge ?? 'unknown (defaulting to 8)'}`);
+
     let generated = 0;
     for (const stop of stops) {
       try {
@@ -5269,7 +5281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const exploreData = await getExploreContent(
           stop.name,
           stop.stopType || 'landmark',
-          destination
+          destination,
+          youngestChildAge
         );
 
         // Cache in the journey pack — create it first if it doesn't exist yet
@@ -10359,8 +10372,18 @@ Return ONLY valid JSON in this exact format:
       }
 
       // 4. Cache miss — generate
+      // Derive youngest child age for age-calibrated story prompts
+      let youngestChildAge: number | undefined;
+      try {
+        const childrenAges = ((trip.travelers ?? []) as any[])
+          .filter((t: any) => !t.isParent && t.age)
+          .map((t: any) => parseInt(t.age ?? "0", 10))
+          .filter((n: number) => n > 0 && n < 18);
+        if (childrenAges.length > 0) youngestChildAge = Math.min(...childrenAges);
+      } catch { /* non-fatal */ }
+
       const { getExploreContent } = await import('../exploreContentService');
-      const exploreData = await getExploreContent(stop.name, stopType, destination);
+      const exploreData = await getExploreContent(stop.name, stopType, destination, youngestChildAge);
       const exploreDataWithStop = { ...exploreData, stopId };
 
       // 5. Write to explore_cache (canonical)
