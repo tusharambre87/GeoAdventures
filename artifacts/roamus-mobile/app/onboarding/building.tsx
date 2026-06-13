@@ -97,7 +97,7 @@ export default function BuildingScreen() {
   // ─ Drive progress bar on mount ─
   useEffect(() => {
     Animated.timing(progressAnim, {
-      toValue: 1,
+      toValue: 0.9,
       duration: MIN_ANIM_MS,
       useNativeDriver: false,
     }).start();
@@ -171,8 +171,10 @@ export default function BuildingScreen() {
         if (Array.isArray(body.days) && body.days.length > 0) {
           set({ generatedTrip: { days: body.days } });
         }
+        Animated.timing(progressAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
         setApiDone(true);
       } catch {
+        Animated.timing(progressAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
         setApiDone(true);
       }
     })();
