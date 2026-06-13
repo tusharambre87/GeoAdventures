@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { Analytics } from "@/services/analytics/analytics";
 
 export const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ]);
     setToken(t);
     setUser(u);
+    Analytics.identify(u.id, { email: u.email, created_at: (u as any).createdAt });
   }
 
   async function login(
@@ -141,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearStoredAuth();
     setToken(null);
     setUser(null);
+    Analytics.reset();
   }
 
   async function refreshUser() {

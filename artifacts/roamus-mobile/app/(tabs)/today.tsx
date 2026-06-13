@@ -42,6 +42,7 @@ import AddHotelSheet from "@/components/AddHotelSheet";
 import DirectionsSheet from "@/components/DirectionsSheet";
 import DirectionsToAllStopsCard from "@/components/DirectionsToAllStopsCard";
 import RescueSheet from "@/components/RescueSheet";
+import { Analytics } from "@/services/analytics/analytics";
 import { F, CITY_IMGS } from "@/lib/tokens";
 
 const TODAY_STOP_BG: Record<string, string> = {
@@ -680,8 +681,15 @@ export default function TodayScreen() {
 
   // ── Track time entering At Stop ──
   useEffect(() => {
-    if (todayState === 'at_stop_frozen') setAtStopStartTime(prev => prev ?? Date.now());
-    else if (todayState === 'en_route' || todayState === 'morning') setAtStopStartTime(null);
+    if (todayState === 'at_stop_frozen') {
+      setAtStopStartTime(prev => prev ?? Date.now());
+      const stop = dayStops[currentStopIndex];
+      if (stop && resolvedTripId) {
+        Analytics.track('stop_arrived', { trip_id: resolvedTripId, stop_id: stop.id, stop_type: stop.stopType ?? 'unknown' });
+      }
+    } else if (todayState === 'en_route' || todayState === 'morning') {
+      setAtStopStartTime(null);
+    }
   }, [todayState]);
 
   useEffect(() => {
@@ -690,6 +698,20 @@ export default function TodayScreen() {
       setTodayState('day_complete');
     }
   }, [todayState, dayStops]);
+
+  // ── Analytics: day completed ──
+  useEffect(() => {
+    if (todayState !== 'day_complete') return;
+    const visited = dayStops.filter(s => s.isVisited || s.visited).length;
+    const skipped = dayStops.filter((s: any) => s.isSkipped).length;
+    Analytics.track('day_completed', { trip_id: resolvedTripId ?? '', day_index: resolvedDayIndex, stops_visited: visited, stops_skipped: skipped });
+  }, [todayState]);
+
+  // ── Analytics: rescue sheet opened ──
+  useEffect(() => {
+    if (!showRescue) return;
+    Analytics.track('rescue_sheet_opened', { trip_id: resolvedTripId ?? '', from_state: todayState });
+  }, [showRescue]);
 
   // ── Close menu when state changes ──
   useEffect(() => { setShowMenu(false); }, [todayState]);
@@ -870,6 +892,7 @@ export default function TodayScreen() {
     }
     setCurrentStopIndex(0);
     setTodayState('en_route');
+    Analytics.track('day_started', { trip_id: resolvedTripId ?? trip.id, day_index: resolvedDayIndex });
     if (resolvedTripId && dayStops[0]) {
       onEnRoute({
         tripId: resolvedTripId,
@@ -904,6 +927,7 @@ export default function TodayScreen() {
     setMarkingVisited(false);
     setVisitedElapsed(elapsed);
     bounceAnim.setValue(0);
+    Analytics.track('stop_visited', { trip_id: resolvedTripId ?? '', stop_id: stop.id, dwell_minutes: elapsed ?? 0 });
     setCurrentStopIndex(i => i + 1);
     setTodayState('stop_complete');
     setFeedbackStop(stop);
@@ -941,6 +965,7 @@ export default function TodayScreen() {
     try {
       await apiFetch(`/api/travel/stops/${stop.id}`, { method: 'DELETE' });
     } catch { /* best-effort */ }
+    Analytics.track('stop_skipped', { trip_id: resolvedTripId ?? '', stop_id: stop.id, reason: 'manual_skip' });
     setDayStops(prev => prev.filter(s => s.id !== stop.id));
     setActiveSheet('none');
     setTodayState('en_route');
@@ -956,6 +981,7 @@ export default function TodayScreen() {
         body: JSON.stringify({ isSkipped: true }),
       });
     } catch { /* best-effort */ }
+    Analytics.track('stop_skipped', { trip_id: resolvedTripId ?? trip.id, stop_id: stopId, reason: 'rescue' });
     await loadTrip();
   }, [trip, loadTrip]);
 
@@ -3084,7 +3110,11 @@ export default function TodayScreen() {
           )}
           <TouchableOpacity
             style={dc.kidsZoneBtn} activeOpacity={0.85}
-            onPress={() => router.push('/kids' as never)}
+            onPress={() => {
+              const kzStop = dayStops[currentStopIndex];
+              Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
+              router.push('/kids' as never);
+            }}
           >
             <Text style={dc.kidsZoneBtnText}>{'\uD83E\uDDF8'} Kids zone →</Text>
           </TouchableOpacity>

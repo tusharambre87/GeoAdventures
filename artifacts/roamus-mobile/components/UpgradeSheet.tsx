@@ -17,6 +17,7 @@ import { router } from 'expo-router';
 
 import { API_BASE, useAuth } from '@/lib/authContext';
 import { F, G } from '@/lib/tokens';
+import { Analytics } from '@/services/analytics/analytics';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const MAX_HEIGHT = SCREEN_H * 0.88;
@@ -99,6 +100,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      Analytics.track('paywall_shown', { trigger: context });
       Animated.spring(anim, {
         toValue: 1,
         damping: 22,

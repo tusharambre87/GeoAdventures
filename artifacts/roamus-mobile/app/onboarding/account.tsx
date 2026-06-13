@@ -11,6 +11,7 @@ import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/to
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { onTripDayStart } from "@/services/notifications/notificationTriggers";
+import { Analytics } from "@/services/analytics/analytics";
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
@@ -129,6 +130,11 @@ export default function AccountScreen() {
         const trip = await res.json();
         set({ createdTripId: trip.id });
         set({ templateSlug: null, isTemplate: false, tripDays: null });
+        Analytics.track('trip_created', {
+          city,
+          days: data.tripDays ?? 1,
+          kids_count: data.travelers.filter(t => !t.isParent).length,
+        });
         fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
           method: "POST",
           headers: { Authorization: `Bearer ${jwt}` },

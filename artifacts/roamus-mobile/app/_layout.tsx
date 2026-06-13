@@ -18,6 +18,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { PostHogProvider } from 'posthog-react-native';
+import { posthog } from '@/services/analytics/analytics';
+
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotificationBanner from "@/components/NotificationBanner";
 import { AuthProvider, useAuth } from "@/lib/authContext";
@@ -184,6 +187,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
+    <PostHogProvider client={posthog}>
     <SafeAreaProvider>
       <ErrorBoundary>
         <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
@@ -201,5 +205,6 @@ export default function RootLayout() {
         </PersistQueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
+    </PostHogProvider>
   );
 }

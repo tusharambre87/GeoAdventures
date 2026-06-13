@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/tokens";
 import { useOnboarding, type PreviewDay } from "@/lib/onboardingContext";
 import { API_BASE, useAuth } from "@/lib/authContext";
+import { Analytics } from "@/services/analytics/analytics";
 import { useLandmarkImage } from "@/lib/useLandmarkImage";
 import { useWikiPhoto } from "@/lib/useWikiPhoto";
 
@@ -345,6 +346,11 @@ export default function PreviewScreen() {
   const [activeDay, setActiveDay] = useState(0);
   const curDay = allDays[activeDay];
   const totalStops = allDays.reduce((a, d) => a + d.stops.length, 0);
+
+  useEffect(() => {
+    if (totalStops === 0) return;
+    Analytics.track('trip_preview_viewed', { city: primaryCity, stop_count: totalStops, generation_ms: 0 });
+  }, [totalStops]);
 
   // Date range label
   const dateRange = useMemo(() => {
