@@ -5352,6 +5352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     mealPreferences?: { enabled: boolean; breakfast: boolean; lunch: boolean; snacks: boolean; dinner: boolean; diningStyle: "quick" | "sitdown" | ""; cuisines: string[] } | null,
     tripDays?: number | null,
     pace?: string | null,
+    tripStyle?: "highlights" | "balanced" | "offbeat" | "easy",
   ) {
     try {
       console.log(`🌍 [Travel] [bg] Auto-generating stops for: ${cityName} (tripId=${tripId})`);
@@ -5518,6 +5519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               tripDays: plannerTripDays,
               childrenAges,
               pace: plannerPace,
+              tripStyle: tripStyle ?? undefined,
               interests: (tripTailoring?.interests ?? [])
                 .map((i: string) => i.replace(/\s*[^\w\s].*$/, '').trim().toLowerCase())
                 .filter((i: string) => i.length > 0),
@@ -6224,6 +6226,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validStyles = ['family_explorer','nature_expedition','history_culture','iconic_highlights','foodie_adventure','city_explorer'];
       const rawStyle = rawAdventureStyle ?? style;
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
+      const ADVENTURE_TO_TRIP_STYLE: Record<string, "highlights" | "balanced" | "offbeat" | "easy"> = {
+        iconic_highlights: 'highlights',
+        history_culture:   'highlights',
+        city_explorer:     'offbeat',
+        nature_expedition: 'balanced',
+        family_explorer:   'balanced',
+        foodie_adventure:  'balanced',
+      };
+      const tripStyle = ADVENTURE_TO_TRIP_STYLE[adventureStyle] ?? 'balanced';
 
       // Normalize pace: client sends chill/balanced/packed; PlannerInput expects relaxed/moderate/busy
       const normalizePace = (p: string | undefined): "relaxed" | "moderate" | "busy" => {
@@ -6263,6 +6274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tripDays,
           childrenAges,
           pace: plannerPace,
+          tripStyle,
           interests: (tailoring?.interests ?? [])
             .map((i: string) => i.toLowerCase().trim())
             .filter((i: string) => i.length > 0),
@@ -6469,6 +6481,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
+      const ADVENTURE_TO_TRIP_STYLE: Record<string, "highlights" | "balanced" | "offbeat" | "easy"> = {
+        iconic_highlights: 'highlights',
+        history_culture:   'highlights',
+        city_explorer:     'offbeat',
+        nature_expedition: 'balanced',
+        family_explorer:   'balanced',
+        foodie_adventure:  'balanced',
+      };
+      const tripStyle = ADVENTURE_TO_TRIP_STYLE[adventureStyle] ?? 'balanced';
       const validPaces = ['chill', 'balanced', 'packed'];
       const pace = validPaces.includes(rawPace) ? rawPace : 'balanced';
       
@@ -6601,7 +6622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generateStopsInBackground(
             trip.id, city || destination, isHomeAdventure, resolvedCountry,
             state, stopCount, adventureStyle, destination, city,
-            meals || null, computedTripDays || null, pace || 'balanced'
+            meals || null, computedTripDays || null, pace || 'balanced', tripStyle
           );
         }
       }

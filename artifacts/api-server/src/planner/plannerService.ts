@@ -471,7 +471,8 @@ interface PaceConfig {
 }
 
 function getPaceConfig(pace: string): PaceConfig {
-  if (pace === "relaxed") return {
+  const p = pace?.toLowerCase();
+  if (p === "relaxed" || p === "chill") return {
     mainStops: { min: 1, max: 2 },
     totalStopMinutes: { min: 90, max: 180 },
     totalEffortMinutes: { min: 120, max: 210 },
@@ -482,7 +483,7 @@ function getPaceConfig(pace: string): PaceConfig {
     maxTicketedStops: 1,
     label: "Easy & relaxed — 1–2 main stops, max 2 transitions, 2–3.5 hrs total effort",
   };
-  if (pace === "busy") return {
+  if (p === "busy" || p === "packed") return {
     mainStops: { min: 3, max: 5 },
     totalStopMinutes: { min: 240, max: 360 },
     totalEffortMinutes: { min: 300, max: 420 },
@@ -517,9 +518,10 @@ function getPaceConstraints(pace: string): { min: number; max: number; maxHours:
 }
 
 function getStopsPerDay(pace: string): number {
-  if (pace === "relaxed") return 2;
-  if (pace === "busy") return 4;
-  return 3;
+  const p = pace?.toLowerCase();
+  if (p === "relaxed" || p === "chill")  return 2;
+  if (p === "busy"    || p === "packed") return 4;
+  return 3; // moderate / balanced / default
 }
 
 function getAgeContext(ages: number[]): string {
