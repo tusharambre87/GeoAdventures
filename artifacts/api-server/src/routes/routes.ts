@@ -5912,9 +5912,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/travel/city-landmark-image/:city', async (req: any, res) => {
     try {
       console.log('[landmark-image] requested city:', req.params.city);
-      const city = decodeURIComponent(req.params.city as string);
+      const rawCity = decodeURIComponent(req.params.city as string);
+      // Normalize: remove commas, collapse spaces, strip trailing country suffix
+      const normalizedCity = rawCity
+        .replace(/,/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s*(usa|us)$/i, '')
+        .trim();
+      console.log('[landmark-image] normalized city:', normalizedCity);
       const { CITY_SVG_KEY } = await import("../cityLandmarkMap.js");
-      const svgKey = CITY_SVG_KEY[city];
+      const svgKey = CITY_SVG_KEY[normalizedCity]
+        ?? Object.entries(CITY_SVG_KEY).find(([k]) => k.toLowerCase() === normalizedCity.toLowerCase())?.[1]
+        ?? null;
       if (!svgKey) {
         return res.json({ imageUrl: null });
       }

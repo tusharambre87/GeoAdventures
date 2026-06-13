@@ -102,20 +102,15 @@ export async function getOrGenerateLandmarkImage(svgKey: string, landmarkName?: 
   try {
     const openai = getOpenAI();
     const result = await openai.images.generate({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt,
       n: 1,
       size: "1024x1024",
-      quality: "standard",
-    });
+      quality: "low",
+    } as any);
 
-    const imageUrl = result.data[0]?.url;
-    if (!imageUrl) throw new Error("No image URL returned");
-
-    const response = await fetch(imageUrl);
-    if (!response.ok) throw new Error(`Failed to download image: ${response.statusText}`);
-    const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
+    const base64 = (result.data[0] as any)?.b64_json as string | undefined;
+    if (!base64) throw new Error("No image data returned");
 
     if (existing.length > 0) {
       await db
