@@ -5928,7 +5928,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (rows.length === 0 || !rows[0].imageData) {
         return res.json({ imageUrl: null });
       }
-      return res.json({ imageUrl: `data:image/png;base64,${rows[0].imageData}` });
+      const imageUrl = `data:image/png;base64,${rows[0].imageData}`;
+      console.log('[landmark-image] response imageUrl:', imageUrl.substring(0, 80));
+      return res.json({ imageUrl });
     } catch (error: any) {
       req.log?.error({ error }, "[CityLandmarkImage] Error");
       return res.status(500).json({ message: "Failed to get city landmark image" });
