@@ -43,7 +43,7 @@ export default function Mission3() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const instruction =
-    kids.exploreContent?.missions[2]?.type === "photo"
+    kids.exploreContent?.missions?.[2]?.type === "photo"
       ? kids.exploreContent.missions[2].instruction
       : MOCK_PHOTO.instruction;
 
