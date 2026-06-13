@@ -47,15 +47,15 @@ export default function BuildingScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const city    = data.cities[0] ?? 'Chicago';
-  const country = CITY_COUNTRY[city] ?? 'USA';
+  const city    = data.cities[0] ?? null;
+  const country = city ? (CITY_COUNTRY[city] ?? 'USA') : 'USA';
 
   // ─ Multi-city hero image ─
-  const cities  = data.cities.length > 0 ? data.cities : [city];
-  const isMulti = cities.length > 1;
+  const cities   = data.cities.length > 0 ? data.cities : [];
+  const isMulti  = cities.length > 1;
   const [imgIdx, setImgIdx] = useState(0);
-  const heroCity = cities[imgIdx % cities.length];
-  const heroImg  = CITY_IMGS[heroCity] ?? null;
+  const heroCity = cities.length > 0 ? cities[imgIdx % cities.length] : null;
+  const heroImg  = heroCity ? (CITY_IMGS[heroCity] ?? null) : null;
 
   const tripDays   = data.generatedTrip?.days?.length ?? 0;
   const totalStops = (data.generatedTrip?.days ?? []).reduce(
@@ -65,7 +65,7 @@ export default function BuildingScreen() {
   const travelerCount = data.travelers.length;
 
   const MESSAGES = [
-    `Mapping ${city}…`,
+    city ? `Mapping ${city}…` : 'Mapping your destination…',
     'Finding family-friendly stops…',
     'Checking ages & interests…',
     'Calculating travel times…',
@@ -146,6 +146,7 @@ export default function BuildingScreen() {
   // ─ API call ─
   useEffect(() => {
     (async () => {
+      if (!city) { setApiDone(true); return; }
       try {
         const adventureStyle = STYLE_MAP[data.tripStyle ?? ''] ?? 'family_explorer';
         const players = data.travelers.map(t => ({
@@ -186,7 +187,7 @@ export default function BuildingScreen() {
   });
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[city ? styles.rootDark : styles.rootLight, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
 
       {/* City hero photo */}
       {heroImg && (
@@ -221,7 +222,8 @@ export default function BuildingScreen() {
             {/* Heading */}
             <Text style={styles.heading}>
               {'Building your\n'}
-              <Text style={styles.headingCity}>{heroCity} adventure</Text>
+              <Text style={styles.headingCity}>{heroCity ?? 'adventure'}</Text>
+              {heroCity ? ' adventure' : ''}
             </Text>
             {isMulti && (
               <View style={styles.cityDots}>
@@ -249,7 +251,7 @@ export default function BuildingScreen() {
           <Reanimated.View style={[styles.finishWrap, finishStyle]}>
             <Text style={styles.finishTitle}>Your adventure is ready</Text>
             <Text style={styles.finishSub}>
-              {city}{tripDays > 0 ? ` \u00b7 ${tripDays} days` : ''}{totalStops > 0 ? ` \u00b7 ${totalStops} stops` : ''}
+              {city ?? ''}{tripDays > 0 ? ` \u00b7 ${tripDays} days` : ''}{totalStops > 0 ? ` \u00b7 ${totalStops} stops` : ''}
             </Text>
           </Reanimated.View>
         )}
@@ -258,7 +260,7 @@ export default function BuildingScreen() {
 
       {/* Footer */}
       <Text style={styles.footer}>
-        {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''} \u00b7 ${isMulti ? cities.join(' \u00b7 ') : city}`}
+        {`Personalised for ${travelerCount} traveller${travelerCount !== 1 ? 's' : ''}${city ? ` \u00b7 ${isMulti ? cities.join(' \u00b7 ') : city}` : ''}`}
       </Text>
 
     </View>
@@ -268,9 +270,14 @@ export default function BuildingScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
+  rootDark: {
     flex: 1,
     backgroundColor: '#060810',
+    justifyContent: 'space-between',
+  },
+  rootLight: {
+    flex: 1,
+    backgroundColor: '#F5F2EE',
     justifyContent: 'space-between',
   },
 

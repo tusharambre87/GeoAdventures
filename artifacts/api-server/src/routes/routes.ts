@@ -5865,6 +5865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/travel/city-landmark-image/:city', async (req: any, res) => {
     try {
+      console.log('[landmark-image] requested city:', req.params.city);
       const city = decodeURIComponent(req.params.city as string);
       const { CITY_SVG_KEY } = await import("../cityLandmarkMap.js");
       const svgKey = CITY_SVG_KEY[city];
