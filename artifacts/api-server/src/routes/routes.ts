@@ -1177,7 +1177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
     } catch (error) {
-      console.error("Error registering user:", error);
+      req.log.error({ err: error }, "Error registering user");
       res.status(500).json({ message: "Failed to register user" });
     }
   });
