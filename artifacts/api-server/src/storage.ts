@@ -7,6 +7,7 @@ import { stopQualitySignals, type StopQualitySignal, type InsertStopQualitySigna
 import { guideSubscribers, type GuideSubscriber, guideEmailSchedules, type GuideEmailSchedule } from "@workspace/db";
 import { stopLibrary, type StopLibrary, type InsertStopLibrary, exploreCache, type ExploreCache } from "@workspace/db";
 import { db } from "./db";
+import { buildCityPoolKey } from "./cityPoolUtils.js";
 import { eq, desc, sql, and, gte, lte, isNull, isNotNull, ne, inArray, or, asc } from "drizzle-orm";
 
 export interface IMapPuzzleWithRegions extends MapPuzzle {
@@ -5851,15 +5852,22 @@ export class DatabaseStorage implements IStorage {
   // ── City Stop Pool Cache ─────────────────────────────────────────────────────
 
   async getCityStopPool(city: string, country: string): Promise<CityStopPoolCache | undefined> {
-    const normalizedKey = `${city.toLowerCase().trim()}:${normalizeCountryKey(country)}`;
-    const [row] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, normalizedKey)).limit(1);
-    return row;
+    const primaryKey = buildCityPoolKey(city, country);
+    const [row] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, primaryKey)).limit(1);
+    if (row) return row;
+
+    // Fallback: city-only key (no country), catches entries stored without country suffix
+    const cityOnlyKey = buildCityPoolKey(city, '').replace(/:$/, '');
+    const [rowCityOnly] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, cityOnlyKey)).limit(1);
+    if (rowCityOnly) return rowCityOnly;
+
+    console.warn(`[Pool] Cache miss for city: "${city}" country: "${country}" — tried keys: ${primaryKey}, ${cityOnlyKey}`);
+    return undefined;
   }
 
   async saveCityStopPool(entry: InsertCityStopPoolCache): Promise<CityStopPoolCache> {
-    // Re-derive the key using the same normalization so save and lookup always agree.
-    const [rawCity, ...rest] = entry.normalizedKey.split(":");
-    const normalizedKey = `${rawCity}:${normalizeCountryKey(rest.join(":"))}`;
+    // Always re-derive the key from city+country so save and lookup always agree.
+    const normalizedKey = buildCityPoolKey(entry.city, entry.country);
     const normalizedEntry = { ...entry, normalizedKey };
     const [row] = await db
       .insert(cityStopPoolCache)

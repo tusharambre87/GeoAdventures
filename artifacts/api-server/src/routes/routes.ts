@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
+import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
@@ -5518,9 +5519,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ── Try pool first (zero AI calls for cached cities) ──────────────────
         let usedPool = false;
         try {
-          // Pool is keyed by bare city name — strip country suffix if cityName is the full destination
-          const poolCityName = cityName.split(",")[0].trim();
-          const cachedPool = await storage.getCityStopPool(poolCityName, country);
+          // Pass full city name — getCityStopPool normalizes commas and country variants
+          const cachedPool = await storage.getCityStopPool(cityName, country);
           if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
             console.log(`🎯 [Travel] [bg] Pool hit for ${cityName}`);
             const firstWithCoords = (cachedPool.stopPool as any[]).find(s => s.latitude && s.longitude);
@@ -6319,13 +6319,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const days: { label: string; stops: { name: string; description: string; stopType: string; time: string }[] }[] = [];
 
       // ── Pool shortcut: skip GPT entirely if a warm pool exists for this city ──
-      const poolCityName = city.split(',')[0].trim();
-      const cachedPool = await storage.getCityStopPool(poolCityName, country);
+      const cachedPool = await storage.getCityStopPool(city, country);
       let stops: { name: string; description: string; stopType: string }[];
       if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
         req.log
-          ? req.log.info({ city: poolCityName, pace: plannerPace, tripDays }, '[Preview] pool hit — skipping GPT')
-          : console.log(`[Preview] pool hit for ${poolCityName} (pace=${plannerPace}, days=${tripDays}) — skipping GPT`);
+          ? req.log.info({ city, pace: plannerPace, tripDays }, '[Preview] pool hit — skipping GPT')
+          : console.log(`[Preview] pool hit for ${city} (pace=${plannerPace}, days=${tripDays}) — skipping GPT`);
         const plannerInput: PlannerInput = {
           destination: city,
           tripDays,
@@ -6777,7 +6776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   // Save AI results to stop library asynchronously
                   if (stopsToUse.length > 0) {
-                    const nk = `${(capturedCity ?? '').toLowerCase().trim()}:${(capturedCountry ?? '').toLowerCase().trim()}`;
+                    const nk = buildCityPoolKey(capturedCity ?? '', capturedCountry ?? '');
                     const entries = stopsToUse.map((s: any) => ({
                       city: capturedCity,
                       country: capturedCountry,
@@ -7765,7 +7764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Save AI results to stop library
         if (generatedStops.length > 0) {
-          const nk = `${cityName.toLowerCase().trim()}:${(country || '').toLowerCase().trim()}`;
+          const nk = buildCityPoolKey(cityName, country || '');
           const entries = generatedStops.map((s: any) => ({
             city: cityName,
             country: country || '',
@@ -16239,7 +16238,7 @@ CRITICAL RULES:
           await storage.saveCityStopPool({
             city,
             country,
-            normalizedKey: `${(city ?? '').toLowerCase().trim()}:${(country ?? '').toLowerCase().trim()}`,
+            normalizedKey: buildCityPoolKey(city ?? '', country ?? ''),
             stopPool: pool,
           });
           console.log(`[CityPool Admin] ✅ ${city}: ${pool.length} stops`);
