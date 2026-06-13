@@ -43,7 +43,7 @@ export default function Mission2() {
   const [obs, setObs] = useState("");
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { isListening, start, stop } = useSpeechToText();
+  const { isListening, isTranscribing, start, stop } = useSpeechToText();
 
   const hasRealContent = kids.exploreContent?.missions?.[1]?.type === "observation";
   const instruction = hasRealContent
@@ -162,14 +162,18 @@ export default function Mission2() {
               </Text>
             </Pressable>
             <Pressable
-              style={[s.micBtn, isListening && { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }]}
+              style={[s.micBtn, isListening && { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }, isTranscribing && { opacity: 0.6 }]}
+              disabled={isTranscribing}
               onPress={() => {
                 if (isListening) { stop(); } else {
                   start((t) => { setObs((prev) => prev ? prev + " " + t : t); });
                 }
               }}
             >
-              <Text style={{ fontSize: 24 }}>{"\uD83C\uDFA4"}</Text>
+              {isTranscribing
+                ? <ActivityIndicator size="small" color="#7C3AED" />
+                : <Text style={{ fontSize: 24 }}>{"\uD83C\uDFA4"}</Text>
+              }
             </Pressable>
           </View>
         </View>

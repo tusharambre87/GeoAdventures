@@ -11516,6 +11516,21 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // ── Speech-to-text transcription (Whisper) ────────────────────────────────
+  const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+  app.post('/api/travel/transcribe', isAuthenticated, audioUpload.single('audio'), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'No audio file provided' });
+      const openai = getOpenAI();
+      const file = new File([req.file.buffer], 'recording.m4a', { type: req.file.mimetype || 'audio/m4a' });
+      const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1' });
+      res.json({ text: transcription.text });
+    } catch (err: any) {
+      req.log?.error({ err }, 'transcribe failed');
+      res.status(500).json({ message: 'Transcription failed' });
+    }
+  });
+
   // HMAC-signed photo proxy — each URL carries a ?sig= token generated at upload time.
   // React Native Image / browser <img> renders without auth headers; the signature proves
   // the URL was issued by this server (not guessed) and ties to the specific object path.

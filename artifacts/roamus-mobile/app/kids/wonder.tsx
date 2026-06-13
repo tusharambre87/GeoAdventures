@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView,
@@ -46,7 +47,7 @@ export default function WonderTime() {
   const [text, setText] = useState(kids.wonderObservation);
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const { isListening, start, stop } = useSpeechToText();
+  const { isListening, isTranscribing, start, stop } = useSpeechToText();
   const { speak, isSpeaking } = useSpeech();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -163,16 +164,22 @@ export default function WonderTime() {
               <Text style={s.submitText}>{submitting ? "Saving…" : "Save"}</Text>
             </Pressable>
             <Pressable
-              style={[s.micBtn, isListening && s.micBtnActive]}
+              style={[s.micBtn, isListening && s.micBtnActive, isTranscribing && { opacity: 0.6 }]}
+              disabled={isTranscribing}
               onPress={() => {
                 if (isListening) { stop(); } else {
                   start((t) => { setText(prev => prev ? prev + " " + t : t); });
                 }
               }}
             >
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <Text style={{ fontSize: 22 }}>{"\uD83C\uDFA4"}</Text>
-              </Animated.View>
+              {isTranscribing
+                ? <ActivityIndicator size="small" color="#7C3AED" />
+                : (
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Text style={{ fontSize: 22 }}>{"\uD83C\uDFA4"}</Text>
+                  </Animated.View>
+                )
+              }
             </Pressable>
           </View>
         </View>
