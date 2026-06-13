@@ -6427,7 +6427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const share = await storage.getItineraryShareBySlug(templateSlug);
         if (!share || !share.stops || (share.stops as any[]).length === 0) {
           console.log(`[Travel][template] No share for slug "${templateSlug}" — falling back to AI`);
-          generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, 'balanced');
+          generateStopsInBackground(tripId, cityName, false, country, undefined, undefined, adventureStyle, cityName, cityName, null, requestedDays, ADVENTURE_TO_TRIP_STYLE[adventureStyle] ?? 'balanced');
           return;
         }
         rawStops = [...(share.stops as any[])].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
@@ -7417,6 +7417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         memoryStars: memoryStarsData,
         plannerTripDays,
         isShared,
+        parentSuggestions: (trip as any).parentSuggestions ?? {},
         _apiVersion: 'v2-20241228'
       });
     } catch (error: any) {
