@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
+import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
@@ -5651,59 +5652,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Save parent suggestions: assign each to the day whose planned stops are
             // geographically nearest (proximity-based, not all under day 0).
             if (poolParentSuggestions.length > 0) {
-              // Build per-day stop coordinate lists from selectedStops (dayNumber is 1-based).
-              const dayStopCoords = new Map<number, Array<{ lat: number; lng: number }>>();
-              for (const stop of selectedStops) {
-                const dayKey = (stop.dayNumber ?? 1) - 1;
-                const lat = parseFloat(stop.latitude ?? '');
-                const lng = parseFloat(stop.longitude ?? '');
-                if (!isNaN(lat) && !isNaN(lng)) {
-                  if (!dayStopCoords.has(dayKey)) dayStopCoords.set(dayKey, []);
-                  dayStopCoords.get(dayKey)!.push({ lat, lng });
-                }
-              }
-
-              // Inline haversine distance in km (unit is irrelevant for comparison only).
-              const haversineDist = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-                const R = 6371;
-                const dLat = (lat2 - lat1) * Math.PI / 180;
-                const dLng = (lng2 - lng1) * Math.PI / 180;
-                const a = Math.sin(dLat / 2) ** 2 +
-                          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                          Math.sin(dLng / 2) ** 2;
-                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              };
-
-              // Initialize empty arrays for every day.
-              const parentSuggestionsMap: Record<string, GeneratedStop[]> = {};
-              for (let d = 0; d < plannerTripDays; d++) {
-                parentSuggestionsMap[String(d)] = [];
-              }
-
-              for (const suggestion of poolParentSuggestions) {
-                const sLat = parseFloat(suggestion.latitude ?? '');
-                const sLng = parseFloat(suggestion.longitude ?? '');
-
-                if (isNaN(sLat) || isNaN(sLng) || dayStopCoords.size === 0) {
-                  // No valid coordinates — fall back to day 0.
-                  parentSuggestionsMap['0'].push(suggestion);
-                  continue;
-                }
-
-                // Assign to the day with the nearest individual planned stop.
-                let bestDay = 0;
-                let bestDist = Infinity;
-                for (const [dayKey, coords] of dayStopCoords) {
-                  for (const coord of coords) {
-                    const dist = haversineDist(sLat, sLng, coord.lat, coord.lng);
-                    if (dist < bestDist) {
-                      bestDist = dist;
-                      bestDay = dayKey;
-                    }
-                  }
-                }
-                parentSuggestionsMap[String(bestDay)].push(suggestion);
-              }
+              const parentSuggestionsMap = assignSuggestionsByProximity(
+                selectedStops,
+                poolParentSuggestions,
+                plannerTripDays,
+              );
 
               await storage.updateTrip(tripId, { parentSuggestions: parentSuggestionsMap });
               const daysWithSuggestions = Object.values(parentSuggestionsMap).filter(a => a.length > 0).length;
