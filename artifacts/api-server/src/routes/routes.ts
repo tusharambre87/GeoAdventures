@@ -5648,16 +5648,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             console.log(`[Travel] [bg] Resequenced display_order for ${createdStops.length} stops`);
 
-            // Save parent suggestions: age-filtered high-quality stops not in the plan.
-            // Stored as a JSONB map keyed by day index string; all suggestions under "0"
-            // since pool selection is trip-global (not per-day).
+            // Save parent suggestions: assign each to the day whose planned stops are
+            // geographically nearest (proximity-based, not all under day 0).
             if (poolParentSuggestions.length > 0) {
-              const parentSuggestionsMap: Record<string, GeneratedStop[]> = { '0': poolParentSuggestions };
-              for (let d = 1; d < plannerTripDays; d++) {
+              // Build per-day stop coordinate lists from selectedStops (dayNumber is 1-based).
+              const dayStopCoords = new Map<number, Array<{ lat: number; lng: number }>>();
+              for (const stop of selectedStops) {
+                const dayKey = (stop.dayNumber ?? 1) - 1;
+                const lat = parseFloat(stop.latitude ?? '');
+                const lng = parseFloat(stop.longitude ?? '');
+                if (!isNaN(lat) && !isNaN(lng)) {
+                  if (!dayStopCoords.has(dayKey)) dayStopCoords.set(dayKey, []);
+                  dayStopCoords.get(dayKey)!.push({ lat, lng });
+                }
+              }
+
+              // Inline haversine distance in km (unit is irrelevant for comparison only).
+              const haversineDist = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+                const R = 6371;
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLng = (lng2 - lng1) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) ** 2 +
+                          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                          Math.sin(dLng / 2) ** 2;
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              };
+
+              // Initialize empty arrays for every day.
+              const parentSuggestionsMap: Record<string, GeneratedStop[]> = {};
+              for (let d = 0; d < plannerTripDays; d++) {
                 parentSuggestionsMap[String(d)] = [];
               }
+
+              for (const suggestion of poolParentSuggestions) {
+                const sLat = parseFloat(suggestion.latitude ?? '');
+                const sLng = parseFloat(suggestion.longitude ?? '');
+
+                if (isNaN(sLat) || isNaN(sLng) || dayStopCoords.size === 0) {
+                  // No valid coordinates — fall back to day 0.
+                  parentSuggestionsMap['0'].push(suggestion);
+                  continue;
+                }
+
+                // Assign to the day with the nearest individual planned stop.
+                let bestDay = 0;
+                let bestDist = Infinity;
+                for (const [dayKey, coords] of dayStopCoords) {
+                  for (const coord of coords) {
+                    const dist = haversineDist(sLat, sLng, coord.lat, coord.lng);
+                    if (dist < bestDist) {
+                      bestDist = dist;
+                      bestDay = dayKey;
+                    }
+                  }
+                }
+                parentSuggestionsMap[String(bestDay)].push(suggestion);
+              }
+
               await storage.updateTrip(tripId, { parentSuggestions: parentSuggestionsMap });
-              console.log(`[Travel] [bg] Saved ${poolParentSuggestions.length} parent suggestion(s)`);
+              const daysWithSuggestions = Object.values(parentSuggestionsMap).filter(a => a.length > 0).length;
+              console.log(`[Travel] [bg] Saved ${poolParentSuggestions.length} parent suggestion(s) across ${daysWithSuggestions} day(s)`);
             }
 
             console.log(`✅ [Travel] [bg] Pool-served ${selectedStops.length} stops for ${cityName} (0 AI calls)`);
