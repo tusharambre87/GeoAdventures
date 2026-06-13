@@ -2483,11 +2483,29 @@ export function selectStopsFromPool(
     // Mixed ages: plan stamina to youngest
     if (childrenAges.length > 1 && minChildAge <= 4 && stop.durationMinutes <= 60) score += 1;
 
-    // Interest matching
+    // Interest matching — type-category map (primary) + substring fallback (secondary)
     if (input.interests && input.interests.length > 0) {
+      const INTEREST_TYPE_MAP: Record<string, string[]> = {
+        animals:      ['zoo', 'aquarium', 'nature'],
+        art:          ['museum', 'culture', 'gallery'],
+        science:      ['museum', 'activity'],
+        history:      ['landmark', 'museum', 'palace', 'temple', 'culture'],
+        sports:       ['activity', 'stadium'],
+        food:         ['restaurant', 'market', 'street_food', 'cafe'],
+        nature:       ['park', 'nature', 'garden', 'mountain', 'lake', 'beach'],
+        music:        ['culture', 'activity'],
+        shopping:     ['shopping', 'market', 'plaza'],
+        architecture: ['landmark', 'bridge', 'palace', 'temple', 'plaza'],
+        interactive:  ['activity', 'museum'],
+        shows:        ['culture', 'activity'],
+      };
       const stopText = `${stop.name} ${stop.type} ${stop.whyNow ?? ""}`.toLowerCase();
+      const stopType = (stop.type ?? "").toLowerCase();
       for (const interest of input.interests) {
-        if (stopText.includes(interest.toLowerCase())) score += 2;
+        const key = interest.toLowerCase();
+        const mappedTypes = INTEREST_TYPE_MAP[key] ?? [];
+        if (mappedTypes.includes(stopType)) score += 3;
+        else if (stopText.includes(key)) score += 1;
       }
     }
 

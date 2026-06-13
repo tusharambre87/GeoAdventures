@@ -6213,6 +6213,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         city: rawCity, country: rawCountry, style,
         destination, adventureStyle: rawAdventureStyle,
+        travelers: rawTravelers, tripDays: rawTripDays,
+        tailoring, pace: rawPace,
       } = req.body;
       const city = rawCity || destination;
       const country = rawCountry;
@@ -6223,8 +6225,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rawStyle = rawAdventureStyle ?? style;
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
 
-      const SESSION_TIMES = ['9:30 AM', '12:30 PM', '3:00 PM', '10:00 AM', '1:30 PM', '4:00 PM'];
-      const CHUNK = 3;
+      // Normalize pace: client sends chill/balanced/packed; PlannerInput expects relaxed/moderate/busy
+      const normalizePace = (p: string | undefined): "relaxed" | "moderate" | "busy" => {
+        if (!p) return "moderate";
+        const lower = p.toLowerCase();
+        if (["chill", "relaxed", "easy", "slow"].includes(lower)) return "relaxed";
+        if (["packed", "busy", "active", "intense"].includes(lower)) return "busy";
+        return "moderate";
+      };
+      const plannerPace = normalizePace(rawPace);
+
+      // Extract children ages from travelers
+      const travelers = Array.isArray(rawTravelers) ? rawTravelers : [];
+      const childrenAges = travelers
+        .filter((t: any) => !t.isParent)
+        .map((t: any) => Number(t.age ?? 0))
+        .filter((a: number) => a > 0 && a < 18);
+
+      const tripDays = rawTripDays ? Number(rawTripDays) : 2;
+      // Stops per preview day follows the same pace rule as the real planner
+      const CHUNK = plannerPace === "relaxed" ? 2 : plannerPace === "busy" ? 4 : 3;
+      const totalStops = tripDays * CHUNK;
+
+      const SESSION_TIMES = ['9:30 AM', '12:30 PM', '3:00 PM', '10:00 AM', '1:30 PM', '4:00 PM', '11:00 AM', '2:00 PM', '5:00 PM'];
       const days: { label: string; stops: { name: string; description: string; stopType: string; time: string }[] }[] = [];
 
       // ── Pool shortcut: skip GPT entirely if a warm pool exists for this city ──
@@ -6233,23 +6256,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let stops: { name: string; description: string; stopType: string }[];
       if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
         req.log
-          ? req.log.info({ city: poolCityName }, '[Preview] pool hit — skipping GPT')
-          : console.log(`[Preview] pool hit for ${poolCityName} — skipping GPT`);
+          ? req.log.info({ city: poolCityName, pace: plannerPace, tripDays }, '[Preview] pool hit — skipping GPT')
+          : console.log(`[Preview] pool hit for ${poolCityName} (pace=${plannerPace}, days=${tripDays}) — skipping GPT`);
         const plannerInput: PlannerInput = {
           destination: city,
-          tripDays: 2,
-          childrenAges: [],
-          pace: 'moderate',
-          interests: [],
+          tripDays,
+          childrenAges,
+          pace: plannerPace,
+          interests: (tailoring?.interests ?? [])
+            .map((i: string) => i.toLowerCase().trim())
+            .filter((i: string) => i.length > 0),
+          strollerNeeded: tailoring?.stroller ?? false,
+          indoorLean: tailoring?.indoorOutdoor ?? undefined,
+          budgetSensitivity: tailoring?.budgetSensitivity ?? undefined,
+          kidEnergyLevel: tailoring?.kidEnergyLevel ?? undefined,
         };
         const poolStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
-        stops = poolStops.slice(0, 6).map((s: any) => ({
+        stops = poolStops.slice(0, totalStops).map((s: any) => ({
           name: s.name,
           description: s.description ?? '',
           stopType: s.type ?? s.stopType ?? 'landmark',
         }));
       } else {
-        stops = await generateCityStops(city, null, country, 6, adventureStyle);
+        stops = await generateCityStops(city, null, country, totalStops, adventureStyle);
       }
 
       for (let d = 0; d < Math.ceil(stops.length / CHUNK); d++) {

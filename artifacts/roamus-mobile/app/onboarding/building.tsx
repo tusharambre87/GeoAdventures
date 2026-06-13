@@ -161,7 +161,15 @@ export default function BuildingScreen() {
             pace: PACE_MAP[data.pace ?? ''] ?? 'balanced',
             startDate: data.startDate, endDate: data.endDate,
             travelers: players,
-            tailoring: { transport: data.transport, stroller: data.stroller, interests: data.interests },
+            tripDays: data.tripDays,
+            tailoring: {
+              transport: data.transport,
+              stroller: data.stroller,
+              interests: data.interests,
+              indoorOutdoor: data.indoorOutdoor,
+              budgetSensitivity: data.budgetLevel,
+              kidEnergyLevel: data.kidEnergyLevel,
+            },
           }),
         });
         if (!res.ok) {
