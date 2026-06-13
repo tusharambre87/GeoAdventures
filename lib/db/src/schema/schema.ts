@@ -983,6 +983,7 @@ export const travelStops = pgTable("travel_stops", {
   metadata: jsonb("metadata"),
   heroImageUrl: text("hero_image_url"), // AI-generated hero image (DALL-E 3); null until background job completes
   selectionReason: varchar("selection_reason"),
+  addedByParent: boolean("added_by_parent").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_travel_stops_trip").on(table.tripId),

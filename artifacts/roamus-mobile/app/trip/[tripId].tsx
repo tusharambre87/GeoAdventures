@@ -50,6 +50,11 @@ import TripPlanStopSheet from "@/components/TripPlanStopSheet";
 import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import { preCacheTrip } from "@/lib/tripCache";
+import ParentSuggestionsSection, {
+  PositionPickerSheet,
+  type ParentSuggestion,
+  type PmalStop,
+} from "@/components/ParentSuggestionsSection";
 
 const TAB_BAR_H = 49;
 
@@ -177,6 +182,7 @@ type TripData = {
     lastDay?: string;
     interests?: string[];
   } | null;
+  parentSuggestions?: Record<string, ParentSuggestion[]> | null;
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
@@ -1390,6 +1396,7 @@ function DayDetail({
   onAddStop,
   isFree,
   onShowUpgrade,
+  onPmalAddRequest,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1410,6 +1417,7 @@ function DayDetail({
   onAddStop: (filter?: 'food' | 'kids' | 'landmarks') => void;
   isFree?: boolean;
   onShowUpgrade?: () => void;
+  onPmalAddRequest?: (suggestion: ParentSuggestion, dayStops: PmalStop[], dayIndex: number, onAdded: () => void) => void;
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
@@ -1823,6 +1831,30 @@ function DayDetail({
             )}
           </View>
         )}
+
+        {/* Parents might also like */}
+        {(() => {
+          const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
+          const children = trip.travelers?.filter(t => !t.isParent && t.age != null) ?? [];
+          const youngest = children.sort((a, b) => Number(a.age) - Number(b.age))[0];
+          if (!pmalSuggestions?.length || !youngest) return null;
+          return (
+            <View style={{ marginBottom: 4 }}>
+              <ParentSuggestionsSection
+                suggestions={pmalSuggestions}
+                dayStops={dayStops as PmalStop[]}
+                dayIndex={selectedDay - 1}
+                tripId={tripId}
+                youngestChildName={youngest.name}
+                youngestChildAge={Number(youngest.age)}
+                onStopAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
+                onAddRequest={(s, onAdded) => {
+                  onPmalAddRequest?.(s, dayStops as PmalStop[], selectedDay - 1, onAdded);
+                }}
+              />
+            </View>
+          );
+        })()}
 
         {/* Add a stop — editable, only when stops already exist */}
         {isEditable && dayStops.length > 0 && (
@@ -3868,6 +3900,12 @@ export default function TripPlanScreen() {
   const [checklistCloseCount, setChecklistCloseCount] = useState(0);
   const { user, isLoading: authLoading } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [pmalTarget, setPmalTarget] = useState<{
+    suggestion: ParentSuggestion;
+    dayStops: PmalStop[];
+    dayIndex: number;
+    onAdded: () => void;
+  } | null>(null);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [upgradeContext, setUpgradeContext] = useState<UpgradeContext>('run_day');
 
@@ -4159,6 +4197,25 @@ export default function TripPlanScreen() {
           onAddStop={(filter) => { setAddStopFilter(filter ?? 'food'); setActiveSheet('addStop'); }}
           isFree={isFree}
           onShowUpgrade={() => { setUpgradeContext('locked_day'); setUpgradeVisible(true); }}
+          onPmalAddRequest={(suggestion, dayStops, dayIndex, onAdded) => {
+            setPmalTarget({ suggestion, dayStops, dayIndex, onAdded });
+          }}
+        />
+      )}
+
+      {/* ── PMAL Position Picker ── */}
+      {pmalTarget && (
+        <PositionPickerSheet
+          suggestion={pmalTarget.suggestion}
+          dayStops={pmalTarget.dayStops}
+          dayIndex={pmalTarget.dayIndex}
+          tripId={tripId ?? ''}
+          onSuccess={() => {
+            pmalTarget.onAdded();
+            setPmalTarget(null);
+            queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+          }}
+          onClose={() => setPmalTarget(null)}
         />
       )}
 
