@@ -932,6 +932,7 @@ export const travelTrips = pgTable("travel_trips", {
   isArchived: boolean("is_archived").default(false),
   heroImageUrl: text("hero_image_url"), // Cover image fetched from Wikipedia at trip creation
   plannerInputSnapshot: jsonb("planner_input_snapshot"),
+  parentSuggestions: jsonb("parent_suggestions"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

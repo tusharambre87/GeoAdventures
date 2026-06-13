@@ -313,6 +313,10 @@ export interface GeneratedStop {
   reviewNote?: string;
   /** Why this stop was selected for this family — captured at generation time, stored on travel_stops. */
   selectionReason?: string;
+  /** For parent suggestions: recommended insertion position in the day (0-indexed after this stop). */
+  recommendedPosition?: number;
+  /** Human-readable reason for the recommended position, e.g. "Best before noon · 0.8 mi from Lincoln Memorial". */
+  recommendedPositionReason?: string;
 }
 
 /**
@@ -2375,12 +2379,57 @@ function estimateTravelMins(km: number, mode: string): number {
   return Math.round((km / (speeds[mode] ?? 35)) * 60);
 }
 
+export type StopPoolResult = {
+  stops: GeneratedStop[];
+  parentSuggestions: GeneratedStop[];
+};
+
+/**
+ * Compute where in an existing day a parent-suggestion stop fits best.
+ * Uses PSI time-of-day fit scores to determine morning / afternoon / late slot,
+ * then picks the adjacent existing stop for proximity calculation.
+ */
+function getRecommendedPosition(
+  suggestion: CachedStopCandidate,
+  dayStops: GeneratedStop[],
+): { position: number; reason: string } {
+  const morning = suggestion.morningFitScore ?? 0;
+  const afterLunch = suggestion.afterLunchFitScore ?? 0;
+  const lateDay = suggestion.lateDayFitScore ?? 0;
+
+  const bestTimeOfDay: 'morning' | 'afternoon' | 'late' =
+    morning > afterLunch && morning > lateDay ? 'morning'
+    : afterLunch > lateDay ? 'afternoon'
+    : 'late';
+
+  const position = dayStops.length === 0 ? 0
+    : bestTimeOfDay === 'morning' ? 0
+    : bestTimeOfDay === 'afternoon' ? Math.floor(dayStops.length / 2)
+    : Math.max(0, dayStops.length - 1);
+
+  const adjStop = dayStops[position];
+  let distPart = '';
+  if (adjStop?.latitude && adjStop?.longitude && suggestion.latitude && suggestion.longitude) {
+    const distKm = haversineKm(
+      parseFloat(String(adjStop.latitude)), parseFloat(String(adjStop.longitude)),
+      parseFloat(String(suggestion.latitude)), parseFloat(String(suggestion.longitude)),
+    );
+    distPart = ` · ${(distKm * 0.621371).toFixed(1)} mi from ${adjStop.name}`;
+  }
+
+  const timeLabel = bestTimeOfDay === 'morning' ? 'Best before noon'
+    : bestTimeOfDay === 'afternoon' ? 'Best mid-day'
+    : 'Best late afternoon';
+
+  return { position, reason: `${timeLabel}${distPart}` };
+}
+
 export function selectStopsFromPool(
   pool: CachedStopCandidate[],
   input: PlannerInput,
   qualityProfile?: UserStopTypeProfile,
   targetCity?: string,
-): GeneratedStop[] {
+): StopPoolResult {
   const stopsPerDay = getStopsPerDay(input.pace);
   const paceConfig = getPaceConfig(input.pace);
   const childrenAges = input.childrenAges || [];
@@ -2399,6 +2448,19 @@ export function selectStopsFromPool(
     const filtered = candidates.filter(c => c.placeProfileData?.strollerFriendly !== false);
     if (filtered.length >= totalStopsNeeded) candidates = filtered;
   }
+
+  // ── Capture age-filtered candidates for parent suggestions ────────────────
+  // Collected BEFORE the age batch filter so we capture stops removed due to
+  // youngest-child age mismatch. Pre-checks stroller and indoor filters so
+  // only genuinely usable suggestions survive.
+  const rawAgeFilteredCandidates: CachedStopCandidate[] = childrenAges.length > 0
+    ? candidates.filter(c => {
+        if ((c.minAge ?? 0) <= minChildAge + 2) return false;
+        if (input.indoorLean === 'indoor' && c.indoorOutdoor !== 'indoor' && c.indoorOutdoor !== 'both') return false;
+        if (input.indoorLean === 'outdoor' && c.indoorOutdoor !== 'outdoor' && c.indoorOutdoor !== 'both') return false;
+        return true;
+      })
+    : [];
 
   // ── Hard constraint: age suitability (AGE RULES from generateDayStops) ───
   const ageFiltered = candidates.filter(c => (c.minAge ?? 0) <= maxChildAge + 2);
@@ -2580,6 +2642,17 @@ export function selectStopsFromPool(
   const scoredMap = new Map(candidates.map(c => [c, scoreCandidate(c)]));
   const baseScores = new Map(candidates.map(c => [c, scoredMap.get(c)!.score]));
   const selectionReasons = new Map(candidates.map(c => [c, scoredMap.get(c)!.selectionReason]));
+
+  // Score age-filtered candidates (not in candidates set; scored independently)
+  const ageFilteredScoredMap = new Map(rawAgeFilteredCandidates.map(c => [c, scoreCandidate(c)]));
+  // 60th-percentile threshold of main pool scores — parent suggestions must clear this bar
+  const allScoresArr = [...candidates].map(c => scoredMap.get(c)!.score).sort((a, b) => a - b);
+  const AGE_FILTER_THRESHOLD = allScoresArr.length > 0
+    ? (allScoresArr[Math.floor(allScoresArr.length * 0.60)] ?? 0)
+    : 0;
+  const ageFilteredCandidates = rawAgeFilteredCandidates.filter(c =>
+    (ageFilteredScoredMap.get(c)?.score ?? 0) > AGE_FILTER_THRESHOLD
+  );
 
   // ── Greedy selection with dynamic consecutive-type and zone-clustering scoring ─
   // At each selection step, candidates receive adjusted scores:
@@ -3022,7 +3095,27 @@ export function selectStopsFromPool(
     });
   }
 
-  return result;
+  // ── Parent suggestions: age-filtered high-quality stops not in the selected plan ─
+  // Stops are above the youngest child's age threshold but otherwise scored well.
+  // Excluded: anything already selected, capped at 3. Per-day position and proximity
+  // reason computed using Day 1 as the reference day.
+  const selectedNormNames = new Set(selected.map(c => normStopName(c.name)));
+  const day1Stops = result.filter(s => s.dayNumber === 1);
+  const parentSuggestions: GeneratedStop[] = ageFilteredCandidates
+    .filter(c => !selectedNormNames.has(normStopName(c.name)))
+    .sort((a, b) => (ageFilteredScoredMap.get(b)?.score ?? 0) - (ageFilteredScoredMap.get(a)?.score ?? 0))
+    .slice(0, 3)
+    .map(c => {
+      const { selectionReason } = ageFilteredScoredMap.get(c)!;
+      const { position, reason } = getRecommendedPosition(c, day1Stops);
+      return {
+        ...candidateToGeneratedStop(c, 1, position, false, selectionReason),
+        recommendedPosition: position,
+        recommendedPositionReason: reason,
+      };
+    });
+
+  return { stops: result, parentSuggestions };
 }
 
 /** Compute days-per-city for a multi-city trip.

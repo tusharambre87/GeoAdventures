@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
 import { fromError } from "zod-validation-error";
 import { eq, and, lte, gt, desc, asc, or, ilike, inArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
@@ -5539,7 +5539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 generatedAt: new Date().toISOString(),
               },
             });
-            const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
+            const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             const rawDistributedPoolStops = distributeStopsToDays(
               selectedStops.slice(0, effectiveStopCount),
               plannerTripDays,
@@ -5634,6 +5634,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             console.log(`[Travel] [bg] Resequenced display_order for ${createdStops.length} stops`);
+
+            // Save parent suggestions: age-filtered high-quality stops not in the plan.
+            // Stored as a JSONB map keyed by day index string; all suggestions under "0"
+            // since pool selection is trip-global (not per-day).
+            if (poolParentSuggestions.length > 0) {
+              const parentSuggestionsMap: Record<string, GeneratedStop[]> = { '0': poolParentSuggestions };
+              for (let d = 1; d < plannerTripDays; d++) {
+                parentSuggestionsMap[String(d)] = [];
+              }
+              await storage.updateTrip(tripId, { parentSuggestions: parentSuggestionsMap });
+              console.log(`[Travel] [bg] Saved ${poolParentSuggestions.length} parent suggestion(s)`);
+            }
 
             console.log(`✅ [Travel] [bg] Pool-served ${selectedStops.length} stops for ${cityName} (0 AI calls)`);
             usedPool = true;
@@ -6299,7 +6311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           budgetSensitivity: tailoring?.budgetSensitivity ?? undefined,
           kidEnergyLevel: tailoring?.kidEnergyLevel ?? undefined,
         };
-        const poolStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
+        const { stops: poolStops } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
         stops = poolStops.slice(0, totalStops).map((s: any) => ({
           name: s.name,
           description: s.description ?? '',
