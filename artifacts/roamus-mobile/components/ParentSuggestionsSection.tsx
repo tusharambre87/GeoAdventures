@@ -338,7 +338,7 @@ type PickerProps = {
   onClose: () => void;
 };
 
-export function PositionPickerSheet({
+export function PmalPositionPickerSheet({
   suggestion,
   dayStops,
   dayIndex,

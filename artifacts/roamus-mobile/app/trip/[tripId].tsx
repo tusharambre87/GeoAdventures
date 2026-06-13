@@ -51,7 +51,7 @@ import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 import ParentSuggestionsSection, {
-  PositionPickerSheet,
+  PmalPositionPickerSheet,
   type ParentSuggestion,
   type PmalStop,
 } from "@/components/ParentSuggestionsSection";
@@ -4205,7 +4205,7 @@ export default function TripPlanScreen() {
 
       {/* ── PMAL Position Picker ── */}
       {pmalTarget && (
-        <PositionPickerSheet
+        <PmalPositionPickerSheet
           suggestion={pmalTarget.suggestion}
           dayStops={pmalTarget.dayStops}
           dayIndex={pmalTarget.dayIndex}
