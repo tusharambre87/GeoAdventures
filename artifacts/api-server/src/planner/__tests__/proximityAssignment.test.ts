@@ -229,3 +229,144 @@ describe('assignSuggestionsByProximity', () => {
     expect(result['2']).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// assignSuggestionsByProximity — multi-city trips (4 days, 2 cities)
+//
+// Scenario: days 1–2 are in Paris, days 3–4 are in Tokyo.
+// Suggestions near Paris must land only on days 0–1 (0-based);
+// suggestions near Tokyo must land only on days 2–3.
+// This guards against city-bleed: stops from one city must not migrate onto
+// days that belong to a different city.
+// ---------------------------------------------------------------------------
+
+describe('assignSuggestionsByProximity — multi-city trips', () => {
+  // Paris cluster (~48.86, 2.35)
+  const parisStops = [
+    makeStop({ dayNumber: 1, name: 'Notre-Dame',  latitude: '48.8530', longitude: '2.3499' }),
+    makeStop({ dayNumber: 1, name: 'Champs-Elysees', latitude: '48.8698', longitude: '2.3078', displayOrder: 1 }),
+    makeStop({ dayNumber: 2, name: 'Musee d Orsay', latitude: '48.8600', longitude: '2.3266' }),
+    makeStop({ dayNumber: 2, name: 'Montmartre',    latitude: '48.8867', longitude: '2.3431', displayOrder: 1 }),
+  ];
+
+  // Tokyo cluster (~35.68, 139.69)
+  const tokyoStops = [
+    makeStop({ dayNumber: 3, name: 'Shinjuku Gyoen',  latitude: '35.6852', longitude: '139.7100' }),
+    makeStop({ dayNumber: 3, name: 'Meiji Shrine',    latitude: '35.6763', longitude: '139.6993', displayOrder: 1 }),
+    makeStop({ dayNumber: 4, name: 'Ueno Park',       latitude: '35.7146', longitude: '139.7713' }),
+    makeStop({ dayNumber: 4, name: 'Asakusa Temple',  latitude: '35.7148', longitude: '139.7967', displayOrder: 1 }),
+  ];
+
+  const selectedStops = [...parisStops, ...tokyoStops];
+  const totalDays = 4;
+
+  // Suggestions — intentionally given wrong dayNumber to confirm proximity overrides it
+  const eiffelTower = makeStop({
+    dayNumber: 3, // wrong city day
+    name: 'Eiffel Tower',
+    latitude: '48.8584',
+    longitude: '2.2945',
+  });
+  const louvre = makeStop({
+    dayNumber: 4, // wrong city day
+    name: 'Louvre Museum',
+    latitude: '48.8606',
+    longitude: '2.3376',
+  });
+  const shibuyaCrossing = makeStop({
+    dayNumber: 1, // wrong city day
+    name: 'Shibuya Crossing',
+    latitude: '35.6595',
+    longitude: '139.7004',
+  });
+  const sensojitemple = makeStop({
+    dayNumber: 2, // wrong city day
+    name: 'Senso-ji Temple',
+    latitude: '35.7147',
+    longitude: '139.7967',
+  });
+
+  it('Paris suggestions land on Paris days (0 or 1), not Tokyo days', () => {
+    const result = assignSuggestionsByProximity(
+      selectedStops,
+      [eiffelTower, louvre],
+      totalDays,
+    );
+
+    const parisNames = [...result['0'], ...result['1']].map(s => s.name);
+    const tokyoNames = [...result['2'], ...result['3']].map(s => s.name);
+
+    expect(parisNames).toContain('Eiffel Tower');
+    expect(parisNames).toContain('Louvre Museum');
+    expect(tokyoNames).not.toContain('Eiffel Tower');
+    expect(tokyoNames).not.toContain('Louvre Museum');
+  });
+
+  it('Tokyo suggestions land on Tokyo days (2 or 3), not Paris days', () => {
+    const result = assignSuggestionsByProximity(
+      selectedStops,
+      [shibuyaCrossing, sensojitemple],
+      totalDays,
+    );
+
+    const parisNames = [...result['0'], ...result['1']].map(s => s.name);
+    const tokyoNames = [...result['2'], ...result['3']].map(s => s.name);
+
+    expect(tokyoNames).toContain('Shibuya Crossing');
+    expect(tokyoNames).toContain('Senso-ji Temple');
+    expect(parisNames).not.toContain('Shibuya Crossing');
+    expect(parisNames).not.toContain('Senso-ji Temple');
+  });
+
+  it('mixed suggestions each land in their own city with no cross-contamination', () => {
+    const result = assignSuggestionsByProximity(
+      selectedStops,
+      [eiffelTower, louvre, shibuyaCrossing, sensojitemple],
+      totalDays,
+    );
+
+    const parisNames = [...result['0'], ...result['1']].map(s => s.name);
+    const tokyoNames = [...result['2'], ...result['3']].map(s => s.name);
+
+    // Paris suggestions stay in Paris days
+    expect(parisNames).toContain('Eiffel Tower');
+    expect(parisNames).toContain('Louvre Museum');
+
+    // Tokyo suggestions stay in Tokyo days
+    expect(tokyoNames).toContain('Shibuya Crossing');
+    expect(tokyoNames).toContain('Senso-ji Temple');
+
+    // No cross-contamination
+    expect(tokyoNames).not.toContain('Eiffel Tower');
+    expect(tokyoNames).not.toContain('Louvre Museum');
+    expect(parisNames).not.toContain('Shibuya Crossing');
+    expect(parisNames).not.toContain('Senso-ji Temple');
+  });
+
+  it('all 4 day buckets are initialised even when only one city has suggestions', () => {
+    const result = assignSuggestionsByProximity(
+      selectedStops,
+      [eiffelTower],
+      totalDays,
+    );
+
+    expect(result).toHaveProperty('0');
+    expect(result).toHaveProperty('1');
+    expect(result).toHaveProperty('2');
+    expect(result).toHaveProperty('3');
+    expect(result['2']).toEqual([]);
+    expect(result['3']).toEqual([]);
+  });
+
+  it('no suggestion appears in more than one day bucket across a 4-day trip', () => {
+    const result = assignSuggestionsByProximity(
+      selectedStops,
+      [eiffelTower, louvre, shibuyaCrossing, sensojitemple],
+      totalDays,
+    );
+
+    const allAssigned = Object.values(result).flat().map(s => s.name);
+    const unique = new Set(allAssigned);
+    expect(unique.size).toBe(allAssigned.length);
+  });
+});
