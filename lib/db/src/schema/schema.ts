@@ -931,6 +931,7 @@ export const travelTrips = pgTable("travel_trips", {
   missionXpTotal: integer("mission_xp_total").default(0),
   isArchived: boolean("is_archived").default(false),
   heroImageUrl: text("hero_image_url"), // Cover image fetched from Wikipedia at trip creation
+  plannerInputSnapshot: jsonb("planner_input_snapshot"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -980,6 +981,7 @@ export const travelStops = pgTable("travel_stops", {
   // Populated at start-adventure time from planner intelligence tables.
   metadata: jsonb("metadata"),
   heroImageUrl: text("hero_image_url"), // AI-generated hero image (DALL-E 3); null until background job completes
+  selectionReason: varchar("selection_reason"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_travel_stops_trip").on(table.tripId),

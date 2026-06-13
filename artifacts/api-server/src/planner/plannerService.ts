@@ -311,6 +311,8 @@ export interface GeneratedStop {
   reviewRequired?: boolean;
   /** Explanation shown to the parent when they tap the reviewRequired badge. */
   reviewNote?: string;
+  /** Why this stop was selected for this family — captured at generation time, stored on travel_stops. */
+  selectionReason?: string;
 }
 
 /**
@@ -2313,7 +2315,8 @@ function candidateToGeneratedStop(
   c: CachedStopCandidate,
   day: number,
   order: number,
-  isCanonical = false
+  isCanonical = false,
+  selectionReason?: string
 ): GeneratedStop {
   const sc = c.placeReferenceData?.sourceConfidence;
   const isLowConfidence = !isCanonical && sc != null && sc < MIN_SOURCE_CONFIDENCE;
@@ -2342,6 +2345,7 @@ function candidateToGeneratedStop(
     reviewNote: isLowConfidence
       ? "We found this stop but couldn't fully verify it — worth confirming before you visit."
       : undefined,
+    selectionReason,
   };
 }
 
@@ -2434,8 +2438,11 @@ export function selectStopsFromPool(
   }
 
   // ── Soft scoring: family-fit personalization ──────────────────────────────
-  function scoreCandidate(stop: CachedStopCandidate): number {
+  function scoreCandidate(stop: CachedStopCandidate): { score: number; selectionReason: string } {
     let score = 0;
+    let ageBoost = 0;
+    let interestMatched = false;
+    let matchedInterest = '';
 
     // Trip style weighting (mirrors generateDayStops "highlights/offbeat/easy" logic)
     if (input.tripStyle === "highlights" && stop.familyAnchorType === "anchor") score += 4;
@@ -2466,15 +2473,15 @@ export function selectStopsFromPool(
 
     // Age-band fit (mirrors AGE RULES 0-4, 5-7, 8-12 in generateDayStops)
     if (minChildAge <= 4) {
-      if (stop.effortLevel === "low" && stop.sensoryLoad === "low") score += 3;
+      if (stop.effortLevel === "low" && stop.sensoryLoad === "low") { score += 3; ageBoost += 3; }
       if (stop.durationMinutes > 90) score -= 2; // max 90 min for toddlers
-      if (["park", "zoo", "aquarium", "garden"].includes(stop.type)) score += 2;
+      if (["park", "zoo", "aquarium", "garden"].includes(stop.type)) { score += 2; ageBoost += 2; }
       // For young children: outdoor landmarks with low effort are great
-      if (stop.type === "landmark" && stop.effortLevel === "low" && stop.indoorOutdoor !== "indoor") score += 2;
+      if (stop.type === "landmark" && stop.effortLevel === "low" && stop.indoorOutdoor !== "indoor") { score += 2; ageBoost += 2; }
     } else if (minChildAge <= 7) {
-      if (["museum", "zoo", "landmark"].includes(stop.type) && stop.sensoryLoad !== "high") score += 2;
+      if (["museum", "zoo", "landmark"].includes(stop.type) && stop.sensoryLoad !== "high") { score += 2; ageBoost += 2; }
     } else if (minChildAge >= 8) {
-      if (stop.effortLevel !== "low") score += 1;
+      if (stop.effortLevel !== "low") { score += 1; ageBoost += 1; }
     }
 
     // Landmark diversity bonus: boost outdoor iconic landmarks to prevent museum-only trips
@@ -2506,8 +2513,13 @@ export function selectStopsFromPool(
       for (const interest of input.interests) {
         const key = interest.toLowerCase();
         const mappedTypes = INTEREST_TYPE_MAP[key] ?? [];
-        if (mappedTypes.includes(stopType)) score += 3;
-        else if (stopText.includes(key)) score += 1;
+        if (mappedTypes.includes(stopType)) {
+          score += 3;
+          if (!interestMatched) { interestMatched = true; matchedInterest = interest; }
+        } else if (stopText.includes(key)) {
+          score += 1;
+          if (!interestMatched) { interestMatched = true; matchedInterest = interest; }
+        }
       }
     }
 
@@ -2542,7 +2554,19 @@ export function selectStopsFromPool(
     // (0–2 pts, normalised from anchorStopFitScore 0–100; never overrides categorical weights)
     if (stop.anchorStopFitScore != null) score += Math.round((stop.anchorStopFitScore / 100) * 2);
 
-    return score;
+    const isAnchor = stop.familyAnchorType === 'anchor';
+    const lowEffort = input.kidEnergyLevel === 'low' && stop.effortLevel === 'low';
+    const familyAnchor = stop.familyAnchorType === 'anchor' || stop.familyAnchorType === 'support';
+
+    let selectionReason = '';
+    if (ageBoost > 0)                                        selectionReason = `great for age ${minChildAge}`;
+    else if (interestMatched)                                selectionReason = `matches ${matchedInterest} interest`;
+    else if (isAnchor && input.tripStyle === 'highlights')   selectionReason = 'must-see highlight';
+    else if (lowEffort)                                      selectionReason = 'easy pace match';
+    else if (familyAnchor)                                   selectionReason = 'family-friendly anchor';
+    else                                                     selectionReason = 'well-rated for families';
+
+    return { score, selectionReason };
   }
 
   // Detect canonical trips before selection — zone scoring is skipped for India
@@ -2552,8 +2576,10 @@ export function selectStopsFromPool(
     (targetCity && getIndiaCanonicalCityKey(`${targetCity}, India`))
   );
 
-  // Pre-compute base scores for all candidates
-  const baseScores = new Map(candidates.map(c => [c, scoreCandidate(c)]));
+  // Pre-compute base scores and selection reasons for all candidates
+  const scoredMap = new Map(candidates.map(c => [c, scoreCandidate(c)]));
+  const baseScores = new Map(candidates.map(c => [c, scoredMap.get(c)!.score]));
+  const selectionReasons = new Map(candidates.map(c => [c, scoredMap.get(c)!.selectionReason]));
 
   // ── Greedy selection with dynamic consecutive-type and zone-clustering scoring ─
   // At each selection step, candidates receive adjusted scores:
@@ -2992,7 +3018,7 @@ export function selectStopsFromPool(
     }
 
     orderedSlice.forEach((stop, idx) => {
-      result.push(candidateToGeneratedStop(stop, day, idx, isCanonicalTrip));
+      result.push(candidateToGeneratedStop(stop, day, idx, isCanonicalTrip, selectionReasons.get(stop)));
     });
   }
 

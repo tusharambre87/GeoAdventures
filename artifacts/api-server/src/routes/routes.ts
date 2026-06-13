@@ -5370,7 +5370,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateTrip(tripId, { latitude: template.latitude, longitude: template.longitude });
           }
           // Meal stops are NEVER auto-inserted — they must be user-confirmed
-          const AUTO_MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery', 'dining', 'bakery', 'dessert', 'lunch']);
           for (const stop of templateStops) {
             if (AUTO_MEAL_TYPES.has((stop.stopType || '').toLowerCase()) || (stop as any).familyAnchorType === 'meal') continue;
             await storage.createStop({
@@ -5435,6 +5434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!usedTemplate) {
         // Wait briefly so AdventureBuilder can POST anchors to DB before we generate stops
         await new Promise(r => setTimeout(r, 2500));
+
+        // Shared meal-type filter used by all three stop-insertion paths (template / pool / AI)
+        const AUTO_MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery', 'dining', 'bakery', 'dessert', 'lunch']);
 
         // ── Fetch trip data + tailoring for stop planning ─────────────────────
         const fullTrip = await storage.getTripById(tripId);
@@ -5524,6 +5526,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .map((i: string) => i.replace(/\s*[^\w\s].*$/, '').trim().toLowerCase())
                 .filter((i: string) => i.length > 0),
             };
+            await storage.updateTrip(tripId, {
+              plannerInputSnapshot: {
+                childrenAges,
+                pace: plannerPace,
+                tripStyle,
+                interests: plannerInput.interests,
+                strollerNeeded: plannerInput.strollerNeeded,
+                indoorLean: plannerInput.indoorLean,
+                budgetSensitivity: tripTailoring?.budgetSensitivity,
+                kidEnergyLevel: tripTailoring?.kidEnergyLevel,
+                generatedAt: new Date().toISOString(),
+              },
+            });
             const selectedStops = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             const rawDistributedPoolStops = distributeStopsToDays(
               selectedStops.slice(0, effectiveStopCount),
@@ -5590,6 +5605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 missionKeepsakeReward: false,
                 stopMissions: null,
                 cityGroup: cityName,
+                selectionReason: stop.selectionReason ?? null,
                 metadata: {
                   durationMinutes: familyDurationFloor(stop.type ?? stop.stopType ?? 'landmark', stop.durationMinutes),
                   sessionFit: null,
