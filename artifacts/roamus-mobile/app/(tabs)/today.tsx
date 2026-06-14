@@ -75,6 +75,10 @@ const MO_STOP_EMOJI: Record<string, string> = {
 };
 
 
+// ─── Layout constants ─────────────────────────────────────────────────────────
+
+const TAB_BAR_H = 49; // standard iOS/Android tab bar height (excluding safe area)
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
@@ -2084,10 +2088,12 @@ export default function TodayScreen() {
               ? <ActivityIndicator color="#fff" />
               : <Text style={mo.startBtnText}>{'▶'}  Start Day {resolvedDayIndex + 1}</Text>}
           </Pressable>
-          {/* Day not going to plan trigger */}
-          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 20 }} />
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
-            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setShowRescue(true)}
+            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+          >
+            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
           </TouchableOpacity>
           {__DEV__ && (
             <TouchableOpacity
@@ -2421,10 +2427,12 @@ export default function TodayScreen() {
               <Text style={er.hereBtnText}>I’m here {'\u2713'}</Text>
             </TouchableOpacity>
           </View>
-          {/* Day not going to plan trigger */}
-          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
-            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setShowRescue(true)}
+            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+          >
+            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
           </TouchableOpacity>
         </ScrollView>
         <IndoorAlternativesSheet
@@ -2675,9 +2683,12 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
-          <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
-            <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? \u203A'}</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setShowRescue(true)}
+            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+          >
+            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
           </TouchableOpacity>
         </ScrollView>
         <IndoorAlternativesSheet
@@ -2831,12 +2842,13 @@ export default function TodayScreen() {
             </View>
           )}
           {!isLastStop && (
-            <>
-              <View style={{ height: 1, backgroundColor: 'rgba(26,31,46,0.08)', marginHorizontal: 24, marginTop: 16 }} />
-              <TouchableOpacity activeOpacity={0.7} onPress={() => setShowRescue(true)} style={{ alignItems: 'center', paddingVertical: 14 }}>
-                <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.medium }}>{'Day not going to plan? ›'}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowRescue(true)}
+              style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+            >
+              <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
+            </TouchableOpacity>
           )}
         </ScrollView>
         {menuOverlay}
