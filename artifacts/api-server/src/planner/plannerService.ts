@@ -2239,6 +2239,9 @@ export async function generateCityStopPool(
       afterLunchFitScore: row.afterLunchFitScore ?? undefined,
       lateDayFitScore: row.lateDayFitScore ?? undefined,
       anchorStopFitScore: row.anchorStopFitScore ?? undefined,
+      age2to4Fit: row.age2to4Fit ?? undefined,
+      age5to7Fit: row.age5to7Fit ?? undefined,
+      age8to12Fit: row.age8to12Fit ?? undefined,
       parentSupportData: {
         breakSuggestion: "Find a nearby bench or café for a quick rest.",
         foodSuggestion: "Check the venue's café or look for options nearby.",
@@ -2462,6 +2465,30 @@ export function selectStopsFromPool(
       })
     : [];
 
+  // ── Fallback: relative age-band ranking ──────────────────────────────────
+  // When minAge-based filtering yields fewer than 3 candidates (e.g. cities where
+  // nearly every stop has minAge=0), supplement with stops that score meaningfully
+  // better for older children: a2 < 75 AND (a8 - a2) >= 20.
+  // Only applies when the youngest child is ≤ 6 and pool stops carry age-band scores.
+  const hasAgeBandScores = candidates.some(c => c.age2to4Fit != null);
+  const needsRelativeFallback = rawAgeFilteredCandidates.length < 3
+    && childrenAges.length > 0
+    && minChildAge <= 6
+    && hasAgeBandScores;
+  const rawAgeFilteredSet = new Set(rawAgeFilteredCandidates);
+  const relativeAgeFilteredCandidates: CachedStopCandidate[] = needsRelativeFallback
+    ? candidates.filter(c => {
+        if (rawAgeFilteredSet.has(c)) return false;
+        const a2 = c.age2to4Fit ?? 0;
+        const a8 = c.age8to12Fit ?? 0;
+        if (a2 >= 75) return false;
+        if (a8 - a2 < 20) return false;
+        if (input.indoorLean === 'indoor' && c.indoorOutdoor !== 'indoor' && c.indoorOutdoor !== 'both') return false;
+        if (input.indoorLean === 'outdoor' && c.indoorOutdoor !== 'outdoor' && c.indoorOutdoor !== 'both') return false;
+        return true;
+      })
+    : [];
+
   // ── Hard constraint: age suitability (AGE RULES from generateDayStops) ───
   const ageFiltered = candidates.filter(c => (c.minAge ?? 0) <= maxChildAge + 2);
   if (ageFiltered.length >= totalStopsNeeded) candidates = ageFiltered;
@@ -2643,15 +2670,25 @@ export function selectStopsFromPool(
   const baseScores = new Map(candidates.map(c => [c, scoredMap.get(c)!.score]));
   const selectionReasons = new Map(candidates.map(c => [c, scoredMap.get(c)!.selectionReason]));
 
-  // Score age-filtered candidates (not in candidates set; scored independently)
-  const ageFilteredScoredMap = new Map(rawAgeFilteredCandidates.map(c => [c, scoreCandidate(c)]));
-  // 60th-percentile threshold of main pool scores — parent suggestions must clear this bar
+  // Merge raw + relative — raw stops (explicit minAge mismatch) come first as stronger signal.
+  const effectiveAgeFilteredCandidates = [
+    ...rawAgeFilteredCandidates,
+    ...relativeAgeFilteredCandidates,
+  ];
+
+  // Score age-filtered candidates (not in candidates set; scored independently).
+  // Raw (minAge mismatch) candidates are scored normally and threshold-filtered.
+  // Relative (age-band differential) candidates skip the threshold — their quality
+  // is already validated by (a8 - a2 >= 20), and they share the same score range
+  // as main pool stops so applying the threshold would eliminate all of them.
+  const ageFilteredScoredMap = new Map(effectiveAgeFilteredCandidates.map(c => [c, scoreCandidate(c)]));
   const allScoresArr = [...candidates].map(c => scoredMap.get(c)!.score).sort((a, b) => a - b);
   const AGE_FILTER_THRESHOLD = allScoresArr.length > 0
     ? (allScoresArr[Math.floor(allScoresArr.length * 0.60)] ?? 0)
     : 0;
-  const ageFilteredCandidates = rawAgeFilteredCandidates.filter(c =>
-    (ageFilteredScoredMap.get(c)?.score ?? 0) > AGE_FILTER_THRESHOLD
+  const relativeSet = new Set(relativeAgeFilteredCandidates);
+  const ageFilteredCandidates = effectiveAgeFilteredCandidates.filter(c =>
+    relativeSet.has(c) || (ageFilteredScoredMap.get(c)?.score ?? 0) > AGE_FILTER_THRESHOLD
   );
 
   // ── Greedy selection with dynamic consecutive-type and zone-clustering scoring ─

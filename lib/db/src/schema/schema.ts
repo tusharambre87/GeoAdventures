@@ -3366,6 +3366,12 @@ export interface CachedStopCandidate {
   afterLunchFitScore?: number;
   lateDayFitScore?: number;
   anchorStopFitScore?: number;
+  // Age-band fit scores from planner_stop_intelligence (0-100). Stored so that
+  // selectStopsFromPool can do relative parent-suggestion ranking even when all
+  // pool stops share the same derived minAge (e.g. all family-friendly cities).
+  age2to4Fit?: number;
+  age5to7Fit?: number;
+  age8to12Fit?: number;
   // Journey content — pre-generated so stop content is available without extra AI calls
   facts?: string[];
   parentTip?: string;
