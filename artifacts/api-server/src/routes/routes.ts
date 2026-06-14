@@ -170,7 +170,8 @@ function getOpenAI(): OpenAI {
 let openaiAudioInstance: OpenAI | null = null;
 function getOpenAIForAudio(): OpenAI {
   if (!openaiAudioInstance) {
-    const key = process.env.OPENAI_API_KEY;
+    // Support both the canonical name and the mixed-case variant Replit Secrets may store
+    const key = process.env.OPENAI_API_KEY || process.env.OpenAI_API_Key;
     if (!key) throw new Error('OPENAI_API_KEY is not set — audio transcription is unavailable');
     openaiAudioInstance = new OpenAI({ apiKey: key });
   }
