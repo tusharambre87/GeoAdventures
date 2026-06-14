@@ -5368,9 +5368,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     tripDays?: number | null,
     pace?: string | null,
     tripStyle?: "highlights" | "balanced" | "offbeat" | "easy",
+    previewStopIds?: string[],
   ) {
     try {
       console.log(`🌍 [Travel] [bg] Auto-generating stops for: ${cityName} (tripId=${tripId})`);
+
+      // Parity shortcut: if preview stop IDs were supplied, insert them in order and skip generation
+      if (previewStopIds?.length) {
+        try {
+          const slRows = await db.select().from(stopLibrary).where(inArray(stopLibrary.id, previewStopIds));
+          const idOrder = new Map(previewStopIds.map((id, i) => [id, i]));
+          const ordered = [...slRows].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+          if (ordered.length > 0) {
+            const plannerTripDays = tripDays || 2;
+            const stopsPerDay = Math.ceil(ordered.length / plannerTripDays);
+            for (let i = 0; i < ordered.length; i++) {
+              const sl = ordered[i];
+              await storage.createStop({
+                tripId,
+                name: sl.name,
+                stopType: sl.stopType || 'landmark',
+                displayOrder: i % stopsPerDay,
+                dayIndex: Math.floor(i / stopsPerDay),
+                address: sl.address || null,
+                description: null,
+                latitude: sl.latitude || null,
+                longitude: sl.longitude || null,
+                cityGroup: cityName,
+                missionType: null,
+                missionQuestion: null,
+                missionHint: null,
+                missionAnswer: null,
+                missionDifficulty: 'normal',
+                missionKeepsakeReward: false,
+                stopMissions: null,
+                selectionReason: 'preview_parity',
+                metadata: { durationMinutes: familyDurationFloor(sl.stopType ?? 'landmark', undefined) },
+              });
+            }
+            console.log(`[Travel] [bg] Inserted ${ordered.length} preview-parity stops for trip ${tripId}`);
+            return;
+          }
+        } catch (e) {
+          console.error('[Travel] [bg] previewStopIds fast-path failed, falling through to normal generation:', e);
+        }
+      }
 
       const template = isHomeAdventure ? await storage.getCityAdventureTemplate(cityName, country) : undefined;
       let usedTemplate = false;
@@ -6320,6 +6362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ── Pool shortcut: skip GPT entirely if a warm pool exists for this city ──
       const cachedPool = await storage.getCityStopPool(city, country);
+      let previewStopIds: string[] = [];
       let stops: { name: string; description: string; stopType: string }[];
       if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
         req.log
@@ -6345,6 +6388,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           description: s.description ?? '',
           stopType: s.type ?? s.stopType ?? 'landmark',
         }));
+        // Resolve stop_library IDs by name so trip creation can reuse the exact same stops (preview parity)
+        try {
+          const stopNames = stops.map(s => s.name);
+          const cityPrefix = city.split(',')[0].trim();
+          const slRows = await db.select({ id: stopLibrary.id, name: stopLibrary.name })
+            .from(stopLibrary)
+            .where(and(inArray(stopLibrary.name, stopNames), ilike(stopLibrary.city, `%${cityPrefix}%`)));
+          const nameToId = new Map(slRows.map((r: any) => [r.name, r.id]));
+          previewStopIds = stops.map(s => nameToId.get(s.name)).filter((id): id is string => Boolean(id));
+        } catch { /* non-critical */ }
       } else {
         stops = await generateCityStops(city, null, country, totalStops, adventureStyle);
       }
@@ -6361,7 +6414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })),
         });
       }
-      return res.json({ days });
+      return res.json({ days, previewStopIds });
     } catch (err) {
       req.log ? req.log.warn({ err }, '[Preview] stop generation failed') : console.error('[Preview] stop generation failed:', err);
       return res.status(500).json({ message: 'Failed to generate preview' });
@@ -6532,7 +6585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/travel/trips', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug } = req.body;
+      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug, previewStopIds } = req.body;
       // templateStops is intentionally NOT read from req.body — stops are always sourced server-side
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
@@ -6678,7 +6731,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generateStopsInBackground(
             trip.id, city || destination, isHomeAdventure, resolvedCountry,
             state, stopCount, adventureStyle, destination, city,
-            meals || null, computedTripDays || null, pace || 'balanced', tripStyle
+            meals || null, computedTripDays || null, pace || 'balanced', tripStyle,
+            Array.isArray(previewStopIds) && previewStopIds.length ? previewStopIds : undefined,
           );
         }
       }

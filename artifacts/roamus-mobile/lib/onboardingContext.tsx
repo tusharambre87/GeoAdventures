@@ -43,6 +43,8 @@ export type OnboardingData = {
   createdTripId: string | null;
   /** AI-generated trip preview; set by Building screen before account creation */
   generatedTrip: { days: PreviewDay[] } | null;
+  /** stop_library IDs of the preview stops, in order — passed to trip creation for parity */
+  previewStopIds: string[];
   /** true only while the user is actively mid-flow after registration (Account→Upgrade) */
   onboardingInProgress: boolean;
   /** true when a logged-in user starts the "Plan a trip" flow — skips account screen */
@@ -78,6 +80,7 @@ const DEFAULT: OnboardingData = {
   kidEnergyLevel: null,
   createdTripId: null,
   generatedTrip: null,
+  previewStopIds: [],
   onboardingInProgress: false,
   returningUser: false,
   lastDay: null,

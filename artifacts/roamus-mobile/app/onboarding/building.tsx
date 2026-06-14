@@ -178,7 +178,7 @@ export default function BuildingScreen() {
         }
         const body = await res.json();
         if (Array.isArray(body.days) && body.days.length > 0) {
-          set({ generatedTrip: { days: body.days } });
+          set({ generatedTrip: { days: body.days }, previewStopIds: body.previewStopIds ?? [] });
         }
         Animated.timing(progressAnim, { toValue: 1, duration: 300, useNativeDriver: false }).start();
         setApiDone(true);

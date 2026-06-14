@@ -101,6 +101,7 @@ export default function AccountScreen() {
           autoGenerateStops: true,
           templateSlug: data.templateSlug || undefined,
           tripDays: data.tripDays || undefined,
+          previewStopIds: data.previewStopIds?.length ? data.previewStopIds : undefined,
           ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
             cityDates: Object.fromEntries(
               Object.entries(data.cityDates).map(([city, dates]) => [
