@@ -1310,6 +1310,9 @@ function isMealStop(t?: string | null): boolean {
               stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
               address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
               destination: encodeURIComponent(trip?.destination ?? trip?.city ?? ''),
+              lat: currentStop.latitude ?? '',
+              lng: currentStop.longitude ?? '',
+              cityGroup: encodeURIComponent((currentStop as any).cityGroup ?? ''),
             } }); }}>
             <Text style={dt.gridIcon}>{'\uD83D\uDD00'}</Text>
             <Text style={dt.gridTitle}>Need something?</Text>

@@ -8447,13 +8447,18 @@ Example structure:
   // POST /api/travel/stops/rescue-extras
   app.post('/api/travel/stops/rescue-extras', async (req: any, res) => {
     try {
-      const { type, destination, stopName } = req.body;
+      const { type, destination, stopName, lat, lng } = req.body;
       if (!destination) return res.status(400).json({ message: 'destination is required' });
       if (!['break', 'kids'].includes(type)) return res.status(400).json({ message: "type must be 'break' or 'kids'" });
 
       const openai = getOpenAI();
       const isBreak = type === 'break';
-      const contextHint = stopName ? `near "${stopName}" in ${destination}` : `in ${destination}`;
+      // Use exact stop coordinates when available so results reflect the stop's location,
+      // not just the city name (critical for multi-city trips).
+      const locationStr = (lat != null && lng != null)
+        ? `at coordinates ${lat}, ${lng} (near "${stopName ?? destination}")`
+        : stopName ? `near "${stopName}" in ${destination}` : `in ${destination}`;
+      const contextHint = locationStr;
 
       const prompt = isBreak
         ? `You are a family travel expert. A family needs a quick outdoor break ${contextHint}. Return a JSON object with a "places" array of 4 real nearby break spots (parks, plazas, waterfronts, botanical gardens, playgrounds).
@@ -8563,14 +8568,21 @@ Return valid JSON only. No markdown.`;
   // POST /api/travel/rescue/food-options
   app.post('/api/travel/rescue/food-options', isAuthenticated, async (req: any, res) => {
     try {
-      const { tripId } = req.body;
+      const { tripId, cityGroup, lat, lng } = req.body;
       if (!tripId) return res.status(400).json({ message: 'tripId is required' });
 
-      const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
-      if (!trip) return res.status(404).json({ message: 'Trip not found' });
-
-      const cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
+      // Prefer stop-level city (cityGroup) over trip-level destination so multi-city
+      // trips return restaurants near the *current stop*, not the trip's primary city.
+      let cityRaw: string = cityGroup ? String(cityGroup).split(',')[0].trim() : '';
+      if (!cityRaw) {
+        const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
+        if (!trip) return res.status(404).json({ message: 'Trip not found' });
+        cityRaw = (trip.destination ?? (trip as any).city ?? '').split(',')[0].trim();
+      }
       if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
+
+      // Suppress unused-variable warnings — lat/lng accepted for future proximity ranking
+      void lat; void lng;
 
       const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food', 'market'];
 

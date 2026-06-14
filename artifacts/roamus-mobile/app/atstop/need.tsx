@@ -28,13 +28,19 @@ export default function NeedScreen() {
     stopId?: string;
     tripId?: string;
     destination?: string;
+    lat?: string;
+    lng?: string;
+    cityGroup?: string;
   }>();
 
-  const stopName = params.stopName ? decodeURIComponent(params.stopName) : 'This Stop';
-  const address  = params.address  ? decodeURIComponent(params.address)  : '';
-  const stopId   = params.stopId   ?? '';
-  const tripId     = params.tripId      ?? '';
+  const stopName    = params.stopName    ? decodeURIComponent(params.stopName)    : 'This Stop';
+  const address     = params.address     ? decodeURIComponent(params.address)     : '';
+  const stopId      = params.stopId      ?? '';
+  const tripId      = params.tripId      ?? '';
   const destination = params.destination ? decodeURIComponent(params.destination) : stopName;
+  const stopLat     = params.lat         ? parseFloat(params.lat)                 : null;
+  const stopLng     = params.lng         ? parseFloat(params.lng)                 : null;
+  const cityGroup   = params.cityGroup   ? decodeURIComponent(params.cityGroup)   : '';
 
   // ── Running behind sub-sheet animation ────────────────────────────────────
   const [showRunning, setShowRunning] = useState(false);
@@ -85,9 +91,11 @@ export default function NeedScreen() {
     openRescue(type === 'break' ? 'Break spots nearby' : 'Fun options nearby');
     setRescueLoading(true);
     try {
+      const body: Record<string, unknown> = { type, destination, stopName };
+      if (stopLat != null && stopLng != null) { body.lat = stopLat; body.lng = stopLng; }
       const data = await apiFetch<{ places?: Array<{ name: string; distance?: string; description?: string }> }>(
         '/api/travel/stops/rescue-extras',
-        { method: 'POST', body: JSON.stringify({ type, destination, stopName }) }
+        { method: 'POST', body: JSON.stringify(body) }
       );
       setRescueResults(data.places ?? []);
     } catch { setRescueResults([]); }
@@ -98,10 +106,14 @@ export default function NeedScreen() {
     openRescue('Food nearby');
     setRescueLoading(true);
     try {
-      const data = await apiFetch<{ food?: Array<{ name: string; distance?: string; description?: string }> }>(
-        `/api/travel/stops/${stopId}/nearby`
+      const body: Record<string, unknown> = { tripId };
+      if (stopLat != null && stopLng != null) { body.lat = stopLat; body.lng = stopLng; }
+      if (cityGroup) body.cityGroup = cityGroup;
+      const data = await apiFetch<{ options?: Array<{ name: string; distance?: string; description?: string }> }>(
+        '/api/travel/rescue/food-options',
+        { method: 'POST', body: JSON.stringify(body) }
       );
-      setRescueResults(data.food ?? []);
+      setRescueResults(data.options ?? []);
     } catch { setRescueResults([]); }
     finally { setRescueLoading(false); }
   }
