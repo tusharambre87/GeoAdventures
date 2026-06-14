@@ -8549,14 +8549,15 @@ Return valid JSON only. No markdown.`;
       const completion = await openai.chat.completions.create({
         model: 'gpt-5-mini',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
         max_completion_tokens: 800,
-        response_format: { type: 'json_object' },
       });
 
       const raw = completion.choices[0]?.message?.content ?? '{}';
       let parsed: { places?: unknown[] } = {};
-      try { parsed = JSON.parse(raw); } catch {}
+      try {
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+      } catch {}
 
       return res.json({ places: Array.isArray(parsed.places) ? parsed.places : [] });
     } catch (error) {

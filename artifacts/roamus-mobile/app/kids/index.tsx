@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { kidsAPI } from "@/lib/apiClient";
+import { kidsAPI, getMyPlayers } from "@/lib/apiClient";
 import { isStaleContent } from "@/lib/staleContent";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
@@ -92,11 +92,14 @@ export default function ExplorerHome() {
   // Refresh XP every time this screen comes into focus (including back-nav from missions)
   useFocusEffect(
     useCallback(() => {
-      if (!tripId) return;
-      kidsAPI.getProgress(tripId, kids.explorerId || "explorer")
-        .then((prog) => kids.setXpToday(Number(prog?.xp) || 0))
+      if (!kids.explorerId) return;
+      getMyPlayers()
+        .then(players => {
+          const player = players.find(p => p.id === kids.explorerId);
+          if (player != null) kids.setXpToday(player.totalXp ?? 0);
+        })
         .catch(() => {});
-    }, [tripId, kids.explorerId])
+    }, [kids.explorerId])
   );
 
   const minChildAge = parseInt(params.minChildAge ?? '99');

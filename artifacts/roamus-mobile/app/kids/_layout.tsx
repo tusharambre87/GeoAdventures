@@ -12,7 +12,7 @@ function KidsLayoutInner() {
     explorerId?: string;
     explorerName?: string;
   }>();
-  const { setStopInfo, setKidName, setExplorerId } = useKids();
+  const { setStopInfo, setKidName, setExplorerId, setXpToday } = useKids();
 
   useEffect(() => {
     if (params.stopId) {
@@ -32,7 +32,10 @@ function KidsLayoutInner() {
           );
           const fallback = players.find(p => !p.isParent);
           const resolved = match ?? fallback;
-          if (resolved) setExplorerId(resolved.id);
+          if (resolved) {
+            setExplorerId(resolved.id);
+            setXpToday(resolved.totalXp ?? 0);
+          }
         })
         .catch(() => {});
     } else if (params.stopName) {

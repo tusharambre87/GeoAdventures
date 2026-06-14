@@ -1761,7 +1761,7 @@ function DayDetail({
                     cityGroup={localContentStops[mealInsertAfterIdx]?.cityGroup ?? null}
                     confirmedStop={mealStops[0]}
                     onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
-                    onOtherOptions={() => onAddStop('food')}
+                    onOtherOptions={() => { if (mealStops[0]) void onDelete(mealStops[0].id); onAddStop('food'); }}
                     canMoveUp={mealPos > 0}
                     canMoveDown={mealPos >= 0 && mealPos < mealSorted.length - 1}
                     onMoveUp={mealStops[0] ? () => handleMoveStop(mealStops[0].id, 'up') : undefined}
