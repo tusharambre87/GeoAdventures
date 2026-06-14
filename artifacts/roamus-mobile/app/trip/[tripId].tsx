@@ -1623,7 +1623,7 @@ function DayDetail({
         keyExtractor={s => s.id}
         extraData={mealInsertAfterIdx}
         onDragEnd={handleDragEnd}
-        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 100 : 20) + TAB_BAR_H }]}
+        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 120 : 100) + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>

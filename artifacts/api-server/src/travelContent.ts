@@ -10,6 +10,14 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
+// Separate client for audio endpoints — the Replit AI Integration proxy only
+// supports text completions. Audio speech synthesis requires a direct API key.
+function getOpenAIAudioClient(): OpenAI {
+  const key = process.env.OpenAI_API_Key || process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('No OpenAI API key available for audio TTS');
+  return new OpenAI({ apiKey: key });
+}
+
 // Google Cloud TTS client - uses GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_CLOUD_TTS_CREDENTIALS
 let ttsClient: TextToSpeechClient | null = null;
 
@@ -701,12 +709,13 @@ async function loadSfxBuffer(sfxName: string): Promise<Buffer | null> {
 
 async function generateWithOpenAITTS(storyText: string, voice: NarratorVoice = 'eva'): Promise<Buffer | null> {
   try {
+    const audioClient = getOpenAIAudioClient();
     const openaiVoice = voice === 'avi' ? 'onyx' : 'nova';
     const chunks = splitTextIntoChunks(storyText, 4000);
     const audioBuffers: Buffer[] = [];
     console.log(`🎙️ Generating audio with OpenAI TTS (${voice} → ${openaiVoice}), ${chunks.length} chunk(s)`);
     for (const chunk of chunks) {
-      const mp3 = await openai.audio.speech.create({
+      const mp3 = await audioClient.audio.speech.create({
         model: 'tts-1',
         voice: openaiVoice,
         input: chunk,
