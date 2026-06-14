@@ -9,6 +9,7 @@
 export function buildCityPoolKey(city: string, country: string): string {
   const normalizedCity = (city ?? '')
     .toLowerCase()
+    .replace(/\./g, '')
     .replace(/,/g, '')
     .replace(/\s+/g, ' ')
     .replace(/\s*(usa|us|united states)$/i, '')
