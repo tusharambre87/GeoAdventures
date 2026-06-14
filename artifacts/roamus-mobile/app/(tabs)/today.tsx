@@ -3529,7 +3529,7 @@ const mo = StyleSheet.create({
   activePillText: { fontFamily: F.bold, fontSize: 11, color: '#fff', letterSpacing: 0.6 },
   tripName:       { fontFamily: F.bold, fontSize: 26, color: '#fff', lineHeight: 30, marginBottom: 4 },
   tripSub:        { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 18 },
-  weatherPill:    { position: 'absolute', top: 8, right: 16, flexDirection: 'row', alignItems: 'center', gap: 5,
+  weatherPill:    { position: 'absolute', top: 8, right: 68, flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5 },
   weatherText:    { fontFamily: F.bold, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
