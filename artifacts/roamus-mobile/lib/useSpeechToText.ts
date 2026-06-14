@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
@@ -11,6 +11,16 @@ export function useSpeechToText() {
   const recordingRef  = useRef<Audio.Recording | null>(null);
   const onResultRef   = useRef<((text: string) => void) | null>(null);
   const autoStopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (autoStopTimer.current) { clearTimeout(autoStopTimer.current); autoStopTimer.current = null; }
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+    };
+  }, []);
 
   const stop = useCallback(async () => {
     if (autoStopTimer.current) { clearTimeout(autoStopTimer.current); autoStopTimer.current = null; }
@@ -65,9 +75,9 @@ export function useSpeechToText() {
         return;
       }
 
-      // Clean up any stale recording before starting a new one.
-      // "Only one Recording object can be prepared at a given time" is thrown when a
-      // previous session's recording was never unloaded (e.g. quick nav or state race).
+      // Always unload any existing recording before creating a new one.
+      // Skipping this causes "Only one Recording object can be prepared at a
+      // given time" when tapping mic twice quickly or after navigating screens.
       if (recordingRef.current) {
         try { await recordingRef.current.stopAndUnloadAsync(); } catch {}
         recordingRef.current = null;
@@ -76,9 +86,11 @@ export function useSpeechToText() {
 
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await recording.startAsync();
+      // createAsync atomically prepares and starts the recording — no partial-init
+      // window where a second tap could race in between prepare and start.
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
 
       recordingRef.current = recording;
       onResultRef.current  = onResult;
