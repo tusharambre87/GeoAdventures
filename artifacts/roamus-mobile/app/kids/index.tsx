@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   Animated,
   Pressable,
@@ -87,12 +87,17 @@ export default function ExplorerHome() {
         kids.setExploreError(true);
       });
 
-    if (tripId) {
+  }, [stopId]);
+
+  // Refresh XP every time this screen comes into focus (including back-nav from missions)
+  useFocusEffect(
+    useCallback(() => {
+      if (!tripId) return;
       kidsAPI.getProgress(tripId, kids.explorerId || "explorer")
         .then((prog) => kids.setXpToday(Number(prog?.xp) || 0))
         .catch(() => {});
-    }
-  }, [stopId]);
+    }, [tripId, kids.explorerId])
+  );
 
   const minChildAge = parseInt(params.minChildAge ?? '99');
   const allUnder5 = params.allUnder5 === '1';
