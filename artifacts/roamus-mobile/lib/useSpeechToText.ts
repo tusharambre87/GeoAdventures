@@ -48,6 +48,10 @@ export function useSpeechToText() {
         body: formData,
       });
 
+      if (res.status === 503) {
+        Alert.alert('Voice input unavailable', 'Please type your answer instead.');
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { text } = await res.json() as { text: string };
       if (text?.trim()) callback(text.trim());

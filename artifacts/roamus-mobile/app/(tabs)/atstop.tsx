@@ -39,7 +39,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_BASE } from '@/lib/apiClient';
+import { API_BASE, getMyPlayers } from '@/lib/apiClient';
 import { F, CITY_IMGS } from '@/lib/tokens';
 import StopPickerSheet from '@/components/StopPickerSheet';
 import { useAuth } from '@/lib/authContext';
@@ -369,15 +369,20 @@ async function fetchWikiImages(name: string, city?: string): Promise<string[]> {
   } catch { return []; }
 }
 
-async function loadFoodNearby(address: string): Promise<FoodPlace[]> {
+async function loadFoodNearby(address: string, stopLat?: string | null, stopLon?: string | null): Promise<FoodPlace[]> {
   try {
-    const geoRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
-      { headers: { 'User-Agent': 'RoamUsApp/1.0' } }
-    );
-    const geoData = (await geoRes.json()) as Array<{ lat: string; lon: string }>;
-    if (!geoData[0]) return [];
-    const { lat, lon } = geoData[0];
+    let lat: string, lon: string;
+    if (stopLat && stopLon) {
+      lat = stopLat; lon = stopLon;
+    } else {
+      const geoRes = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'RoamUsApp/1.0' } }
+      );
+      const geoData = (await geoRes.json()) as Array<{ lat: string; lon: string }>;
+      if (!geoData[0]) return [];
+      lat = geoData[0].lat; lon = geoData[0].lon;
+    }
     const query = `[out:json][timeout:10];node["amenity"~"^(restaurant|cafe|fast_food|food_court)$"](around:600,${lat},${lon});out 8;`;
     const ovRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
     const ovData = (await ovRes.json()) as { elements?: Array<{ id: number; lat: number; lon: number; tags?: Record<string,string> }> };
@@ -476,6 +481,7 @@ export default function AtStopScreen() {
 
   // ── Detail state ──
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [kidPlayerId, setKidPlayerId] = useState('');
   const [stopImages, setStopImages]     = useState<(string | null)[]>([null, null, null]);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [rescueType, setRescueType]     = useState<RescueType>('behind');
@@ -971,6 +977,15 @@ function isMealStop(t?: string | null): boolean {
   // Booking URL for ticket button
   const bookingHref  = pRef.bookingUrl ?? enrichment.bookingUrl;
   // Lat/lon for directions
+  // Fetch child player ID eagerly so Kids Zone navigation has it ready
+  useEffect(() => {
+    if (!trip?.id) return;
+    getMyPlayers().then(players => {
+      const kid = players.find(p => !p.isParent) ?? null;
+      if (kid) setKidPlayerId(kid.id);
+    }).catch(() => {});
+  }, [trip?.id]);
+
   const stopLat      = currentStop.latitude ? parseFloat(currentStop.latitude) : null;
   const stopLon      = currentStop.longitude ? parseFloat(currentStop.longitude) : null;
 
@@ -1287,6 +1302,7 @@ function isMealStop(t?: string | null): boolean {
                 stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
                 tripId: trip?.id ?? '',
                 explorerName: encodeURIComponent(explorerName),
+                explorerId: kidPlayerId,
                 minChildAge: String(minChildAge),
                 allUnder5: allUnder5 ? '1' : '0',
               }});
@@ -1852,7 +1868,7 @@ function isMealStop(t?: string | null): boolean {
               onPress={() => {
                 if (!foodLoaded && !foodLoading && address) {
                   setFoodLoading(true);
-                  loadFoodNearby(address).then(places => {
+                  loadFoodNearby(address, currentStop?.latitude, currentStop?.longitude).then(places => {
                     setFoodPlaces(places); setFoodLoaded(true); setFoodLoading(false);
                   });
                 }

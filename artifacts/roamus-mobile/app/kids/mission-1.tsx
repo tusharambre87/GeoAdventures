@@ -114,7 +114,7 @@ export default function Mission1() {
     if (kids.stopId) {
       try {
         const result = await kidsAPI.completeMission(kids.stopId, {
-          explorerId: kids.explorerId || "explorer",
+          explorerId: kids.explorerId || "",
           missionId: "quiz",
           answer: quiz!.options[idx] ?? String(idx),
         }) as { missionXpAwarded?: number } | undefined;

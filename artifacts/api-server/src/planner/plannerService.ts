@@ -2693,8 +2693,12 @@ export function selectStopsFromPool(
     ? (allScoresArr[Math.floor(allScoresArr.length * 0.60)] ?? 0)
     : 0;
   const relativeSet = new Set(relativeAgeFilteredCandidates);
+  // rawAgeFilteredCandidates have an explicit minAge mismatch — they are definitively
+  // age-restricted stops. Don't gate them behind the quality threshold; they should
+  // always appear in parentSuggestions regardless of their general family-fit score.
+  const rawAgeSet = new Set(rawAgeFilteredCandidates);
   const ageFilteredCandidates = effectiveAgeFilteredCandidates.filter(c =>
-    relativeSet.has(c) || (ageFilteredScoredMap.get(c)?.score ?? 0) > AGE_FILTER_THRESHOLD
+    rawAgeSet.has(c) || relativeSet.has(c) || (ageFilteredScoredMap.get(c)?.score ?? 0) > AGE_FILTER_THRESHOLD
   );
 
   // ── Greedy selection with dynamic consecutive-type and zone-clustering scoring ─

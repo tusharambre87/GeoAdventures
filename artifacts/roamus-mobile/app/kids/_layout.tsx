@@ -22,6 +22,9 @@ function KidsLayoutInner() {
         params.tripId ?? ""
       );
     }
+    if (params.explorerId) {
+      setExplorerId(params.explorerId);
+    }
     if (params.explorerName) {
       const name = decodeURIComponent(params.explorerName);
       setKidName(name);

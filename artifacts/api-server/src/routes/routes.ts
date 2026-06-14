@@ -164,6 +164,19 @@ function getOpenAI(): OpenAI {
   return openaiInstance;
 }
 
+// Separate client for audio transcription (Whisper) — the Replit AI Integration
+// proxy at AI_INTEGRATIONS_OPENAI_BASE_URL only handles text completions; audio
+// endpoints must go directly to api.openai.com using a real OPENAI_API_KEY.
+let openaiAudioInstance: OpenAI | null = null;
+function getOpenAIForAudio(): OpenAI {
+  if (!openaiAudioInstance) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error('OPENAI_API_KEY is not set — audio transcription is unavailable');
+    openaiAudioInstance = new OpenAI({ apiKey: key });
+  }
+  return openaiAudioInstance;
+}
+
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -11638,7 +11651,14 @@ Return ONLY valid JSON in this exact format:
   app.post('/api/travel/transcribe', isAuthenticated, audioUpload.single('audio'), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: 'No audio file provided' });
-      const openai = getOpenAI();
+      let openai: OpenAI;
+      try {
+        openai = getOpenAIForAudio();
+      } catch {
+        // OPENAI_API_KEY not set — the Replit AI Integration proxy does not support
+        // audio transcription. Add OPENAI_API_KEY to Replit Secrets to enable STT.
+        return res.status(503).json({ message: 'Speech-to-text is not configured. Add OPENAI_API_KEY to Secrets to enable it.', code: 'STT_NOT_CONFIGURED' });
+      }
       const file = new File([req.file.buffer], 'recording.m4a', { type: req.file.mimetype || 'audio/m4a' });
       const transcription = await openai.audio.transcriptions.create({ file, model: 'whisper-1' });
       res.json({ text: transcription.text });

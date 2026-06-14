@@ -91,7 +91,7 @@ export default function Mission2() {
     try {
       if (kids.stopId) {
         missionResult = await kidsAPI.completeMission(kids.stopId, {
-          explorerId: kids.explorerId || "explorer",
+          explorerId: kids.explorerId || "",
           missionId: "observation",
           answer: obs || "—",
         }) as { missionXpAwarded?: number } | undefined;
