@@ -74,7 +74,7 @@ export function SpeechTextInput({
           style={[styles.micBtn, isListening && styles.micBtnActive]}
         >
           <Feather
-            name="mic"
+            name="mic-off"
             size={15}
             color={isListening ? '#E8692A' : '#8A8FA8'}
           />

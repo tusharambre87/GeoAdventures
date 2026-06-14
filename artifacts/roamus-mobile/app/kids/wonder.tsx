@@ -2,7 +2,6 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
@@ -172,14 +172,13 @@ export default function WonderTime() {
                 }
               }}
             >
-              {isTranscribing
-                ? <ActivityIndicator size="small" color="#7C3AED" />
-                : (
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Text style={{ fontSize: 22 }}>{"\uD83C\uDFA4"}</Text>
-                  </Animated.View>
-                )
-              }
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <Ionicons
+                  name="mic-off"
+                  size={22}
+                  color={isListening ? "#7C3AED" : "#E8692A"}
+                />
+              </Animated.View>
             </Pressable>
           </View>
         </View>

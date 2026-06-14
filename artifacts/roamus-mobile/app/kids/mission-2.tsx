@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
@@ -170,10 +171,11 @@ export default function Mission2() {
                 }
               }}
             >
-              {isTranscribing
-                ? <ActivityIndicator size="small" color="#7C3AED" />
-                : <Text style={{ fontSize: 24 }}>{"\uD83C\uDFA4"}</Text>
-              }
+              <Ionicons
+                name="mic-off"
+                size={22}
+                color={isListening ? "#7C3AED" : "#E8692A"}
+              />
             </Pressable>
           </View>
         </View>
