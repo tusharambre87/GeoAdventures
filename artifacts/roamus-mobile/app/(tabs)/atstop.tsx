@@ -584,6 +584,13 @@ export default function AtStopScreen() {
         .then(d => setStopMoments(d.moments ?? []))
         .catch(() => {});
     }
+    // Fetch child player ID so Kids Zone navigation has it ready
+    if (trip?.id) {
+      getMyPlayers().then(players => {
+        const kid = players.find(p => !p.isParent) ?? null;
+        if (kid) setKidPlayerId(kid.id);
+      }).catch(() => {});
+    }
   }, [currentStop?.id, trip?.id]);
 
   // Sync mealDone when switching stops
@@ -952,15 +959,6 @@ function isMealStop(t?: string | null): boolean {
   const s = t.toLowerCase();
   return ['restaurant','food','cafe','market','meal','street_food','diner','eatery'].some(k => s.includes(k));
 }
-
-  // Fetch child player ID eagerly so Kids Zone navigation has it ready
-  useEffect(() => {
-    if (!trip?.id) return;
-    getMyPlayers().then(players => {
-      const kid = players.find(p => !p.isParent) ?? null;
-      if (kid) setKidPlayerId(kid.id);
-    }).catch(() => {});
-  }, [trip?.id]);
 
   if (!currentStop) return null;
   const meta        = parseMetadata(currentStop.metadata);
