@@ -138,6 +138,17 @@ export type GameContentRounds = {
   connectionFact?: string;
 };
 
+export type PlayerRecord = {
+  id: string;
+  name: string;
+  isParent?: boolean;
+  totalXp?: number;
+};
+
+export async function getMyPlayers(): Promise<PlayerRecord[]> {
+  return apiFetch<PlayerRecord[]>('/api/players/me');
+}
+
 export const kidsAPI = {
   getExplore: (stopId: string) =>
     apiFetch<ExploreContent>(`/api/travel/stops/${stopId}/explore`),

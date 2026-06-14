@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect } from "react";
 
+import { getMyPlayers } from "@/lib/apiClient";
 import { KidsProvider, useKids } from "@/lib/kidsContext";
 
 function KidsLayoutInner() {
@@ -21,11 +22,19 @@ function KidsLayoutInner() {
         params.tripId ?? ""
       );
     }
-    if (params.explorerId) {
-      setExplorerId(params.explorerId);
-    }
     if (params.explorerName) {
-      setKidName(decodeURIComponent(params.explorerName));
+      const name = decodeURIComponent(params.explorerName);
+      setKidName(name);
+      getMyPlayers()
+        .then(players => {
+          const match = players.find(
+            p => !p.isParent && p.name.toLowerCase() === name.toLowerCase()
+          );
+          const fallback = players.find(p => !p.isParent);
+          const resolved = match ?? fallback;
+          if (resolved) setExplorerId(resolved.id);
+        })
+        .catch(() => {});
     } else if (params.stopName) {
       setKidName("Explorer");
     }

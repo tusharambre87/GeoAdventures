@@ -2340,7 +2340,7 @@ export default function TodayScreen() {
             style={er.kidsStrip} activeOpacity={0.85}
             onPress={() => router.push({
               pathname: '/kids' as never,
-              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' },
+              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '', explorerName: encodeURIComponent((trip?.travelers ?? []).find(t => !(t as any).isParent)?.name ?? '') },
             })}
           >
             <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>
@@ -2602,7 +2602,7 @@ export default function TodayScreen() {
             style={er.kidsStrip} activeOpacity={0.85}
             onPress={() => router.push({
               pathname: '/kids' as never,
-              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '' },
+              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '', explorerName: encodeURIComponent((trip?.travelers ?? []).find(t => !(t as any).isParent)?.name ?? '') },
             })}
           >
             <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>

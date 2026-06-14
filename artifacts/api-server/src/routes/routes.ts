@@ -1387,6 +1387,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/players/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const playersList = await storage.getPlayersByUserId(userId);
+      res.json(playersList);
+    } catch (error) {
+      req.log.error({ error }, "Error fetching my players");
+      res.status(500).json({ message: "Failed to fetch players" });
+    }
+  });
+
   app.get('/api/players/:playerId', isAuthenticated, async (req: any, res) => {
     try {
       const { playerId } = req.params;

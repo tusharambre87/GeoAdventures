@@ -1285,7 +1285,7 @@ function isMealStop(t?: string | null): boolean {
               const allUnder5 = childAgesList.length > 0 && childAgesList.every((a: number) => a < 3);
               keepDetailOnFocus.current = true; router.push({ pathname: '/kids' as never, params: {
                 stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
-                tripId: trip?.id ?? '', explorerId: explorerName,
+                tripId: trip?.id ?? '',
                 explorerName: encodeURIComponent(explorerName),
                 minChildAge: String(minChildAge),
                 allUnder5: allUnder5 ? '1' : '0',
