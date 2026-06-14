@@ -953,6 +953,15 @@ function isMealStop(t?: string | null): boolean {
   return ['restaurant','food','cafe','market','meal','street_food','diner','eatery'].some(k => s.includes(k));
 }
 
+  // Fetch child player ID eagerly so Kids Zone navigation has it ready
+  useEffect(() => {
+    if (!trip?.id) return;
+    getMyPlayers().then(players => {
+      const kid = players.find(p => !p.isParent) ?? null;
+      if (kid) setKidPlayerId(kid.id);
+    }).catch(() => {});
+  }, [trip?.id]);
+
   if (!currentStop) return null;
   const meta        = parseMetadata(currentStop.metadata);
   const enrichment  = parseEnrichment(currentStop.enrichment);
@@ -977,14 +986,6 @@ function isMealStop(t?: string | null): boolean {
   // Booking URL for ticket button
   const bookingHref  = pRef.bookingUrl ?? enrichment.bookingUrl;
   // Lat/lon for directions
-  // Fetch child player ID eagerly so Kids Zone navigation has it ready
-  useEffect(() => {
-    if (!trip?.id) return;
-    getMyPlayers().then(players => {
-      const kid = players.find(p => !p.isParent) ?? null;
-      if (kid) setKidPlayerId(kid.id);
-    }).catch(() => {});
-  }, [trip?.id]);
 
   const stopLat      = currentStop.latitude ? parseFloat(currentStop.latitude) : null;
   const stopLon      = currentStop.longitude ? parseFloat(currentStop.longitude) : null;
