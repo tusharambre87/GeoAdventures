@@ -1282,7 +1282,7 @@ function isMealStop(t?: string | null): boolean {
                 .filter(t => t.name && t.name !== 'You' && !(t as any).isParent)
                 .map(t => Number((t as any).age ?? 99));
               const minChildAge = childAgesList.length > 0 ? Math.min(...childAgesList) : 99;
-              const allUnder5 = childAgesList.length > 0 && childAgesList.every((a: number) => a <= 5);
+              const allUnder5 = childAgesList.length > 0 && childAgesList.every((a: number) => a < 3);
               keepDetailOnFocus.current = true; router.push({ pathname: '/kids' as never, params: {
                 stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
                 tripId: trip?.id ?? '', explorerId: explorerName,

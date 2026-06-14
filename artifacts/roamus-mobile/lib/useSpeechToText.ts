@@ -65,6 +65,15 @@ export function useSpeechToText() {
         return;
       }
 
+      // Clean up any stale recording before starting a new one.
+      // "Only one Recording object can be prepared at a given time" is thrown when a
+      // previous session's recording was never unloaded (e.g. quick nav or state race).
+      if (recordingRef.current) {
+        try { await recordingRef.current.stopAndUnloadAsync(); } catch {}
+        recordingRef.current = null;
+      }
+      if (autoStopTimer.current) { clearTimeout(autoStopTimer.current); autoStopTimer.current = null; }
+
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
       const recording = new Audio.Recording();

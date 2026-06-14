@@ -2242,7 +2242,7 @@ export default function TodayScreen() {
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Photo hero with gradient overlay */}
           <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
             <Image
@@ -2490,7 +2490,7 @@ export default function TodayScreen() {
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Hero — same as EN_ROUTE, not dimmed */}
           <View style={[er.heroWrap, { paddingTop: insets.top + 20, height: 340 }]}>
             <Image
@@ -2726,7 +2726,7 @@ export default function TodayScreen() {
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <View style={[sc.hero, { paddingTop: insets.top + 24 }]}>
             <Animated.View style={{ transform: [{ scale: bounceScale }] }}>
               <Text style={sc.heroEmoji}>{'\uD83C\uDF89'}</Text>
@@ -2887,7 +2887,7 @@ export default function TodayScreen() {
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <LinearGradient
             colors={['#1D4A42', '#163830']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
