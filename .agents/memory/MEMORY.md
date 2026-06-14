@@ -10,5 +10,6 @@
 - [gpt-5-mini unsupported params](gpt5mini-params.md) — gpt-5-mini rejects temperature AND response_format:{type:"json_object"}; extract JSON with regex from plain-text response instead.
 - [KeyboardAvoidingView in position:absolute sheets](keyboard-avoiding-absolute.md) — KAV inside position:absolute bottom:0 Animated.View doesn't know its frame; use Keyboard.addListener('keyboardDidShow') + scrollToEnd instead.
 - [smart-suggestions library-first pattern](smart-suggestions-library.md) — For kids/landmark contexts, always query stop_library before calling AI; return early if ≥4 results. Catches AI failures silently and eliminates "No stops found" for well-seeded cities.
+- [PSI minAge vs planner_places.min_age](psi-min-age-vs-planner-places.md) — Pool reads psiMinAge (PSI), not planner_places; NULL=bands, 0=explicit no restriction, >0=hard min. Code fix: !== null check in plannerService.ts.
 - [gpt-image-1 via Replit AI proxy](gpt-image-1-proxy.md) — dall-e-3 unsupported; use gpt-image-1 with quality:"low"; response returns b64_json (not url), read via data[0].b64_json.
 - [PMAL relative fallback gate](pmal-relative-fallback.md) — `rawAgeFiltered.length < 3` (not `=== 0`) is the correct gate; cities like DC have 1-2 stray minAge stops that break the strict zero check.

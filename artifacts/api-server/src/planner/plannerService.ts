@@ -2203,11 +2203,11 @@ export async function generateCityStopPool(
     if (slText === "low") sensoryLoad = "low";
     else if (slText === "high") sensoryLoad = "high";
 
-    // minAge: explicit PSI override takes precedence; fall back to age-band score derivation.
-    // psiMinAge is set manually for stops with known age suitability (e.g. Holocaust Museum = 8).
+    // minAge: if psiMinAge is explicitly set (even to 0), use it as a hard override —
+    // 0 means "no minimum age restriction". NULL means "not set" → derive from age-band scores.
     let minAge = 0;
-    if ((row.psiMinAge ?? 0) > 0) {
-      minAge = row.psiMinAge!;
+    if (row.psiMinAge !== null && row.psiMinAge !== undefined) {
+      minAge = row.psiMinAge;
     } else {
       const a2 = row.age2to4Fit ?? 0;
       const a5 = row.age5to7Fit ?? 0;
