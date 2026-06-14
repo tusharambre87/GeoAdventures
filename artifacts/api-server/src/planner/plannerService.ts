@@ -2142,6 +2142,7 @@ export async function generateCityStopPool(
       age5to7Fit: plannerStopIntelligence.age5to7Fit,
       age8to12Fit: plannerStopIntelligence.age8to12Fit,
       parentEffortScore: plannerStopIntelligence.parentEffortScore,
+      psiMinAge: plannerStopIntelligence.minAge,
     })
     .from(stopLibrary)
     .leftJoin(
@@ -2202,14 +2203,19 @@ export async function generateCityStopPool(
     if (slText === "low") sensoryLoad = "low";
     else if (slText === "high") sensoryLoad = "high";
 
-    // minAge: derive from age-band fit scores (threshold ≥60)
+    // minAge: explicit PSI override takes precedence; fall back to age-band score derivation.
+    // psiMinAge is set manually for stops with known age suitability (e.g. Holocaust Museum = 8).
     let minAge = 0;
-    const a2 = row.age2to4Fit ?? 0;
-    const a5 = row.age5to7Fit ?? 0;
-    const a8 = row.age8to12Fit ?? 0;
-    if (a2 >= 60 || (a2 === 0 && a5 === 0 && a8 === 0)) minAge = 0;
-    else if (a5 >= 60) minAge = 5;
-    else if (a8 >= 60) minAge = 8;
+    if ((row.psiMinAge ?? 0) > 0) {
+      minAge = row.psiMinAge!;
+    } else {
+      const a2 = row.age2to4Fit ?? 0;
+      const a5 = row.age5to7Fit ?? 0;
+      const a8 = row.age8to12Fit ?? 0;
+      if (a2 >= 60 || (a2 === 0 && a5 === 0 && a8 === 0)) minAge = 0;
+      else if (a5 >= 60) minAge = 5;
+      else if (a8 >= 60) minAge = 8;
+    }
 
     // strollerFriendly: intelligence score ≥60, or enrichment flag
     const strollerFriendly =
