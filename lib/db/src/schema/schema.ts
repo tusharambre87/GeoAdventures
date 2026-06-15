@@ -3839,12 +3839,13 @@ export const exploreCache = pgTable("explore_cache", {
   normalizedName: text("normalized_name").notNull(),
   cityGroup: text("city_group").notNull(),
   stopType: text("stop_type"),
+  ageBand: varchar("age_band", { length: 10 }).notNull().default("middle"),
   exploreData: jsonb("explore_data").notNull(),
   rescueSuggestions: jsonb("rescue_suggestions"),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("explore_cache_name_city_idx").on(table.normalizedName, table.cityGroup),
+  uniqueIndex("explore_cache_name_city_age_idx").on(table.normalizedName, table.cityGroup, table.ageBand),
 ]);
 export type ExploreCache = typeof exploreCache.$inferSelect;
 export type InsertExploreCache = typeof exploreCache.$inferInsert;

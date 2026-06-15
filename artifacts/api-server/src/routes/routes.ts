@@ -9876,12 +9876,15 @@ Return ONLY valid JSON in this exact format:
       let enriched: any = { ...stop, storyPack: null, audioUrl: null, keepsake: null, enrichment: null };
       try {
         const destination = stop.cityGroup ?? stopTrip?.destination ?? '';
+        const { getAgeBand: _getAgeBand } = await import('../ageBand');
+        const _cAges = ((stopTrip?.travelers ?? []) as any[]).filter((t: any) => !t.isParent && t.age).map((t: any) => Number(t.age)).filter((n: number) => n > 0 && n < 18);
+        const ageBand = _getAgeBand(_cAges.length > 0 ? Math.min(..._cAges) : 8);
         const [libRows, cachedExplore, psiRows] = await Promise.all([
           stop.name && stop.cityGroup
             ? storage.getStopLibraryByNames([{ city: stop.cityGroup, name: stop.name }])
             : Promise.resolve([]),
           stop.name && destination
-            ? getExploreCacheByStop(stop.name, destination).catch(() => null)
+            ? getExploreCacheByStop(stop.name, destination, ageBand).catch(() => null)
             : Promise.resolve(null),
           stop.name
             ? db.select({
@@ -10623,27 +10626,7 @@ Return ONLY valid JSON in this exact format:
       const destination = stop.cityGroup ?? trip?.destination ?? '';
       const stopType = stop.stopType ?? 'landmark';
 
-      // 2. Check explore_cache first (canonical, cross-trip cache)
-      const cachedExplore = await getExploreCacheByStop(stop.name, destination);
-      if (cachedExplore) {
-        return res.json({ ...cachedExplore.exploreData as any, stopId });
-      }
-
-      // 3. Check journey_pack fallback (per-trip legacy cache)
-      //    Require a properly generated main story of at least 7 minutes (420s).
-      //    Invalidate stale entries that contain narrator cues or generic fallback text.
-      const journeyPack = await storage.getJourneyPackByStopId(stopId);
-      const legacyCached = journeyPack?.exploreData as any;
-      const hasRichStories = (legacyCached?.stories?.main?.durationSeconds ?? 0) >= 420;
-      const isStale = isStaleExploreContent(legacyCached);
-      if (legacyCached && legacyCached.reviews !== undefined && hasRichStories && !isStale) {
-        // Promote warm legacy entry into explore_cache for future cross-trip reuse
-        await upsertExploreCache(stop.name, destination, stopType, legacyCached).catch(() => {});
-        return res.json({ ...legacyCached, stopId });
-      }
-
-      // 4. Cache miss — generate
-      // Derive youngest child age for age-calibrated story prompts
+      // 2. Derive age band from trip travelers (drives cache lookup + story generation)
       let youngestChildAge: number | undefined;
       try {
         const childrenAges = ((trip.travelers ?? []) as any[])
@@ -10652,13 +10635,35 @@ Return ONLY valid JSON in this exact format:
           .filter((n: number) => n > 0 && n < 18);
         if (childrenAges.length > 0) youngestChildAge = Math.min(...childrenAges);
       } catch { /* non-fatal */ }
+      const { getAgeBand } = await import('../ageBand');
+      const ageBand = getAgeBand(youngestChildAge ?? 8);
 
+      // 3. Check explore_cache first (canonical, cross-trip cache)
+      const cachedExplore = await getExploreCacheByStop(stop.name, destination, ageBand);
+      if (cachedExplore) {
+        return res.json({ ...cachedExplore.exploreData as any, stopId });
+      }
+
+      // 4. Check journey_pack fallback (per-trip legacy cache)
+      //    Require a properly generated main story of at least 7 minutes (420s).
+      //    Invalidate stale entries that contain narrator cues or generic fallback text.
+      const journeyPack = await storage.getJourneyPackByStopId(stopId);
+      const legacyCached = journeyPack?.exploreData as any;
+      const hasRichStories = (legacyCached?.stories?.main?.durationSeconds ?? 0) >= 420;
+      const isStale = isStaleExploreContent(legacyCached);
+      if (legacyCached && legacyCached.reviews !== undefined && hasRichStories && !isStale) {
+        // Promote warm legacy entry into explore_cache for future cross-trip reuse
+        await upsertExploreCache(stop.name, destination, stopType, legacyCached, ageBand).catch(() => {});
+        return res.json({ ...legacyCached, stopId });
+      }
+
+      // 5. Cache miss — generate
       const { getExploreContent } = await import('../exploreContentService');
       const exploreData = await getExploreContent(stop.name, stopType, destination, youngestChildAge);
       const exploreDataWithStop = { ...exploreData, stopId };
 
-      // 5. Write to explore_cache (canonical)
-      await upsertExploreCache(stop.name, destination, stopType, exploreDataWithStop);
+      // 6. Write to explore_cache (canonical)
+      await upsertExploreCache(stop.name, destination, stopType, exploreDataWithStop, ageBand);
 
       // 6. Keep existing journey_pack write (per-trip; only when story is rich enough)
       const generatedDuration = (exploreData as any)?.stories?.main?.durationSeconds ?? 0;

@@ -1,28 +1,37 @@
 /**
- * Backfill explore_cache from stop_library.
+ * Backfill explore_cache from stop_library — three age bands per stop.
  *
- * Canonical cache keyed on (normalizedName, cityGroup) — one row per real-world
- * stop identity, reused across all trips. Run once; idempotent thereafter.
+ * Generates young (age 5), middle (age 8), and older (age 12) story variants
+ * so runtime callers can serve age-appropriate content immediately.
  *
  * Usage:
  *   pnpm --filter @workspace/api-server run backfill:explore
+ *
+ * Expected runtime: ~1,314 stops × 3 bands × 2.5s = ~165 minutes
+ * After completion: set FORCE_REGEN = false
  */
 
 import { db } from '../db.js';
 import { stopLibrary } from '@workspace/db';
 import { eq, or } from 'drizzle-orm';
 import { getExploreContent } from '../exploreContentService.js';
-import { getExploreCacheByStop, upsertExploreCache } from '../storage.js';
+import { upsertExploreCache } from '../storage.js';
 
-const PAUSE_MS = 2500;
+const PAUSE_MS   = 2500;
 const FORCE_REGEN = true; // set to false after this run completes
+
+const AGE_BANDS = [
+  { band: 'young',  representativeAge: 5  },
+  { band: 'middle', representativeAge: 8  },
+  { band: 'older',  representativeAge: 12 },
+] as const;
 
 async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
 async function backfillExploreContent() {
-  console.log('Starting explore_cache backfill from stop_library...');
+  console.log('Starting explore_cache backfill — 3 age bands per stop...');
   console.log(`FORCE_REGEN = ${FORCE_REGEN}`);
 
   const stops = await db
@@ -50,78 +59,71 @@ async function backfillExploreContent() {
       ),
     );
 
-  console.log(`Total stops: ${stops.length}`);
+  const total = stops.length * AGE_BANDS.length;
+  console.log(`Total stops: ${stops.length} → ${total} total rows to generate`);
 
-  let skipped   = 0;
   let generated = 0;
   let failed    = 0;
-  const failedStops: string[] = [];
+  const failedItems: string[] = [];
 
-  for (let i = 0; i < stops.length; i++) {
-    const stop = stops[i];
-
-    try {
-      const lookupName = stop.normalizedName || stop.name;
-
-      // Skip if already cached, unless FORCE_REGEN
-      if (!FORCE_REGEN) {
-        const existing = await getExploreCacheByStop(lookupName, stop.city ?? '');
-        if (existing) {
-          skipped++;
-          continue;
+  let rowIndex = 0;
+  for (const stop of stops) {
+    for (const { band, representativeAge } of AGE_BANDS) {
+      rowIndex++;
+      try {
+        if (rowIndex % 10 === 1) {
+          console.log(
+            `[${rowIndex}/${total}] ${band} — ${stop.name} (${stop.city ?? ''}) — ${generated} done, ${failed} failed`,
+          );
         }
-      }
 
-      if (i % 10 === 0) {
-        console.log(
-          `[${i + 1}/${stops.length}] Generating: ${stop.name} (${stop.city ?? ''}) — ${generated} done, ${skipped} skipped, ${failed} failed`,
+        const gpFacts = {
+          gpHours:                stop.gpHours,
+          gpRating:               stop.gpRating,
+          gpPriceLevel:           stop.gpPriceLevel,
+          gpAddressVerified:      stop.gpAddressVerified,
+          gpWheelchairAccessible: stop.gpWheelchairAccessible,
+          gpPhone:                stop.gpPhone,
+          gpWebsite:              stop.gpWebsite,
+        };
+
+        const lookupName = stop.normalizedName || stop.name;
+
+        const content = await getExploreContent(
+          stop.name,
+          stop.stopType ?? 'attraction',
+          stop.city ?? '',
+          representativeAge,
+          gpFacts,
         );
+
+        await upsertExploreCache(
+          lookupName,
+          stop.city ?? '',
+          stop.stopType ?? '',
+          content,
+          band,
+        );
+
+        generated++;
+
+      } catch (err) {
+        failed++;
+        failedItems.push(`${band}:${stop.name} (${stop.city ?? ''})`);
+        console.error(`Failed [${band}] ${stop.name} — ${err}`);
       }
 
-      const gpFacts = {
-        gpHours:                stop.gpHours,
-        gpRating:               stop.gpRating,
-        gpPriceLevel:           stop.gpPriceLevel,
-        gpAddressVerified:      stop.gpAddressVerified,
-        gpWheelchairAccessible: stop.gpWheelchairAccessible,
-        gpPhone:                stop.gpPhone,
-        gpWebsite:              stop.gpWebsite,
-      };
-
-      const content = await getExploreContent(
-        stop.name,
-        stop.stopType ?? 'attraction',
-        stop.city ?? '',
-        undefined,
-        gpFacts,
-      );
-
-      await upsertExploreCache(
-        lookupName,
-        stop.city ?? '',
-        stop.stopType ?? '',
-        content,
-      );
-
-      generated++;
-
-    } catch (err) {
-      failed++;
-      failedStops.push(`${stop.name} (${stop.city ?? ''})`);
-      console.error(`Failed: ${stop.name} — ${err}`);
-    }
-
-    if (i < stops.length - 1) {
-      await sleep(PAUSE_MS);
+      if (rowIndex < total) {
+        await sleep(PAUSE_MS);
+      }
     }
   }
 
   console.log('\nBackfill complete');
   console.log(`Generated : ${generated}`);
-  console.log(`Skipped   : ${skipped}`);
   console.log(`Failed    : ${failed}`);
-  if (failedStops.length > 0) {
-    console.log('Failed stops:', failedStops.slice(0, 20).join(', '));
+  if (failedItems.length > 0) {
+    console.log('Failed items:', failedItems.slice(0, 20).join(', '));
   }
 }
 

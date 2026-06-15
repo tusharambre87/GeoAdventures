@@ -6281,6 +6281,7 @@ export function normalizeStopType(type: string | null | undefined): string {
 export async function getExploreCacheByStop(
   stopName: string,
   cityGroup: string,
+  ageBand: string = 'middle',
 ): Promise<ExploreCache | null> {
   const normalized = normalizeStopName(stopName);
   const city = cityGroup.toLowerCase().trim();
@@ -6292,6 +6293,7 @@ export async function getExploreCacheByStop(
       and(
         eq(exploreCache.normalizedName, normalized),
         eq(exploreCache.cityGroup, city),
+        eq(exploreCache.ageBand, ageBand),
       ),
     )
     .limit(1);
@@ -6304,6 +6306,7 @@ export async function upsertExploreCache(
   cityGroup: string,
   stopType: string,
   data: unknown,
+  ageBand: string = 'middle',
 ): Promise<void> {
   const normalized = normalizeStopName(stopName);
   const city = cityGroup.toLowerCase().trim();
@@ -6315,13 +6318,14 @@ export async function upsertExploreCache(
       normalizedName:    normalized,
       cityGroup:         city,
       stopType,
+      ageBand,
       exploreData:       data as any,
       rescueSuggestions: rescueSuggestions as any,
       generatedAt:       new Date(),
       updatedAt:         new Date(),
     })
     .onConflictDoUpdate({
-      target: [exploreCache.normalizedName, exploreCache.cityGroup],
+      target: [exploreCache.normalizedName, exploreCache.cityGroup, exploreCache.ageBand],
       set: {
         exploreData:       data as any,
         rescueSuggestions: rescueSuggestions as any,
