@@ -536,7 +536,9 @@ function getStopsPerDay(pace: string): number {
     'packed':    6,
     'busy':      6,
   };
-  return map[pace?.toLowerCase()] ?? 4;
+  const result = map[pace?.toLowerCase()] ?? 4;
+  console.log('[pace debug]', pace, '→', result);
+  return result;
 }
 
 function getAgeContext(ages: number[]): string {

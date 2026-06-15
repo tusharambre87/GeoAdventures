@@ -5396,7 +5396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     previewStopIds?: string[],
   ) {
     try {
-      console.log(`🌍 [Travel] [bg] Auto-generating stops for: ${cityName} (tripId=${tripId})`);
+      console.log(`🌍 [Travel] [bg] Auto-generating stops for: ${cityName} (tripId=${tripId}, pace=${pace}, previewStopIds=${previewStopIds?.length ?? 0})`);
 
       // Parity shortcut: if preview stop IDs were supplied, insert them in order and skip generation
       if (previewStopIds?.length) {
@@ -5404,9 +5404,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const slRows = await db.select().from(stopLibrary).where(inArray(stopLibrary.id, previewStopIds));
           const idOrder = new Map(previewStopIds.map((id, i) => [id, i]));
           const ordered = [...slRows].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+          console.log(`[pace debug] fast-path: previewStopIds.length=${previewStopIds.length} resolved=${ordered.length} tripDays=${tripDays || 2}`);
           if (ordered.length > 0) {
             const plannerTripDays = tripDays || 2;
             const stopsPerDay = Math.ceil(ordered.length / plannerTripDays);
+            console.log(`[pace debug] fast-path: stopsPerDay=${stopsPerDay} (${ordered.length} stops ÷ ${plannerTripDays} days)`);
             for (let i = 0; i < ordered.length; i++) {
               const sl = ordered[i];
               await storage.createStop({
