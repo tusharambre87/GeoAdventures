@@ -13,6 +13,7 @@ import {
   doublePrecision,
   serial,
   real,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -3798,6 +3799,18 @@ export const stopLibrary = pgTable("stop_library", {
   enrichedAt: timestamp("enriched_at"),
   lastServedAt: timestamp("last_served_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  // ── Google Places enrichment ────────────────────────────────────────────────
+  gpPlaceId: varchar("gp_place_id"),           // Places place_id; 'NOT_FOUND' if no match
+  gpHours: jsonb("gp_hours"),                  // opening_hours object from Places Details
+  gpRating: numeric("gp_rating"),              // 0.0–5.0
+  gpPhotoRefs: text("gp_photo_refs").array(),  // photo_reference tokens only (no key embedded)
+  gpPriceLevel: integer("gp_price_level"),     // 0–4
+  gpAddressVerified: text("gp_address_verified"),
+  gpParkingType: text("gp_parking_type"),
+  gpWheelchairAccessible: boolean("gp_wheelchair_accessible"),
+  gpPhone: text("gp_phone"),
+  gpWebsite: text("gp_website"),
+  gpVerifiedAt: timestamp("gp_verified_at"),   // set after lookup; NULL = not yet attempted
 }, (table) => [
   index("IDX_stop_library_normalized_key").on(table.normalizedKey),
   // Dedup key: same normalized stop name in same city → update, not duplicate insert
