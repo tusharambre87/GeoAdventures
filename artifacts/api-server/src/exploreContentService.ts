@@ -43,6 +43,23 @@ export interface StoryTrack {
   durationSeconds: number;
 }
 
+export interface RescueSuggestions {
+  kidsHungry: string;
+  kidsTired: string;
+  moreFun: string;
+  weatherBad: string;
+}
+
+interface GpFacts {
+  gpHours?: unknown;
+  gpRating?: unknown;
+  gpPriceLevel?: unknown;
+  gpAddressVerified?: unknown;
+  gpWheelchairAccessible?: unknown;
+  gpPhone?: unknown;
+  gpWebsite?: unknown;
+}
+
 export interface ExploreData {
   aboutArea: string;
   nearbyAttractions: NearbyAttraction[];
@@ -67,6 +84,7 @@ export interface ExploreData {
   stopName?: string;
   stopIndex?: number;
   totalStops?: number;
+  rescueSuggestions?: RescueSuggestions;
 }
 
 // Strip emojis and markdown — text must be clean for TTS
@@ -94,11 +112,12 @@ export async function getExploreContent(
   stopName: string,
   stopType: string,
   destination: string,
-  youngestChildAge?: number
+  youngestChildAge?: number,
+  gpFacts?: GpFacts
 ): Promise<ExploreData> {
   try {
     const [practical, stories] = await Promise.all([
-      generatePracticalContent(stopName, stopType, destination),
+      generatePracticalContent(stopName, stopType, destination, gpFacts),
       generateStories(stopName, stopType, destination, youngestChildAge),
     ]);
     return { ...practical, stories };
@@ -111,9 +130,27 @@ export async function getExploreContent(
 async function generatePracticalContent(
   stopName: string,
   stopType: string,
-  destination: string
+  destination: string,
+  gpFacts?: GpFacts
 ): Promise<ExploreData> {
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(stopName + " " + (destination || ""))}`;
+
+  // Build verified GP facts block — only include non-null fields
+  const fmt = (v: unknown): string =>
+    (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+  const gpLines: string[] = [];
+  if (gpFacts) {
+    if (gpFacts.gpHours               != null) gpLines.push(`- Hours: ${fmt(gpFacts.gpHours)}`);
+    if (gpFacts.gpRating              != null) gpLines.push(`- Rating: ${fmt(gpFacts.gpRating)}/5`);
+    if (gpFacts.gpPriceLevel          != null) gpLines.push(`- Price level: ${fmt(gpFacts.gpPriceLevel)} (0=free, 1=$, 2=$$, 3=$$$, 4=$$$$)`);
+    if (gpFacts.gpAddressVerified     != null) gpLines.push(`- Address: ${fmt(gpFacts.gpAddressVerified)}`);
+    if (gpFacts.gpWheelchairAccessible != null) gpLines.push(`- Wheelchair accessible: ${fmt(gpFacts.gpWheelchairAccessible)}`);
+    if (gpFacts.gpPhone               != null) gpLines.push(`- Phone: ${fmt(gpFacts.gpPhone)}`);
+    if (gpFacts.gpWebsite             != null) gpLines.push(`- Website: ${fmt(gpFacts.gpWebsite)}`);
+  }
+  const gpBlock = gpLines.length > 0
+    ? `Verified facts from Google Places (use these as ground truth):\n${gpLines.join('\n')}\n\n`
+    : '';
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
@@ -128,7 +165,7 @@ Return valid JSON only.`,
       },
       {
         role: "user",
-        content: `Provide factual, real information about "${stopName}" (${stopType}) in ${destination || "this area"} for families with kids aged 5-12.
+        content: `${gpBlock}Provide factual, real information about "${stopName}" (${stopType}) in ${destination || "this area"} for families with kids aged 5-12.
 
 Return JSON with this exact structure:
 {
@@ -155,7 +192,7 @@ Return JSON with this exact structure:
   "kidFriendlyPlaces": [
     {
       "name": "Real kid-friendly spot nearby",
-      "type": "playground|ice_cream|toy_store|arcade|splash_pad|zoo|aquarium|mini_golf",
+      "type": "playground|ice_cream|toy_store|arcade|splash_pad|zoo|aquarium|mini_gif",
       "distance": "e.g. 8 min walk",
       "description": "Brief description",
       "ageRange": "e.g. Ages 3-10 or All ages"
@@ -170,7 +207,13 @@ Return JSON with this exact structure:
       "text": "Realistic review text (2-3 sentences) referencing specific real features of this attraction",
       "relativeTime": "e.g. 2 weeks ago"
     }
-  ]
+  ],
+  "rescueSuggestions": {
+    "kidsHungry": "Nearest food option within 5 min walk from this stop",
+    "kidsTired": "Shorter alternative or bench/rest spot right nearby",
+    "moreFun": "One age-appropriate activity upgrade within easy reach",
+    "weatherBad": "Best indoor alternative if outdoor, or nearest shelter if already indoor"
+  }
 }
 
 Provide 4-6 real nearby attractions, 4-5 real restaurants, 3-4 kid-friendly spots, and 4 realistic family reviews.
@@ -197,6 +240,7 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
     tips: Array.isArray(data.tips) ? data.tips.slice(0, 4) : undefined,
     reviews: Array.isArray(data.reviews) ? data.reviews.slice(0, 4) : undefined,
     googleMapsUrl,
+    rescueSuggestions: data.rescueSuggestions || undefined,
   };
 }
 

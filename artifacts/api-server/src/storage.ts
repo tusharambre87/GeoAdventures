@@ -6307,22 +6307,25 @@ export async function upsertExploreCache(
 ): Promise<void> {
   const normalized = normalizeStopName(stopName);
   const city = cityGroup.toLowerCase().trim();
+  const rescueSuggestions = (data as any)?.rescueSuggestions ?? null;
 
   await db
     .insert(exploreCache)
     .values({
-      normalizedName: normalized,
-      cityGroup:      city,
+      normalizedName:    normalized,
+      cityGroup:         city,
       stopType,
-      exploreData:    data as any,
-      generatedAt:    new Date(),
-      updatedAt:      new Date(),
+      exploreData:       data as any,
+      rescueSuggestions: rescueSuggestions as any,
+      generatedAt:       new Date(),
+      updatedAt:         new Date(),
     })
     .onConflictDoUpdate({
       target: [exploreCache.normalizedName, exploreCache.cityGroup],
       set: {
-        exploreData: data as any,
-        updatedAt:   new Date(),
+        exploreData:       data as any,
+        rescueSuggestions: rescueSuggestions as any,
+        updatedAt:         new Date(),
       },
     });
 }

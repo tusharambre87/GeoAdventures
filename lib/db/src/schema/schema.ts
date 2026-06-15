@@ -3840,6 +3840,7 @@ export const exploreCache = pgTable("explore_cache", {
   cityGroup: text("city_group").notNull(),
   stopType: text("stop_type"),
   exploreData: jsonb("explore_data").notNull(),
+  rescueSuggestions: jsonb("rescue_suggestions"),
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
