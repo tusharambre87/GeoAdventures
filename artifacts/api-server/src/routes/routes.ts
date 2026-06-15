@@ -5539,19 +5539,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })();
 
         // ── Stop count — arrival/departure-aware ──────────────────────────────
-        const stopsPerDayByPace = effectivePace === "chill" ? 2 : effectivePace === "packed" ? 3 : 3;
+        const stopsPerDayByPace = effectivePace === "chill" ? 3 : effectivePace === "packed" ? 6 : 4;
 
         // Read arrival signals from tailoring JSONB
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
         const lastDayType = tripTailoring?.lastDay as string | null;
 
-        // Arrival day cap: afternoon arrival = 2 stops, evening = 1, morning = full
-        const arrivalDayCap = arrivalTimeSig === "afternoon" ? 2
+        // Arrival day cap: late night = 0 (rest day), evening = 1, afternoon = 2, morning = full
+        const arrivalDayCap = (arrivalTimeSig === "late" || arrivalTimeSig === "late_night") ? 0
           : arrivalTimeSig === "evening" ? 1
+          : arrivalTimeSig === "afternoon" ? 2
           : stopsPerDayByPace;
 
-        // Last day cap: travel day = 1 stop max, leaving late = 2, full day = normal
-        const lastDayCap = lastDayType === "travel" ? 1
+        // Last day cap: travel day = 0 (heading home — no stops), leaving late = 2, full day = normal
+        const lastDayCap = lastDayType === "travel" ? 0
           : lastDayType === "late" ? 2
           : stopsPerDayByPace;
 
@@ -5603,9 +5604,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               childrenAges,
               pace: plannerPace,
               tripStyle: tripStyle ?? undefined,
+              adventureStyle: adventureStyle ?? undefined,
               interests: (tripTailoring?.interests ?? [])
                 .map((i: string) => i.replace(/\s*[^\w\s].*$/, '').trim().toLowerCase())
                 .filter((i: string) => i.length > 0),
+              strollerNeeded: tripTailoring?.stroller ?? false,
+              indoorLean: tripTailoring?.indoorOutdoor ?? undefined,
+              budgetSensitivity: tripTailoring?.budgetSensitivity ?? undefined,
+              kidEnergyLevel: tripTailoring?.kidEnergyLevel ?? undefined,
             };
             await storage.updateTrip(tripId, {
               plannerInputSnapshot: {
@@ -6360,12 +6366,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const tripStyle = ADVENTURE_TO_TRIP_STYLE[adventureStyle] ?? 'balanced';
 
-      // Normalize pace: client sends chill/balanced/packed; PlannerInput expects relaxed/moderate/busy
+      // Normalize pace: client sends chill/balanced/packed/go-getter; PlannerInput expects relaxed/moderate/busy
       const normalizePace = (p: string | undefined): "relaxed" | "moderate" | "busy" => {
         if (!p) return "moderate";
-        const lower = p.toLowerCase();
+        const lower = p.toLowerCase().replace(/-/g, '');
         if (["chill", "relaxed", "easy", "slow"].includes(lower)) return "relaxed";
-        if (["packed", "busy", "active", "intense"].includes(lower)) return "busy";
+        if (["packed", "busy", "active", "intense", "gogetter"].includes(lower)) return "busy";
         return "moderate";
       };
       const plannerPace = normalizePace(rawPace);
@@ -6379,7 +6385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const tripDays = rawTripDays ? Number(rawTripDays) : 2;
       // Stops per preview day follows the same pace rule as the real planner
-      const CHUNK = plannerPace === "relaxed" ? 2 : plannerPace === "busy" ? 4 : 3;
+      const CHUNK = plannerPace === "relaxed" ? 3 : plannerPace === "busy" ? 6 : 4;
       const totalStops = tripDays * CHUNK;
 
       const SESSION_TIMES = ['9:30 AM', '12:30 PM', '3:00 PM', '10:00 AM', '1:30 PM', '4:00 PM', '11:00 AM', '2:00 PM', '5:00 PM'];
@@ -6399,6 +6405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           childrenAges,
           pace: plannerPace,
           tripStyle,
+          adventureStyle,
           interests: (tailoring?.interests ?? [])
             .map((i: string) => i.toLowerCase().trim())
             .filter((i: string) => i.length > 0),
@@ -6408,11 +6415,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           kidEnergyLevel: tailoring?.kidEnergyLevel ?? undefined,
         };
         const { stops: poolStops } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
-        stops = poolStops.slice(0, totalStops).map((s: any) => ({
-          name: s.name,
-          description: s.description ?? '',
-          stopType: s.type ?? s.stopType ?? 'landmark',
-        }));
+        // Group by dayNumber — selectStopsFromPool now adds meals additively per day,
+        // so each day may have more stops than CHUNK. Use dayNumber grouping, not flat slicing.
+        const byDay = new Map<number, typeof poolStops>();
+        for (const s of poolStops) {
+          const dn = (s as any).dayNumber ?? 1;
+          if (dn > tripDays) continue;
+          if (!byDay.has(dn)) byDay.set(dn, []);
+          byDay.get(dn)!.push(s);
+        }
+        // Build preview days directly from grouped stops
+        for (let d = 1; d <= tripDays; d++) {
+          const dayStops = byDay.get(d) ?? [];
+          days.push({
+            label: `Day ${d}`,
+            stops: dayStops.map((s, i) => ({
+              name: s.name,
+              description: (s as any).description ?? '',
+              stopType: (s as any).type ?? (s as any).stopType ?? 'landmark',
+              time: SESSION_TIMES[i] ?? '10:00 AM',
+            })),
+          });
+        }
+        // Flat list for previewStopIds — order follows day groups
+        stops = days.flatMap(day => day.stops.map(s => ({ name: s.name, description: s.description, stopType: s.stopType })));
         // Resolve stop_library IDs by name so trip creation can reuse the exact same stops (preview parity)
         try {
           const stopNames = stops.map(s => s.name);
@@ -6425,19 +6451,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch { /* non-critical */ }
       } else {
         stops = await generateCityStops(city, null, country, totalStops, adventureStyle);
-      }
-
-      for (let d = 0; d < Math.ceil(stops.length / CHUNK); d++) {
-        const chunk = stops.slice(d * CHUNK, (d + 1) * CHUNK);
-        days.push({
-          label: `Day ${d + 1}`,
-          stops: chunk.map((s, i) => ({
-            name: s.name,
-            description: s.description,
-            stopType: s.stopType,
-            time: SESSION_TIMES[d * CHUNK + i] ?? '10:00 AM',
-          })),
-        });
+        for (let d = 0; d < Math.ceil(stops.length / CHUNK); d++) {
+          const chunk = stops.slice(d * CHUNK, (d + 1) * CHUNK);
+          days.push({
+            label: `Day ${d + 1}`,
+            stops: chunk.map((s, i) => ({
+              name: s.name,
+              description: s.description,
+              stopType: s.stopType,
+              time: SESSION_TIMES[d * CHUNK + i] ?? '10:00 AM',
+            })),
+          });
+        }
       }
       return res.json({ days, previewStopIds });
     } catch (err) {

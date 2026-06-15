@@ -3381,6 +3381,12 @@ export interface CachedStopCandidate {
   age2to4Fit?: number;
   age5to7Fit?: number;
   age8to12Fit?: number;
+  // PSI family-profile scores (0-100) from the backfill pipeline. Used in
+  // selectStopsFromPool to boost stops that match the user's adventure vibe.
+  scoreToddlerFinal?: number;
+  scoreClassicFinal?: number;
+  scoreUrbanFinal?: number;
+  scoreAdventureFinal?: number;
   // Journey content — pre-generated so stop content is available without extra AI calls
   facts?: string[];
   parentTip?: string;

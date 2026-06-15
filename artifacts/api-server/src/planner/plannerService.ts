@@ -248,6 +248,8 @@ export interface PlannerInput {
   childrenAges: number[];
   pace: "relaxed" | "moderate" | "busy";
   tripStyle?: "highlights" | "balanced" | "offbeat" | "easy";
+  /** Adventure vibe from onboarding How screen — used to boost PSI profile-score-matched stops */
+  adventureStyle?: string;
   transportMode?: "walking" | "driving" | "transit";
   budgetSensitivity?: "budget" | "moderate" | "premium";
   kidEnergyLevel?: "full" | "mixed" | "low";
@@ -489,16 +491,16 @@ function getPaceConfig(pace: string): PaceConfig {
     maxTicketedStops: 1,
     label: "Easy & relaxed — 1–2 main stops, max 2 transitions, 2–3.5 hrs total effort",
   };
-  if (p === "busy" || p === "packed") return {
-    mainStops: { min: 3, max: 5 },
-    totalStopMinutes: { min: 240, max: 360 },
-    totalEffortMinutes: { min: 300, max: 420 },
-    maxTransitions: 4,
-    maxHighEffortStops: 2,
-    maxLearningHeavyStops: 2,
+  if (p === "busy" || p === "packed" || p === "go-getter") return {
+    mainStops: { min: 5, max: 6 },
+    totalStopMinutes: { min: 300, max: 480 },
+    totalEffortMinutes: { min: 360, max: 480 },
+    maxTransitions: 5,
+    maxHighEffortStops: 3,
+    maxLearningHeavyStops: 3,
     breakEveryMinutes: 120,
-    maxTicketedStops: 2,
-    label: "Active & packed — 3–5 stops, max 4 transitions, 5–7 hrs total effort",
+    maxTicketedStops: 3,
+    label: "Active & packed — 5–6 stops, max 5 transitions, 6–8 hrs total effort",
   };
   return {
     mainStops: { min: 2, max: 3 },
@@ -524,10 +526,17 @@ function getPaceConstraints(pace: string): { min: number; max: number; maxHours:
 }
 
 function getStopsPerDay(pace: string): number {
-  const p = pace?.toLowerCase();
-  if (p === "relaxed" || p === "chill")  return 2;
-  if (p === "busy"    || p === "packed") return 4;
-  return 3; // moderate / balanced / default
+  const map: Record<string, number> = {
+    'relaxed':   3,
+    'moderate':  4,
+    'go-getter': 6,
+    // Legacy mappings — never remove these
+    'chill':     3,
+    'balanced':  4,
+    'packed':    6,
+    'busy':      6,
+  };
+  return map[pace?.toLowerCase()] ?? 4;
 }
 
 function getAgeContext(ages: number[]): string {
@@ -2143,6 +2152,11 @@ export async function generateCityStopPool(
       age8to12Fit: plannerStopIntelligence.age8to12Fit,
       parentEffortScore: plannerStopIntelligence.parentEffortScore,
       psiMinAge: plannerStopIntelligence.minAge,
+      // PSI family-profile vibe scores
+      scoreToddlerFinal: plannerStopIntelligence.scoreToddlerFinal,
+      scoreClassicFinal: plannerStopIntelligence.scoreClassicFinal,
+      scoreUrbanFinal: plannerStopIntelligence.scoreUrbanFinal,
+      scoreAdventureFinal: plannerStopIntelligence.scoreAdventureFinal,
     })
     .from(stopLibrary)
     .leftJoin(
@@ -2248,6 +2262,10 @@ export async function generateCityStopPool(
       age2to4Fit: row.age2to4Fit ?? undefined,
       age5to7Fit: row.age5to7Fit ?? undefined,
       age8to12Fit: row.age8to12Fit ?? undefined,
+      scoreToddlerFinal: row.scoreToddlerFinal ?? undefined,
+      scoreClassicFinal: row.scoreClassicFinal ?? undefined,
+      scoreUrbanFinal: row.scoreUrbanFinal ?? undefined,
+      scoreAdventureFinal: row.scoreAdventureFinal ?? undefined,
       parentSupportData: {
         breakSuggestion: "Find a nearby bench or café for a quick rest.",
         foodSuggestion: "Check the venue's café or look for options nearby.",
@@ -2579,6 +2597,21 @@ export function selectStopsFromPool(
       if (stop.effortLevel !== "low") { score += 1; ageBoost += 1; }
     }
 
+    // PSI age-band score boost (Fix 3): use the actual scored age-fit from intelligence data.
+    // Adds up to +5 pts for a perfect age-group match — overrides type heuristics when PSI data exists.
+    // Bracket: youngest child age drives the selection (plan to most constrained traveler).
+    {
+      const ageBandScore =
+        minChildAge <= 4 ? stop.age2to4Fit :
+        minChildAge <= 7 ? stop.age5to7Fit :
+        stop.age8to12Fit;
+      if (ageBandScore != null) {
+        const psiAgePts = Math.round((ageBandScore / 100) * 5);
+        score += psiAgePts;
+        ageBoost += psiAgePts;
+      }
+    }
+
     // Landmark diversity bonus: boost outdoor iconic landmarks to prevent museum-only trips
     if (stop.type === "landmark" && stop.indoorOutdoor !== "indoor" && stop.familyAnchorType === "anchor") {
       score += 2;
@@ -2609,10 +2642,11 @@ export function selectStopsFromPool(
         const key = interest.toLowerCase();
         const mappedTypes = INTEREST_TYPE_MAP[key] ?? [];
         if (mappedTypes.includes(stopType)) {
-          score += 3;
+          // Fix 4: boosted from +3 → +5 so interests meaningfully reorder the stop pool
+          score += 5;
           if (!interestMatched) { interestMatched = true; matchedInterest = interest; }
         } else if (stopText.includes(key)) {
-          score += 1;
+          score += 2;
           if (!interestMatched) { interestMatched = true; matchedInterest = interest; }
         }
       }
@@ -2643,6 +2677,30 @@ export function selectStopsFromPool(
           score += 2;
         }
       }
+    }
+
+    // PSI vibe-profile boost: up to +4 pts for stops that match the family's adventure style.
+    // Mapping: family_explorer/iconic_highlights → Classic; city_explorer → Urban; outdoor_adventure → Adventure;
+    // toddler/chill context (minChildAge ≤ 3) → Toddler profile takes precedence.
+    if (input.adventureStyle) {
+      const childMin = childrenAges.length > 0 ? Math.min(...childrenAges) : 5;
+      let profileScore: number | undefined;
+      if (childMin <= 3 && stop.scoreToddlerFinal != null) {
+        profileScore = stop.scoreToddlerFinal;
+      } else {
+        const style = input.adventureStyle.toLowerCase();
+        if ((style === 'family_explorer' || style === 'iconic_highlights') && stop.scoreClassicFinal != null) {
+          profileScore = stop.scoreClassicFinal;
+        } else if (style === 'city_explorer' && stop.scoreUrbanFinal != null) {
+          profileScore = stop.scoreUrbanFinal;
+        } else if (style === 'outdoor_adventure' && stop.scoreAdventureFinal != null) {
+          profileScore = stop.scoreAdventureFinal;
+        } else if (stop.scoreClassicFinal != null) {
+          // Unrecognised style — fall back to classic score as a quality proxy
+          profileScore = stop.scoreClassicFinal;
+        }
+      }
+      if (profileScore != null) score += Math.round((profileScore / 100) * 4);
     }
 
     // PSI quality nudge: breaks alphabetical ties in favour of higher-quality stops
@@ -2789,9 +2847,10 @@ export function selectStopsFromPool(
       // Anchor hard cap: exactly 1 anchor per day — prevents two big-ticket stops competing
       if (c.familyAnchorType === 'anchor' && anchorsInCurrentDay >= 1) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
-      // Toddler nap rule: meal stops cannot be the first activity of the day (must come after nap at ~1pm)
-      const isMealType = ["restaurant", "meal", "food", "cafe"].includes(c.type ?? "");
-      if (napActive && dayPosition === 0 && isMealType) continue;
+      // Meal stops are additive (not counted against the per-day activity target).
+      // They are appended per-day after the main greedy selection finishes.
+      const isMealType = ["restaurant", "meal", "food", "cafe", "market", "street_food", "diner", "eatery", "dining", "bakery", "dessert", "lunch"].includes(c.type ?? "");
+      if (isMealType) continue;
       // Confidence gate: low-confidence stops (sourceConfidence < MIN_SOURCE_CONFIDENCE) cannot
       // be the anchor (first) stop of the day. Bypassed for canonical trips.
       if (!isCanonicalTripForSelection && dayPosition === 0) {
@@ -2972,27 +3031,23 @@ export function selectStopsFromPool(
     }
   }
 
-  // ── Meal stop minimum guarantee ───────────────────────────────────────────
-  // Every trip should include at least one food/meal stop (familyAnchorType === 'meal').
-  // If greedy selection produced none (meal stops scored below competing parks/activities),
-  // swap the lowest-priority non-anchor, non-meal stop with the best meal candidate
-  // from the full pool. Skipped for trips of 1 stop or fewer per day (no room to add food).
+  // ── Per-day meal addition (additive — never replaces activity stops) ─────
+  // Meal stops are additions on top of the activity-stop target.
+  // Build one meal per day from the pool (best-scored, non-duplicate).
+  // Skipped for trips of 1 stop or fewer per day.
+  const MEAL_STOP_TYPES = new Set(["restaurant", "meal", "food", "cafe", "market", "street_food", "diner", "eatery", "dining", "bakery", "dessert", "lunch"]);
+  const perDayMeals: (CachedStopCandidate | undefined)[] = Array(input.tripDays).fill(undefined);
   if (effectiveStopsPerDay >= 2) {
-    const hasMeal = selected.some(s => s.familyAnchorType === "meal");
-    if (!hasMeal) {
-      const mealCandidates = pool
-        .filter(c => c.familyAnchorType === "meal" && !usedNormNames.has(normStopName(c.name)))
-        .sort((a, b) => (baseScores.get(b) ?? 0) - (baseScores.get(a) ?? 0));
-      const bestMeal = mealCandidates[0];
-      if (bestMeal) {
-        // Prefer swapping the last stop of the last day (least prominent position)
-        const swapIdx = selected.length - 1;
-        // Don't swap out an anchor stop
-        if (selected[swapIdx]?.familyAnchorType !== "anchor") {
-          const displaced = selected[swapIdx]?.name ?? "??";
-          selected[swapIdx] = bestMeal;
-          console.log(`[MealGuarantee] Swapped out "${displaced}" → inserted meal stop "${bestMeal.name}".`);
-        }
+    const mealPool = pool
+      .filter(c => (c.familyAnchorType === "meal" || MEAL_STOP_TYPES.has(c.type ?? "")) && !usedNormNames.has(normStopName(c.name)))
+      .sort((a, b) => (baseScores.get(b) ?? 0) - (baseScores.get(a) ?? 0));
+    const addedMealNames = new Set<string>();
+    for (let d = 0; d < input.tripDays; d++) {
+      const meal = mealPool.find(m => !addedMealNames.has(normStopName(m.name)));
+      if (meal) {
+        perDayMeals[d] = meal;
+        addedMealNames.add(normStopName(meal.name));
+        console.log(`[MealAdditive] Day ${d + 1}: appending "${meal.name}"`);
       }
     }
   }
@@ -3080,6 +3135,9 @@ export function selectStopsFromPool(
     stopIdx += effectiveStopsPerDay;
     if (daySlice.length === 0) break;
 
+    // Meal for this day (additive — appended after activity sequencing)
+    const dayMeal = perDayMeals[day - 1];
+
     let orderedSlice: CachedStopCandidate[];
 
     if (isCanonicalTrip) {
@@ -3122,20 +3180,11 @@ export function selectStopsFromPool(
       }
     }
 
-    // ── Meal-at-slot-0 guard ─────────────────────────────────────────────────
-    // SI-score slot assignment can place a high-morningFitScore restaurant first.
-    // Ensure no meal stop leads the day (families need an activity anchor first).
-    if (
-      !isCanonicalTrip &&
-      orderedSlice.length > 1 &&
-      orderedSlice[0].familyAnchorType === "meal"
-    ) {
-      const firstNonMeal = orderedSlice.findIndex(s => s.familyAnchorType !== "meal");
-      if (firstNonMeal > 0) {
-        const [meal] = orderedSlice.splice(0, 1);
-        orderedSlice.splice(firstNonMeal, 0, meal);
-      }
-    }
+    // Meal-at-slot-0 guard removed: meals are now always appended at end of day,
+    // never appear at slot 0 by construction.
+
+    // Append per-day meal at the end (additive: after all activity stops)
+    if (dayMeal) orderedSlice = [...orderedSlice, dayMeal];
 
     orderedSlice.forEach((stop, idx) => {
       result.push(candidateToGeneratedStop(stop, day, idx, isCanonicalTrip, selectionReasons.get(stop)));
