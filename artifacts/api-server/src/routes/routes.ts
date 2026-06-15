@@ -13978,6 +13978,7 @@ Respond with JSON only, no markdown:
       const openai = getOpenAI();
       const isBreak = needType === 'break';
       const isFun = needType === 'fun';
+      const isWeather = needType === 'weather';
 
       // Build location context string from locationMode
       const locMode = locationMode || 'near_next_stop';
@@ -14064,6 +14065,41 @@ Return JSON only with max 3 suggestions:
     }
   ]
 }`
+        : isWeather
+        ? `You are a family travel expert. A family with young children is ${locationContext} and the weather has changed — they need indoor alternatives.
+
+Suggest 3 REAL, nearby indoor family-friendly activities. Focus on:
+- Museums, science centers, aquariums, indoor playgrounds, arcades, movie theaters, bowling alleys, libraries with kids sections
+- Must be fully indoors, kid-welcoming, no advance tickets required ideally
+- Within 5-20 min travel
+- Must actually exist near this location
+
+Scoring criteria (apply internally, don't show scores):
+- Kid-friendliness: 30%
+- Fully indoors: 25%
+- Distance/accessibility: 20%
+- Value/budget: 15%
+- No advance booking required: 10%
+
+For the Maps URL: https://www.google.com/maps/search/?api=1&query=PLACE_NAME+CITY
+
+Return JSON only with max 3 suggestions:
+{
+  "suggestions": [
+    {
+      "id": "uuid-like-string-1",
+      "name": "Place name",
+      "type": "museum|science_center|aquarium|arcade|bowling|indoor_playground|movie_theater",
+      "travelTimeMinutes": 12,
+      "whyThisWorks": "One sentence — why this works for kids when the weather is bad",
+      "chips": ["Fully indoors", "Kids love it"],
+      "goNowMapsUrl": "https://www.google.com/maps/search/?api=1&query=Place+Name+City",
+      "canAddToToday": true,
+      "isFree": false,
+      "description": "One short sentence — what it is and why families love it"
+    }
+  ]
+}`
         : `You are a family travel expert. A family with young children is ${locationContext} and needs a meal stop${beforeStopName ? ` before heading to "${beforeStopName}"` : ''}.
 
 STRICT FAMILY FILTER — NEVER suggest:
@@ -14112,7 +14148,7 @@ Return JSON only with max 3 suggestions:
 }`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini",
+        model: "gpt-5.5",
         messages: [{ role: "user", content: prompt }],
         max_completion_tokens: 900,
         response_format: { type: "json_object" },

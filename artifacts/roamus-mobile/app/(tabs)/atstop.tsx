@@ -47,6 +47,7 @@ import { isFreePlan } from '@/lib/subscription';
 import UpgradeSheet from '@/components/UpgradeSheet';
 import { useSpeech } from '@/lib/useSpeech';
 import { SpeakButton } from '@/components/SpeakButton';
+import RescueSheet from '@/components/RescueSheet';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -528,6 +529,7 @@ export default function AtStopScreen() {
     ? parseLocalDate(trip.startDate)!.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : '';
   const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [showAtstopRescue, setShowAtstopRescue] = useState(false);
   useEffect(() => {
     if (isUserFree && dayIndex > 0) setUpgradeVisible(true);
   }, [isUserFree, dayIndex]);
@@ -1321,14 +1323,7 @@ function isMealStop(t?: string | null): boolean {
 
           {/* Need something? */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
-            onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/need' as never, params: {
-              stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
-              address: encodeURIComponent(address ?? ''), tripId: trip?.id ?? '',
-              destination: encodeURIComponent(trip?.destination ?? trip?.city ?? ''),
-              lat: currentStop.latitude ?? '',
-              lng: currentStop.longitude ?? '',
-              cityGroup: encodeURIComponent((currentStop as any).cityGroup ?? ''),
-            } }); }}>
+            onPress={() => setShowAtstopRescue(true)}>
             <Text style={dt.gridIcon}>{'\uD83D\uDD00'}</Text>
             <Text style={dt.gridTitle}>Need something?</Text>
             <Text style={dt.gridSub}>Adjust, skip, or swap</Text>
@@ -1973,6 +1968,28 @@ function isMealStop(t?: string | null): boolean {
           trip={trip as any}
           onDismiss={() => setShowPhotoSheet(false)}
           onSelect={handleStopSelectFromAtStop}
+        />
+      )}
+      {currentStop && (
+        <RescueSheet
+          visible={showAtstopRescue}
+          onClose={() => setShowAtstopRescue(false)}
+          context="stop"
+          stops={dayStops}
+          currentStopIndex={Math.max(0, stopIdx)}
+          tripId={trip?.id}
+          dayIndex={dayIndex}
+          stopLat={currentStop.latitude ?? undefined}
+          stopLng={currentStop.longitude ?? undefined}
+          stopName={currentStop.name}
+          destination={trip?.destination ?? trip?.city ?? undefined}
+          onDropStop={async (stopId: string) => {
+            await apiFetch(`/api/travel/stops/${stopId}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isSkipped: true }),
+            });
+          }}
+          onStopsChanged={() => {}}
         />
       )}
       <UpgradeSheet

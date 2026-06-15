@@ -46,8 +46,16 @@ interface OtherDayStop {
   durationMinutes?: number | null;
 }
 
-type Context = 'morning' | 'en_route' | 'stop_complete';
+type Context = 'morning' | 'en_route' | 'stop_complete' | 'stop';
 type SheetView = 'picker' | RescueOptionId | 'applied';
+
+interface NeedRec {
+  id: string;
+  name: string;
+  type?: string;
+  travelTimeMinutes?: number;
+  description?: string;
+}
 
 interface Props {
   visible: boolean;
@@ -61,6 +69,10 @@ interface Props {
   onWrapDay?: () => Promise<void> | void;
   onStopsChanged?: () => void;
   initialOption?: SheetView;
+  stopLat?: string | number | null;
+  stopLng?: string | number | null;
+  stopName?: string;
+  destination?: string;
 }
 
 function getFoodLabel(hour: number): string {
@@ -104,8 +116,13 @@ export default function RescueSheet({
   onWrapDay,
   onStopsChanged,
   initialOption,
+  stopLat,
+  stopLng,
+  stopName,
+  destination,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const isStopContext = !!(stopLat != null && stopLng != null);
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(700)).current;
 
@@ -146,6 +163,12 @@ export default function RescueSheet({
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
   const mealLabel = getFoodLabel(new Date().getHours());
 
+  // Need-recs state (stop context: food/fun/weather)
+  const [needRecsResults, setNeedRecsResults] = React.useState<NeedRec[]>([]);
+  const [needRecsLoading, setNeedRecsLoading] = React.useState(false);
+  const [needRecsError, setNeedRecsError] = React.useState<string | null>(null);
+  const [applyingRec, setApplyingRec] = React.useState<string | null>(null);
+
   useEffect(() => {
     if (visible) {
       setView('picker');
@@ -165,6 +188,10 @@ export default function RescueSheet({
       setSwappedToName(null);
       setApplyError(null);
       setSelectedFoodId(null);
+      setNeedRecsResults([]);
+      setNeedRecsLoading(false);
+      setNeedRecsError(null);
+      setApplyingRec(null);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -177,9 +204,9 @@ export default function RescueSheet({
     }
   }, [visible]);
 
-  // Load swap options when fun view opens
+  // Load swap options when fun view opens (skipped in stop context)
   useEffect(() => {
-    if (view !== 'fun' || !tripId) return;
+    if (view !== 'fun' || !tripId || isStopContext) return;
     setSwapLoading(true);
     setSwapError(null);
     apiFetch<{ options: LibraryStop[]; otherDayStops: OtherDayStop[] }>('/api/travel/rescue/swap-options', {
@@ -193,9 +220,9 @@ export default function RescueSheet({
     }).finally(() => setSwapLoading(false));
   }, [view]);
 
-  // Load food options when food view opens
+  // Load food options when food view opens (skipped in stop context)
   useEffect(() => {
-    if (view !== 'food' || !tripId) return;
+    if (view !== 'food' || !tripId || isStopContext) return;
     setFoodLoading(true);
     setFoodError(null);
     apiFetch<{ options: LibraryStop[]; city: string }>('/api/travel/rescue/food-options', {
@@ -209,9 +236,9 @@ export default function RescueSheet({
     }).finally(() => setFoodLoading(false));
   }, [view]);
 
-  // Load indoor alternatives when weather view opens
+  // Load indoor alternatives when weather view opens (skipped in stop context)
   useEffect(() => {
-    if (view !== 'weather' || !tripId) return;
+    if (view !== 'weather' || !tripId || isStopContext) return;
     setWeatherLoading(true);
     apiFetch<{ options: LibraryStop[] }>('/api/travel/rescue/swap-options', {
       method: 'POST',
@@ -334,6 +361,60 @@ export default function RescueSheet({
       setApplyingPlan(false);
     }
     setView('applied');
+  }
+
+  // Load need-recs when food/fun/weather opens in stop context
+  useEffect(() => {
+    if (!isStopContext) return;
+    if (view !== 'food' && view !== 'fun' && view !== 'weather') return;
+    setNeedRecsLoading(true);
+    setNeedRecsError(null);
+    setNeedRecsResults([]);
+    apiFetch<{ suggestions: NeedRec[] }>('/api/travel/need-recs', {
+      method: 'POST',
+      body: JSON.stringify({
+        destination: destination ?? '',
+        nearStopName: stopName ?? '',
+        needType: view,
+        lat: stopLat,
+        lng: stopLng,
+      }),
+    }).then(r => {
+      setNeedRecsResults(r.suggestions ?? []);
+    }).catch(() => {
+      setNeedRecsError("We couldn't find options right now.");
+    }).finally(() => setNeedRecsLoading(false));
+  }, [view, isStopContext]);
+
+  async function handleNeedRecAction(rec: NeedRec, action: 'add' | 'swap') {
+    if (!tripId) return;
+    setApplyingRec(rec.id);
+    setApplyError(null);
+    try {
+      if (action === 'swap') {
+        const nextStop = stops.slice(currentStopIndex + 1).find(s => !(s as any).isSkipped && !(s as any).isVisited);
+        if (nextStop) {
+          await apiFetch(`/api/travel/stops/${nextStop.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isSkipped: true }),
+          });
+        }
+      }
+      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: rec.name,
+          stopType: rec.type ?? null,
+          dayIndex: dayIndex ?? 0,
+          durationMinutes: 60,
+        }),
+      });
+      onStopsChanged?.();
+      setView('applied');
+    } catch {
+      setApplyError('Could not add stop — try again.');
+      setApplyingRec(null);
+    }
   }
 
   const { primary, secondary } = getOptions(context);
@@ -483,8 +564,73 @@ export default function RescueSheet({
           </ResultView>
         )}
 
+        {/* ── STOP CONTEXT: NEED-RECS VIEW (food / fun / weather) ── */}
+        {isStopContext && (view === 'food' || view === 'fun' || view === 'weather') && (
+          <>
+            <View style={s.header}>
+              <Text style={s.headerTitle}>
+                {view === 'food' ? 'Need food now' : view === 'fun' ? 'Something more fun' : 'Weather changed'}
+              </Text>
+              <Text style={s.headerSub}>
+                {view === 'food' ? 'Family-friendly spots nearby' : view === 'fun' ? 'Fun alternatives near this stop' : 'Indoor alternatives nearby'}
+              </Text>
+            </View>
+            <ScrollView style={s.scroll} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
+              {needRecsLoading ? (
+                <View style={s.centeredNote}>
+                  <ActivityIndicator color="#E8692A" />
+                  <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding options nearby…</Text>
+                </View>
+              ) : needRecsResults.length === 0 && !needRecsLoading ? (
+                <>
+                  <View style={s.centeredNote}>
+                    <Text style={s.centeredNoteText}>{needRecsError ?? "We couldn't find options right now."}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[s.ctaBtn, { backgroundColor: '#1A1F2E', marginTop: 12 }]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      const q = view === 'weather' ? 'indoor+activities' : view === 'fun' ? 'family+activities' : 'family+restaurants';
+                      Linking.openURL('https://www.google.com/maps/search/?api=1&query=' + q + '+near+' + encodeURIComponent(stopName ?? ''));
+                    }}
+                  >
+                    <Text style={s.ctaBtnText}>Search on Google Maps</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                needRecsResults.map(rec => (
+                  <View key={rec.id} style={s.needRecCard}>
+                    <Text style={s.needRecName}>{rec.name}</Text>
+                    {!!rec.description && <Text style={s.needRecDesc}>{rec.description}</Text>}
+                    {rec.travelTimeMinutes != null && (
+                      <Text style={s.needRecMeta}>~{rec.travelTimeMinutes} min away</Text>
+                    )}
+                    {applyingRec === rec.id ? (
+                      <ActivityIndicator color="#E8692A" style={{ marginTop: 10 }} />
+                    ) : (
+                      <View style={s.needRecActions}>
+                        <TouchableOpacity style={s.needRecAddBtn} activeOpacity={0.85} onPress={() => handleNeedRecAction(rec, 'add')}>
+                          <Text style={s.needRecBtnText}>+ Add to plan</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.needRecSwapBtn} activeOpacity={0.85} onPress={() => handleNeedRecAction(rec, 'swap')}>
+                          <Text style={s.needRecBtnText}>Swap next stop</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <View style={s.resultFooter}>
+              <TouchableOpacity style={[s.goBackBtn, { flex: 1 }]} onPress={() => setView('picker')} activeOpacity={0.7}>
+                <Text style={s.goBackText}>Go back</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {/* ── SWAP / FUN VIEW ── */}
-        {view === 'fun' && (
+        {view === 'fun' && !isStopContext && (
           <>
             {/* Step 1: pick which stop to swap out */}
             {swapStep === 1 && (
@@ -631,7 +777,7 @@ export default function RescueSheet({
         )}
 
         {/* ── FOOD VIEW ── */}
-        {view === 'food' && plan && (
+        {view === 'food' && plan && !isStopContext && (
           <ResultView
             plan={plan}
             onBack={() => setView('picker')}
@@ -717,7 +863,7 @@ export default function RescueSheet({
         )}
 
         {/* ── WEATHER VIEW ── */}
-        {view === 'weather' && plan && (
+        {view === 'weather' && plan && !isStopContext && (
           <ResultView
             plan={plan}
             onBack={() => setView('picker')}
@@ -1123,6 +1269,16 @@ const s = StyleSheet.create({
     borderRadius: 12, padding: 14,
   },
   infoBoxText: { fontSize: 13, fontFamily: F.regular, lineHeight: 19 },
+
+  // ── Need-recs (stop context) ──
+  needRecCard:    { backgroundColor: '#F5F2EE', borderRadius: 16, padding: 16, marginBottom: 12 },
+  needRecName:    { fontSize: 15, fontWeight: '800', color: '#1A1F2E', fontFamily: F.bold, marginBottom: 4 },
+  needRecDesc:    { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, lineHeight: 18, marginBottom: 4 },
+  needRecMeta:    { fontSize: 12, fontWeight: '600', color: '#E8692A', fontFamily: F.semibold, marginBottom: 12 },
+  needRecActions: { flexDirection: 'row', gap: 8 },
+  needRecAddBtn:  { flex: 1, backgroundColor: '#E8692A', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  needRecSwapBtn: { flex: 1, backgroundColor: '#1A1F2E', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  needRecBtnText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
 
   // ── Stop select rows (swap step 1) ──
   stopSelectRow: {
