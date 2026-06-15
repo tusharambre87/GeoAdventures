@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
@@ -290,6 +290,7 @@ export default function PreviewScreen() {
   const { token, user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [previewSpots, setPreviewSpots] = useState<DisplayDay[]>([]);
+  const mountTimeRef = useRef(Date.now());
 
   const primaryCity = data.cities[0] ?? "Your City";
   const isMulti = data.cities.length > 1;
@@ -349,7 +350,7 @@ export default function PreviewScreen() {
 
   useEffect(() => {
     if (totalStops === 0) return;
-    Analytics.track('trip_preview_viewed', { city: primaryCity, stop_count: totalStops, generation_ms: 0 });
+    Analytics.track('trip_preview_viewed', { city: primaryCity, stop_count: totalStops, generation_ms: Date.now() - mountTimeRef.current });
   }, [totalStops]);
 
   // Date range label
