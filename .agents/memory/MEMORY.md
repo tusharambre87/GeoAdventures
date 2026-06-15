@@ -18,3 +18,4 @@
 - [kids explorerId race condition](kids-explorer-id.md) — atstop.tsx must fetch child player ID eagerly (useEffect on trip.id) and pass explorerId param in navigation; _layout.tsx applies it immediately before the async name-match lookup resolves.
 - [rescue food uses stop coords](rescue-food-coords.md) — loadFoodNearby(address, stopLat, stopLon) uses stop lat/lon directly for Overpass query when available; falls back to Nominatim geocoding only if coords are null.
 - [trip personalization pipeline](trip-personalization-pipeline.md) — meals are additive per day (not counted in pace stop target); preview groups by dayNumber not CHUNK; city pool cache must be invalidated when mapper fields change.
+- [stop_library name normalization](stop-library-name-normalization.md) — three normalizers must stay in sync; "U.S."/"United States", "Mt."/"Mount", "St."/"Saint" variants need word-expansion before punct-strip.

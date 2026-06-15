@@ -6240,6 +6240,9 @@ export class DatabaseStorage implements IStorage {
 export function normalizeStopName(name: string): string {
   return name
     .toLowerCase()
+    .replace(/\bunited\s+states\b/g, 'us')
+    .replace(/\bmount\b/g, 'mt')
+    .replace(/\bsaint\b/g, 'st')
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();

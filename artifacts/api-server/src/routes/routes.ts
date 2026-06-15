@@ -5708,6 +5708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const normN = (n: string): string =>
               n.toLowerCase()
                 .replace(/^the\s+/, '')
+                .replace(/\bunited\s+states\b/g, 'us')
+                .replace(/\bmount\b/g, 'mt')
+                .replace(/\bsaint\b/g, 'st')
                 .replace(/\bof\s+arts?\b/g, 'of art')
                 .replace(/\s+regional\s+/g, ' ')
                 .replace(/\s+state\s+park\b/g, '')
