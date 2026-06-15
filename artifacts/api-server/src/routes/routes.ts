@@ -5668,8 +5668,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               },
             });
             const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
+            // Separate meals from activity stops BEFORE slicing so meal stops from all
+            // days are captured regardless of effectiveStopCount.
+            const POOL_MEAL_TYPES = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+            const poolMealsByDay = new Map<number, GeneratedStop>();
+            const activityOnlyStops = selectedStops.filter(s => {
+              if (POOL_MEAL_TYPES.has((s.type ?? '').toLowerCase())) {
+                if (s.dayNumber != null && !poolMealsByDay.has(s.dayNumber)) {
+                  poolMealsByDay.set(s.dayNumber, s);
+                }
+                return false;
+              }
+              return true;
+            });
             const rawDistributedPoolStops = distributeStopsToDays(
-              selectedStops.slice(0, effectiveStopCount),
+              activityOnlyStops.slice(0, effectiveStopCount),
               plannerTripDays,
               arrivalDayCap,
               lastDayCap,
@@ -5762,6 +5775,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             console.log(`[Travel] [bg] Resequenced display_order for ${createdStops.length} stops`);
+
+            // Insert additive meal stops — always last in their day.
+            // Activity stops have already been resequenced to 0-based, so the
+            // count of activity stops in each day equals the next displayOrder slot.
+            if (poolMealsByDay.size > 0) {
+              const activityCountByDayIdx = new Map<number, number>();
+              for (const s of createdStops) {
+                const di = s.dayIndex ?? 0;
+                activityCountByDayIdx.set(di, (activityCountByDayIdx.get(di) ?? 0) + 1);
+              }
+              for (const [dayNum, mealStop] of poolMealsByDay) {
+                const dayIdx = dayNum - 1;
+                const actCount = activityCountByDayIdx.get(dayIdx) ?? 0;
+                if (actCount === 0) continue; // no activity stops on this day — skip meal
+                await storage.createStop({
+                  tripId,
+                  name: mealStop.name,
+                  stopType: mealStop.type || 'restaurant',
+                  displayOrder: actCount,
+                  dayIndex: dayIdx,
+                  address: mealStop.address || null,
+                  description: null,
+                  latitude: mealStop.latitude ? String(mealStop.latitude) : null,
+                  longitude: mealStop.longitude ? String(mealStop.longitude) : null,
+                  missionType: null,
+                  missionQuestion: null,
+                  missionHint: null,
+                  missionAnswer: null,
+                  missionDifficulty: 'normal',
+                  missionKeepsakeReward: false,
+                  stopMissions: null,
+                  cityGroup: cityName,
+                  selectionReason: 'pool_meal_additive',
+                  metadata: { durationMinutes: familyDurationFloor(mealStop.type ?? 'restaurant', undefined) },
+                });
+                console.log(`[MealAdditive] Pool path — inserted "${mealStop.name}" as last stop on day ${dayNum} (displayOrder=${actCount})`);
+              }
+            }
 
             // Save parent suggestions: assign each to the day whose planned stops are
             // geographically nearest (proximity-based, not all under day 0).
@@ -5857,6 +5908,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lastDayCap,
             effectivePerDay,
           );
+          // Collect AI-generated meal stops separately so they can be inserted last per day
+          const aiMealsByDay = new Map<number, (typeof distributedAIStops)[0]>();
+          for (const stop of distributedAIStops) {
+            if (AUTO_MEAL_TYPES.has((stop.stopType || '').toLowerCase())) {
+              const dn = stop.dayNumber ?? 1;
+              if (!aiMealsByDay.has(dn)) aiMealsByDay.set(dn, stop);
+            }
+          }
           for (const stop of distributedAIStops) {
             if (AUTO_MEAL_TYPES.has((stop.stopType || '').toLowerCase())) continue;
             await storage.createStop({
@@ -5889,6 +5948,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 : { durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', null) },
             });
+          }
+          // Insert AI meal stops last per day — after all activity stops have been written
+          if (aiMealsByDay.size > 0) {
+            const aiCreatedStops = await storage.getStopsByTripId(tripId);
+            const aiActivityCountByDayIdx = new Map<number, number>();
+            for (const s of aiCreatedStops) {
+              const di = s.dayIndex ?? 0;
+              aiActivityCountByDayIdx.set(di, (aiActivityCountByDayIdx.get(di) ?? 0) + 1);
+            }
+            for (const [dayNum, mealStop] of aiMealsByDay) {
+              const dayIdx = dayNum - 1;
+              const actCount = aiActivityCountByDayIdx.get(dayIdx) ?? 0;
+              if (actCount === 0) continue;
+              await storage.createStop({
+                tripId,
+                name: mealStop.name,
+                stopType: mealStop.stopType || 'restaurant',
+                displayOrder: actCount,
+                dayIndex: dayIdx,
+                address: mealStop.address || null,
+                description: mealStop.description || null,
+                latitude: mealStop.latitude || null,
+                longitude: mealStop.longitude || null,
+                missionType: null,
+                missionQuestion: null,
+                missionHint: null,
+                missionAnswer: null,
+                missionDifficulty: 'normal',
+                missionKeepsakeReward: false,
+                stopMissions: null,
+                cityGroup: cityName,
+                selectionReason: 'ai_meal_additive',
+                metadata: { durationMinutes: familyDurationFloor(mealStop.stopType ?? 'restaurant', mealStop.durationMinutes ?? null) },
+              });
+              console.log(`[MealAdditive] AI path — inserted "${mealStop.name}" as last stop on day ${dayNum} (displayOrder=${actCount})`);
+            }
           }
           const missionCount = generatedStops.filter(s => s.missionType).length;
           if (missionCount > 0) {
