@@ -5406,34 +5406,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const ordered = [...slRows].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
           console.log(`[pace debug] fast-path: previewStopIds.length=${previewStopIds.length} resolved=${ordered.length} tripDays=${tripDays || 2}`);
           if (ordered.length > 0) {
+            // getStopsPerDay is the authority — never divide ids.length by tripDays
+            const rawPaceNorm = (pace ?? "").toLowerCase().replace(/[^a-z_]/g, '');
+            const fpEffectivePace = ["chill","relaxed","easy","slow","chillout","chill_out"].includes(rawPaceNorm) ? "chill"
+              : ["packed","gogetter","go_getter","full","busy","active","intense"].includes(rawPaceNorm) ? "packed"
+              : "balanced";
+            const stopsPerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 6 : 4;
+            const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+            const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
+            const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const plannerTripDays = tripDays || 2;
-            const stopsPerDay = Math.ceil(ordered.length / plannerTripDays);
-            console.log(`[pace debug] fast-path: stopsPerDay=${stopsPerDay} (${ordered.length} stops ÷ ${plannerTripDays} days)`);
-            for (let i = 0; i < ordered.length; i++) {
-              const sl = ordered[i];
-              await storage.createStop({
-                tripId,
-                name: sl.name,
-                stopType: sl.stopType || 'landmark',
-                displayOrder: i % stopsPerDay,
-                dayIndex: Math.floor(i / stopsPerDay),
-                address: sl.address || null,
-                description: null,
-                latitude: sl.latitude || null,
-                longitude: sl.longitude || null,
-                cityGroup: cityName,
-                missionType: null,
-                missionQuestion: null,
-                missionHint: null,
-                missionAnswer: null,
-                missionDifficulty: 'normal',
-                missionKeepsakeReward: false,
-                stopMissions: null,
-                selectionReason: 'preview_parity',
-                metadata: { durationMinutes: familyDurationFloor(sl.stopType ?? 'landmark', undefined) },
-              });
+            console.log(`[pace debug] fast-path: stopsPerDay=${stopsPerDay} from pace="${pace}" (effective=${fpEffectivePace}), activity=${activityStops.length}, meals=${mealStops.length}`);
+
+            let insertCount = 0;
+            for (let d = 0; d < plannerTripDays; d++) {
+              const dayActivity = activityStops.slice(d * stopsPerDay, (d + 1) * stopsPerDay);
+              const dayMeal = mealStops[d] ?? null;
+              for (let i = 0; i < dayActivity.length; i++) {
+                const sl = dayActivity[i];
+                await storage.createStop({
+                  tripId,
+                  name: sl.name,
+                  stopType: sl.stopType || 'landmark',
+                  displayOrder: i,
+                  dayIndex: d,
+                  address: sl.address || null,
+                  description: null,
+                  latitude: sl.latitude || null,
+                  longitude: sl.longitude || null,
+                  cityGroup: cityName,
+                  missionType: null,
+                  missionQuestion: null,
+                  missionHint: null,
+                  missionAnswer: null,
+                  missionDifficulty: 'normal',
+                  missionKeepsakeReward: false,
+                  stopMissions: null,
+                  selectionReason: 'preview_parity',
+                  metadata: { durationMinutes: familyDurationFloor(sl.stopType ?? 'landmark', undefined) },
+                });
+                insertCount++;
+              }
+              if (dayMeal) {
+                await storage.createStop({
+                  tripId,
+                  name: dayMeal.name,
+                  stopType: dayMeal.stopType || 'restaurant',
+                  displayOrder: dayActivity.length,
+                  dayIndex: d,
+                  address: dayMeal.address || null,
+                  description: null,
+                  latitude: dayMeal.latitude || null,
+                  longitude: dayMeal.longitude || null,
+                  cityGroup: cityName,
+                  missionType: null,
+                  missionQuestion: null,
+                  missionHint: null,
+                  missionAnswer: null,
+                  missionDifficulty: 'normal',
+                  missionKeepsakeReward: false,
+                  stopMissions: null,
+                  selectionReason: 'preview_parity',
+                  metadata: { durationMinutes: familyDurationFloor(dayMeal.stopType ?? 'restaurant', undefined) },
+                });
+                insertCount++;
+              }
             }
-            console.log(`[Travel] [bg] Inserted ${ordered.length} preview-parity stops for trip ${tripId}`);
+            console.log(`[Travel] [bg] Inserted ${insertCount} preview-parity stops for trip ${tripId}`);
             return;
           }
         } catch (e) {
