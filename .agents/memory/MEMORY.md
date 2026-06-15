@@ -7,7 +7,7 @@
 - [stop_library dedup safety order](stop-library-dedup-safety.md) — Reassign live trip FK references BEFORE deleting any duplicate stop_library row; never delete first.
 - [JSX whitespace text node](jsx-whitespace-text-node.md) — space before {/* comment */} on same line as </Tag> becomes a real string child; crashes RN Fabric in non-Text parent.
 - [stop_library pipeline](stop-library-pipeline.md) — 4 correctness invariants: normalized_name column, stop_type CHECK, dedup key (UQ_stop_library_normalized), PSI auto-seeding via psiTrigger.ts.
-- [gpt-5-mini unsupported params](gpt5mini-params.md) — gpt-5-mini rejects temperature AND response_format:{type:"json_object"}; extract JSON with regex from plain-text response instead.
+- [gpt-5-mini unsupported params](gpt5mini-params.md) — gpt-5-mini rejects temperature and legacy max_tokens; response_format json_object is fine without temperature; use max_completion_tokens.
 - [KeyboardAvoidingView in position:absolute sheets](keyboard-avoiding-absolute.md) — KAV inside position:absolute bottom:0 Animated.View doesn't know its frame; use Keyboard.addListener('keyboardDidShow') + scrollToEnd instead.
 - [smart-suggestions library-first pattern](smart-suggestions-library.md) — For kids/landmark contexts, always query stop_library before calling AI; return early if ≥4 results. Catches AI failures silently and eliminates "No stops found" for well-seeded cities.
 - [PSI minAge vs planner_places.min_age](psi-min-age-vs-planner-places.md) — Pool reads psiMinAge (PSI), not planner_places; NULL=bands, 0=explicit no restriction, >0=hard min. Code fix: !== null check in plannerService.ts.

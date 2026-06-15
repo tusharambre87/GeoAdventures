@@ -61,6 +61,7 @@ import { isFreePlan } from "@/lib/subscription";
 import { useSpeech } from "@/lib/useSpeech";
 import { SpeakButton } from "@/components/SpeakButton";
 import { hasAskedPermission } from "@/services/notifications/notificationPermission";
+import { useKids } from "@/lib/kidsContext";
 import { onEnRoute, onDayComplete, onWeatherAlert } from "@/services/notifications/notificationTriggers";
 import NotificationPermissionModal from "@/components/NotificationPermissionModal";
 const MO_STOP_BG: Record<string, string> = {
@@ -484,6 +485,7 @@ export default function TodayScreen() {
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const { speak, isSpeaking } = useSpeech();
+  const kids = useKids();
   useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
   const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
 
@@ -2333,6 +2335,18 @@ export default function TodayScreen() {
                 </View>
                 <Text style={{ fontSize: 13, color: C.deep, lineHeight: 20, fontWeight: '500' }}>{didYouKnow}</Text>
               </View>
+            </View>
+          )}
+
+          {!!kids.exploreContent?.missions?.individual?.length && (
+            <View style={{ marginHorizontal: 16, marginBottom: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: C.orange, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, paddingHorizontal: 2 }}>{'Your missions'}</Text>
+              {kids.exploreContent.missions.individual.map((m, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#fff', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 4, borderWidth: 1, borderColor: 'rgba(28,25,23,0.08)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#7C3AED', letterSpacing: 0.5, textTransform: 'uppercase', minWidth: 24, paddingTop: 1 }}>{`M${i + 1}`}</Text>
+                  <Text style={{ fontSize: 12, color: C.deep, lineHeight: 18, flex: 1, fontWeight: '500' }}>{m.enRouteBrief}</Text>
+                </View>
+              ))}
             </View>
           )}
 

@@ -185,13 +185,11 @@ async function run(): Promise<void> {
               stop.stopType ?? "landmark",
             );
 
-            // Require exactly 3 missions with types knowledge/observation/photo.
-            // generateMissionsForStop can return a 2-mission fallback on AI failure;
-            // reject that rather than persisting non-compliant data.
-            const validationError = validateMissions(missions);
-            if (validationError) {
-              throw new Error(`Mission shape invalid: ${validationError}`);
-            }
+            // Missions now generated in exploreContentService.ts per age band. This validator is legacy.
+            // const validationError = validateMissions(missions);
+            // if (validationError) {
+            //   throw new Error(`Mission shape invalid: ${validationError}`);
+            // }
 
             await db
               .update(stopLibrary)

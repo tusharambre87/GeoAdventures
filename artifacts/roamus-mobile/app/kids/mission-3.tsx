@@ -1,10 +1,8 @@
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
-  Image,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,67 +12,71 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { kidsAPI } from "@/lib/apiClient";
+import type { Mission } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
+import { MissionCard } from "@/components/MissionCard";
 import { F } from "@/lib/tokens";
-import { useSpeech } from "@/lib/useSpeech";
-import { SpeakButton } from "@/components/SpeakButton";
 
 const K = {
-  purple: "#7C3AED",
-  purpleLt: "#F5F3FF",
-  bg: "#FFF8F0",
-  card: "#FFFFFF",
-  deep: "#1C1917",
-  muted: "#78716C",
-  green: "#16A34A",
-  border: "rgba(28,25,23,0.08)",
+  purple:    "#7C3AED",
+  bg:        "#FFF8F0",
+  card:      "#FFFFFF",
+  muted:     "#78716C",
+  green:     "#16A34A",
+  border:    "rgba(28,25,23,0.08)",
   borderMed: "rgba(28,25,23,0.14)",
 } as const;
 
-const MOCK_PHOTO = {
-  instruction: "Find the most interesting detail at this stop and take a photo of it! Look for something others might walk right past.",
-  xp: 5,
+const MOCK_M3: Mission = {
+  type: "photographer",
+  enRouteBrief: "Agent: the perfect shot exists here — find the angle no tourist takes.",
+  instruction: "Take a photo of this place from an angle no tourist would think of. Get low, get high, or get close to something others ignore. The constraint is what makes it interesting.",
+  proof: "photo",
+  xp: 10,
 };
 
 export default function Mission3() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
-  const { speak, isSpeaking } = useSpeech();
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const instruction =
-    kids.exploreContent?.missions?.[2]?.type === "photo"
-      ? kids.exploreContent.missions[2].instruction
-      : MOCK_PHOTO.instruction;
+  const mission: Mission | null = kids.exploreContent?.missions?.individual?.[2] ?? null;
+  const effectiveMission = mission ?? (__DEV__ ? MOCK_M3 : null);
 
-  async function handleTakePhoto() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Camera needed",
-        "Please allow camera access to take your explorer photo!"
-      );
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
-    }
+  if (kids.isLoadingExplore) {
+    return (
+      <View style={{ flex: 1, backgroundColor: K.bg, justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color={K.purple} />
+        <Text style={{ marginTop: 16, fontSize: 15, color: K.muted, fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
+  }
+  if (!effectiveMission) {
+    return (
+      <View style={{ flex: 1, backgroundColor: K.bg, justifyContent: "center", alignItems: "center", paddingBottom: 40 }}>
+        <ActivityIndicator size="large" color={K.purple} />
+        <Text style={{ marginTop: 16, fontSize: 15, color: K.muted, fontFamily: "PlusJakartaSans_500Medium" }}>Loading your mission...</Text>
+      </View>
+    );
   }
 
-  async function handlePickPhoto() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
-    }
+  async function handleComplete(proof: string | null) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setSubmitting(true);
+    let xpAwarded = effectiveMission!.xp;
+    try {
+      if (kids.stopId) {
+        const result = await kidsAPI.completeMission(kids.stopId, {
+          explorerId: kids.explorerId || "",
+          missionId: effectiveMission!.type,
+          answer: proof ?? "skipped",
+        }) as { missionXpAwarded?: number } | undefined;
+        if (result?.missionXpAwarded != null) xpAwarded = result.missionXpAwarded;
+      }
+    } catch {}
+    kids.addSessionXp(xpAwarded);
+    setSubmitting(false);
+    router.push("/kids/celebration");
   }
 
   return (
@@ -83,20 +85,12 @@ export default function Mission3() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingVertical: 16 }}
       >
-        {/* ── Header ── */}
         <View style={[s.header, { paddingTop: insets.top + 16 }]}>
           <Text style={s.counter}>Mission 3 of 3</Text>
-          <View style={s.missionDots}>
+          <View style={s.dots}>
             {[0, 1, 2].map((i) => (
-              <View
-                key={i}
-                style={[
-                  s.mDot,
-                  i < 2 && s.mDotDone,
-                  i === 2 && s.mDotCur,
-                ]}
-              >
-                <Text style={[s.mDotText, s.mDotTextAlt]}>
+              <View key={i} style={[s.dot, i < 2 && s.dotDone, i === 2 && s.dotCur]}>
+                <Text style={[s.dotText, s.dotTextAlt]}>
                   {i < 2 ? "\u2713" : "3"}
                 </Text>
               </View>
@@ -104,71 +98,30 @@ export default function Mission3() {
           </View>
         </View>
 
-        {/* ── White card ── */}
-        <View style={s.card}>
-          <Text style={s.typeLabel}>{"\uD83D\uDCF8 PHOTO · +5 XP"}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <Text style={[s.question, { flex: 1, marginRight: 8 }]}>{instruction}</Text>
-            <SpeakButton text={instruction} isSpeaking={isSpeaking} onPress={speak} size="sm" color="#7C3AED" />
-          </View>
-
-          {photoUri ? (
-            <View style={s.photoPreview}>
-              <Image source={{ uri: photoUri }} style={s.previewImg} />
-              <Pressable style={s.retakeBtn} onPress={() => setPhotoUri(null)}>
-                <Text style={s.retakeText}>Retake photo</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={s.photoCenter}>
-              <Text style={s.cameraIcon}>{"\uD83D\uDCF7"}</Text>
-              <Text style={s.photoSub}>Find something amazing to capture!</Text>
-            </View>
-          )}
-
-          <Pressable
-            style={({ pressed }) => [s.photoBtn, pressed && { opacity: 0.88 }]}
-            onPress={handleTakePhoto}
-          >
-            <Text style={s.photoBtnText}>
-              {photoUri ? "\uD83D\uDCF7 Retake Photo" : "\uD83D\uDCF7 Take a photo!"}
-            </Text>
-          </Pressable>
-          <Pressable style={s.libraryLink} onPress={handlePickPhoto}>
-            <Text style={s.libraryLinkText}>Or choose from library</Text>
-          </Pressable>
-        </View>
+        <MissionCard
+          mission={effectiveMission}
+          index={3}
+          onComplete={handleComplete}
+          isSubmitting={submitting}
+        />
       </ScrollView>
 
-      {/* ── Bottom nav ── */}
       <View style={[s.nav, { paddingBottom: insets.bottom + 12 }]}>
         <View style={s.navRow}>
           <Pressable style={s.backBtn} onPress={() => router.back()}>
             <Text style={s.backBtnText}>{"←"}</Text>
           </Pressable>
           <Pressable
-            style={({ pressed }) => [s.nextBtn, pressed && { opacity: 0.88 }]}
+            style={[s.nextBtn, { backgroundColor: K.purple }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-              if (kids.stopId) {
-                kidsAPI.completeMission(kids.stopId, {
-                  explorerId: kids.explorerId || "",
-                  missionId: "photo",
-                  answer: photoUri ?? "skipped",
-                }).catch(() => {});
-              }
               router.push("/kids/celebration");
             }}
           >
             <Text style={s.nextBtnText}>{"Finish! \uD83C\uDF89"}</Text>
           </Pressable>
         </View>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
+        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}>
           <Text style={s.handBack}>{"\u2190 Back"}</Text>
         </Pressable>
       </View>
@@ -185,123 +138,17 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  counter: {
-    fontFamily: F.bold,
-    fontSize: 13,
-    color: K.muted,
+  counter: { fontFamily: F.bold, fontSize: 13, color: K.muted },
+  dots: { flexDirection: "row", gap: 8 },
+  dot: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: K.bg, borderWidth: 1.5, borderColor: K.border,
+    alignItems: "center", justifyContent: "center",
   },
-  missionDots: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  mDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: K.bg,
-    borderWidth: 1.5,
-    borderColor: K.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mDotDone: {
-    backgroundColor: K.green,
-    borderColor: K.green,
-  },
-  mDotCur: {
-    backgroundColor: K.purple,
-    borderColor: K.purple,
-  },
-  mDotText: {
-    fontFamily: F.bold,
-    fontSize: 12,
-    color: K.muted,
-  },
-  mDotTextAlt: {
-    color: "#fff",
-  },
-  card: {
-    marginHorizontal: 20,
-    backgroundColor: K.card,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: K.border,
-  },
-  typeLabel: {
-    fontFamily: F.bold,
-    fontSize: 11,
-    color: K.purple,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 10,
-  },
-  question: {
-    fontFamily: F.bold,
-    fontSize: 19,
-    color: K.deep,
-    lineHeight: 27,
-    marginBottom: 20,
-  },
-  photoCenter: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  cameraIcon: {
-    fontSize: 64,
-    marginBottom: 10,
-  },
-  photoSub: {
-    fontFamily: F.medium,
-    fontSize: 14,
-    color: K.muted,
-  },
-  photoPreview: {
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  previewImg: {
-    width: "100%",
-    height: 200,
-    borderRadius: 16,
-  },
-  retakeBtn: {
-    alignItems: "center",
-    paddingTop: 10,
-  },
-  retakeText: {
-    fontFamily: F.semibold,
-    fontSize: 13,
-    color: K.muted,
-  },
-  photoBtn: {
-    backgroundColor: K.purple,
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-    shadowColor: K.purple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  photoBtnText: {
-    fontFamily: F.bold,
-    fontSize: 17,
-    color: "#fff",
-  },
-  libraryLink: {
-    alignItems: "center",
-    paddingTop: 12,
-  },
-  libraryLinkText: {
-    fontFamily: F.medium,
-    fontSize: 13,
-    color: K.muted,
-  },
+  dotDone: { backgroundColor: K.green, borderColor: K.green },
+  dotCur:  { backgroundColor: K.purple, borderColor: K.purple },
+  dotText:    { fontFamily: F.bold, fontSize: 12, color: K.muted },
+  dotTextAlt: { color: "#fff" },
   nav: {
     backgroundColor: K.card,
     borderTopWidth: 1,
@@ -309,49 +156,18 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
   },
-  navRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
-  },
+  navRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   backBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: K.borderMed,
-    backgroundColor: K.card,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 54, height: 54, borderRadius: 16,
+    borderWidth: 1.5, borderColor: K.borderMed, backgroundColor: K.card,
+    alignItems: "center", justifyContent: "center",
   },
-  backBtnText: {
-    fontFamily: F.bold,
-    fontSize: 20,
-    color: K.deep,
-  },
+  backBtnText: { fontFamily: F.bold, fontSize: 20, color: "#1C1917" },
   nextBtn: {
-    flex: 1,
-    backgroundColor: K.purple,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1, borderRadius: 16, alignItems: "center", justifyContent: "center",
     paddingVertical: 16,
-    shadowColor: K.purple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 4,
   },
-  nextBtnText: {
-    fontFamily: F.bold,
-    fontSize: 17,
-    color: "#fff",
-  },
-  handBack: {
-    fontFamily: F.semibold,
-    fontSize: 12,
-    color: K.muted,
-    textAlign: "center",
-    paddingVertical: 6,
-  },
+  nextBtnText: { fontFamily: F.bold, fontSize: 17, color: "#fff" },
+  handBack: { fontFamily: F.semibold, fontSize: 12, color: K.muted, textAlign: "center", paddingVertical: 6 },
 });

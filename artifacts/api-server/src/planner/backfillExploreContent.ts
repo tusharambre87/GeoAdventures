@@ -72,9 +72,7 @@ async function backfillExploreContent() {
       rowIndex++;
       try {
         if (rowIndex % 10 === 1) {
-          console.log(
-            `[${rowIndex}/${total}] ${band} — ${stop.name} (${stop.city ?? ''}) — ${generated} done, ${failed} failed`,
-          );
+          console.log(`[${rowIndex}/${total}] ${band} — ${stop.name} (${stop.city ?? ''})`);
         }
 
         const gpFacts = {

@@ -60,6 +60,19 @@ interface GpFacts {
   gpWebsite?: unknown;
 }
 
+export interface Mission {
+  type: 'detective' | 'scientist' | 'photographer' | 'reporter' | 'collector' | 'decider' | 'family';
+  enRouteBrief: string;
+  instruction: string;
+  proof: 'photo' | 'tap' | 'number' | 'text';
+  xp: number;
+}
+
+export interface MissionSet {
+  individual: Mission[];
+  family: Mission;
+}
+
 export interface ExploreData {
   aboutArea: string;
   nearbyAttractions: NearbyAttraction[];
@@ -79,7 +92,7 @@ export interface ExploreData {
   };
   wonderPrompt?: string;
   wonderTopics?: string[];
-  missions?: any[];
+  missions?: MissionSet;
   stopId?: string;
   stopName?: string;
   stopIndex?: number;
@@ -120,7 +133,11 @@ export async function getExploreContent(
       generatePracticalContent(stopName, stopType, destination, gpFacts),
       generateStories(stopName, stopType, destination, youngestChildAge),
     ]);
-    return { ...practical, stories };
+    return {
+      ...practical,
+      stories: { main: stories.main, quickHits: stories.quickHits, history: stories.history },
+      ...(stories.missions ? { missions: stories.missions } : {}),
+    };
   } catch (error) {
     console.error("Error generating explore content:", error);
     return getFallbackData(stopName, stopType, destination);
@@ -246,6 +263,115 @@ The reviews must mention specific real details about ${stopName} — exhibits, f
 
 // ─── Story generation — one call per track, run in parallel ──────────────────
 
+// Extract 2-3 vivid specific facts from the gathered facts list to seed mission prompts.
+// Both story tracks and missions draw from the same facts — this is what creates
+// narrative coherence between story and missions without a sequential dependency.
+function extractStoryHook(facts: string[]): string {
+  if (facts.length === 0) return '';
+  return facts.slice(0, 3).join('; ');
+}
+
+async function generateMissions(
+  stopName: string,
+  stopType: string,
+  destination: string,
+  ageBand: string,
+  storyHook: string,
+): Promise<MissionSet | null> {
+  const ageBandLabel = ageBand === 'young'  ? 'young (ages 4-6)'
+    : ageBand === 'middle' ? 'middle (ages 7-9)'
+    : 'older (ages 10-12)';
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You are designing missions for children visiting ${stopName} in ${destination} on a family trip.
+The child's age band is: ${ageBandLabel}.
+
+The story they just heard introduced these specific elements: ${storyHook || `vivid details about ${stopName}`}
+— extracted as the 2-3 most vivid specific facts from the main story. Missions should reward having heard the story.
+
+MISSION DESIGN RULES — violating these produces bad missions:
+- Every mission must reference something specific to THIS stop. Generic missions are failures.
+- A child who listened to the story should have an advantage over one who didn't.
+- Missions create detectives, not students. The child is the expert, not the information.
+- Bad: "Learn about geysers." Good: "Find out why Old Faithful is predictable when other geysers aren't."
+- Every mission produces something shareable at dinner — a discovery, a photo, a theory.
+- enRouteBrief is exactly 1 sentence, written as a spy briefing: "Agent: [specific thing] is waiting for you."
+
+MISSION TYPES BY AGE BAND:
+young (4-6): use photographer and collector only. One-step tasks. Immediate payoff. Sensory anchors.
+middle (7-9): use detective and scientist primarily. photographer and reporter are secondary options.
+older (10-12): use scientist and reporter at full depth. Frame as challenges not games. Never condescending.
+
+TYPE DEFINITIONS:
+detective — find something specific that requires actually looking. Not on any sign.
+scientist — observe a phenomenon, form a theory. Wrong theories are fine. Thinking is the point.
+photographer — constrained photo challenge. The constraint is what makes it interesting.
+reporter — one real question to one real person who works there.
+collector — gather something across this stop that connects to other stops today.
+decider — give the child real ownership over a real decision with real consequences.
+
+FAMILY MISSION RULES:
+Always present. Requires 2+ children to contribute different things simultaneously.
+The age gap is an asset — younger child does sensory/visual, older child does analytical.
+Do not use real names — write "your older child" and "your younger child."
+XP = 20, proof = "tap" (parent confirms completion).
+
+Return ONLY valid JSON:
+{
+  "missions": {
+    "individual": [
+      {
+        "type": "detective|scientist|photographer|reporter|collector|decider",
+        "enRouteBrief": "Agent: [1 sentence spy briefing specific to this stop]",
+        "instruction": "[full mission text, specific, active, produces something shareable]",
+        "proof": "photo|tap|number|text",
+        "xp": 15
+      }
+    ],
+    "family": {
+      "type": "family",
+      "enRouteBrief": "Family mission incoming — you will need everyone for this one.",
+      "instruction": "[mission requiring older + younger child to contribute different things]",
+      "proof": "tap",
+      "xp": 20
+    }
+  }
+}
+Generate exactly 3 individual missions. XP values: detective/scientist = 15, photographer/reporter = 10, collector/decider = 8, family = 20.`,
+        },
+        {
+          role: 'user',
+          content: `Generate age-appropriate missions for a ${ageBandLabel} child visiting ${stopName} (${stopType}) in ${destination}.`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      max_completion_tokens: 1000,
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const ms = parsed?.missions;
+    if (!ms?.individual || !Array.isArray(ms.individual) || ms.individual.length < 1 || !ms.family) {
+      console.warn(`[generateMissions] Unexpected shape for "${stopName}" — skipping missions`);
+      return null;
+    }
+    console.log(`[generateMissions] ${stopName} (${ageBand}) — ${ms.individual.length} individual + 1 family mission`);
+    return {
+      individual: ms.individual.slice(0, 3) as Mission[],
+      family: ms.family as Mission,
+    };
+  } catch (err) {
+    console.error(`[generateMissions] Failed for "${stopName}":`, (err as Error).message);
+    return null;
+  }
+}
+
 const STORY_SYSTEM_PROMPT = `You are a brilliant storyteller creating audio narration for families visiting a real place on a trip.
 
 Your voice is warm, curious, and slightly conspiratorial — like a favourite relative who knows amazing things and loves sharing them. Not a teacher. Not a tour guide reading a pamphlet. A real storyteller who earns every sentence.
@@ -302,7 +428,7 @@ async function generateStories(
   stopType: string,
   destination: string,
   youngestChildAge?: number
-): Promise<{ main: StoryTrack; quickHits: StoryTrack; history: StoryTrack }> {
+): Promise<{ main: StoryTrack; quickHits: StoryTrack; history: StoryTrack; missions: MissionSet | null }> {
 
   // ── Step 1: Gather real, specific facts about this exact place ──────────────
   let realFacts: string[] = [];
@@ -410,11 +536,15 @@ End by connecting that person's decision to what the child is standing next to t
 
 Return ONLY the text. No JSON. No labels. No track heading. Just the story.`;
 
+  const storyHook = extractStoryHook(realFacts);
+  const ageBand = age <= 6 ? 'young' : age <= 9 ? 'middle' : 'older';
+
   try {
-    const [mainRaw, quickHitsRaw, historyRaw] = await Promise.all([
+    const [mainRaw, quickHitsRaw, historyRaw, missionsResult] = await Promise.all([
       generateTrackText(mainPrompt, 700, "main"),
       generateTrackText(quickHitsPrompt, 220, "quickHits"),
       generateTrackText(historyPrompt, 220, "history"),
+      generateMissions(stopName, stopType, destination, ageBand, storyHook),
     ]);
 
     for (const [key, val] of [["main", mainRaw], ["quickHits", quickHitsRaw], ["history", historyRaw]] as [string, string][]) {
@@ -436,6 +566,7 @@ Return ONLY the text. No JSON. No labels. No track heading. Just the story.`;
       main:      { text: mainText,      durationSeconds: estimateDuration(mainText) },
       quickHits: { text: quickHitsText, durationSeconds: estimateDuration(quickHitsText) },
       history:   { text: historyText,   durationSeconds: estimateDuration(historyText) },
+      missions:  missionsResult,
     };
 
   } catch (error) {

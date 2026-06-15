@@ -96,6 +96,14 @@ export type ReplacementSuggestion = {
   imageUrl?: string;
 };
 
+export interface Mission {
+  type: 'detective' | 'scientist' | 'photographer' | 'reporter' | 'collector' | 'decider' | 'family';
+  enRouteBrief: string;
+  instruction: string;
+  proof: 'photo' | 'tap' | 'number' | 'text';
+  xp: number;
+}
+
 export interface ExploreContent {
   stopId: string;
   stopName: string;
@@ -108,11 +116,10 @@ export interface ExploreContent {
   };
   wonderPrompt: string;
   wonderTopics: string[];
-  missions: [
-    { type: "quiz"; question: string; options: string[]; correctIndex: number; xp: number },
-    { type: "observation"; instruction: string; xp: number },
-    { type: "photo"; instruction: string; xp: number },
-  ];
+  missions?: {
+    individual: Mission[];
+    family: Mission;
+  };
 }
 
 export type GuessRound = {

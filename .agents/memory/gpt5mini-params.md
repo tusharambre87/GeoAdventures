@@ -1,19 +1,25 @@
 ---
 name: gpt-5-mini unsupported params
-description: gpt-5-mini rejects temperature AND response_format:{type:"json_object"}; causes invalid_request_error silently swallowed by callers.
+description: gpt-5-mini rejects temperature; response_format json_object is fine without it. Also rejects legacy max_tokens — use max_completion_tokens.
 ---
 
 # gpt-5-mini Unsupported Parameters
 
-## The rule
-Never pass `temperature` or `response_format: { type: "json_object" }` to gpt-5-mini. Both cause `invalid_request_error` from OpenAI.
+## The rules
+1. Never pass `temperature` — causes `invalid_request_error`.
+2. Use `max_completion_tokens` not `max_tokens`.
+3. `response_format: { type: "json_object" }` is **fine** when temperature is absent.
 
 ## Why
-gpt-5-mini uses a different API contract from gpt-4o family. The JSON object response format and temperature params are rejected. The errors appear in deployment logs as `type: 'invalid_request_error'` from `_APIError.generate`.
+gpt-5-mini uses a different API contract. `temperature` is rejected outright. An earlier investigation
+blamed `response_format` too, but the working generatePracticalContent and facts-gathering calls
+in exploreContentService.ts both use `response_format: { type: "json_object" }` with gpt-5-mini
+and no temperature — they succeed. The rejection was specifically from `temperature`, not from
+`response_format` alone.
 
 ## How to apply
-- Remove `temperature` — confirmed earlier.
-- Remove `response_format: { type: "json_object" }` — confirmed: smart-suggestions was returning empty results for kids/landmarks because gpt-5-mini threw on this param.
-- Instead: instruct the model in the system prompt to "Return valid JSON only", then extract JSON from the plain-text response with `/\{[\s\S]*\}/` regex.
-- `max_completion_tokens` is fine to keep.
-- Affects any route using `openai.chat.completions.create` with `model: "gpt-5-mini"`. Check all such call sites when adding new params.
+- Remove `temperature` from any gpt-5-mini call site.
+- Keep `max_completion_tokens` (confirmed working).
+- Keep `response_format: { type: "json_object" }` when structured output is needed — it works.
+- Only fall back to regex JSON extraction if you have a specific reason to avoid response_format.
+- Affects any `openai.chat.completions.create` with `model: "gpt-5-mini"`. Check all call sites when adding params.
