@@ -7,8 +7,10 @@ description: gpt-5-mini rejects temperature; response_format json_object is fine
 
 ## The rules
 1. Never pass `temperature` — causes `invalid_request_error`.
-2. Use `max_completion_tokens` not `max_tokens`.
-3. `response_format: { type: "json_object" }` is **fine** when temperature is absent.
+2. Do NOT pass `max_completion_tokens` when using `response_format: {type:"json_object"}` — the proxy
+   buffers the entire JSON until it closes; if the token cap is hit first, the response is `content: ""`
+   with `finish_reason: "length"`. generatePracticalContent works exactly because it omits this param.
+3. `response_format: { type: "json_object" }` is **fine** when temperature and max_completion_tokens are absent.
 
 ## Why
 gpt-5-mini uses a different API contract. `temperature` is rejected outright. An earlier investigation

@@ -350,7 +350,6 @@ Generate exactly 3 individual missions. XP values: detective/scientist = 15, pho
         },
       ],
       response_format: { type: 'json_object' },
-      max_completion_tokens: 1000,
     });
 
     const raw = completion.choices[0]?.message?.content;
