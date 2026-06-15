@@ -13992,11 +13992,16 @@ Respond with JSON only, no markdown:
       const prompt = isFun
         ? `You are a family travel expert. A family with young children is ${locationContext} and wants a quick, exciting bonus activity for kids.
 
-Suggest 3 REAL kid-friendly activity spots. Focus on:
-- Playgrounds, splash pads, arcades, mini-golf, bowling, science centers, aquariums, go-karts, trampoline parks, escape rooms for kids, candy stores, toy shops, ice cream parlors
-- Should be fun, hands-on, and energizing for kids aged 4-12
-- 15-30 min activity time preferred
-- Must actually exist near this location
+Suggest 3 REAL kid-friendly places or activities nearby. Think broadly — whatever actually exists near this location:
+- Museums, monuments, historic sites, interactive exhibits, science centers, aquariums
+- Parks, playgrounds, splash pads, waterfronts, gardens, trails
+- Arcades, mini-golf, bowling, trampoline parks (only if they genuinely exist near this location)
+- Ice cream shops, candy stores, bakeries, food markets
+- Toy shops, bookstores with kids sections, street performers, markets
+- Any spot kids aged 4-12 would genuinely enjoy
+- Should be energizing or engaging for kids
+- 5-30 min travel time preferred
+- IMPORTANT: Only suggest places that ACTUALLY EXIST near this specific location — do not invent or approximate
 
 Scoring criteria to pick the best options (apply internally, don't show scores):
 - Distance/accessibility: 25%
