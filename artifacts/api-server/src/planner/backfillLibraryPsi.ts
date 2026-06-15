@@ -25,7 +25,7 @@ import { computeScores, type FamilyProfile } from "./scoringEngine.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 // Set to false to run against the full library after DC test passes.
-const DC_ONLY = true;
+const DC_ONLY = false;
 
 const BATCH_SIZE = 5;
 const BATCH_PAUSE_MS = 2000;
