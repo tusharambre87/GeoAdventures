@@ -3258,6 +3258,15 @@ export const plannerStopIntelligence = pgTable("planner_stop_intelligence", {
   // Cache freshness — used by serve-then-refresh TTL system
   cachedAt: timestamp("cached_at").defaultNow(),
   invalidatedAt: timestamp("invalidated_at"),
+  // Canonical family profile scores — populated by backfill-library-psi
+  scoreToddlerFinal: integer("score_toddler_final"),
+  scoreToddlerKidFit: integer("score_toddler_kid_fit"),
+  scoreClassicFinal: integer("score_classic_final"),
+  scoreClassicKidFit: integer("score_classic_kid_fit"),
+  scoreUrbanFinal: integer("score_urban_final"),
+  scoreUrbanKidFit: integer("score_urban_kid_fit"),
+  scoreAdventureFinal: integer("score_adventure_final"),
+  scoreAdventureKidFit: integer("score_adventure_kid_fit"),
 }, (table) => [index("IDX_planner_stop_intelligence_place").on(table.placeId)]);
 
 export const insertPlannerStopIntelligenceSchema = createInsertSchema(plannerStopIntelligence).omit({ id: true, enrichedAt: true, cachedAt: true });
