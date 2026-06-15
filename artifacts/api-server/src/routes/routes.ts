@@ -14150,12 +14150,13 @@ Return JSON only with max 3 suggestions:
       const completion = await openai.chat.completions.create({
         model: "gpt-5.5",
         messages: [{ role: "user", content: prompt }],
-        max_completion_tokens: 900,
-        response_format: { type: "json_object" },
+        max_completion_tokens: 1500,
       });
 
       const raw = completion.choices[0]?.message?.content || '{"suggestions":[]}';
-      const parsed = JSON.parse(raw);
+      console.log("[need-recs raw]", raw.slice(0, 300));
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
       const suggestions = (parsed.suggestions || []).slice(0, 3);
       res.json({ suggestions });
     } catch (err: any) {
