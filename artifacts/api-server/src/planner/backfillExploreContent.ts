@@ -62,14 +62,35 @@ async function backfillExploreContent() {
   const total = stops.length * AGE_BANDS.length;
   console.log(`Total stops: ${stops.length} → ${total} total rows to generate`);
 
+  // Build skip-set from existing rows so restarts never re-process completed entries
+  const existing = await db.$client.query(
+    `SELECT normalized_name, city_group, age_band FROM explore_cache`,
+  );
+  const skipSet = new Set<string>(
+    existing.rows.map((r: { normalized_name: string; city_group: string; age_band: string }) =>
+      `${r.normalized_name}|${r.city_group}|${r.age_band}`,
+    ),
+  );
+  console.log(`Skip-set loaded: ${skipSet.size} existing rows will be skipped`);
+
   let generated = 0;
   let failed    = 0;
+  let skipped   = 0;
   const failedItems: string[] = [];
 
   let rowIndex = 0;
   for (const stop of stops) {
     for (const { band, representativeAge } of AGE_BANDS) {
       rowIndex++;
+
+      const lookupName = stop.normalizedName || stop.name;
+      const skipKey = `${lookupName}|${stop.city ?? ''}|${band}`;
+      if (skipSet.has(skipKey)) {
+        skipped++;
+        console.log(`SKIP: ${skipKey}`);
+        continue;
+      }
+
       try {
         if (rowIndex % 10 === 1) {
           console.log(`[${rowIndex}/${total}] ${band} — ${stop.name} (${stop.city ?? ''})`);
@@ -84,8 +105,6 @@ async function backfillExploreContent() {
           gpPhone:                stop.gpPhone,
           gpWebsite:              stop.gpWebsite,
         };
-
-        const lookupName = stop.normalizedName || stop.name;
 
         const content = await getExploreContent(
           stop.name,
@@ -118,6 +137,7 @@ async function backfillExploreContent() {
   }
 
   console.log('\nBackfill complete');
+  console.log(`Skipped   : ${skipped}`);
   console.log(`Generated : ${generated}`);
   console.log(`Failed    : ${failed}`);
   if (failedItems.length > 0) {

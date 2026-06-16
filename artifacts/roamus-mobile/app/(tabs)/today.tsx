@@ -2461,6 +2461,13 @@ export default function TodayScreen() {
                   </View>
                 );
               })}
+              <TouchableOpacity
+                style={er.afterAddBtn}
+                activeOpacity={0.7}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+              >
+                <Text style={er.afterAddText}>+ Add a stop</Text>
+              </TouchableOpacity>
             </View>
           )}
           {/* Dual action buttons: outline Directions + dark I'm here */}
@@ -2724,6 +2731,13 @@ export default function TodayScreen() {
                   </View>
                 );
               })}
+              <TouchableOpacity
+                style={er.afterAddBtn}
+                activeOpacity={0.7}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+              >
+                <Text style={er.afterAddText}>+ Add a stop</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -3714,6 +3728,8 @@ const er = StyleSheet.create({
   imHereText: { fontFamily: F.bold, fontSize: 15, color: C.blue },
   afterSection: { paddingHorizontal: 20, paddingTop: 20 },
   afterLabel:   { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 10 },
+  afterAddBtn:  { borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(232,105,42,0.45)', borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  afterAddText: { fontFamily: F.semibold, fontSize: 13, color: C.orange },
   afterRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card,
     borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, marginBottom: 6 },
   afterThumb:            { width: 46, height: 46, borderRadius: 8, flexShrink: 0 },
