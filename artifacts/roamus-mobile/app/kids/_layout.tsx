@@ -11,8 +11,9 @@ function KidsLayoutInner() {
     tripId?: string;
     explorerId?: string;
     explorerName?: string;
+    ageBand?: string;
   }>();
-  const { setStopInfo, setKidName, setExplorerId, setXpToday } = useKids();
+  const { setStopInfo, setKidName, setExplorerId, setXpToday, setAgeBand } = useKids();
 
   useEffect(() => {
     if (params.stopId) {
@@ -24,6 +25,9 @@ function KidsLayoutInner() {
     }
     if (params.explorerId) {
       setExplorerId(params.explorerId);
+    }
+    if (params.ageBand === 'young' || params.ageBand === 'middle' || params.ageBand === 'older') {
+      setAgeBand(params.ageBand);
     }
     if (params.explorerName) {
       const name = decodeURIComponent(params.explorerName);
@@ -44,7 +48,7 @@ function KidsLayoutInner() {
     } else if (params.stopName) {
       setKidName("Explorer");
     }
-  }, [params.stopId, params.explorerId, params.explorerName]);
+  }, [params.stopId, params.explorerId, params.explorerName, params.ageBand]);
 
   return (
     <Stack

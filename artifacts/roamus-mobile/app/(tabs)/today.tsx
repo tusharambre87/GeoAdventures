@@ -33,7 +33,7 @@ import * as Haptics from "expo-haptics";
 import * as FileSystem from "expo-file-system/legacy";
 import { Swipeable, TouchableOpacity as GHTouchable } from "react-native-gesture-handler";
 
-import { API_BASE, kidsAPI, memoriesAPI } from "@/lib/apiClient";
+import { API_BASE, getMyPlayers, kidsAPI, memoriesAPI, PlayerRecord } from "@/lib/apiClient";
 import { SpeechTextInput } from "@/components/SpeechTextInput";
 import ChecklistSheet from "@/components/ChecklistSheet";
 import IndoorAlternativesSheet from "@/components/IndoorAlternativesSheet";
@@ -64,6 +64,7 @@ import { hasAskedPermission } from "@/services/notifications/notificationPermiss
 import { useKids } from "@/lib/kidsContext";
 import { onEnRoute, onDayComplete, onWeatherAlert } from "@/services/notifications/notificationTriggers";
 import NotificationPermissionModal from "@/components/NotificationPermissionModal";
+import KidPickerScreen, { getAgeBand, PickedKid } from "@/components/KidPickerScreen";
 const MO_STOP_BG: Record<string, string> = {
   park: '#C8E6C9', museum: '#BBDEFB', zoo: '#FFE0B2',
   landmark: '#E1BEE7', nature: '#DCEDC8', culture: '#FFF3E0',
@@ -545,6 +546,9 @@ export default function TodayScreen() {
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [showDirections, setShowDirections]      = useState(false);
   const [showRescue, setShowRescue]              = useState(false);
+  const [kidPickerVisible, setKidPickerVisible]  = useState(false);
+  const [kidsForPicker, setKidsForPicker]        = useState<PlayerRecord[]>([]);
+  const pendingKidsParams = useRef<{ stopId: string; stopName: string; tripId: string } | null>(null);
   const [rescueInitialOption, setRescueInitialOption] = useState<'weather' | undefined>(undefined);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
@@ -2221,6 +2225,52 @@ export default function TodayScreen() {
     );
   }
 
+  function handleKidsZonePress(stopId: string, stopName: string, tripId: string) {
+    function launch(kids: PlayerRecord[]) {
+      if (kids.length === 0) {
+        router.push({ pathname: '/kids' as never, params: {
+          stopId, stopName: encodeURIComponent(stopName), tripId,
+        }});
+      } else if (kids.length === 1) {
+        const k = kids[0];
+        router.push({ pathname: '/kids' as never, params: {
+          stopId, stopName: encodeURIComponent(stopName), tripId,
+          explorerName: encodeURIComponent(k.name),
+          explorerId: k.id,
+          ageBand: getAgeBand(k.age),
+        }});
+      } else {
+        pendingKidsParams.current = { stopId, stopName, tripId };
+        setKidPickerVisible(true);
+      }
+    }
+    if (!kidsForPicker.length) {
+      getMyPlayers()
+        .then(players => {
+          const kids = players.filter(p => !p.isParent && !p.isArchived);
+          setKidsForPicker(kids);
+          launch(kids);
+        })
+        .catch(() => launch([]));
+    } else {
+      launch(kidsForPicker);
+    }
+  }
+
+  function handlePickerSelect(kid: PickedKid) {
+    setKidPickerVisible(false);
+    const p = pendingKidsParams.current;
+    if (!p) return;
+    router.push({ pathname: '/kids' as never, params: {
+      stopId: p.stopId,
+      stopName: encodeURIComponent(p.stopName),
+      tripId: p.tripId,
+      explorerName: encodeURIComponent(kid.playerName),
+      explorerId: kid.playerId,
+      ageBand: kid.ageBand,
+    }});
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE: EN_ROUTE
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2356,10 +2406,7 @@ export default function TodayScreen() {
 
           <TouchableOpacity
             style={er.kidsStrip} activeOpacity={0.85}
-            onPress={() => router.push({
-              pathname: '/kids' as never,
-              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '', explorerName: encodeURIComponent((trip?.travelers ?? []).find(t => !(t as any).isParent)?.name ?? '') },
-            })}
+            onPress={() => handleKidsZonePress(stop.id, stop.name ?? '', trip?.id ?? '')}
           >
             <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>
             <View style={{ flex: 1 }}>
@@ -2368,6 +2415,12 @@ export default function TodayScreen() {
             </View>
             <Text style={er.kidsArrow}>{'›'}</Text>
           </TouchableOpacity>
+          <KidPickerScreen
+            visible={kidPickerVisible}
+            kids={kidsForPicker}
+            onSelect={handlePickerSelect}
+            onClose={() => setKidPickerVisible(false)}
+          />
 
           {!!doFirst && (
             <View style={er.infoCard}>
@@ -2622,10 +2675,7 @@ export default function TodayScreen() {
           {/* Kids strip */}
           <TouchableOpacity
             style={er.kidsStrip} activeOpacity={0.85}
-            onPress={() => router.push({
-              pathname: '/kids' as never,
-              params: { stopId: stop.id, stopName: encodeURIComponent(stop.name ?? ''), tripId: trip?.id ?? '', explorerName: encodeURIComponent((trip?.travelers ?? []).find(t => !(t as any).isParent)?.name ?? '') },
-            })}
+            onPress={() => handleKidsZonePress(stop.id, stop.name ?? '', trip?.id ?? '')}
           >
             <View style={er.kidsIcon}><Text style={{ fontSize: 20 }}>{'\uD83E\uDDED'}</Text></View>
             <View style={{ flex: 1 }}>
@@ -3147,12 +3197,18 @@ export default function TodayScreen() {
             onPress={() => {
               const kzStop = dayStops[currentStopIndex];
               Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
-              router.push('/kids' as never);
+              handleKidsZonePress(kzStop?.id ?? '', kzStop?.name ?? '', resolvedTripId ?? '');
             }}
           >
             <Text style={dc.kidsZoneBtnText}>{'\uD83E\uDDF8'} Kids zone →</Text>
           </TouchableOpacity>
         </ScrollView>
+        <KidPickerScreen
+          visible={kidPickerVisible}
+          kids={kidsForPicker}
+          onSelect={handlePickerSelect}
+          onClose={() => setKidPickerVisible(false)}
+        />
         {menuOverlay}
       </View>
     );

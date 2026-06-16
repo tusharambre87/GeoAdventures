@@ -82,8 +82,8 @@ export default function Celebration() {
           {"\u2B50"}
         </Animated.Text>
 
-        <Text style={s.title}>You leveled up!</Text>
-        <Text style={s.sub}>{stopName}</Text>
+        <Text style={s.title}>{`Well done, ${kids.kidName || 'Explorer'}!`}</Text>
+        <Text style={s.sub}>{`+${xpEarned} XP earned today`}</Text>
 
         {/* Achievement rows */}
         <View style={s.list}>

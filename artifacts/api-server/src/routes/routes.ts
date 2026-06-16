@@ -10636,7 +10636,10 @@ Return ONLY valid JSON in this exact format:
         if (childrenAges.length > 0) youngestChildAge = Math.min(...childrenAges);
       } catch { /* non-fatal */ }
       const { getAgeBand } = await import('../ageBand');
-      const ageBand = getAgeBand(youngestChildAge ?? 8);
+      const requestedBand = req.query.ageBand as string | undefined;
+      const ageBand = (requestedBand === 'young' || requestedBand === 'middle' || requestedBand === 'older')
+        ? requestedBand
+        : getAgeBand(youngestChildAge ?? 8);
 
       // 3. Check explore_cache first (canonical, cross-trip cache)
       const cachedExplore = await getExploreCacheByStop(stop.name, destination, ageBand);

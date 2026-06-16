@@ -4,12 +4,15 @@ import type { ExploreContent } from "@/lib/apiClient";
 
 export type { ExploreContent };
 
+export type AgeBand = 'young' | 'middle' | 'older';
+
 interface KidsState {
   stopId: string;
   stopName: string;
   tripId: string;
   kidName: string;
   explorerId: string;
+  ageBand: AgeBand;
   xpToday: number;
   currentStoryIndex: number;
   completedStories: [boolean, boolean, boolean];
@@ -33,6 +36,7 @@ interface KidsCtx extends KidsState {
   setKidName: (name: string) => void;
   setXpToday: (xp: number) => void;
   setExplorerId: (id: string) => void;
+  setAgeBand: (band: AgeBand) => void;
   addSessionXp: (xp: number) => void;
   resetSessionXp: () => void;
 }
@@ -46,6 +50,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
     tripId: "",
     kidName: "Explorer",
     explorerId: "",
+    ageBand: "middle" as AgeBand,
     xpToday: 0,
     currentStoryIndex: 0,
     completedStories: [false, false, false],
@@ -81,6 +86,7 @@ export function KidsProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, exploreError })),
     setKidName: (kidName) => setState((s) => ({ ...s, kidName })),
     setXpToday: (xpToday) => setState((s) => ({ ...s, xpToday })),
+    setAgeBand: (ageBand) => setState((s) => ({ ...s, ageBand })),
     addSessionXp: (xp) => setState((s) => ({ ...s, sessionXpEarned: (s.sessionXpEarned || 0) + (Number(xp) || 0), xpToday: (s.xpToday || 0) + (Number(xp) || 0) })),
     resetSessionXp: () => setState((s) => ({ ...s, sessionXpEarned: 0 })),
     setExplorerId: (explorerId) => setState((s) => ({ ...s, explorerId })),

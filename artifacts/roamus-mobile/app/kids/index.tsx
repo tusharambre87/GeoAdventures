@@ -74,7 +74,7 @@ export default function ExplorerHome() {
     );
 
     console.log('Fetching story for stop:', stopId, kids.stopName);
-    Promise.race([kidsAPI.getExplore(stopId), timeout])
+    Promise.race([kidsAPI.getExplore(stopId, kids.ageBand || undefined), timeout])
       .then((content) => {
         console.log('Story response stories.main (first 300 chars):', JSON.stringify(content?.stories?.main?.text ?? '').slice(0, 300));
         console.log('Story durationSeconds:', content?.stories?.main?.durationSeconds);

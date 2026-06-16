@@ -149,6 +149,10 @@ export type PlayerRecord = {
   id: string;
   name: string;
   isParent?: boolean;
+  isArchived?: boolean;
+  age?: string | number;
+  avatarKey?: string;
+  profileType?: string;
   totalXp?: number;
 };
 
@@ -157,8 +161,10 @@ export async function getMyPlayers(): Promise<PlayerRecord[]> {
 }
 
 export const kidsAPI = {
-  getExplore: (stopId: string) =>
-    apiFetch<ExploreContent>(`/api/travel/stops/${stopId}/explore`),
+  getExplore: (stopId: string, ageBand?: string) =>
+    apiFetch<ExploreContent>(
+      `/api/travel/stops/${stopId}/explore${ageBand ? `?ageBand=${ageBand}` : ''}`
+    ),
   getGames: (stopId: string) =>
     apiFetch<GameContentRounds>(`/api/travel/stops/${stopId}/games`),
   postWonderResponse: (

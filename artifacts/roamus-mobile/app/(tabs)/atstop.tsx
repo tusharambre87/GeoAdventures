@@ -39,7 +39,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_BASE, getMyPlayers } from '@/lib/apiClient';
+import { API_BASE, getMyPlayers, PlayerRecord } from '@/lib/apiClient';
 import { F, CITY_IMGS } from '@/lib/tokens';
 import StopPickerSheet from '@/components/StopPickerSheet';
 import { useAuth } from '@/lib/authContext';
@@ -48,6 +48,7 @@ import UpgradeSheet from '@/components/UpgradeSheet';
 import { useSpeech } from '@/lib/useSpeech';
 import { SpeakButton } from '@/components/SpeakButton';
 import RescueSheet from '@/components/RescueSheet';
+import KidPickerScreen, { getAgeBand, PickedKid } from '@/components/KidPickerScreen';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -483,6 +484,8 @@ export default function AtStopScreen() {
   // ── Detail state ──
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
   const [kidPlayerId, setKidPlayerId] = useState('');
+  const [kidPlayers, setKidPlayers]   = useState<PlayerRecord[]>([]);
+  const [kidPickerVisible, setKidPickerVisible] = useState(false);
   const [stopImages, setStopImages]     = useState<(string | null)[]>([null, null, null]);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [rescueType, setRescueType]     = useState<RescueType>('behind');
@@ -586,11 +589,12 @@ export default function AtStopScreen() {
         .then(d => setStopMoments(d.moments ?? []))
         .catch(() => {});
     }
-    // Fetch child player ID so Kids Zone navigation has it ready
+    // Fetch child players so Kids Zone navigation has them ready
     if (trip?.id) {
       getMyPlayers().then(players => {
-        const kid = players.find(p => !p.isParent) ?? null;
-        if (kid) setKidPlayerId(kid.id);
+        const kids = players.filter(p => !p.isParent && !p.isArchived);
+        setKidPlayers(kids);
+        if (kids[0]) setKidPlayerId(kids[0].id);
       }).catch(() => {});
     }
   }, [currentStop?.id, trip?.id]);
@@ -1290,23 +1294,21 @@ function isMealStop(t?: string | null): boolean {
           {/* Kids explorer */}
           <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
             onPress={() => {
-              const travelers = trip?.travelers ?? [];
-              const kidExplorer = travelers.find(t => t.name && t.name !== 'You') ?? travelers[0];
-              const explorerName = kidExplorer?.name && kidExplorer.name !== 'You'
-                ? kidExplorer.name : travelers[0]?.name ?? 'Explorer';
-              const childAgesList = travelers
-                .filter(t => t.name && t.name !== 'You' && !(t as any).isParent)
-                .map(t => Number((t as any).age ?? 99));
-              const minChildAge = childAgesList.length > 0 ? Math.min(...childAgesList) : 99;
-              const allUnder5 = childAgesList.length > 0 && childAgesList.every((a: number) => a <= 5);
-              keepDetailOnFocus.current = true; router.push({ pathname: '/kids' as never, params: {
-                stopId: currentStop.id, stopName: encodeURIComponent(currentStop.name),
-                tripId: trip?.id ?? '',
-                explorerName: encodeURIComponent(explorerName),
-                explorerId: kidPlayerId,
-                minChildAge: String(minChildAge),
-                allUnder5: allUnder5 ? '1' : '0',
-              }});
+              if (!currentStop) return;
+              if (kidPlayers.length >= 2) {
+                setKidPickerVisible(true);
+              } else {
+                const k = kidPlayers[0] ?? null;
+                keepDetailOnFocus.current = true;
+                router.push({ pathname: '/kids' as never, params: {
+                  stopId: currentStop.id,
+                  stopName: encodeURIComponent(currentStop.name),
+                  tripId: trip?.id ?? '',
+                  explorerName: encodeURIComponent(k?.name ?? 'Explorer'),
+                  explorerId: k?.id ?? kidPlayerId,
+                  ageBand: k ? getAgeBand(k.age) : 'middle',
+                }});
+              }
             }}>
             <Text style={dt.gridIcon}>{'\uD83E\uDDED'}</Text>
             <Text style={dt.gridTitle}>Kids Zone</Text>
@@ -1999,6 +2001,24 @@ function isMealStop(t?: string | null): boolean {
           router.replace('/(tabs)/today');
         }}
         context="at_stop"
+      />
+      <KidPickerScreen
+        visible={kidPickerVisible}
+        kids={kidPlayers}
+        onSelect={kid => {
+          setKidPickerVisible(false);
+          if (!currentStop) return;
+          keepDetailOnFocus.current = true;
+          router.push({ pathname: '/kids' as never, params: {
+            stopId: currentStop.id,
+            stopName: encodeURIComponent(currentStop.name),
+            tripId: trip?.id ?? '',
+            explorerName: encodeURIComponent(kid.playerName),
+            explorerId: kid.playerId,
+            ageBand: kid.ageBand,
+          }});
+        }}
+        onClose={() => setKidPickerVisible(false)}
       />
     </View>
   );
