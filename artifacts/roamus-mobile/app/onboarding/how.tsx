@@ -21,9 +21,9 @@ const STYLES = [
 ];
 
 const PACES = [
-  { id: "relaxed",  icon: "\uD83D\uDE0C", label: "Relaxed",  sub: "2–3 stops/day, plenty of downtime" },
-  { id: "moderate", icon: "\uD83D\uDEB6", label: "Moderate",  sub: "4–5 stops/day, good balance" },
-  { id: "busy",     icon: "\u26A1",  label: "Go-getter", sub: "6+ stops/day, maximum experience" },
+  { id: "relaxed",  icon: "\uD83D\uDE0C", label: "Relaxed",  sub: "We take it easy — plenty of breathing room" },
+  { id: "moderate", icon: "\uD83D\uDEB6", label: "Moderate",  sub: "A good mix — exploring without exhaustion" },
+  { id: "busy",     icon: "\u26A1",  label: "Go-getter", sub: "Pack it in — we love a full day" },
 ];
 
 const TRANSPORTS = [
