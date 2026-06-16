@@ -2094,13 +2094,6 @@ export default function TodayScreen() {
               ? <ActivityIndicator color="#fff" />
               : <Text style={mo.startBtnText}>{'▶'}  Start Day {resolvedDayIndex + 1}</Text>}
           </Pressable>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setShowRescue(true)}
-            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
-          >
-            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
-          </TouchableOpacity>
           {__DEV__ && (
             <TouchableOpacity
               activeOpacity={0.7}
