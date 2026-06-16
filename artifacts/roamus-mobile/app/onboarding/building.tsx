@@ -28,6 +28,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 type PreviewSpot = {
   name: string;
   photoRef: string | null;
+  imageUrl: string | null;
 };
 
 // ─── PulseDot ────────────────────────────────────────────────────────────────
@@ -162,9 +163,8 @@ export default function BuildingScreen() {
 
   // ─ Helper: resolve image URL from a spot ─
   function getImgUrl(spot: PreviewSpot): string | null {
-    if (spot.photoRef) {
-      return `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(spot.photoRef)}`;
-    }
+    if (spot.imageUrl) return `${API_BASE}${spot.imageUrl}`;
+    if (spot.photoRef) return `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(spot.photoRef)}`;
     return heroImg;
   }
 
@@ -173,7 +173,7 @@ export default function BuildingScreen() {
     if (!city) return;
     fetch(`${API_BASE}/api/travel/builder-preview?city=${encodeURIComponent(city)}`)
       .then(r => r.ok ? r.json() : { spots: [] })
-      .then((body: { spots?: Array<{ name: string; photoRef: string | null }> }) => {
+      .then((body: { spots?: Array<{ name: string; photoRef: string | null; imageUrl: string | null }> }) => {
         const s = Array.isArray(body.spots) && body.spots.length > 0 ? body.spots : [];
         setSpots(s);
       })
@@ -181,7 +181,7 @@ export default function BuildingScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─ Initialise A panel when spots first load (also handles hero-only fallback) ─
+  // ─ Initialise A panel when spots first load; pre-load spot[1] into B ─
   useEffect(() => {
     const firstUrl = spots.length > 0 ? getImgUrl(spots[0]) : heroImg;
     setSrcA(firstUrl);
@@ -190,30 +190,33 @@ export default function BuildingScreen() {
     frontA.current = true;
     stopIdxRef.current = 0;
     if (firstUrl) pillOpacity.setValue(1);
+    // Pre-load the second image into the inactive B panel now, so it's
+    // ready before the first crossfade fires at t=2.2s.
+    if (spots.length > 1) setSrcB(getImgUrl(spots[1]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
 
   // ─ Image + message cycling every 2.2 s ─
+  // Inactive panel is always pre-loaded with the next image — never set src
+  // immediately before starting the animation (async React state update would
+  // mean the incoming panel starts fading in before its Image source renders).
   useEffect(() => {
     if (spots.length === 0) return;
     const iv = setInterval(() => {
       const nextIdx = (stopIdxRef.current + 1) % spots.length;
-      const nextUrl = getImgUrl(spots[nextIdx]);
 
       // Fade pill + message out
       Animated.timing(pillOpacity, { toValue: 0, duration: 200, useNativeDriver: true }).start();
       msgOpacity.value = withTiming(0, { duration: 200 });
 
-      // Crossfade images (300 ms)
+      // Crossfade — inactive panel has next image already loaded
       if (frontA.current) {
-        setSrcB(nextUrl);
         Animated.parallel([
           Animated.timing(opA, { toValue: 0, duration: 300, useNativeDriver: true }),
           Animated.timing(opB, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]).start();
         frontA.current = false;
       } else {
-        setSrcA(nextUrl);
         Animated.parallel([
           Animated.timing(opB, { toValue: 0, duration: 300, useNativeDriver: true }),
           Animated.timing(opA, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -221,13 +224,23 @@ export default function BuildingScreen() {
         frontA.current = true;
       }
 
-      // After crossfade: update index, pill, message
+      // After crossfade: update state + pre-load next+1 into now-inactive panel
       setTimeout(() => {
         stopIdxRef.current = nextIdx;
         setStopIdx(nextIdx);
         setMsgIdx(nextIdx % MESSAGES.length);
         Animated.timing(pillOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
         msgOpacity.value = withTiming(1, { duration: 250 });
+        // frontA.current is now the POST-swap value; inactive panel is the opposite
+        const preloadIdx = (nextIdx + 1) % spots.length;
+        const preloadUrl = getImgUrl(spots[preloadIdx]);
+        if (frontA.current) {
+          // A is front → B is inactive, pre-load into B
+          setSrcB(preloadUrl);
+        } else {
+          // B is front → A is inactive, pre-load into A
+          setSrcA(preloadUrl);
+        }
       }, 320);
     }, 2200);
     return () => clearInterval(iv);

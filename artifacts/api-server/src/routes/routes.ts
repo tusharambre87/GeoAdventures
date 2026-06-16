@@ -6238,6 +6238,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         diverse.push(r);
       }
 
+      // Look up hero-img stopIds for diverse stops (public endpoint, no auth)
+      const nameToStopId: Record<string, string> = {};
+      if (diverse.length > 0) {
+        const heroRows = await db
+          .select({ id: travelStops.id, name: travelStops.name, heroImageUrl: travelStops.heroImageUrl })
+          .from(travelStops)
+          .where(and(
+            inArray(travelStops.name, diverse.map(r => r.name)),
+            isNotNull(travelStops.heroImageUrl),
+          ))
+          .limit(diverse.length * 3);
+        for (const row of heroRows) {
+          if (!nameToStopId[row.name] && row.heroImageUrl?.startsWith('stop-images/')) {
+            nameToStopId[row.name] = row.id;
+          }
+        }
+      }
+
       const spots = diverse.map(r => {
           const t = (r.stopType ?? "other").toLowerCase();
           const emojiKey = Object.keys(ANCHOR_EMOJIS).find(k => t.includes(k));
@@ -6248,6 +6266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             reason: r.description ? r.description.slice(0, 120) + (r.description.length > 120 ? "…" : "") : `A great stop for families`,
             anchorType: "anchor" as const,
             photoRef: (r.gpPhotoRefs as string[] | null)?.[0] ?? null,
+            imageUrl: nameToStopId[r.name] ? `/api/travel/stops/${nameToStopId[r.name]}/hero-img` : null,
           };
         });
 
