@@ -1471,7 +1471,7 @@ function DayDetail({
   const queryClient  = useQueryClient();
   const contentKey   = contentStops.map(s => s.id + (s.displayOrder ?? 0)).join(',');
   const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
-  useEffect(() => { setLocalContentStops(contentStops); }, [contentKey]);
+  useEffect(() => { setLocalContentStops(contentStops); }, [selectedDay, contentKey]);
 
   // Local optimistic meal display order — updated immediately on ↑/↓ tap,
   // synced from server data after each refetch.
@@ -1644,7 +1644,7 @@ function DayDetail({
       {/* Body */}
       {/* Body — DraggableFlatList IS the scroll container; no outer ScrollView */}
       <DraggableFlatList
-        data={localContentStops}
+        data={localContentStops.length > 0 || contentStops.length === 0 ? localContentStops : contentStops}
         keyExtractor={s => s.id}
         extraData={mealInsertAfterIdx}
         onDragEnd={handleDragEnd}

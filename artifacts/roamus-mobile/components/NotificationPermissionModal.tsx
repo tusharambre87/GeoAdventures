@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import {
+  Alert,
   Animated,
   Pressable,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { F } from '@/lib/tokens'
 import { requestNotificationPermission } from '@/services/notifications/notificationPermission'
 
 interface Props {
@@ -66,7 +68,20 @@ export default function NotificationPermissionModal({ onClose }: Props) {
   }
 
   function handleNotNow() {
-    dismiss(true, onClose)
+    Alert.alert(
+      '',
+      'You can turn on notifications from the Me tab anytime.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Ok',
+          onPress: () => dismiss(true, onClose),
+        },
+      ],
+    )
   }
 
   return (
@@ -139,13 +154,14 @@ const styles = StyleSheet.create({
   },
   iconText: { fontSize: 30 },
   headline: {
+    fontFamily: F.bold,
     fontSize: 22,
-    fontWeight: '800',
     color: '#1A1F2E',
     textAlign: 'center',
     marginBottom: 10,
   },
   bodyText: {
+    fontFamily: F.regular,
     fontSize: 14,
     color: '#8A8FA8',
     textAlign: 'center',
@@ -169,8 +185,8 @@ const styles = StyleSheet.create({
   },
   chipIcon:  { fontSize: 20 },
   chipText:  { flex: 1 },
-  chipTitle: { fontSize: 14, fontWeight: '700', color: '#1A1F2E' },
-  chipSub:   { fontSize: 12, color: '#8A8FA8', marginTop: 2 },
+  chipTitle: { fontFamily: F.semibold, fontSize: 14, color: '#1A1F2E' },
+  chipSub:   { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 2 },
   primaryBtn: {
     backgroundColor: '#E8692A',
     borderRadius: 14,
@@ -179,11 +195,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  primaryBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  primaryBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   secondaryBtn: {
     paddingVertical: 12,
     width: '100%',
     alignItems: 'center',
   },
-  secondaryBtnText: { fontSize: 13, color: '#8A8FA8' },
+  secondaryBtnText: { fontFamily: F.regular, fontSize: 13, color: '#8A8FA8' },
 })
