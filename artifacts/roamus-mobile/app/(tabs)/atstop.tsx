@@ -304,6 +304,15 @@ const WIKI_TITLE_OVERRIDES: Record<string, string> = {
   'Saint Louis Zoo': 'Saint_Louis_Zoo',
 };
 
+const WIKI_URL_OVERRIDES: Record<string, string> = {
+  'Como Park Zoo & Conservatory':        'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Como_Park_Zoo_and_Conservatory-2006.jpg/800px-Como_Park_Zoo_and_Conservatory-2006.jpg',
+  'Como Park Zoo and Conservatory':      'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Como_Park_Zoo_and_Conservatory-2006.jpg/800px-Como_Park_Zoo_and_Conservatory-2006.jpg',
+  "Children's Theatre Company":          "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Children%27s_Theatre_Company.jpg/800px-Children%27s_Theatre_Company.jpg",
+  "The Children's Theatre Company":      "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Children%27s_Theatre_Company.jpg/800px-Children%27s_Theatre_Company.jpg",
+  'Stone Arch Bridge':                   'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg/800px-Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg',
+  'The Stone Arch Bridge':               'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg/800px-Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg',
+};
+
 function buildWikiTitle(stopName: string, city?: string): string {
   const base = stopName.replace(/\s+/g, '_');
   if (!city) return base;
@@ -322,7 +331,13 @@ async function fetchWikiThumbnail(title: string): Promise<string | null> {
 
 async function fetchWikiImages(name: string, city?: string): Promise<string[]> {
   try {
-    // Check hardcoded overrides first — bypasses the generic title-building logic
+    // Check direct URL overrides first — avoids wrong Wikipedia page for known stops
+    const directUrl = WIKI_URL_OVERRIDES[name];
+    if (directUrl) {
+      console.log('[fetchWikiImages] direct URL override:', name);
+      return [directUrl];
+    }
+    // Check hardcoded title overrides — bypasses the generic title-building logic
     const override = WIKI_TITLE_OVERRIDES[name];
     if (override) {
       console.log('[fetchWikiImages] override:', override);

@@ -576,12 +576,12 @@ Return ONLY the text. No JSON. No labels. No track heading. Just the story.`;
 
 // ─── Hero image ───────────────────────────────────────────────────────────────
 
-const WIKI_SKIP_STOPS = [
-  'minneapolis institute of art',
-  "children's theatre company",
-  'stone arch bridge',
-  'como park zoo',
-];
+const WIKI_IMAGE_OVERRIDES: Record<string, string> = {
+  'minneapolis institute of art': '',
+  "children's theatre company":   'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Children%27s_Theatre_Company.jpg/800px-Children%27s_Theatre_Company.jpg',
+  'stone arch bridge':            'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg/800px-Mill_City_Museum_20_view_of_Stone_Arch_bridge.jpg',
+  'como park zoo':                'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Como_Park_Zoo_and_Conservatory-2006.jpg/800px-Como_Park_Zoo_and_Conservatory-2006.jpg',
+};
 
 export async function generateStopHeroImage(
   stopName: string,
@@ -589,8 +589,10 @@ export async function generateStopHeroImage(
   _destination: string
 ): Promise<string | undefined> {
   const stopNameNorm = stopName.toLowerCase();
-  if (WIKI_SKIP_STOPS.some(s => stopNameNorm.includes(s))) {
-    return undefined;
+  for (const [key, url] of Object.entries(WIKI_IMAGE_OVERRIDES)) {
+    if (stopNameNorm.includes(key)) {
+      return url || undefined;
+    }
   }
 
   try {
