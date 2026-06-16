@@ -14,6 +14,15 @@ import { useWikiPhoto } from "@/lib/useWikiPhoto";
 
 const STOP_TIMES = ["9:30", "11:30", "2:00", "3:30"];
 
+const FALLBACK_CITIES: CityEntry[] = [
+  { name: 'Chicago', country: 'USA', state: 'Illinois' },
+  { name: 'New York', country: 'USA', state: 'New York' },
+  { name: 'San Francisco', country: 'USA', state: 'California' },
+  { name: 'Los Angeles', country: 'USA', state: 'California' },
+  { name: 'Washington DC', country: 'USA', state: 'DC' },
+  { name: 'Boston', country: 'USA', state: 'Massachusetts' },
+];
+
 // City name → canonical name used when querying the API (handles abbreviations)
 const CITY_CANONICAL: Record<string, string> = {
   "Saint Louis": "St. Louis",
@@ -295,7 +304,7 @@ export default function WhereScreen() {
   const [sel, setSel] = useState<string[]>(data.cities);
   const [query, setQuery] = useState("");
   const [previews, setPreviews] = useState<Record<string, any>>({});
-  const [popularCities, setPopularCities] = useState<CityEntry[]>([]);
+  const [popularCities, setPopularCities] = useState<CityEntry[]>(FALLBACK_CITIES);
   const searchRef = useRef<TextInput>(null);
   // Track which cities have already had a fetch started (survives re-renders without stale closure issues)
   const fetchingRef = useRef<Set<string>>(new Set());

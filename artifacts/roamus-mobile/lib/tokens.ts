@@ -26,14 +26,6 @@ export const CHIP_COLORS = [G.orange, G.sage, G.amber, '#E86A9A', '#7B6FE8'] as 
 // Cities with pre-seeded data in the GeoAdventures backend
 export type CityEntry = { name: string; country: string; state?: string };
 
-export const POPULAR_CITIES: CityEntry[] = [
-  { name: 'Chicago', country: 'USA', state: 'Illinois' },
-  { name: 'New York', country: 'USA', state: 'New York' },
-  { name: 'San Francisco', country: 'USA', state: 'California' },
-  { name: 'Los Angeles', country: 'USA', state: 'California' },
-  { name: 'Washington DC', country: 'USA', state: 'DC' },
-  { name: 'Boston', country: 'USA', state: 'Massachusetts' },
-];
 
 export const ALL_CITIES: CityEntry[] = [
   // USA — pre-seeded
