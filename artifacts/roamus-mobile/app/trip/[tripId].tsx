@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -1444,6 +1445,26 @@ function DayDetail({
   const dateStr  = trip.startDate ? formatDate(trip.startDate, selectedDay - 1) : null;
   const stopCount = dayStops.length;
   const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
+  const [showHotelSheet, setShowHotelSheet] = useState(false);
+  const [hotelInput, setHotelInput] = useState<string>(trip.stayLocations?.[0]?.address ?? '');
+  const [savingHotel, setSavingHotel] = useState(false);
+
+  async function saveHotelAddress() {
+    if (!hotelInput.trim()) return;
+    setSavingHotel(true);
+    try {
+      await apiFetch(`/api/travel/trips/${tripId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ stayLocations: [{ name: trip.destination ?? trip.city ?? 'Destination', address: hotelInput.trim() }] }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      setShowHotelSheet(false);
+    } catch {
+      // ignore
+    } finally {
+      setSavingHotel(false);
+    }
+  }
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
@@ -1627,7 +1648,8 @@ function DayDetail({
         keyExtractor={s => s.id}
         extraData={mealInsertAfterIdx}
         onDragEnd={handleDragEnd}
-        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + (isEditable ? 120 : 100) + TAB_BAR_H }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + 32 + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
@@ -1868,6 +1890,25 @@ function DayDetail({
           </Pressable>
         )}
 
+        {/* Add starting point / hotel accommodation */}
+        {dayStops.length > 0 && (
+          <Pressable
+            style={dd.hotelBtn}
+            onPress={() => { setHotelInput(trip.stayLocations?.[0]?.address ?? ''); setShowHotelSheet(true); }}
+          >
+            <Text style={dd.hotelBtnIcon}>{'\uD83C\uDFE8'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={dd.hotelBtnLabel} numberOfLines={1}>
+                {trip.stayLocations?.[0]?.address ? trip.stayLocations[0].address : 'Add starting point / hotel'}
+              </Text>
+              <Text style={dd.hotelBtnSub}>
+                {trip.stayLocations?.[0]?.address ? 'Directions start here — tap to change' : 'Used as origin for directions'}
+              </Text>
+            </View>
+            <Text style={dd.hotelBtnArrow}>{'\u203A'}</Text>
+          </Pressable>
+        )}
+
         {/* Directions to all stops card — shown whenever there are stops */}
         {dayStops.length > 0 && (() => {
           const dayCity = trip.destination ?? trip.city ?? '';
@@ -1878,15 +1919,30 @@ function DayDetail({
           return (
             <DirectionsToAllStopsCard
               onPress={() => openDirections(dayStops, hotel)}
-              marginTop={12}
+              marginTop={8}
               marginBottom={8}
             />
           );
         })()}
 
+        {/* Inline Start Day / Day Complete button */}
+        {dayStops.length > 0 && !isDayComplete && !isViewingPast && (
+          <Pressable
+            style={[dd.runBtn, { marginHorizontal: 16, marginTop: 10, marginBottom: 4 }]}
+            onPress={onRunDay}
+          >
+            <IconPlay /><Text style={dd.runBtnText}>{'  '}Start Day {selectedDay}</Text>
+          </Pressable>
+        )}
+        {dayStops.length > 0 && (isDayComplete || isViewingPast) && (
+          <View style={[dd.runBtn, dd.runBtnDone, { marginHorizontal: 16, marginTop: 10, marginBottom: 4 }]}>
+            <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'\u2713'} Day {selectedDay} Complete</Text>
+          </View>
+        )}
+
         <Pressable
           onPress={() => setDisclaimerExpanded(!disclaimerExpanded)}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 16, paddingHorizontal: 24 }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingTop: 16, paddingHorizontal: 24, paddingBottom: 8 }}
         >
           <Text style={{ fontSize: 11, color: '#B0ADA8' }}>ℹ️</Text>
           <Text style={{ fontSize: 11, color: '#B0ADA8' }}>
@@ -1903,22 +1959,60 @@ function DayDetail({
       />
 
 
-      {/* Footer — show for the selected day */}
-      {selectedDayStops.length > 0 && (
-        <View style={[dd.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
+      {/* Hotel / Starting Point input modal */}
+      <Modal
+        visible={showHotelSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHotelSheet(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          onPress={() => setShowHotelSheet(false)}
+        >
           <Pressable
-            style={[dd.runBtn, runBtnDisabled && dd.runBtnDone]}
-            onPress={runBtnDisabled ? undefined : onRunDay}
-            disabled={runBtnDisabled}>
-            {isDayComplete
-              ? <Text style={[dd.runBtnText, dd.runBtnTextDone]}>{'\u2713'} Day {selectedDay} Complete</Text>
-              : <><IconPlay /><Text style={dd.runBtnText}>{'  '}Run today</Text></>}
+            style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: insets.bottom + 24 }}
+            onPress={() => {}}
+          >
+            <Text style={{ fontFamily: F.bold, fontSize: 16, color: C.deep, marginBottom: 4 }}>Starting point / hotel</Text>
+            <Text style={{ fontFamily: F.regular, fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 20 }}>
+              Enter your hotel address or starting point — used as the origin when you open Google Maps directions.
+            </Text>
+            <TextInput
+              style={{ backgroundColor: C.bg, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 13, fontFamily: F.regular, fontSize: 14, color: C.deep, marginBottom: 14 }}
+              placeholder="e.g. The Plaza Hotel, New York, NY"
+              placeholderTextColor={C.muted}
+              value={hotelInput}
+              onChangeText={setHotelInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => void saveHotelAddress()}
+            />
+            <Pressable
+              style={[dd.runBtn, savingHotel && { opacity: 0.6 }]}
+              onPress={() => void saveHotelAddress()}
+              disabled={savingHotel}
+            >
+              <Text style={dd.runBtnText}>{savingHotel ? 'Saving...' : 'Set starting point'}</Text>
+            </Pressable>
+            {trip.stayLocations?.[0]?.address ? (
+              <Pressable
+                style={{ alignItems: 'center', marginTop: 14 }}
+                onPress={async () => {
+                  setSavingHotel(true);
+                  try {
+                    await apiFetch(`/api/travel/trips/${tripId}`, { method: 'PATCH', body: JSON.stringify({ stayLocations: [] }) });
+                    queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+                    setShowHotelSheet(false);
+                  } catch { } finally { setSavingHotel(false); }
+                }}
+              >
+                <Text style={{ fontFamily: F.regular, fontSize: 13, color: '#D44' }}>Remove starting point</Text>
+              </Pressable>
+            ) : null}
           </Pressable>
-          {!isDayComplete && (
-            <Text style={dd.runSub}>Switches to Today tab — live mode</Text>
-          )}
-        </View>
-      )}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -4730,6 +4824,11 @@ const dd = StyleSheet.create({
   emptyChipTxt:    { fontFamily: F.regular, fontSize: 13, color: C.deep },
   addStopBtn: { borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(232,105,42,0.45)', borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   addStopText: { fontFamily: F.semibold, fontSize: 13, color: C.orange },
+  hotelBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 10, marginBottom: 4, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 12, paddingHorizontal: 14 },
+  hotelBtnIcon: { fontSize: 18, width: 26, textAlign: 'center' },
+  hotelBtnLabel: { fontFamily: F.semibold, fontSize: 13, color: C.deep },
+  hotelBtnSub: { fontFamily: F.regular, fontSize: 11, color: C.muted, marginTop: 2 },
+  hotelBtnArrow: { fontFamily: F.regular, fontSize: 18, color: C.muted },
   footer: { paddingHorizontal: 16, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
   runBtn: { backgroundColor: C.orange, borderRadius: 14, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: C.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 20, elevation: 6 },
   runBtnDone: { backgroundColor: C.border, shadowOpacity: 0 },
