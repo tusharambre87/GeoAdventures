@@ -725,21 +725,42 @@ function StopCard({
   const duration = getStopDuration(stop);
 
   const renderRightActions = () => (
-    <GHTouchable
-      style={{
-        backgroundColor: '#E8692A',
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: 80,
-        borderRadius: 12,
-        marginVertical: 4,
-        marginRight: 4,
-      }}
-      onPress={() => onReplace(stop)}
-    >
-      <Text style={{ fontSize: 20 }}>{'\uD83D\uDD04'}</Text>
-      <Text style={{ color: 'white', fontSize: 11, fontWeight: '800', marginTop: 3, letterSpacing: 0.3 }}>Replace</Text>
-    </GHTouchable>
+    <View style={{ width: 80, flexDirection: 'column', gap: 4, marginVertical: 4, marginRight: 4 }}>
+      <GHTouchable
+        style={{
+          backgroundColor: '#E8692A',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flex: 1,
+          borderRadius: 12,
+        }}
+        onPress={() => onReplace(stop)}
+      >
+        <Text style={{ fontSize: 18 }}>{'\uD83D\uDD04'}</Text>
+        <Text style={{ color: 'white', fontSize: 10, fontWeight: '800', marginTop: 2, letterSpacing: 0.3 }}>Replace</Text>
+      </GHTouchable>
+      <GHTouchable
+        style={{
+          backgroundColor: '#C0392B',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flex: 1,
+          borderRadius: 12,
+        }}
+        onPress={() =>
+          Alert.alert(
+            'Remove stop?',
+            `This will remove ${stop.name} from your trip plan.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Remove', style: 'destructive', onPress: () => void onDelete(stop.id) },
+            ]
+          )
+        }
+      >
+        <Text style={{ color: 'white', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>Remove</Text>
+      </GHTouchable>
+    </View>
   );
 
   // actionRow lives outside the card so long-press drag is never blocked
@@ -796,7 +817,7 @@ function StopCard({
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
         {isEditable && (
           <View style={{ position: 'absolute', bottom: 10, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.35 }}>
-            <Text style={sc.swipeHintText}>Replace</Text>
+            <Text style={sc.swipeHintText}>Remove  ·  Replace</Text>
             <Text style={sc.swipeHintText}>{'\u2039'}</Text>
           </View>
         )}
@@ -2345,9 +2366,11 @@ function ReplaceSheet({
   const [search, setSearch]         = useState('');
   const [loading, setLoading]       = useState(false);
   const [allSugs, setAllSugs]       = useState<SuggestionItem[]>([]);
+  const [previewAlt, setPreviewAlt] = useState<SuggestionItem | null>(null);
   const sugsCache = useRef<Map<string, SuggestionItem[]>>(new Map());
 
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   async function loadSuggestions(stopId: string) {
     const cached = sugsCache.current.get(stopId);
@@ -2527,8 +2550,8 @@ function ReplaceSheet({
               {alt.description && (
                 <Text style={rep.altDesc} numberOfLines={2}>{alt.description}</Text>
               )}
-              <Pressable style={rep.useBtn} onPress={() => useAlt(alt)}>
-                <Text style={rep.useBtnText}>Use this stop →</Text>
+              <Pressable style={rep.useBtn} onPress={() => setPreviewAlt(alt)}>
+                <Text style={rep.useBtnText}>Preview this stop →</Text>
               </Pressable>
             </View>
           ))
@@ -2547,6 +2570,20 @@ function ReplaceSheet({
           <Text style={rep.removeBtnText}>Remove this stop from the day</Text>
         </Pressable>
       </ScrollView>
+
+      {/* Stop preview before confirming swap */}
+      {previewAlt != null && (
+        <AddStopDetailSheet
+          opt={previewAlt as StopOption}
+          category={'landmarks'}
+          city={trip.city ?? trip.destination ?? 'your destination'}
+          insets={insets}
+          actionLabel={'Swap this stop \u2192'}
+          onBack={() => setPreviewAlt(null)}
+          onClose={() => { setPreviewAlt(null); onClose(); }}
+          onAddToDay={() => { void useAlt(previewAlt); setPreviewAlt(null); }}
+        />
+      )}
     </View>
   );
 }
@@ -3698,7 +3735,7 @@ const as = StyleSheet.create({
 // ─── AddStopDetailSheet ───────────────────────────────────────────────────────
 
 function AddStopDetailSheet({
-  opt, category, city, insets, onBack, onClose, onAddToDay,
+  opt, category, city, insets, onBack, onClose, onAddToDay, actionLabel,
 }: {
   opt: StopOption;
   category: 'food' | 'kids' | 'landmarks';
@@ -3707,6 +3744,7 @@ function AddStopDetailSheet({
   onBack: () => void;
   onClose: () => void;
   onAddToDay: () => void;
+  actionLabel?: string;
 }) {
   const dur = parseDurationMins(opt, category);
   const typeLabel = (opt.stopType ?? opt.type ?? category).replace(/_/g, ' ');
@@ -3776,7 +3814,7 @@ function AddStopDetailSheet({
 
       <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]}>
         <Pressable style={asd.addBtn} onPress={onAddToDay}>
-          <Text style={asd.addBtnText}>Add to my day →</Text>
+          <Text style={asd.addBtnText}>{actionLabel ?? 'Add to my day \u2192'}</Text>
         </Pressable>
       </View>
     </View>
