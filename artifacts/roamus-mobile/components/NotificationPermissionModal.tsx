@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { markPermissionAsked, requestNotificationPermission } from '@/services/notifications/notificationPermission'
+import { requestNotificationPermission } from '@/services/notifications/notificationPermission'
 
 interface Props {
   onClose: () => void
@@ -62,8 +62,7 @@ export default function NotificationPermissionModal({ onClose }: Props) {
     dismiss(true, onClose)
   }
 
-  async function handleNotNow() {
-    await markPermissionAsked()
+  function handleNotNow() {
     dismiss(true, onClose)
   }
 

@@ -57,7 +57,7 @@ export default function BuildingScreen() {
   const heroCity = cities.length > 0 ? cities[imgIdx % cities.length] : null;
   const heroImg  = heroCity ? (CITY_IMGS[heroCity] ?? null) : null;
 
-  const tripDays   = data.generatedTrip?.days?.length ?? 0;
+  const tripDays   = data.tripDays ?? data.generatedTrip?.days?.length ?? 0;
   const totalStops = (data.generatedTrip?.days ?? []).reduce(
     (sum: number, day: { stops?: unknown[] }) => sum + (Array.isArray(day.stops) ? day.stops.length : 0),
     0,
