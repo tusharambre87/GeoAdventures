@@ -84,7 +84,7 @@ async function backfillExploreContent() {
       rowIndex++;
 
       const lookupName = stop.normalizedName || stop.name;
-      const skipKey = `${lookupName}|${stop.city ?? ''}|${band}`;
+      const skipKey = `${lookupName}|${(stop.city ?? '').toLowerCase().trim()}|${band}`;
       if (skipSet.has(skipKey)) {
         skipped++;
         console.log(`SKIP: ${skipKey}`);
