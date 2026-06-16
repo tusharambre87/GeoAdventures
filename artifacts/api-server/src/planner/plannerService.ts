@@ -2485,6 +2485,11 @@ export function selectStopsFromPool(
 
   let candidates = [...pool];
 
+  // ── Hard quality gate: primary score floor ────────────────────────────────
+  // Any stop with no scoreClassicFinal or scoreClassicFinal < 40 is excluded
+  // entirely — not ranked, not selected, not surfaced.
+  candidates = candidates.filter(c => c.scoreClassicFinal != null && c.scoreClassicFinal >= 40);
+
   // ── Hard constraint: stroller accessibility ──────────────────────────────
   if (input.strollerNeeded) {
     const filtered = candidates.filter(c => c.placeProfileData?.strollerFriendly !== false);
