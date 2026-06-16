@@ -1667,7 +1667,7 @@ function DayDetail({
       <DraggableFlatList
         data={localContentStops.length > 0 || contentStops.length === 0 ? localContentStops : contentStops}
         keyExtractor={s => s.id}
-        extraData={mealInsertAfterIdx}
+        extraData={`${mealInsertAfterIdx}-${localContentStops.map(s => s.id).join(',')}`}
         onDragEnd={handleDragEnd}
         style={{ flex: 1 }}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + 32 + TAB_BAR_H }]}
@@ -4022,35 +4022,7 @@ export default function TripPlanScreen() {
   const queryClient = useQueryClient();
   useFrauncesFonts({ Fraunces_900Black });
 
-  // ── Screen state ──
-  const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
-  const [selectedDay, setSelectedDay]   = useState(1);
-  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
-  const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('food');
-  const [showCommunityShare, setShowCommunityShare] = useState(false);
-  const [showInviteSheet, setShowInviteSheet] = useState(false);
-  const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
-  const [runMode, setRunMode]           = useState<RunMode>('balanced');
-  const [localStops, setLocalStops]     = useState<Stop[]>([]);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [checklistCloseCount, setChecklistCloseCount] = useState(0);
-  const { user, isLoading: authLoading } = useAuth();
-  const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
-  const [pmalTarget, setPmalTarget] = useState<{
-    suggestion: ParentSuggestion;
-    dayStops: PmalStop[];
-    dayIndex: number;
-    onAdded: () => void;
-  } | null>(null);
-  const [upgradeVisible, setUpgradeVisible] = useState(false);
-  const [upgradeContext, setUpgradeContext] = useState<UpgradeContext>('run_day');
-
-  function handleChecklistClose() {
-    setChecklistOpen(false);
-    setChecklistCloseCount(n => n + 1);
-  }
-
-  // ── Data ──
+  // ── Data — declared first so rawTrip can seed localStops synchronously from cache ──
   const { data: rawTrip, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ['trip', tripId],
     queryFn: async () => {
@@ -4071,6 +4043,37 @@ export default function TripPlanScreen() {
 
   const trip: TripData | null = rawTrip as TripData | null ?? null;
 
+  // ── Screen state ──
+  const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
+  const [selectedDay, setSelectedDay]   = useState(1);
+  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
+  const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('food');
+  const [showCommunityShare, setShowCommunityShare] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+  const [runMode, setRunMode]           = useState<RunMode>('balanced');
+  // Seed localStops from the React Query cache synchronously so DayDetail never
+  // mounts with an empty list when data is already available (prevents blank screen).
+  const [localStops, setLocalStops]     = useState<Stop[]>(() => (rawTrip?.stops as Stop[]) ?? []);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistCloseCount, setChecklistCloseCount] = useState(0);
+  const { user, isLoading: authLoading } = useAuth();
+  const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
+  const [pmalTarget, setPmalTarget] = useState<{
+    suggestion: ParentSuggestion;
+    dayStops: PmalStop[];
+    dayIndex: number;
+    onAdded: () => void;
+  } | null>(null);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [upgradeContext, setUpgradeContext] = useState<UpgradeContext>('run_day');
+
+  function handleChecklistClose() {
+    setChecklistOpen(false);
+    setChecklistCloseCount(n => n + 1);
+  }
+
+  // Keep localStops in sync when the query refreshes / returns updated data.
   useEffect(() => {
     if (trip?.stops) setLocalStops(trip.stops as Stop[]);
   }, [trip?.stops]);
