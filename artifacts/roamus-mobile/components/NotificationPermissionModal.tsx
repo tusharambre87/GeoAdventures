@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { markPermissionAsked, requestNotificationPermission } from '@/services/notifications/notificationPermission'
 
 interface Props {
@@ -32,6 +33,7 @@ const chips = [
 ]
 
 export default function NotificationPermissionModal({ onClose }: Props) {
+  const insets = useSafeAreaInsets()
   const translateY = useRef(new Animated.Value(400)).current
   const opacity = useRef(new Animated.Value(0)).current
 
@@ -68,7 +70,7 @@ export default function NotificationPermissionModal({ onClose }: Props) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss(true, onClose)} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
         {/* Icon */}
         <View style={styles.iconRing}>
           <Text style={styles.iconText}>{'\uD83D\uDD14'}</Text>
@@ -95,7 +97,7 @@ export default function NotificationPermissionModal({ onClose }: Props) {
           <Text style={styles.primaryBtnText}>{'Turn on notifications'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.7} onPress={handleNotNow}>
-          <Text style={styles.secondaryBtnText}>{'Not now'}</Text>
+          <Text style={styles.secondaryBtnText}>{'Not now \u2192'}</Text>
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>
