@@ -2246,7 +2246,11 @@ export default function TodayScreen() {
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
     const afterStops = dayStops.slice(currentStopIndex + 1);
-    const didYouKnow = typeof stop.enrichment?.whyNow === 'string' ? stop.enrichment.whyNow : null;
+    const quickHitsFirst = kids.exploreContent?.stories?.quickHits?.text
+      ? kids.exploreContent.stories.quickHits.text.split('.')[0].trim() + '.'
+      : null;
+    const didYouKnow = quickHitsFirst ??
+      (stop.enrichment?.whyNow !== doFirst ? stop.enrichment?.whyNow ?? null : null);
 
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -2505,7 +2509,11 @@ export default function TodayScreen() {
       ? stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)
       : 'Stop';
     const afterStops = dayStops.slice(currentStopIndex + 1);
-    const didYouKnow = typeof stop.enrichment?.whyNow === 'string' ? stop.enrichment.whyNow : null;
+    const quickHitsFirst = kids.exploreContent?.stories?.quickHits?.text
+      ? kids.exploreContent.stories.quickHits.text.split('.')[0].trim() + '.'
+      : null;
+    const didYouKnow = quickHitsFirst ??
+      (stop.enrichment?.whyNow !== doFirst ? stop.enrichment?.whyNow ?? null : null);
     const heroImageUrl = trip?.firstPhotoUrl
       ?? CITY_IMGS[city]
       ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
