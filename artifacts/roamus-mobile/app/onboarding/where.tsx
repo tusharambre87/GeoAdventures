@@ -7,7 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackBtn, BigBtn, ProgressDots } from "@/lib/onboardingAtoms";
-import { ALL_CITIES, CITY_IMGS, F, G, POPULAR_CITIES, POPULAR_ROUTES, type CityEntry, type PopularRoute } from "@/lib/tokens";
+import { ALL_CITIES, CITY_IMGS, F, G, POPULAR_ROUTES, type CityEntry, type PopularRoute } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { API_BASE } from "@/lib/authContext";
 import { useWikiPhoto } from "@/lib/useWikiPhoto";
@@ -295,9 +295,23 @@ export default function WhereScreen() {
   const [sel, setSel] = useState<string[]>(data.cities);
   const [query, setQuery] = useState("");
   const [previews, setPreviews] = useState<Record<string, any>>({});
+  const [popularCities, setPopularCities] = useState<CityEntry[]>([]);
   const searchRef = useRef<TextInput>(null);
   // Track which cities have already had a fetch started (survives re-renders without stale closure issues)
   const fetchingRef = useRef<Set<string>>(new Set());
+
+  // Fetch popular cities from the API on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/travel/cities`)
+      .then(r => r.ok ? r.json() : { cities: [] })
+      .then((body: { cities?: CityEntry[] }) => {
+        if (Array.isArray(body.cities) && body.cities.length > 0) {
+          setPopularCities(body.cities);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const suggestions = useMemo<CityEntry[]>(() => {
     const q = query.trim().toLowerCase();
@@ -486,10 +500,10 @@ export default function WhereScreen() {
         {showOneCityGrid && (
           <View style={showOneCityCard ? {} : { flex: 1 }}>
             <Text style={s.gridLabel}>POPULAR WITH FAMILIES</Text>
-            {/* Rows of 2 — each row uses flex:1 to fill available height */}
+            {/* Rows of 2, generated dynamically from API-returned popularCities */}
             <View style={showOneCityCard ? { gap: 10 } : { flex: 1, gap: 10 }}>
-              {[0, 2, 4].map(si => {
-                const row = POPULAR_CITIES.slice(si, si + 2);
+              {Array.from({ length: Math.ceil(popularCities.length / 2) }, (_, i) => i * 2).map(si => {
+                const row = popularCities.slice(si, si + 2);
                 if (!row.length) return null;
                 return (
                   <View key={si} style={{ flex: 1, flexDirection: "row", gap: 10, minHeight: 110 }}>

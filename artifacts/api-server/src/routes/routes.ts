@@ -6175,6 +6175,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: returns US cities that have 15+ verified stops in stop_library, ordered by depth
+  app.get('/api/travel/cities', async (req: any, res) => {
+    try {
+      const rows = await db.execute(drizzleSql`
+        SELECT city AS name, COUNT(*) AS stop_count, country
+        FROM stop_library
+        WHERE country IN ('US', 'United States', 'USA')
+          AND gp_verified_at IS NOT NULL
+        GROUP BY city, country
+        HAVING COUNT(*) >= 15
+        ORDER BY stop_count DESC
+      `);
+      const cities = (rows.rows as Array<{ name: string; stop_count: string | number; country: string }>)
+        .map(r => ({ name: r.name, country: r.country }));
+      return res.json({ cities });
+    } catch (err) {
+      req.log.error({ err }, 'cities endpoint error');
+      return res.status(500).json({ cities: [] });
+    }
+  });
+
   // Builder preview — returns stop_library data for a city (pre-auth teaser shown during onboarding)
   // planner_places is NOT queried here: it's populated by the full trip planner post-registration,
   // not by this endpoint. stop_library is the correct seeded source for this lightweight preview.
