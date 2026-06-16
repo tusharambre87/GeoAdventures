@@ -34,10 +34,12 @@ function KidsLayoutInner() {
       setKidName(name);
       getMyPlayers()
         .then(players => {
+          const isKid = (p: { isParent?: boolean; profileType?: string }) =>
+            !p.isParent && p.profileType !== 'parent' && p.profileType !== 'adult';
           const match = players.find(
-            p => !p.isParent && p.name.toLowerCase() === name.toLowerCase()
+            p => isKid(p) && p.name.toLowerCase() === name.toLowerCase()
           );
-          const fallback = players.find(p => !p.isParent);
+          const fallback = players.find(p => isKid(p));
           const resolved = match ?? fallback;
           if (resolved) {
             setExplorerId(resolved.id);

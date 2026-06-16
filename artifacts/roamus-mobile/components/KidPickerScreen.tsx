@@ -37,11 +37,26 @@ const AVATAR_EMOJI: Record<string, string> = {
   cat: '\uD83D\uDC31', penguin: '\uD83D\uDC27', koala: '\uD83D\uDC28',
 };
 
+// Deterministic color per name — cycles through brand palette
+const AVATAR_COLORS = ['#E8692A', '#7C3AED', '#3DAA6E', '#F5A623', '#7A9E8E', '#E86A9A'];
+function nameColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h * 31) + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
 type RichPlayer = PlayerRecord & { age?: string | number; avatarKey?: string; isArchived?: boolean };
 
-function avatarDisplay(player: RichPlayer): { emoji: string | null; initial: string } {
-  const emoji = player.avatarKey ? (AVATAR_EMOJI[player.avatarKey] ?? null) : null;
-  return { emoji, initial: (player.name?.[0] ?? 'K').toUpperCase() };
+function avatarDisplay(player: RichPlayer): { emoji: string | null; initial: string; color: string } {
+  // 'panda' is the DB default — treat it as "no avatar chosen yet"; show initial instead.
+  // Non-panda keys are explicit user choices and show their emoji.
+  const key = player.avatarKey;
+  const emoji = (key && key !== 'panda') ? (AVATAR_EMOJI[key] ?? null) : null;
+  return {
+    emoji,
+    initial: (player.name?.[0] ?? 'K').toUpperCase(),
+    color: nameColor(player.name ?? ''),
+  };
 }
 
 interface Props {
@@ -93,14 +108,14 @@ export default function KidPickerScreen({ visible, kids, onSelect, onClose }: Pr
 
           <View style={s.list}>
             {kids.map(player => {
-              const { emoji, initial } = avatarDisplay(player);
+              const { emoji, initial, color } = avatarDisplay(player);
               return (
                 <Pressable
                   key={player.id}
                   style={({ pressed }) => [s.card, pressed && { opacity: 0.82 }]}
                   onPress={() => handleSelect(player)}
                 >
-                  <View style={s.avatar}>
+                  <View style={[s.avatar, { backgroundColor: color }]}>
                     {emoji ? (
                       <Text style={s.avatarEmoji}>{emoji}</Text>
                     ) : (

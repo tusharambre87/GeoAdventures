@@ -607,7 +607,7 @@ export default function AtStopScreen() {
     // Fetch child players so Kids Zone navigation has them ready
     if (trip?.id) {
       getMyPlayers().then(players => {
-        const kids = players.filter(p => !p.isParent && !p.isArchived);
+        const kids = players.filter(p => !p.isParent && !p.isArchived && p.profileType !== 'parent' && p.profileType !== 'adult');
         setKidPlayers(kids);
         if (kids[0]) setKidPlayerId(kids[0].id);
       }).catch(() => {});

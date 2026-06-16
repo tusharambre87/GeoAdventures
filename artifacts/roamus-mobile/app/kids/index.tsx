@@ -118,8 +118,14 @@ const ps = StyleSheet.create({
 
 export default function ExplorerHome() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string }>();
+  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string; ageBand?: string }>();
   const kids = useKids();
+  // Read ageBand directly from params to avoid a race with _layout.tsx's setAgeBand effect.
+  // Both effects run on mount; params is synchronously available, context state is not.
+  const effectiveAgeBand: 'young' | 'middle' | 'older' =
+    (params.ageBand === 'young' || params.ageBand === 'middle' || params.ageBand === 'older')
+      ? params.ageBand
+      : (kids.ageBand || 'middle');
 
   const [showPersonalising, setShowPersonalising] = useState(false);
   const personalisingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,7 +150,8 @@ export default function ExplorerHome() {
 
   useEffect(() => {
     if (!stopId) return;
-    if (kids.exploreContent && kids.exploreContent.stopId === stopId && !isStaleContent(kids.exploreContent)) return;
+    // Also invalidate when ageBand changes for the same stop (5-yr-old vs 9-yr-old needs different content)
+    if (kids.exploreContent && kids.exploreContent.stopId === stopId && (kids.exploreContent as any).ageBand === effectiveAgeBand && !isStaleContent(kids.exploreContent)) return;
 
     kids.setLoadingExplore(true);
     kids.setExploreError(false);
@@ -156,8 +163,8 @@ export default function ExplorerHome() {
       setTimeout(() => reject(new Error("timeout")), 55000)
     );
 
-    console.log('Fetching story for stop:', stopId, kids.stopName);
-    Promise.race([kidsAPI.getExplore(stopId, kids.ageBand || undefined), timeout])
+    console.log('[Kids] fetch explore stopId:', stopId, 'ageBand:', effectiveAgeBand);
+    Promise.race([kidsAPI.getExplore(stopId, effectiveAgeBand), timeout])
       .then((content) => {
         console.log('Story response stories.main (first 300 chars):', JSON.stringify(content?.stories?.main?.text ?? '').slice(0, 300));
         console.log('Story durationSeconds:', content?.stories?.main?.durationSeconds);
@@ -174,7 +181,8 @@ export default function ExplorerHome() {
         kids.setExploreError(true);
       });
 
-  }, [stopId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopId, effectiveAgeBand]);
 
   // Refresh XP every time this screen comes into focus (including back-nav from missions)
   useFocusEffect(

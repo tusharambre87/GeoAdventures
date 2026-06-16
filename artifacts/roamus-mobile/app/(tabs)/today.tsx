@@ -2247,7 +2247,7 @@ export default function TodayScreen() {
     if (!kidsForPicker.length) {
       getMyPlayers()
         .then(players => {
-          const kids = players.filter(p => !p.isParent && !p.isArchived);
+          const kids = players.filter(p => !p.isParent && !p.isArchived && p.profileType !== 'parent' && p.profileType !== 'adult');
           setKidsForPicker(kids);
           launch(kids);
         })
