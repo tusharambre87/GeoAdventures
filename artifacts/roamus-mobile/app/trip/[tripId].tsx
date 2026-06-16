@@ -249,8 +249,9 @@ function stopHeroBg(stopType?: string | null): string {
   return key ? STOP_HERO_BG[key] : STOP_HERO_BG.default;
 }
 
-function dayTheme(stops: Stop[]): string {
+function dayTheme(stops: Stop[], isLastDay?: boolean): string {
   const content = stops.filter(s => !isMealStop(s.stopType));
+  if (content.length === 0 && isLastDay) return 'Travel day';
   if (content.length === 0) return 'Light Day';
   if (content.length === 1) return 'Light Day';
   const types = content.map(s => s.stopType?.toLowerCase() ?? '');
@@ -1097,14 +1098,16 @@ function DayCard({
   startDate,
   status,
   onPress,
+  isLastDay,
 }: {
   dayNum: number;
   dayStops: Stop[];
   startDate?: string | null;
   status: DayStatus;
   onPress: () => void;
+  isLastDay?: boolean;
 }) {
-  const theme    = dayTheme(dayStops);
+  const theme    = dayTheme(dayStops, isLastDay);
   const tickets  = getTicketCount(dayStops);
   const noLunch  = !hasLunchStop(dayStops);
   const totalMin = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
@@ -1347,6 +1350,7 @@ function TripOverview({
                 startDate={trip.startDate}
                 status={status}
                 onPress={() => onSelectDay(dayNum)}
+                isLastDay={dayNum === totalDays}
               />
             );
           })}
@@ -1432,7 +1436,7 @@ function DayDetail({
   const runBtnDisabled   = isViewingPast || isDayComplete;
   const dayStops = getStopsForDay(selectedDay);
   const anchor   = getAnchorStopForDay(selectedDay);
-  const theme    = dayTheme(dayStops);
+  const theme    = dayTheme(dayStops, selectedDay === totalDays);
   const tickets  = getTicketCount(dayStops);
   const noLunch  = !hasLunchStop(dayStops);
   const totalMin = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
@@ -1778,7 +1782,7 @@ function DayDetail({
         ListFooterComponent={
           <>
         {/* Meal suggestion for days with no content stops */}
-        {localContentStops.length === 0 && isEditable && (
+        {localContentStops.length === 0 && dayStops.length > 0 && isEditable && (
           <MealSuggestionCard
             tripId={tripId}
             destination={trip?.destination ?? trip?.city ?? ''}
@@ -2978,7 +2982,7 @@ function CompareDaysSheet({
           .map(dayNum => {
           const ds       = getStopsForDay(dayNum);
           const st       = getDayStatus(dayNum);
-          const theme    = dayTheme(ds);
+          const theme    = dayTheme(ds, dayNum === totalDays);
           const totalMin = ds.reduce((s, st2) => s + getStopDuration(st2), 0);
           const hrs      = (totalMin / 60).toFixed(1).replace('.0', '');
 
