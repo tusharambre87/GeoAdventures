@@ -218,6 +218,20 @@ export const CITY_IMGS: Record<string, string> = {
   Vancouver: 'https://images.unsplash.com/photo-1559656914-a30970c1affd?w=400&q=80',
   'San Antonio': 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80',
   'Kansas City': 'https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=400&q=80',
+  // Cities missing from original map (API may return these names)
+  'Memphis':        'https://images.unsplash.com/photo-1568660996272-08a6d3c7a0f4?w=400&q=80',
+  'Charleston':     'https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&q=80',
+  'Columbus':       'https://images.unsplash.com/photo-1587563934306-e6b9c1f29d41?w=400&q=80',
+  'Charlotte':      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=80',
+  'Richmond':       'https://images.unsplash.com/photo-1561069934-eee225952461?w=400&q=80',
+  'Santa Fe':       'https://images.unsplash.com/photo-1591794552512-d5e8c48bdf63?w=400&q=80',
+  'Santa Barbara':  'https://images.unsplash.com/photo-1545179272-2e8cece1e6de?w=400&q=80',
+  'Park City':      'https://images.unsplash.com/photo-1510834997251-d6dd67bd1a9e?w=400&q=80',
+  'Williamsburg':   'https://images.unsplash.com/photo-1516912481808-3406841bd33c?w=400&q=80',
+  'Burlington':     'https://images.unsplash.com/photo-1519631128182-433895475ebe?w=400&q=80',
+  'Big Island':     'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&q=80',
+  // API returns "Napa Valley", tokens.ts has "Napa" — cover both keys
+  'Napa Valley':    'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80',
 };
 
 export type PopularRoute = { cities: CityEntry[]; label: string };

@@ -8,11 +8,29 @@ const AMBIGUOUS_TERMS = [
 ];
 
 const WIKI_TITLE_OVERRIDES: Record<string, string> = {
+  // ── Stops ──────────────────────────────────────────────────────────────────
   'Como Zoo': 'Como_Park_Zoo_and_Conservatory',
   'Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
   'The Stone Arch Bridge': 'Stone_Arch_Bridge_(Minneapolis)',
   'St. Louis Zoo': 'Saint_Louis_Zoo',
   'Saint Louis Zoo': 'Saint_Louis_Zoo',
+  // ── Cities — disambiguate names that Wikipedia gets wrong ──────────────────
+  'Portland':       'Portland,_Oregon',
+  'Phoenix':        'Phoenix,_Arizona',
+  'Savannah':       'Savannah,_Georgia',
+  'Burlington':     'Burlington,_Vermont',
+  'Napa':           'Napa,_California',
+  'Napa Valley':    'Napa,_California',
+  'Memphis':        'Memphis,_Tennessee',
+  'Charleston':     'Charleston,_South_Carolina',
+  'Columbus':       'Columbus,_Ohio',
+  'Charlotte':      'Charlotte,_North_Carolina',
+  'Richmond':       'Richmond,_Virginia',
+  'Santa Fe':       'Santa_Fe,_New_Mexico',
+  'Park City':      'Park_City,_Utah',
+  'Santa Barbara':  'Santa_Barbara,_California',
+  'Williamsburg':   'Williamsburg,_Virginia',
+  'Big Island':     'Hawaii_(island)',
 };
 
 function buildWikiTitle(stopName: string, city?: string): string {
