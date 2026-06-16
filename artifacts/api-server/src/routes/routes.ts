@@ -6197,6 +6197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: stopLibrary.name,
           stopType: stopLibrary.stopType,
           description: stopLibrary.description,
+          gpPhotoRefs: stopLibrary.gpPhotoRefs,
         })
         .from(stopLibrary)
         .where(ilike(stopLibrary.city, `%${cityLower}%`))
@@ -6217,7 +6218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       for (const r of sorted) {
-        if (diverse.length >= 3) break;
+        if (diverse.length >= 8) break;
         const nameKey = r.name.toLowerCase();
         if (seenNames.has(nameKey)) continue;
         const t = (r.stopType ?? "other").toLowerCase();
@@ -6228,9 +6229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         diverse.push(r);
       }
 
-      // If we didn't hit 3 unique types, fill remainder allowing type repeats
+      // If we didn't hit 8 unique types, fill remainder allowing type repeats
       for (const r of sorted) {
-        if (diverse.length >= 3) break;
+        if (diverse.length >= 8) break;
         const nameKey = r.name.toLowerCase();
         if (seenNames.has(nameKey)) continue;
         seenNames.add(nameKey);
@@ -6246,6 +6247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: r.name,
             reason: r.description ? r.description.slice(0, 120) + (r.description.length > 120 ? "…" : "") : `A great stop for families`,
             anchorType: "anchor" as const,
+            photoRef: (r.gpPhotoRefs as string[] | null)?.[0] ?? null,
           };
         });
 
@@ -6253,6 +6255,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       req.log?.error({ err }, "[BuilderPreview] Error");
       res.json({ spots: [] });
+    }
+  });
+
+  // Public proxy for Google Places photo references — no auth required
+  app.get('/api/travel/place-photo', async (req: any, res) => {
+    const ref = (req.query.ref as string | undefined)?.trim();
+    if (!ref) return res.status(400).json({ error: 'ref required' });
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return res.status(503).end();
+    const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
+    try {
+      const upstream = await fetch(url);
+      if (!upstream.ok) return res.status(404).end();
+      res.set('Content-Type', upstream.headers.get('content-type') ?? 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=86400');
+      const buf = await upstream.arrayBuffer();
+      res.end(Buffer.from(buf));
+    } catch (err) {
+      req.log?.error({ err }, '[PlacePhoto] proxy error');
+      res.status(500).end();
     }
   });
 
