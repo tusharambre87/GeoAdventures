@@ -5404,7 +5404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const slRows = await db.select().from(stopLibrary).where(inArray(stopLibrary.id, previewStopIds));
           const idOrder = new Map(previewStopIds.map((id, i) => [id, i]));
           const ordered = [...slRows].sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
-          console.log(`[pace debug] fast-path: previewStopIds.length=${previewStopIds.length} resolved=${ordered.length} tripDays=${tripDays || 2}`);
+          console.log(`[pace debug] fast-path: previewStopIds.length=${previewStopIds.length} resolved=${ordered.length} tripDays=${tripDays ?? 2}`);
           if (ordered.length > 0) {
             // getStopsPerDay is the authority — never divide ids.length by tripDays
             const rawPaceNorm = (pace ?? "").toLowerCase().replace(/[^a-z_]/g, '');
@@ -5415,7 +5415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
-            const plannerTripDays = tripDays || 2;
+            const plannerTripDays = tripDays ?? 2;
             console.log(`[pace debug] fast-path: stopsPerDay=${stopsPerDay} from pace="${pace}" (effective=${fpEffectivePace}), activity=${activityStops.length}, meals=${mealStops.length}`);
 
             let insertCount = 0;
@@ -6548,6 +6548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destination, adventureStyle: rawAdventureStyle,
         travelers: rawTravelers, tripDays: rawTripDays,
         tailoring, pace: rawPace,
+        startDate: rawPreviewStartDate, endDate: rawPreviewEndDate,
       } = req.body;
       const city = rawCity || destination;
       const country = rawCountry;
@@ -6584,7 +6585,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .map((t: any) => Number(t.age ?? 0))
         .filter((a: number) => a > 0 && a < 18);
 
-      const tripDays = rawTripDays ? Number(rawTripDays) : 2;
+      // Derive trip length: explicit param → date range → default 2
+      let tripDays = rawTripDays ? Number(rawTripDays) : 0;
+      if (!tripDays && rawPreviewStartDate && rawPreviewEndDate) {
+        const s = new Date(rawPreviewStartDate as string);
+        const e = new Date(rawPreviewEndDate as string);
+        if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+          tripDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        }
+      }
+      if (!tripDays) tripDays = 2;
+      console.log(`[Preview] tripDays=${tripDays} (rawTripDays=${rawTripDays}, startDate=${rawPreviewStartDate}, endDate=${rawPreviewEndDate})`);
       // Stops per preview day follows the same pace rule as the real planner
       const CHUNK = plannerPace === "relaxed" ? 3 : plannerPace === "busy" ? 6 : 4;
       const totalStops = tripDays * CHUNK;
@@ -6972,6 +6983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-generate stops in the background — trip is already returned to client
       // Derive country from destination string when not explicitly provided (e.g. "Washington DC, USA")
       const resolvedCountry = country || destination.split(",").pop()?.trim() || "";
+      console.log(`[TripCreate] computedTripDays=${computedTripDays} (rawTripDays=${rawTripDays}) previewStopIds=${Array.isArray(previewStopIds) ? previewStopIds.length : 0}`);
       if (autoGenerateStops !== false && (city || destination)) {
         if (templateSlug && typeof templateSlug === 'string') {
           generateStopsFromTemplate(
@@ -6982,7 +6994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generateStopsInBackground(
             trip.id, city || destination, isHomeAdventure, resolvedCountry,
             state, stopCount, adventureStyle, destination, city,
-            meals || null, computedTripDays || null, pace || 'balanced', tripStyle,
+            meals || null, computedTripDays ?? null, pace || 'balanced', tripStyle,
             Array.isArray(previewStopIds) && previewStopIds.length ? previewStopIds : undefined,
           );
         }
