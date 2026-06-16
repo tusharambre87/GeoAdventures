@@ -2486,9 +2486,14 @@ export function selectStopsFromPool(
   let candidates = [...pool];
 
   // ── Hard quality gate: primary score floor ────────────────────────────────
-  // Any stop with no scoreClassicFinal or scoreClassicFinal < 40 is excluded
-  // entirely — not ranked, not selected, not surfaced.
-  candidates = candidates.filter(c => c.scoreClassicFinal != null && c.scoreClassicFinal >= 40);
+  // Only apply the ≥40 floor when the pool has enough scored stops to make
+  // the filter meaningful (≥10 stops with a non-null scoreClassicFinal).
+  // When coverage is low (e.g. 61 US cities with zero PSI rows) the filter
+  // would wipe out the entire candidate set, so we skip it in that case.
+  const scoredCount = candidates.filter(c => c.scoreClassicFinal != null).length;
+  if (scoredCount >= 10) {
+    candidates = candidates.filter(c => c.scoreClassicFinal != null && c.scoreClassicFinal >= 40);
+  }
 
   // ── Hard constraint: stroller accessibility ──────────────────────────────
   if (input.strollerNeeded) {
