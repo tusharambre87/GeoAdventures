@@ -5411,7 +5411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fpEffectivePace = ["chill","relaxed","easy","slow","chillout","chill_out"].includes(rawPaceNorm) ? "chill"
               : ["packed","gogetter","go_getter","full","busy","active","intense"].includes(rawPaceNorm) ? "packed"
               : "balanced";
-            const stopsPerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 6 : 4;
+            const stopsPerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 5 : 4;
             const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
@@ -5580,7 +5580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })();
 
         // ── Stop count — arrival/departure-aware ──────────────────────────────
-        const stopsPerDayByPace = effectivePace === "chill" ? 3 : effectivePace === "packed" ? 6 : 4;
+        const stopsPerDayByPace = effectivePace === "chill" ? 3 : effectivePace === "packed" ? 5 : 4;
 
         // Read arrival signals from tailoring JSONB
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;

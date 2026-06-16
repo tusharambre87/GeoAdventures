@@ -14,7 +14,7 @@ export type CityDateRange = { startDate: string; endDate: string };
 
 export function stopsPerDayFromPace(pace?: string | null): number {
   if (pace === "chill") return 3;
-  if (pace === "packed") return 6;
+  if (pace === "packed") return 5;
   return 4;
 }
 

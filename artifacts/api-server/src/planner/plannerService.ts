@@ -529,12 +529,12 @@ function getStopsPerDay(pace: string): number {
   const map: Record<string, number> = {
     'relaxed':   3,
     'moderate':  4,
-    'go-getter': 6,
+    'go-getter': 5,
     // Legacy mappings — never remove these
     'chill':     3,
     'balanced':  4,
-    'packed':    6,
-    'busy':      6,
+    'packed':    5,
+    'busy':      5,
   };
   const result = map[pace?.toLowerCase()] ?? 4;
   console.log('[pace debug]', pace, '→', result);
@@ -847,7 +847,7 @@ HARD CONSTRAINTS (these are firm rules, not suggestions):
      cfg.label.toLowerCase().includes("relax") || cfg.label.toLowerCase().includes("chill")
        ? "use 1–2 sessions; one major stop or one major + one light stop; one session may be intentionally empty"
        : cfg.label.toLowerCase().includes("busy") || cfg.label.toLowerCase().includes("packed")
-         ? "use all 3 sessions; each session gets 1 main stop; only add a short paired mini-stop if it is geographically adjacent"
+         ? "use all 3 sessions; each session gets 1 main stop (5 stops total). You may add a 6th bonus stop ONLY if it has durationClass='short' (≤60 min, a quick walk-by or mini-stop geographically adjacent to another stop). If no such stop fits naturally, return exactly 5."
          : "use 2–3 sessions; 2 solid stops or 1 major + 1 medium + 1 light stop"
    }
    - Total durationMinutes of all stops must be between ${cfg.totalStopMinutes.min} and ${cfg.totalStopMinutes.max} min
@@ -925,6 +925,7 @@ Return a JSON object:
       "name": "Stop name",
       "type": "museum|park|landmark|restaurant|beach|viewpoint|market|garden|activity|other",
       "durationMinutes": 90,
+      "durationClass": "short|medium|long|extra_long",
       "effortLevel": "low|moderate|high",
       "indoorOutdoor": "indoor|outdoor|both",
       "sensoryLoad": "low|moderate|high",
@@ -985,7 +986,19 @@ Return a JSON object:
   if (!content) throw new Error(`No content from AI for day ${dayNumber}`);
 
   const parsed = JSON.parse(content);
-  const stops = (parsed.stops || []) as GeneratedStop[];
+  let stops = (parsed.stops || []) as GeneratedStop[];
+
+  // Go-getter bonus rule: base is 5; 6th stop allowed only if durationClass === 'short'.
+  // Trim any surplus beyond the base, keeping the 6th only when it qualifies.
+  const isGoGetter = ["go-getter", "packed", "busy"].includes((input.pace ?? "").toLowerCase());
+  if (isGoGetter && stops.length > stopsPerDay) {
+    const bonus = stops[stopsPerDay]; // 0-indexed 6th stop
+    const isShort = (bonus as any).durationClass === 'short' || (bonus as any).durationMinutes <= 60;
+    stops = isShort ? stops.slice(0, stopsPerDay + 1) : stops.slice(0, stopsPerDay);
+  } else if (stops.length > stopsPerDay + 1) {
+    // Never return more than base+1 regardless of pace
+    stops = stops.slice(0, stopsPerDay + 1);
+  }
 
   // Confidence gate (AI path): flag stops below MIN_SOURCE_CONFIDENCE.
   // Bypassed for India canonical trips — canonical stops are trusted by definition.
