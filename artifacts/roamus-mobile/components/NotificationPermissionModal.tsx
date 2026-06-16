@@ -2,9 +2,11 @@ import React, { useEffect, useRef } from 'react'
 import {
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -34,6 +36,7 @@ const chips = [
 
 export default function NotificationPermissionModal({ onClose }: Props) {
   const insets = useSafeAreaInsets()
+  const { height: screenHeight } = useWindowDimensions()
   const translateY = useRef(new Animated.Value(400)).current
   const opacity = useRef(new Animated.Value(0)).current
 
@@ -69,35 +72,41 @@ export default function NotificationPermissionModal({ onClose }: Props) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss(true, onClose)} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: Math.max(insets.bottom, 16) + 40 }]}>
-        {/* Icon */}
-        <View style={styles.iconRing}>
-          <Text style={styles.iconText}>{'\uD83D\uDD14'}</Text>
-        </View>
-
-        <Text style={styles.headline}>{'Stay in the flow, not on your phone'}</Text>
-        <Text style={styles.bodyText}>
-          {'RoamUs sends one morning brief and stop reminders\nwhile you travel. Nothing else.'}
-        </Text>
-
-        {/* Chips */}
-        {chips.map(c => (
-          <View key={c.title} style={styles.chip}>
-            <Text style={styles.chipIcon}>{c.icon}</Text>
-            <View style={styles.chipText}>
-              <Text style={styles.chipTitle}>{c.title}</Text>
-              <Text style={styles.chipSub}>{c.sub}</Text>
-            </View>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY }], maxHeight: screenHeight * 0.9, paddingBottom: Math.max(insets.bottom, 16) + 40 }]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          bounces={false}
+        >
+          {/* Icon */}
+          <View style={styles.iconRing}>
+            <Text style={styles.iconText}>{'\uD83D\uDD14'}</Text>
           </View>
-        ))}
 
-        {/* CTAs */}
-        <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={handleAllow}>
-          <Text style={styles.primaryBtnText}>{'Turn on notifications'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.7} onPress={handleNotNow}>
-          <Text style={styles.secondaryBtnText}>{'Not now \u2192'}</Text>
-        </TouchableOpacity>
+          <Text style={styles.headline}>{'Stay in the flow, not on your phone'}</Text>
+          <Text style={styles.bodyText}>
+            {'RoamUs sends one morning brief and stop reminders\nwhile you travel. Nothing else.'}
+          </Text>
+
+          {/* Chips */}
+          {chips.map(c => (
+            <View key={c.title} style={styles.chip}>
+              <Text style={styles.chipIcon}>{c.icon}</Text>
+              <View style={styles.chipText}>
+                <Text style={styles.chipTitle}>{c.title}</Text>
+                <Text style={styles.chipSub}>{c.sub}</Text>
+              </View>
+            </View>
+          ))}
+
+          {/* CTAs */}
+          <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={handleAllow}>
+            <Text style={styles.primaryBtnText}>{'Turn on notifications'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.7} onPress={handleNotNow}>
+            <Text style={styles.secondaryBtnText}>{'Not now \u2192'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </Animated.View>
     </Animated.View>
   )
@@ -115,6 +124,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     padding: 28,
     paddingBottom: 44,
+  },
+  scrollContent: {
     alignItems: 'center',
   },
   iconRing: {
