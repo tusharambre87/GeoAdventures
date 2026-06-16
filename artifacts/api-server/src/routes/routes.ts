@@ -6187,8 +6187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         HAVING COUNT(*) >= 15
         ORDER BY stop_count DESC
       `);
-      const cities = (rows.rows as Array<{ name: string; stop_count: string | number; country: string }>)
-        .map(r => ({ name: r.name, country: r.country }));
+      const cities = (rows.rows as Array<{ name: string; stop_count: string | number; state: string | null; country: string }>)
+        .map(r => ({ name: r.name, state: r.state ?? undefined, country: r.country }));
       return res.json({ cities });
     } catch (err) {
       req.log.error({ err }, 'cities endpoint error');

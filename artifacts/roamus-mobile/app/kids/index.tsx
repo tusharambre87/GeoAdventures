@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -44,10 +44,85 @@ function ShimmerRow() {
   );
 }
 
+function PersonalisingScreen() {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    function pulse(val: Animated.Value, delay: number) {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+          Animated.delay(600 - delay),
+        ])
+      );
+    }
+    const a1 = pulse(dot1, 0);
+    const a2 = pulse(dot2, 200);
+    const a3 = pulse(dot3, 400);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, []);
+
+  return (
+    <View style={ps.container}>
+      <Text style={ps.headline}>{"Personalising this stop\nfor your family\u2026"}</Text>
+      <View style={ps.dots}>
+        <Animated.View style={[ps.dot, { opacity: dot1 }]} />
+        <Animated.View style={[ps.dot, { opacity: dot2 }]} />
+        <Animated.View style={[ps.dot, { opacity: dot3 }]} />
+      </View>
+      <Text style={ps.sub}>{"This stop isn\u2019t in our library yet.\nWe\u2019re building content just for you."}</Text>
+    </View>
+  );
+}
+
+const ps = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#7C3AED",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  headline: {
+    fontFamily: F.bold,
+    fontSize: 26,
+    color: "#fff",
+    textAlign: "center",
+    lineHeight: 34,
+    marginBottom: 28,
+  },
+  dots: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#fff",
+  },
+  sub: {
+    fontFamily: F.medium,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+});
+
 export default function ExplorerHome() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string }>();
   const kids = useKids();
+
+  const [showPersonalising, setShowPersonalising] = useState(false);
+  const personalisingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (params.stopId && params.stopId !== kids.stopId) {
@@ -57,6 +132,11 @@ export default function ExplorerHome() {
         params.tripId ?? ""
       );
     }
+    if (personalisingTimer.current) {
+      clearTimeout(personalisingTimer.current);
+      personalisingTimer.current = null;
+    }
+    setShowPersonalising(false);
   }, [params.stopId]);
 
   const stopId = kids.stopId || params.stopId || "";
@@ -69,6 +149,9 @@ export default function ExplorerHome() {
     kids.setLoadingExplore(true);
     kids.setExploreError(false);
 
+    if (personalisingTimer.current) clearTimeout(personalisingTimer.current);
+    personalisingTimer.current = setTimeout(() => setShowPersonalising(true), 700);
+
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("timeout")), 55000)
     );
@@ -78,11 +161,15 @@ export default function ExplorerHome() {
       .then((content) => {
         console.log('Story response stories.main (first 300 chars):', JSON.stringify(content?.stories?.main?.text ?? '').slice(0, 300));
         console.log('Story durationSeconds:', content?.stories?.main?.durationSeconds);
+        if (personalisingTimer.current) { clearTimeout(personalisingTimer.current); personalisingTimer.current = null; }
+        setShowPersonalising(false);
         kids.setExploreContent(content);
         kids.setLoadingExplore(false);
         kids.setExploreError(false);
       })
       .catch(() => {
+        if (personalisingTimer.current) { clearTimeout(personalisingTimer.current); personalisingTimer.current = null; }
+        setShowPersonalising(false);
         kids.setLoadingExplore(false);
         kids.setExploreError(true);
       });
@@ -131,6 +218,10 @@ export default function ExplorerHome() {
   const allDone = kids.completedStories.every(Boolean);
   const storyProgress = kids.completedStories.filter(Boolean).length;
   const progressPct = (storyProgress / 3) * 100;
+
+  if (showPersonalising && kids.exploreContent === null) {
+    return <PersonalisingScreen />;
+  }
 
   return (
     <View style={[s.root, { backgroundColor: K.bg }]}>
