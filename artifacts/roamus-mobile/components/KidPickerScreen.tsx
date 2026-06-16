@@ -70,6 +70,7 @@ export default function KidPickerScreen({ visible, kids, onSelect, onClose }: Pr
   const insets = useSafeAreaInsets();
   const [showGuest, setShowGuest] = useState(false);
   const [guestName, setGuestName] = useState('');
+  const kidsList = kids.filter(p => p.profileType !== 'parent' && p.profileType !== 'adult' && Number(p.age ?? 0) < 18);
 
   function handleSelect(player: RichPlayer) {
     setShowGuest(false);
@@ -107,7 +108,7 @@ export default function KidPickerScreen({ visible, kids, onSelect, onClose }: Pr
           <Text style={s.subtitle}>{"We'll pick the right missions for them"}</Text>
 
           <View style={s.list}>
-            {kids.map(player => {
+            {kidsList.map(player => {
               const { emoji, initial, color } = avatarDisplay(player);
               return (
                 <Pressable
