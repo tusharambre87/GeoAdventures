@@ -69,7 +69,7 @@ export default function NotificationPermissionModal({ onClose }: Props) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={() => dismiss(true, onClose)} />
-      <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY }], paddingBottom: Math.max(insets.bottom, 16) + 40 }]}>
         {/* Icon */}
         <View style={styles.iconRing}>
           <Text style={styles.iconText}>{'\uD83D\uDD14'}</Text>
