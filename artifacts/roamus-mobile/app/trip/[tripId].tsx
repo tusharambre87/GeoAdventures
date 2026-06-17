@@ -53,7 +53,7 @@ import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import { preCacheTrip } from "@/lib/tripCache";
-import StopPreviewSheet from "@/components/StopPreviewSheet";
+import StopPreviewSheetDemo from "@/components/StopPreviewSheet";
 import ParentSuggestionsSection, {
   PmalPositionPickerSheet,
   type ParentSuggestion,
@@ -1944,7 +1944,7 @@ function DayDetail({
 
         {/* Add a stop — editable, only when stops already exist */}
         {isEditable && dayStops.length > 0 && (
-          <Pressable style={dd.addStopBtn} onPress={() => setShowPreview(true)}>
+          <Pressable style={dd.addStopBtn} onPress={() => onAddStop()}>
             <IconPlus />
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
@@ -4793,14 +4793,12 @@ export default function TripPlanScreen() {
         />
       )}
       {showPreview && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <View style={{ flex:1, backgroundColor:'rgba(26,31,46,0.4)', justifyContent:'flex-end' }}>
-            <StopPreviewSheet
-              context="add"
-              onClose={() => setShowPreview(false)}
-              onConfirm={() => setShowPreview(false)}
-            />
-          </View>
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, zIndex: 300, backgroundColor: 'rgba(26,31,46,0.4)', justifyContent: 'flex-end' }}>
+          <StopPreviewSheetDemo
+            context="add"
+            onClose={() => setShowPreview(false)}
+            onConfirm={() => setShowPreview(false)}
+          />
         </View>
       )}
       <TripTabBar />
