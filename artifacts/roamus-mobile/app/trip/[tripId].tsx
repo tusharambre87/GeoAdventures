@@ -1664,6 +1664,7 @@ function DayDetail({
 
       {/* Body */}
       {/* Body — DraggableFlatList IS the scroll container; no outer ScrollView */}
+      {console.log('RENDER localContentStops:', localContentStops?.length, JSON.stringify(localContentStops?.map(s => s.name)))}
       <DraggableFlatList
         data={localContentStops.length > 0 || contentStops.length === 0 ? localContentStops : contentStops}
         keyExtractor={s => s.id}
