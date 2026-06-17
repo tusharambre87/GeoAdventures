@@ -83,60 +83,65 @@ async function backfillExploreContent() {
 
   async function processStop(stop: typeof stops[number]) {
     const stopNum = ++stopsDone;
+    try {
+      for (let bi = 0; bi < AGE_BANDS.length; bi++) {
+        const { band, representativeAge } = AGE_BANDS[bi];
 
-    for (let bi = 0; bi < AGE_BANDS.length; bi++) {
-      const { band, representativeAge } = AGE_BANDS[bi];
+        const lookupName = stop.normalizedName || stop.name;
+        const skipKey    = `${lookupName}|${(stop.city ?? '').toLowerCase().trim()}|${band}`;
 
-      const lookupName = stop.normalizedName || stop.name;
-      const skipKey    = `${lookupName}|${(stop.city ?? '').toLowerCase().trim()}|${band}`;
+        if (skipSet.has(skipKey)) {
+          skipped++;
+          console.log(`SKIP: ${skipKey}`);
+          continue;
+        }
 
-      if (skipSet.has(skipKey)) {
-        skipped++;
-        console.log(`SKIP: ${skipKey}`);
-        continue;
+        console.log(`[${stopNum}/${stops.length}] ${band} — ${stop.name} (${stop.city ?? ''})`);
+
+        try {
+          const gpFacts = {
+            gpHours:                stop.gpHours,
+            gpRating:               stop.gpRating,
+            gpPriceLevel:           stop.gpPriceLevel,
+            gpAddressVerified:      stop.gpAddressVerified,
+            gpWheelchairAccessible: stop.gpWheelchairAccessible,
+            gpPhone:                stop.gpPhone,
+            gpWebsite:              stop.gpWebsite,
+          };
+
+          const content = await getExploreContent(
+            stop.name,
+            stop.stopType ?? 'attraction',
+            stop.city ?? '',
+            representativeAge,
+            gpFacts,
+          );
+
+          await upsertExploreCache(
+            lookupName,
+            stop.city ?? '',
+            stop.stopType ?? '',
+            content,
+            band,
+          );
+
+          generated++;
+
+        } catch (err) {
+          failed++;
+          failedItems.push(`${band}:${stop.name} (${stop.city ?? ''})`);
+          console.error(`Failed [${band}] ${stop.name} — ${err}`);
+        }
+
+        // Pace each band within a stop to avoid rate-limit spikes
+        if (bi < AGE_BANDS.length - 1) {
+          await sleep(PAUSE_MS);
+        }
       }
-
-      console.log(`[${stopNum}/${stops.length}] ${band} — ${stop.name} (${stop.city ?? ''})`);
-
-      try {
-        const gpFacts = {
-          gpHours:                stop.gpHours,
-          gpRating:               stop.gpRating,
-          gpPriceLevel:           stop.gpPriceLevel,
-          gpAddressVerified:      stop.gpAddressVerified,
-          gpWheelchairAccessible: stop.gpWheelchairAccessible,
-          gpPhone:                stop.gpPhone,
-          gpWebsite:              stop.gpWebsite,
-        };
-
-        const content = await getExploreContent(
-          stop.name,
-          stop.stopType ?? 'attraction',
-          stop.city ?? '',
-          representativeAge,
-          gpFacts,
-        );
-
-        await upsertExploreCache(
-          lookupName,
-          stop.city ?? '',
-          stop.stopType ?? '',
-          content,
-          band,
-        );
-
-        generated++;
-
-      } catch (err) {
-        failed++;
-        failedItems.push(`${band}:${stop.name} (${stop.city ?? ''})`);
-        console.error(`Failed [${band}] ${stop.name} — ${err}`);
-      }
-
-      // Pace each band within a stop to avoid rate-limit spikes
-      if (bi < AGE_BANDS.length - 1) {
-        await sleep(PAUSE_MS);
-      }
+    } catch (err) {
+      failed++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`SKIP_ERROR: ${stop.name} (${stop.city ?? ''}) — ${msg}`);
     }
   }
 
