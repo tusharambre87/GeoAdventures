@@ -4044,7 +4044,7 @@ const pps = StyleSheet.create({
 // ─── Root screen ──────────────────────────────────────────────────────────────
 
 export default function TripPlanScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, openAddStop, addStopDefaultFilter } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string }>();
   const queryClient = useQueryClient();
   useFrauncesFonts({ Fraunces_900Black });
 
@@ -4076,7 +4076,15 @@ export default function TripPlanScreen() {
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
-  const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('food');
+  const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('landmarks');
+
+  useEffect(() => {
+    if (openAddStop === 'true') {
+      const filter = (['food', 'kids', 'landmarks'].includes(addStopDefaultFilter ?? '') ? addStopDefaultFilter : 'landmarks') as 'food' | 'kids' | 'landmarks';
+      setAddStopFilter(filter);
+      setActiveSheet('addStop');
+    }
+  }, []);
   const [showCommunityShare, setShowCommunityShare] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);

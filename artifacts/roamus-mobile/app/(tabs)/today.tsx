@@ -1328,7 +1328,7 @@ export default function TodayScreen() {
             <TouchableOpacity
               style={ptf.viewPlanBtn}
               activeOpacity={0.8}
-              onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+              onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}
             >
               <Text style={ptf.viewPlanText}>View full plan →</Text>
             </TouchableOpacity>
@@ -1507,7 +1507,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={ptt.cta}
             activeOpacity={0.85}
-            onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+            onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}
           >
             <Text style={ptt.ctaText}>Review tomorrow's plan →</Text>
           </TouchableOpacity>
@@ -1765,7 +1765,7 @@ export default function TodayScreen() {
               {viewingDayStops.length === 0 && (
                 <Text style={alt.emptyText}>No stops planned for this day yet.</Text>
               )}
-              <Pressable style={alt.linkBtn} onPress={() => router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}>
+              <Pressable style={alt.linkBtn} onPress={() => router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}>
                 <Text style={alt.linkBtnText}>See full plan →</Text>
               </Pressable>
             </View>
@@ -2056,7 +2056,7 @@ export default function TodayScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+            onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}
             style={{ padding: 16, alignItems: 'center' }}
             activeOpacity={0.7}
           >
@@ -2464,7 +2464,7 @@ export default function TodayScreen() {
               <TouchableOpacity
                 style={er.afterAddBtn}
                 activeOpacity={0.7}
-                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
               >
                 <Text style={er.afterAddText}>+ Add a stop</Text>
               </TouchableOpacity>
@@ -2734,7 +2734,7 @@ export default function TodayScreen() {
               <TouchableOpacity
                 style={er.afterAddBtn}
                 activeOpacity={0.7}
-                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
               >
                 <Text style={er.afterAddText}>+ Add a stop</Text>
               </TouchableOpacity>
@@ -3420,7 +3420,7 @@ export default function TodayScreen() {
                   </TouchableOpacity>
                 </View>
               ))}
-              <Pressable style={dh.linkBtn} onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } })}>
+              <Pressable style={dh.linkBtn} onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}>
                 <Text style={dh.linkBtnText}>View full recap →</Text>
               </Pressable>
             </View>
