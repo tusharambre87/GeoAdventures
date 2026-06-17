@@ -848,6 +848,12 @@ function StopCard({
       {/* Body */}
       <View style={sc.body}>
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
+        {isEditable && (
+          <View style={{ position: 'absolute', bottom: 10, right: 12, flexDirection: 'row', alignItems: 'center', gap: 3, opacity: 0.35 }}>
+            <Text style={{ fontFamily: F.regular, fontSize: 10, color: C.muted }}>Swipe left</Text>
+            <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.muted }}>{'\u2039'}</Text>
+          </View>
+        )}
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
             <Text style={sc.tagMutedText}>{duration} min</Text>

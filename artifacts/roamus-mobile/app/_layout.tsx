@@ -193,7 +193,7 @@ export default function RootLayout() {
         <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
           <AuthProvider>
             <OnboardingProvider>
-              <GestureHandlerRootView>
+              <GestureHandlerRootView style={{ flex: 1 }}>
                 <KeyboardProvider>
                   <AuthGate>
                     <RootLayoutNav />
