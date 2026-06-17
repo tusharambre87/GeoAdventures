@@ -53,6 +53,7 @@ import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import { preCacheTrip } from "@/lib/tripCache";
+import StopPreviewSheetDemo from "@/components/StopPreviewSheet";
 import ParentSuggestionsSection, {
   PmalPositionPickerSheet,
   type ParentSuggestion,
@@ -4301,25 +4302,12 @@ export default function TripPlanScreen() {
   // ── Screen state ──
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
-  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('stopPreview');
+  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('landmarks');
   // ── Stop preview sheet ──
-  const [previewStop, setPreviewStop]   = useState<PreviewStopData | null>({
-    opt: {
-      name: 'United States Botanic Garden',
-      stopType: 'landmark',
-      durationMinutes: 90,
-      address: '100 Maryland Ave SW, Washington, DC 20001',
-      description: 'Kids are captivated by the towering tropical plants and the chance to walk through a real rainforest indoors. The giant lily pads are a favourite stop for photos.',
-      priceRange: 'free',
-      tags: ['Morning'],
-      icon: '\uD83C\uDF3F',
-    },
-    ctx: 'add',
-    dayNum: 1,
-    onConfirm: () => {},
-  });
-  const previewAnim = useRef(new Animated.Value(1)).current;
+  const [showPreview, setShowPreview]   = useState(true);
+  const [previewStop, setPreviewStop]   = useState<PreviewStopData | null>(null);
+  const previewAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(previewAnim, {
       toValue: activeSheet === 'stopPreview' ? 1 : 0,
@@ -4803,6 +4791,15 @@ export default function TripPlanScreen() {
           onClose={() => setActiveSheet('none')}
           insets={insets}
         />
+      )}
+      {showPreview && (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 300, backgroundColor: 'rgba(26,31,46,0.4)', top: 0, justifyContent: 'flex-end' }}>
+          <StopPreviewSheetDemo
+            onClose={() => setShowPreview(false)}
+            onConfirm={() => setShowPreview(false)}
+            context="add"
+          />
+        </View>
       )}
       <TripTabBar />
     </View>
