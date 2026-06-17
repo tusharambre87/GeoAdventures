@@ -12,17 +12,60 @@ import { API_BASE } from '@/lib/apiClient';
 
 export default function SosLostScreen() {
   const insets = useSafeAreaInsets();
-  const { hotelName, hotelAddress, tripId, destination } = useLocalSearchParams<{
+  const { hotelName, hotelAddress, tripId: paramTripId, destination } = useLocalSearchParams<{
     hotelName?: string;
     hotelAddress?: string;
     tripId?: string;
     destination?: string;
   }>();
 
-  const [hotelInput, setHotelInput]     = useState('');
-  const [coords, setCoords]             = useState<{ lat: number; lon: number } | null>(null);
-  const [locationLoading, setLocLoading] = useState(true);
-  const [saving, setSaving]             = useState(false);
+  const [hotelInput, setHotelInput]       = useState('');
+  const [coords, setCoords]               = useState<{ lat: number; lon: number } | null>(null);
+  const [locationLoading, setLocLoading]  = useState(true);
+  const [saving, setSaving]               = useState(false);
+  const [resolvedTripId, setResolvedTripId] = useState<string | undefined>(paramTripId);
+  const [resolvedName, setResolvedName]   = useState<string | undefined>(hotelName);
+  const [resolvedAddress, setResolvedAddress] = useState<string | undefined>(hotelAddress);
+
+  // Self-load hotel data — works even when navigated without params
+  useEffect(() => {
+    async function loadHotel() {
+      // Resolve tripId: prefer param, fall back to atStopFrozenTripId
+      let tid = paramTripId;
+      if (!tid) {
+        tid = (await AsyncStorage.getItem('atStopFrozenTripId')) ?? undefined;
+        if (tid) setResolvedTripId(tid);
+      }
+      if (!tid) return;
+
+      // Fast path: AsyncStorage cache (written by today.tsx + [tripId].tsx)
+      const cached = await AsyncStorage.getItem(`hotel_${tid}_day0`).catch(() => null);
+      if (cached) {
+        if (!resolvedName) setResolvedName(cached);
+        if (!resolvedAddress) setResolvedAddress(cached);
+        return; // good enough — skip API call
+      }
+
+      // Fallback: API
+      try {
+        const token = await AsyncStorage.getItem('auth_token');
+        const r = await fetch(`${API_BASE}/api/travel/trips/${tid}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!r.ok) return;
+        const data: any = await r.json();
+        const locs: any[] = data.stayLocations ?? [];
+        if (locs.length > 0) {
+          const loc = locs[0];
+          const n = loc.name || loc.address;
+          const a = loc.address || loc.name;
+          if (n && !resolvedName) setResolvedName(n);
+          if (a && !resolvedAddress) setResolvedAddress(a);
+        }
+      } catch {}
+    }
+    void loadHotel();
+  }, [paramTripId]);
 
   useEffect(() => {
     Location.requestForegroundPermissionsAsync().then(({ status }) => {
@@ -41,11 +84,12 @@ export default function SosLostScreen() {
   };
 
   async function saveAndNavigate(dest: string) {
-    if (!tripId || saving) { void navigateToHotel(dest); return; }
+    const tid = resolvedTripId;
+    if (!tid || saving) { void navigateToHotel(dest); return; }
     setSaving(true);
     try {
       const token = await AsyncStorage.getItem('auth_token');
-      await fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
+      await fetch(`${API_BASE}/api/travel/trips/${tid}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -59,6 +103,8 @@ export default function SosLostScreen() {
           }],
         }),
       });
+      // Cache for future fast-path
+      await AsyncStorage.setItem(`hotel_${tid}_day0`, dest).catch(() => {});
     } catch {
     } finally {
       setSaving(false);
@@ -66,7 +112,7 @@ export default function SosLostScreen() {
     }
   }
 
-  const savedHotel = hotelName ?? hotelAddress;
+  const savedHotel = resolvedName ?? resolvedAddress;
 
   return (
     <View style={styles.container}>
@@ -87,10 +133,12 @@ export default function SosLostScreen() {
           <Text style={styles.cardLabel}>YOUR HOTEL</Text>
           {savedHotel ? (
             <>
-              <Text style={styles.cardTitle}>{hotelName ?? 'Your accommodation'}</Text>
-              {!!hotelAddress && <Text style={styles.cardBody}>{hotelAddress}</Text>}
+              <Text style={styles.cardTitle}>{resolvedName ?? 'Your accommodation'}</Text>
+              {!!resolvedAddress && resolvedAddress !== resolvedName && (
+                <Text style={styles.cardBody}>{resolvedAddress}</Text>
+              )}
               <TouchableOpacity style={styles.navBtn}
-                onPress={() => navigateToHotel(hotelAddress ?? hotelName ?? '')}>
+                onPress={() => navigateToHotel(resolvedAddress ?? resolvedName ?? '')}>
                 <Text style={styles.navBtnText}>{'\uD83D\uDCCD'}  Navigate to hotel</Text>
               </TouchableOpacity>
             </>
