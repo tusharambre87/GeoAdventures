@@ -51,6 +51,7 @@ import TripDateEditorSheet from "@/components/TripDateEditorSheet";
 import TripPlanStopSheet from "@/components/TripPlanStopSheet";
 import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
+import AddHotelSheet from "@/components/AddHotelSheet";
 import { preCacheTrip } from "@/lib/tripCache";
 import ParentSuggestionsSection, {
   PmalPositionPickerSheet,
@@ -1468,25 +1469,6 @@ function DayDetail({
   const stopCount = dayStops.length;
   const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
   const [showHotelSheet, setShowHotelSheet] = useState(false);
-  const [hotelInput, setHotelInput] = useState<string>(trip.stayLocations?.[0]?.address ?? '');
-  const [savingHotel, setSavingHotel] = useState(false);
-
-  async function saveHotelAddress() {
-    if (!hotelInput.trim()) return;
-    setSavingHotel(true);
-    try {
-      await apiFetch(`/api/travel/trips/${tripId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ stayLocations: [{ name: trip.destination ?? trip.city ?? 'Destination', address: hotelInput.trim() }] }),
-      });
-      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-      setShowHotelSheet(false);
-    } catch {
-      // ignore
-    } finally {
-      setSavingHotel(false);
-    }
-  }
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
@@ -1915,7 +1897,7 @@ function DayDetail({
         {dayStops.length > 0 && (
           <Pressable
             style={dd.hotelBtn}
-            onPress={() => { setHotelInput(trip.stayLocations?.[0]?.address ?? ''); setShowHotelSheet(true); }}
+            onPress={() => setShowHotelSheet(true)}
           >
             <Text style={dd.hotelBtnIcon}>{'\uD83C\uDFE8'}</Text>
             <View style={{ flex: 1 }}>
@@ -1980,60 +1962,17 @@ function DayDetail({
       />
 
 
-      {/* Hotel / Starting Point input modal */}
-      <Modal
+      {/* Hotel / Starting Point sheet */}
+      <AddHotelSheet
         visible={showHotelSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowHotelSheet(false)}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
-          onPress={() => setShowHotelSheet(false)}
-        >
-          <Pressable
-            style={{ backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: insets.bottom + 24 }}
-            onPress={() => {}}
-          >
-            <Text style={{ fontFamily: F.bold, fontSize: 16, color: C.deep, marginBottom: 4 }}>Starting point / hotel</Text>
-            <Text style={{ fontFamily: F.regular, fontSize: 13, color: C.muted, marginBottom: 16, lineHeight: 20 }}>
-              Enter your hotel address or starting point — used as the origin when you open Google Maps directions.
-            </Text>
-            <TextInput
-              style={{ backgroundColor: C.bg, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 13, fontFamily: F.regular, fontSize: 14, color: C.deep, marginBottom: 14 }}
-              placeholder="e.g. The Plaza Hotel, New York, NY"
-              placeholderTextColor={C.muted}
-              value={hotelInput}
-              onChangeText={setHotelInput}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={() => void saveHotelAddress()}
-            />
-            <Pressable
-              style={[dd.runBtn, savingHotel && { opacity: 0.6 }]}
-              onPress={() => void saveHotelAddress()}
-              disabled={savingHotel}
-            >
-              <Text style={dd.runBtnText}>{savingHotel ? 'Saving...' : 'Set starting point'}</Text>
-            </Pressable>
-            {trip.stayLocations?.[0]?.address ? (
-              <Pressable
-                style={{ alignItems: 'center', marginTop: 14 }}
-                onPress={async () => {
-                  setSavingHotel(true);
-                  try {
-                    await apiFetch(`/api/travel/trips/${tripId}`, { method: 'PATCH', body: JSON.stringify({ stayLocations: [] }) });
-                    queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-                    setShowHotelSheet(false);
-                  } catch { } finally { setSavingHotel(false); }
-                }}
-              >
-                <Text style={{ fontFamily: F.regular, fontSize: 13, color: '#D44' }}>Remove starting point</Text>
-              </Pressable>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+        tripId={tripId ?? ''}
+        destination={trip.destination ?? trip.city ?? ''}
+        onClose={() => setShowHotelSheet(false)}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+          setShowHotelSheet(false);
+        }}
+      />
     </View>
   );
 }
