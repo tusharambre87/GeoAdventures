@@ -7,7 +7,7 @@
  * Usage:
  *   pnpm --filter @workspace/api-server run backfill:explore
  *
- * Expected runtime: ~1,314 stops × 3 bands × 2.5s = ~165 minutes
+ * Expected runtime: ~1,314 stops × 3 bands × 2.5s / 3 concurrency ≈ 55 minutes
  * After completion: set FORCE_REGEN = false
  */
 
@@ -17,7 +17,8 @@ import { eq, or } from 'drizzle-orm';
 import { getExploreContent } from '../exploreContentService.js';
 import { upsertExploreCache } from '../storage.js';
 
-const PAUSE_MS   = 2500;
+const PAUSE_MS    = 2500;
+const CONCURRENCY = 3;
 const FORCE_REGEN = true; // set to false after this run completes
 
 const AGE_BANDS = [
@@ -32,7 +33,7 @@ async function sleep(ms: number) {
 
 async function backfillExploreContent() {
   console.log('Starting explore_cache backfill — 3 age bands per stop...');
-  console.log(`FORCE_REGEN = ${FORCE_REGEN}`);
+  console.log(`FORCE_REGEN = ${FORCE_REGEN}  CONCURRENCY = ${CONCURRENCY}`);
 
   const stops = await db
     .select({
@@ -73,29 +74,31 @@ async function backfillExploreContent() {
   );
   console.log(`Skip-set loaded: ${skipSet.size} existing rows will be skipped`);
 
+  // Shared counters — safe to mutate from concurrent tasks in single-threaded JS
   let generated = 0;
   let failed    = 0;
   let skipped   = 0;
+  let stopsDone = 0;
   const failedItems: string[] = [];
 
-  let rowIndex = 0;
-  for (const stop of stops) {
-    for (const { band, representativeAge } of AGE_BANDS) {
-      rowIndex++;
+  async function processStop(stop: typeof stops[number]) {
+    const stopNum = ++stopsDone;
+
+    for (let bi = 0; bi < AGE_BANDS.length; bi++) {
+      const { band, representativeAge } = AGE_BANDS[bi];
 
       const lookupName = stop.normalizedName || stop.name;
-      const skipKey = `${lookupName}|${(stop.city ?? '').toLowerCase().trim()}|${band}`;
+      const skipKey    = `${lookupName}|${(stop.city ?? '').toLowerCase().trim()}|${band}`;
+
       if (skipSet.has(skipKey)) {
         skipped++;
         console.log(`SKIP: ${skipKey}`);
         continue;
       }
 
-      try {
-        if (rowIndex % 10 === 1) {
-          console.log(`[${rowIndex}/${total}] ${band} — ${stop.name} (${stop.city ?? ''})`);
-        }
+      console.log(`[${stopNum}/${stops.length}] ${band} — ${stop.name} (${stop.city ?? ''})`);
 
+      try {
         const gpFacts = {
           gpHours:                stop.gpHours,
           gpRating:               stop.gpRating,
@@ -130,9 +133,20 @@ async function backfillExploreContent() {
         console.error(`Failed [${band}] ${stop.name} — ${err}`);
       }
 
-      if (rowIndex < total) {
+      // Pace each band within a stop to avoid rate-limit spikes
+      if (bi < AGE_BANDS.length - 1) {
         await sleep(PAUSE_MS);
       }
+    }
+  }
+
+  // Process stops in chunks of CONCURRENCY — preserves all skip-set logic
+  for (let i = 0; i < stops.length; i += CONCURRENCY) {
+    const chunk = stops.slice(i, i + CONCURRENCY);
+    await Promise.all(chunk.map(stop => processStop(stop)));
+
+    if ((i / CONCURRENCY) % 10 === 9) {
+      console.log(`--- Progress: ${stopsDone}/${stops.length} stops done | generated=${generated} skipped=${skipped} failed=${failed} ---`);
     }
   }
 
