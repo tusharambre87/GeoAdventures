@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  FlatList,
   Linking,
   Modal,
   Platform,
@@ -25,7 +24,7 @@ import {
   type TextStyle,
 } from "react-native";
 import { useFonts as useFrauncesFonts, Fraunces_900Black } from "@expo-google-fonts/fraunces";
-import { TouchableOpacity as GHTouchable, Swipeable } from "react-native-gesture-handler";
+import { FlatList, TouchableOpacity as GHTouchable, Swipeable } from "react-native-gesture-handler";
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
