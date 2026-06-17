@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Keyboard,
   KeyboardAvoidingView,
@@ -17,7 +15,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -81,7 +78,6 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
   const [suggestions,        setSuggestions]        = useState<Array<{ name: string; sub: string }>>([]);
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-  const [saving,             setSaving]             = useState(false);
   const [saved,              setSaved]              = useState(false);
   const [inputY,             setInputY]             = useState(0);
   const [inputHeight,        setInputHeight]        = useState(48);
@@ -163,32 +159,16 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
     setAddressSuggestions([]);
   }
 
-  async function handleSave() {
+  function handleSave() {
     const name = hotelName.trim();
     const addr = address.trim();
     if (!name && !addr) return;
     const combined = name && addr ? `${name}, ${addr}` : (name || addr);
-    setSaving(true);
-    try {
-      const token = await AsyncStorage.getItem('auth_token');
-      await fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          stayLocations: [{ cityName: destination, name: name || addr, address: combined }],
-        }),
-      });
-      setSaved(true);
-      setTimeout(() => { onSaved(name, combined); onClose(); }, 700);
-    } catch {
-      setSaving(false);
-    }
+    setSaved(true);
+    setTimeout(() => { onSaved(name, combined); onClose(); }, 500);
   }
 
-  const canSave = (hotelName.trim().length > 0 || address.trim().length > 0) && !saving && !saved;
+  const canSave = (hotelName.trim().length > 0 || address.trim().length > 0) && !saved;
 
   return (
     <Modal visible={mounted} transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
@@ -310,10 +290,7 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
                 onPress={handleSave}
                 disabled={!canSave}
               >
-                {saving
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
-                }
+                <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
               </Pressable>
             )}
           </Animated.View>

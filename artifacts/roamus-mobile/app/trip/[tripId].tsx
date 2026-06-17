@@ -2019,9 +2019,58 @@ function DayDetail({
             initialName={initName}
             initialAddress={initAddr}
             onClose={() => setShowHotelSheet(false)}
-            onSaved={() => {
-              queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-              setShowHotelSheet(false);
+            onSaved={async (hotelDisplayName, combined) => {
+              const token = await AsyncStorage.getItem('auth_token');
+              const cities: string[] = (trip as any)?.cities?.length > 0
+                ? (trip as any).cities
+                : [trip.destination ?? (trip as any)?.city ?? ''].filter(Boolean);
+
+              const doPatch = async () => {
+                const allLocs = cities.map((c: string) => ({
+                  cityName: c,
+                  name: hotelDisplayName,
+                  address: combined,
+                }));
+                try {
+                  await fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ stayLocations: allLocs }),
+                  });
+                } catch {}
+                queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+              };
+
+              const saveThisDayOnly = async () => {
+                await doPatch();
+                if (trip?.id) {
+                  await AsyncStorage.setItem(`hotel_${trip.id}_day${selectedDay - 1}`, combined).catch(() => {});
+                }
+                setShowHotelSheet(false);
+              };
+
+              const saveAllDays = async () => {
+                await doPatch();
+                if (trip?.id) {
+                  const totalDays = trip.tripDays ?? trip.plannerTripDays ?? 1;
+                  for (let d = 0; d < totalDays; d++) {
+                    await AsyncStorage.setItem(`hotel_${trip.id}_day${d}`, combined).catch(() => {});
+                  }
+                }
+                setShowHotelSheet(false);
+              };
+
+              Alert.alert(
+                'Use for all days?',
+                `Use "${hotelDisplayName || combined}" as the starting point for every day of your trip?`,
+                [
+                  { text: 'This day only', style: 'cancel', onPress: () => { void saveThisDayOnly(); } },
+                  { text: 'All days', onPress: () => { void saveAllDays(); } },
+                ]
+              );
             }}
           />
         );

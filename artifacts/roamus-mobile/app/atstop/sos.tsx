@@ -17,6 +17,14 @@ export default function SosScreen() {
 
   useEffect(() => {
     if (!tripId) return;
+    // Fast path: AsyncStorage (written by both today.tsx and [tripId].tsx saves)
+    AsyncStorage.getItem(`hotel_${tripId}_day0`).then(cached => {
+      if (cached) {
+        setHotelName(cached);
+        setHotelAddress(cached);
+      }
+    }).catch(() => {});
+    // Also fetch from API for structured name/address
     AsyncStorage.getItem('auth_token').then(token => {
       fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -27,8 +35,10 @@ export default function SosScreen() {
           const locs: any[] = data.stayLocations ?? [];
           if (locs.length > 0) {
             const loc = locs[0];
-            setHotelName(loc.name || loc.address || undefined);
-            setHotelAddress(loc.address || loc.name || undefined);
+            const n = loc.name || loc.address;
+            const a = loc.address || loc.name;
+            if (n) setHotelName(n);
+            if (a) setHotelAddress(a);
           }
         })
         .catch(() => {});
