@@ -768,7 +768,14 @@ function StopCard({
       <TouchableOpacity onPress={() => onReplace(stop)}>
         <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Replace ‹</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => void onDelete(stop.id)}>
+      <TouchableOpacity onPress={() => Alert.alert(
+        'Remove this stop?',
+        `"${stop.name}" will be removed from your trip.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: () => void onDelete(stop.id) },
+        ]
+      )}>
         <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Remove ‹</Text>
       </TouchableOpacity>
     </View>
