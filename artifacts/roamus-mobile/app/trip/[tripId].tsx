@@ -53,7 +53,7 @@ import CommunityShareSheet from "@/components/CommunityShareSheet";
 import InviteCoParentSheet from "@/components/InviteCoParentSheet";
 import AddHotelSheet from "@/components/AddHotelSheet";
 import { preCacheTrip } from "@/lib/tripCache";
-import StopPreviewSheetDemo from "@/components/StopPreviewSheet";
+import StopPreviewSheet from "@/components/StopPreviewSheet";
 import ParentSuggestionsSection, {
   PmalPositionPickerSheet,
   type ParentSuggestion,
@@ -1944,7 +1944,7 @@ function DayDetail({
 
         {/* Add a stop — editable, only when stops already exist */}
         {isEditable && dayStops.length > 0 && (
-          <Pressable style={dd.addStopBtn} onPress={() => onAddStop()}>
+          <Pressable style={dd.addStopBtn} onPress={() => setShowPreview(true)}>
             <IconPlus />
             <Text style={dd.addStopText}> Add a stop</Text>
           </Pressable>
@@ -3920,7 +3920,7 @@ const asd = StyleSheet.create({
   addBtnText:   { fontSize: 15, fontFamily: F.bold, color: '#fff' },
 });
 
-// ─── StopPreviewSheet ─────────────────────────────────────────────────────────
+// ─── StopPreviewSheetPanel ────────────────────────────────────────────────────
 
 function stopPreviewGradient(stopType: string): [string, string] {
   const t = stopType.toLowerCase();
@@ -3939,7 +3939,7 @@ function formatPreviewDuration(mins: number): string {
   return `${h}\u2013${h + 1} hours`;
 }
 
-function StopPreviewSheet({
+function StopPreviewSheetPanel({
   stopData,
   slideAnim,
   onClose,
@@ -4305,7 +4305,7 @@ export default function TripPlanScreen() {
   const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
   const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('landmarks');
   // ── Stop preview sheet ──
-  const [showPreview, setShowPreview]   = useState(true);
+  const [showPreview, setShowPreview]   = useState(false);
   const [previewStop, setPreviewStop]   = useState<PreviewStopData | null>(null);
   const previewAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -4785,7 +4785,7 @@ export default function TripPlanScreen() {
         context={upgradeContext}
       />
       {previewStop && (
-        <StopPreviewSheet
+        <StopPreviewSheetPanel
           stopData={previewStop}
           slideAnim={previewAnim}
           onClose={() => setActiveSheet('none')}
@@ -4793,12 +4793,14 @@ export default function TripPlanScreen() {
         />
       )}
       {showPreview && (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 300, backgroundColor: 'rgba(26,31,46,0.4)', top: 0, justifyContent: 'flex-end' }}>
-          <StopPreviewSheetDemo
-            onClose={() => setShowPreview(false)}
-            onConfirm={() => setShowPreview(false)}
-            context="add"
-          />
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <View style={{ flex:1, backgroundColor:'rgba(26,31,46,0.4)', justifyContent:'flex-end' }}>
+            <StopPreviewSheet
+              context="add"
+              onClose={() => setShowPreview(false)}
+              onConfirm={() => setShowPreview(false)}
+            />
+          </View>
         </View>
       )}
       <TripTabBar />
