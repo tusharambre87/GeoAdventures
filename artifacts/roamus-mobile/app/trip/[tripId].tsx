@@ -33,7 +33,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
@@ -178,7 +178,7 @@ type TripData = {
   isShared?: boolean;
   coverImageUrl?: string | null;
   cityDates?: Record<string, { start: string; end: string }> | null;
-  stayLocations?: Array<{ cityName: string; address?: string; lat?: number; lng?: number }> | null;
+  stayLocations?: Array<{ cityName: string; name?: string; address?: string; lat?: number; lng?: number }> | null;
   tailoring?: {
     arrivalMethod?: string;
     arrivalTime?: string;
@@ -212,6 +212,37 @@ type StopOption = {
 
 const MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery']);
 const TICKET_TYPES = new Set(['museum', 'zoo', 'aquarium', 'palace', 'castle', 'theater', 'theatre', 'observatory', 'observation_deck', 'theme_park', 'science_museum', 'childrens_museum', 'art_museum', 'history_museum', 'planetarium', 'water_park', 'amusement_park']);
+
+const HOTEL_CHAINS_FOR_PARSE = [
+  'JW Marriott', 'Marriott Marquis', 'The Ritz-Carlton', 'DoubleTree by Hilton',
+  'Hilton Garden Inn', 'Courtyard by Marriott', 'Residence Inn', 'Fairfield Inn',
+  'SpringHill Suites', 'TownPlace Suites', 'AC Hotels', 'Home2 Suites',
+  'Signia by Hilton', 'Grand Hyatt', 'Park Hyatt', 'Hyatt Regency',
+  'Thompson Hotels', 'Alila Hotels', 'Caption by Hyatt', 'InterContinental',
+  'Crowne Plaza', 'Holiday Inn Express', 'Holiday Inn', 'Hotel Indigo',
+  'Staybridge Suites', 'Kimpton Hotels', 'Conrad Hotels', 'Waldorf Astoria',
+  'Omni Hotels', 'Loews Hotels', 'Radisson Blu', 'Best Western Plus',
+  'BW Premier Collection', 'Marriott', 'Sheraton', 'Westin', 'W Hotels',
+  'Hilton', 'Embassy Suites', 'Curio Collection by Hilton', 'Canopy by Hilton',
+  'Tru by Hilton', 'Hyatt', 'Andaz', 'Radisson', 'Best Western', 'Wyndham',
+  'La Quinta', 'Ramada', 'Travelodge', 'Days Inn', 'Aloft Hotels',
+  'Element Hotels', 'Le Méridien', 'Sofitel', 'Novotel', 'MGallery',
+  'Swissôtel', 'Delta Hotels', 'Moxy Hotels', 'Edition Hotels', 'Pendry Hotels',
+  'Four Seasons', 'St. Regis', 'Autograph Collection', 'Renaissance by Marriott',
+  'Tribute Portfolio', 'EVEN Hotels', 'voco Hotels',
+].sort((a, b) => b.length - a.length);
+
+function parseHotelLocation(combined: string): { hotelName: string; hotelAddress: string } {
+  if (!combined) return { hotelName: '', hotelAddress: '' };
+  for (const chain of HOTEL_CHAINS_FOR_PARSE) {
+    if (combined.toLowerCase().startsWith(chain.toLowerCase())) {
+      const rest = combined.slice(chain.length);
+      if (rest.startsWith(', ')) return { hotelName: chain, hotelAddress: rest.slice(2) };
+      if (rest === '') return { hotelName: chain, hotelAddress: '' };
+    }
+  }
+  return { hotelName: '', hotelAddress: combined };
+}
 
 function isMealStop(stopType?: string | null): boolean {
   if (!stopType) return false;
@@ -1647,7 +1678,6 @@ function DayDetail({
 
       {/* Body */}
       {/* Body — DraggableFlatList IS the scroll container; no outer ScrollView */}
-      {console.log('RENDER localContentStops:', localContentStops?.length, JSON.stringify(localContentStops?.map(s => s.name)))}
       <FlatList
         data={localContentStops.length > 0 || contentStops.length === 0 ? localContentStops : contentStops}
         keyExtractor={s => s.id}
@@ -1894,23 +1924,34 @@ function DayDetail({
         )}
 
         {/* Add starting point / hotel accommodation */}
-        {dayStops.length > 0 && (
-          <Pressable
-            style={dd.hotelBtn}
-            onPress={() => setShowHotelSheet(true)}
-          >
-            <Text style={dd.hotelBtnIcon}>{'\uD83C\uDFE8'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={dd.hotelBtnLabel} numberOfLines={1}>
-                {trip.stayLocations?.[0]?.address ? trip.stayLocations[0].address : 'Add starting point / hotel'}
-              </Text>
-              <Text style={dd.hotelBtnSub}>
-                {trip.stayLocations?.[0]?.address ? 'Directions start here — tap to change' : 'Used as origin for directions'}
-              </Text>
-            </View>
-            <Text style={dd.hotelBtnArrow}>{'\u203A'}</Text>
-          </Pressable>
-        )}
+        {dayStops.length > 0 && (() => {
+          const stayLoc = trip.stayLocations?.[0];
+          const parsed  = stayLoc?.address ? parseHotelLocation(stayLoc.address) : null;
+          const displayName    = stayLoc?.name ?? parsed?.hotelName ?? '';
+          const displayAddress = stayLoc?.address
+            ? (stayLoc?.name ? stayLoc.address : (parsed?.hotelAddress ?? stayLoc.address))
+            : '';
+          const hasHotel = !!displayName || !!displayAddress;
+          return (
+            <Pressable
+              style={dd.hotelBtn}
+              onPress={() => setShowHotelSheet(true)}
+            >
+              <Text style={dd.hotelBtnIcon}>{'\uD83C\uDFE8'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={dd.hotelBtnLabel} numberOfLines={1}>
+                  {displayName || displayAddress || 'Add starting point / hotel'}
+                </Text>
+                <Text style={dd.hotelBtnSub} numberOfLines={1}>
+                  {hasHotel
+                    ? (displayName && displayAddress ? displayAddress : 'Starting point \u00B7 tap to edit')
+                    : 'Used as origin for directions'}
+                </Text>
+              </View>
+              <Text style={dd.hotelBtnArrow}>{'\u203A'}</Text>
+            </Pressable>
+          );
+        })()}
 
         {/* Directions to all stops card — shown whenever there are stops */}
         {dayStops.length > 0 && (() => {
@@ -1963,16 +2004,28 @@ function DayDetail({
 
 
       {/* Hotel / Starting Point sheet */}
-      <AddHotelSheet
-        visible={showHotelSheet}
-        tripId={tripId ?? ''}
-        destination={trip.destination ?? trip.city ?? ''}
-        onClose={() => setShowHotelSheet(false)}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-          setShowHotelSheet(false);
-        }}
-      />
+      {(() => {
+        const stayLoc = trip.stayLocations?.[0];
+        const parsed  = stayLoc?.address ? parseHotelLocation(stayLoc.address) : null;
+        const initName = stayLoc?.name ?? parsed?.hotelName ?? '';
+        const initAddr = stayLoc?.address
+          ? (stayLoc?.name ? stayLoc.address : (parsed?.hotelAddress ?? ''))
+          : '';
+        return (
+          <AddHotelSheet
+            visible={showHotelSheet}
+            tripId={tripId ?? ''}
+            destination={trip.destination ?? trip.city ?? ''}
+            initialName={initName}
+            initialAddress={initAddr}
+            onClose={() => setShowHotelSheet(false)}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+              setShowHotelSheet(false);
+            }}
+          />
+        );
+      })()}
     </View>
   );
 }
@@ -3982,6 +4035,9 @@ export default function TripPlanScreen() {
 
   const trip: TripData | null = rawTrip as TripData | null ?? null;
 
+  // Refetch whenever the screen comes into focus so hotel/stop changes from the Today tab are reflected
+  useFocusEffect(useCallback(() => { void refetch(); }, [refetch]));
+
   // ── Screen state ──
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
@@ -3994,7 +4050,6 @@ export default function TripPlanScreen() {
   // Seed localStops from the React Query cache synchronously so DayDetail never
   // mounts with an empty list when data is already available (prevents blank screen).
   const [localStops, setLocalStops]     = useState<Stop[]>(() => (rawTrip?.stops as Stop[]) ?? []);
-  console.log('localStops init:', localStops.length, 'rawTrip stops:', rawTrip?.stops?.length ?? 'undefined');
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklistCloseCount, setChecklistCloseCount] = useState(0);
   const { user, isLoading: authLoading } = useAuth();

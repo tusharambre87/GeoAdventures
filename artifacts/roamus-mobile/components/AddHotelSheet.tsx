@@ -64,11 +64,13 @@ interface Props {
   visible: boolean;
   tripId: string;
   destination: string;
+  initialName?: string;
+  initialAddress?: string;
   onClose: () => void;
   onSaved: (hotelName: string, fullAddress: string) => void;
 }
 
-export default function AddHotelSheet({ visible, tripId, destination, onClose, onSaved }: Props) {
+export default function AddHotelSheet({ visible, tripId, destination, initialName, initialAddress, onClose, onSaved }: Props) {
   const insets      = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(500)).current;
@@ -88,7 +90,10 @@ export default function AddHotelSheet({ visible, tripId, destination, onClose, o
   useEffect(() => {
     if (visible) {
       setMounted(true);
-      setSaved(false); setHotelName(''); setAddress(''); setSuggestions([]);
+      setSaved(false);
+      setHotelName(initialName ?? '');
+      setAddress(initialAddress ?? '');
+      setSuggestions([]);
       setAddressSuggestions([]); setIsSearchingAddress(false);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
