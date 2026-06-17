@@ -19,6 +19,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
   type ViewStyle,
   type TextStyle,
@@ -757,41 +758,19 @@ function StopCard({
   const duration = getStopDuration(stop);
 
   const renderRightActions = () => (
-    <View style={{ width: 80, flexDirection: 'column', gap: 4, marginVertical: 4, marginRight: 4 }}>
-      <GHTouchable
-        style={{
-          backgroundColor: '#E8692A',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flex: 1,
-          borderRadius: 12,
-        }}
-        onPress={() => onReplace(stop)}
-      >
-        <Text style={{ fontSize: 18 }}>{'\uD83D\uDD04'}</Text>
-        <Text style={{ color: 'white', fontSize: 10, fontWeight: '800', marginTop: 2, letterSpacing: 0.3 }}>Replace</Text>
-      </GHTouchable>
-      <GHTouchable
-        style={{
-          backgroundColor: '#C0392B',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flex: 1,
-          borderRadius: 12,
-        }}
-        onPress={() =>
-          Alert.alert(
-            'Remove stop?',
-            `This will remove ${stop.name} from your trip plan.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Remove', style: 'destructive', onPress: () => void onDelete(stop.id) },
-            ]
-          )
-        }
-      >
-        <Text style={{ color: 'white', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>Remove</Text>
-      </GHTouchable>
+    <View style={{
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'flex-end',
+      paddingHorizontal: 16,
+      gap: 12,
+    }}>
+      <TouchableOpacity onPress={() => onReplace(stop)}>
+        <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Replace ‹</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => void onDelete(stop.id)}>
+        <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Remove ‹</Text>
+      </TouchableOpacity>
     </View>
   );
 
