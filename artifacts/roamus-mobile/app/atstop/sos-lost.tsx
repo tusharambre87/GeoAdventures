@@ -34,7 +34,7 @@ export default function SosLostScreen() {
   }, []);
 
   const navigateToHotel = (dest: string) =>
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=walking`);
+    Linking.openURL(`https://maps.google.com/maps?daddr=${encodeURIComponent(dest)}`);
 
   const openCurrentLocation = () => {
     if (coords) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lon}`);
