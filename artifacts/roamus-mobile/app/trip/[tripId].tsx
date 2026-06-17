@@ -4055,6 +4055,7 @@ export default function TripPlanScreen() {
   // Seed localStops from the React Query cache synchronously so DayDetail never
   // mounts with an empty list when data is already available (prevents blank screen).
   const [localStops, setLocalStops]     = useState<Stop[]>(() => (rawTrip?.stops as Stop[]) ?? []);
+  console.log('localStops init:', localStops.length, 'rawTrip stops:', rawTrip?.stops?.length ?? 'undefined');
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [checklistCloseCount, setChecklistCloseCount] = useState(0);
   const { user, isLoading: authLoading } = useAuth();
