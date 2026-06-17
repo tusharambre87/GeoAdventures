@@ -936,23 +936,26 @@ function MealSuggestionCard({
   async function loadRec(_excludedNames: string[]) {
     setLoading(true);
     setRec(null);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const data = await apiFetch<{ options: Array<{ id: string; name: string; stopType: string; description?: string }> }>(
-        '/api/travel/rescue/food-options',
-        {
-          method: 'POST',
-          body: JSON.stringify({ tripId, cityGroup, city: destination }),
-          signal: controller.signal,
-        },
+      // Promise.race timeout — AbortController is unreliable in React Native fetch
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 9000)
       );
+      const data = await Promise.race([
+        apiFetch<{ options: Array<{ id: string; name: string; stopType: string; description?: string }> }>(
+          '/api/travel/rescue/food-options',
+          {
+            method: 'POST',
+            body: JSON.stringify({ tripId, cityGroup, city: destination }),
+          },
+        ),
+        timeout,
+      ]);
       const first = data.options?.[0] ?? null;
       setRec(first ? { id: first.id, name: first.name, type: first.stopType, description: first.description } : null);
     } catch {
       setRec(null);
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
     }
   }

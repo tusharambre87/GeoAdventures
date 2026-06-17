@@ -8938,7 +8938,48 @@ Return valid JSON only. No markdown.`;
         const j = Math.floor(Math.random() * (i + 1));
         [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
       }
-      const rows = candidates.slice(0, 5);
+      let rows: typeof candidates = candidates.slice(0, 5);
+
+      // AI fallback when library has no food stops for this city
+      if (rows.length === 0) {
+        try {
+          const openai = getOpenAI();
+          const aiResp = await openai.chat.completions.create({
+            model: 'gpt-5-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'Return ONLY a JSON object (no markdown) with a "results" array of 3 real, family-friendly lunch spots. Each item: name (real place name), stopType (restaurant/food/cafe/market), description (kid appeal, 1 sentence).',
+              },
+              {
+                role: 'user',
+                content: `Suggest 3 real family-friendly, kid-approved lunch restaurants in ${cityRaw}. Return only well-known, real places.`,
+              },
+            ],
+            max_completion_tokens: 300,
+          });
+          const raw = aiResp.choices[0].message.content ?? '';
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            const aiResults: any[] = Array.isArray(parsed.results) ? parsed.results : [];
+            for (const r of aiResults.slice(0, 3)) {
+              if (r.name && !usedNames.has((r.name ?? '').toLowerCase())) {
+                rows.push({
+                  id: `ai-${Date.now()}-${rows.length}`,
+                  name: r.name,
+                  stopType: r.stopType || 'restaurant',
+                  address: null,
+                  description: r.description || null,
+                  city: cityRaw,
+                });
+              }
+            }
+          }
+        } catch (aiErr) {
+          req.log?.warn({ error: aiErr }, '[Rescue] food-options AI fallback failed');
+        }
+      }
 
       return res.json({ options: rows, city: cityRaw });
     } catch (error) {
