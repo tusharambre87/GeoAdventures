@@ -1479,7 +1479,7 @@ function DayDetail({
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
-  const isEditable = status !== 'past';
+  const isEditable = true;
 
   // Run Day button — tracks the currently selected day pill
   const activeDayIndex   = activeTripDay - 1;
