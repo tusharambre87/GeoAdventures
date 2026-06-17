@@ -189,7 +189,15 @@ type TripData = {
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
-type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop' | 'preferences' | 'dateEditor';
+type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop' | 'preferences' | 'dateEditor' | 'stopPreview';
+type PreviewCtx = 'add' | 'replace' | 'swap';
+type PreviewStopData = {
+  opt: StopOption;
+  ctx: PreviewCtx;
+  replacingName?: string;
+  dayNum: number;
+  onConfirm: () => void;
+};
 type DayStatus = 'past' | 'today' | 'future';
 
 type StopOption = {
@@ -3911,6 +3919,191 @@ const asd = StyleSheet.create({
   addBtnText:   { fontSize: 15, fontFamily: F.bold, color: '#fff' },
 });
 
+// ─── StopPreviewSheet ─────────────────────────────────────────────────────────
+
+function stopPreviewGradient(stopType: string): [string, string] {
+  const t = stopType.toLowerCase();
+  if (t === 'park' || t === 'nature' || t === 'garden') return ['#2D7A4F', '#7A9E8E'];
+  if (t === 'museum' || t === 'aquarium' || t === 'zoo') return ['#1B3A5C', '#6B4FA8'];
+  if (t === 'landmark' || t === 'viewpoint' || t === 'culture') return ['#3DAA6E', '#7A9E8E'];
+  if (t === 'restaurant' || t === 'food' || t === 'cafe' || t === 'street_food') return ['#C0392B', '#E8692A'];
+  return ['#1A1F2E', '#2D5A8E'];
+}
+
+function formatPreviewDuration(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (rem === 0) return h === 1 ? '~1 hour' : `~${h} hours`;
+  return `${h}\u2013${h + 1} hours`;
+}
+
+function StopPreviewSheet({
+  stopData,
+  slideAnim,
+  onClose,
+  insets,
+}: {
+  stopData: PreviewStopData;
+  slideAnim: Animated.Value;
+  onClose: () => void;
+  insets: { bottom: number };
+}) {
+  const { opt, ctx, replacingName, dayNum, onConfirm } = stopData;
+  const stopType = (opt.stopType ?? opt.type ?? 'other').toLowerCase();
+  const gradColors = stopPreviewGradient(stopType);
+  const durMins = opt.durationMinutes ?? opt.estimatedDurationMinutes ?? 60;
+  const durLabel = formatPreviewDuration(durMins);
+  const typeLabel = stopType.replace(/_/g, ' ');
+  const typeDisplay = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+  const entryLabel = (opt.priceRange ?? '').toLowerCase() === 'free' ? 'Free entry' : (opt.priceRange ?? 'Check website');
+  const bestTime = (() => {
+    const tag = (opt.tags ?? []).find(t => /morning|afternoon|evening/i.test(t));
+    if (tag) return tag.charAt(0).toUpperCase() + tag.slice(1).toLowerCase();
+    return 'Anytime';
+  })();
+  const ctxLabel = ctx === 'add'
+    ? `Adding to Day ${dayNum}`
+    : ctx === 'replace'
+    ? `Replacing ${replacingName ?? 'stop'}`
+    : 'Swapping for something better';
+  const btnLabel = ctx === 'add' ? 'Add to my day \u2192' : 'Swap this stop \u2192';
+  const hasAddress = !!opt.address;
+  const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(opt.address ?? opt.name)}`;
+  const kidsBlurb = opt.description;
+  const isKidFriendly = !!opt.description || (opt.tags ?? []).some(t => /kid|famil/i.test(t));
+
+  const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [700, 0] });
+  const overlayOp  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const tabBottom  = TAB_BAR_H + insets.bottom;
+
+  return (
+    <Animated.View style={[sps.overlay, { opacity: overlayOp }]} pointerEvents="box-none">
+      <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      <Animated.View style={[sps.sheet, { transform: [{ translateY }], paddingBottom: tabBottom }]}>
+        <View style={sps.handle} />
+
+        <View style={sps.header}>
+          <Text style={sps.stopName} numberOfLines={2}>{opt.name}</Text>
+          <Pressable style={sps.closeBtn} onPress={onClose} hitSlop={8}>
+            <Text style={sps.closeX}>{'\u2715'}</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={sps.body} showsVerticalScrollIndicator={false}>
+          <View style={sps.heroWrap}>
+            <LinearGradient colors={gradColors} style={sps.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Text style={sps.heroEmoji}>{opt.icon ?? '\uD83D\uDCCD'}</Text>
+            </LinearGradient>
+          </View>
+
+          <View style={sps.pillRow}>
+            <View style={sps.typePill}>
+              <Text style={sps.typePillText}>{typeDisplay}</Text>
+            </View>
+            <View style={sps.durPill}>
+              <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+                <Circle cx="12" cy="12" r="10" stroke="#8A8FA8" strokeWidth={2} />
+                <Path d="M12 6v6l4 2" stroke="#8A8FA8" strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+              <Text style={sps.durPillText}>{durLabel}</Text>
+            </View>
+            {isKidFriendly && (
+              <View style={sps.kidPill}>
+                <Text style={sps.kidPillText}>{'\u2713 Kid-friendly'}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={sps.addrCard}>
+            <View style={sps.addrWarnRow}>
+              <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                <Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Line x1="12" y1="9" x2="12" y2="13" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" />
+                <Line x1="12" y1="17" x2="12.01" y2="17" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+              <Text style={sps.addrWarnText}>{'Estimated \u2014 please verify'}</Text>
+            </View>
+            <Text style={sps.addrText}>{hasAddress ? opt.address : 'Address not available'}</Text>
+            {hasAddress && (
+              <Pressable onPress={() => Linking.openURL(mapsUrl)}>
+                <Text style={sps.addrLink}>{'\uD83D\uDCCD Open in Maps to verify'}</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {kidsBlurb ? (
+            <View style={sps.loveCard}>
+              <View style={sps.loveHdr}>
+                <Text style={sps.loveStar}>{'\u2B50'}</Text>
+                <Text style={sps.loveTitle}>{'WHY KIDS LOVE IT'}</Text>
+              </View>
+              <Text style={sps.loveText}>{kidsBlurb}</Text>
+            </View>
+          ) : null}
+
+          <View style={sps.infoRow}>
+            <View style={sps.infoCell}>
+              <Text style={sps.infoLabel}>{'ENTRY'}</Text>
+              <Text style={sps.infoValue}>{entryLabel}</Text>
+            </View>
+            <View style={[sps.infoCell, { marginLeft: 8 }]}>
+              <Text style={sps.infoLabel}>{'BEST TIME'}</Text>
+              <Text style={sps.infoValue}>{bestTime}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={sps.footer}>
+          <Text style={sps.ctxLabel}>{ctxLabel}</Text>
+          <Pressable style={sps.ctaBtn} onPress={onConfirm}>
+            <Text style={sps.ctaBtnText}>{btnLabel}</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+const sps = StyleSheet.create({
+  overlay:      { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.4)', zIndex: 200, justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%' },
+  handle:       { width: 32, height: 4, backgroundColor: '#E0DDD8', borderRadius: 2, alignSelf: 'center', marginTop: 10 },
+  header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14 },
+  stopName:     { fontSize: 19, fontFamily: F.bold, color: '#1A1F2E', lineHeight: 24, flex: 1, paddingRight: 10 },
+  closeBtn:     { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0 },
+  closeX:       { fontSize: 12, color: '#1A1F2E', fontFamily: F.bold },
+  body:         { paddingHorizontal: 18, paddingTop: 0, paddingBottom: 12 },
+  heroWrap:     { marginTop: 12, borderRadius: 14, overflow: 'hidden', height: 120 },
+  hero:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  heroEmoji:    { fontSize: 42 },
+  pillRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  typePill:     { borderWidth: 1.5, borderColor: '#E8692A', borderRadius: 20, paddingVertical: 4, paddingHorizontal: 11 },
+  typePillText: { fontSize: 11, fontFamily: F.bold, color: '#E8692A' },
+  durPill:      { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1.5, borderColor: '#E0DDD8', borderRadius: 20, paddingVertical: 4, paddingHorizontal: 11 },
+  durPillText:  { fontSize: 11, fontFamily: F.semibold, color: '#8A8FA8' },
+  kidPill:      { backgroundColor: 'rgba(61,170,110,0.1)', borderRadius: 20, paddingVertical: 4, paddingHorizontal: 11 },
+  kidPillText:  { fontSize: 11, fontFamily: F.bold, color: '#3DAA6E' },
+  addrCard:     { marginTop: 10, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  addrWarnRow:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  addrWarnText: { fontSize: 10, fontFamily: F.bold, color: '#F5A623', letterSpacing: 0.2 },
+  addrText:     { fontSize: 12, fontFamily: F.medium, color: '#1A1F2E', lineHeight: 18 },
+  addrLink:     { fontSize: 11, fontFamily: F.bold, color: '#E8692A', marginTop: 5 },
+  loveCard:     { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  loveHdr:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  loveStar:     { fontSize: 15 },
+  loveTitle:    { fontSize: 10, fontFamily: F.bold, color: '#1A1F2E', letterSpacing: 0.5, textTransform: 'uppercase' },
+  loveText:     { fontSize: 12, fontFamily: F.medium, color: '#4A5568', lineHeight: 18 },
+  infoRow:      { flexDirection: 'row', marginTop: 8 },
+  infoCell:     { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  infoLabel:    { fontSize: 9, fontFamily: F.bold, color: '#8A8FA8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 3 },
+  infoValue:    { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
+  footer:       { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, backgroundColor: '#F5F2EE', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.05)' },
+  ctxLabel:     { fontSize: 11, fontFamily: F.semibold, color: '#8A8FA8', textAlign: 'center', marginBottom: 8 },
+  ctaBtn:       { backgroundColor: '#E8692A', borderRadius: 13, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', shadowColor: '#E8692A', shadowOpacity: 0.28, shadowRadius: 20, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  ctaBtnText:   { fontSize: 14, fontFamily: F.bold, color: '#fff' },
+});
+
 // ─── PositionPickerSheet ──────────────────────────────────────────────────────
 
 function PositionPickerSheet({
@@ -4108,8 +4301,35 @@ export default function TripPlanScreen() {
   // ── Screen state ──
   const [activeScreen, setActiveScreen] = useState<'overview' | 'detail'>('overview');
   const [selectedDay, setSelectedDay]   = useState(1);
-  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('none');
+  const [activeSheet, setActiveSheet]   = useState<ActiveSheet>('stopPreview');
   const [addStopFilter, setAddStopFilter] = useState<'food' | 'kids' | 'landmarks'>('landmarks');
+  // ── Stop preview sheet ──
+  const [previewStop, setPreviewStop]   = useState<PreviewStopData | null>({
+    opt: {
+      name: 'United States Botanic Garden',
+      stopType: 'landmark',
+      durationMinutes: 90,
+      address: '100 Maryland Ave SW, Washington, DC 20001',
+      description: 'Kids are captivated by the towering tropical plants and the chance to walk through a real rainforest indoors. The giant lily pads are a favourite stop for photos.',
+      priceRange: 'free',
+      tags: ['Morning'],
+      icon: '\uD83C\uDF3F',
+    },
+    ctx: 'add',
+    dayNum: 1,
+    onConfirm: () => {},
+  });
+  const previewAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.spring(previewAnim, {
+      toValue: activeSheet === 'stopPreview' ? 1 : 0,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start(() => {
+      if (activeSheet !== 'stopPreview') setPreviewStop(null);
+    });
+  }, [activeSheet]);
 
   useEffect(() => {
     if (openAddStop === 'true') {
@@ -4576,6 +4796,14 @@ export default function TripPlanScreen() {
         onClose={() => setUpgradeVisible(false)}
         context={upgradeContext}
       />
+      {previewStop && (
+        <StopPreviewSheet
+          stopData={previewStop}
+          slideAnim={previewAnim}
+          onClose={() => setActiveSheet('none')}
+          insets={insets}
+        />
+      )}
       <TripTabBar />
     </View>
   );
