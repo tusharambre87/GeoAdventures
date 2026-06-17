@@ -936,12 +936,15 @@ function MealSuggestionCard({
   async function loadRec(_excludedNames: string[]) {
     setLoading(true);
     setRec(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const data = await apiFetch<{ options: Array<{ id: string; name: string; stopType: string; description?: string }> }>(
         '/api/travel/rescue/food-options',
         {
           method: 'POST',
-          body: JSON.stringify({ tripId, city: destination }),
+          body: JSON.stringify({ tripId, cityGroup, city: destination }),
+          signal: controller.signal,
         },
       );
       const first = data.options?.[0] ?? null;
@@ -949,6 +952,7 @@ function MealSuggestionCard({
     } catch {
       setRec(null);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }
@@ -1502,18 +1506,44 @@ function DayDetail({
     if (mealStops[0]) setLocalMealDisplayOrder(mealStops[0].displayOrder ?? 0);
   }, [mealStops[0]?.id, mealStops[0]?.displayOrder]);
 
-  // Dynamic insertion index for the meal card: re-computed each render from
-  // localContentStops + localMealDisplayOrder so the card moves immediately
-  // on tap without waiting for the server refetch.
+  // Dynamic insertion index for the meal card.
+  // When the meal stop's displayOrder is beyond all content stops (pre-fix data
+  // where the meal was appended last), fall back to a time-based noon estimate.
+  // Otherwise use the DB-order position so ↑/↓ moves are reflected immediately.
   let mealInsertAfterIdx = 0;
-  if (mealStops[0]) {
-    const _mealProxy = { ...mealStops[0], displayOrder: localMealDisplayOrder };
-    const _allSorted = [...localContentStops, _mealProxy]
-      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-    const _mealIdx = _allSorted.findIndex(s => s.id === mealStops[0].id);
-    if (_mealIdx > 0) {
-      const _contentBefore = _allSorted.slice(0, _mealIdx).filter(s => !isMealStop(s.stopType)).length;
-      mealInsertAfterIdx = Math.max(0, _contentBefore - 1);
+  {
+    const contentMaxOrder = localContentStops.length > 0
+      ? Math.max(...localContentStops.map(s => s.displayOrder ?? 0))
+      : -1;
+    const mealIsAppendedLast = !mealStops[0] || (localMealDisplayOrder > contentMaxOrder);
+
+    if (mealIsAppendedLast) {
+      // Time-based: insert after the content stop whose end+transit is closest to noon
+      const DAY_START = 9 * 60, TRANSIT = 15, NOON = 12 * 60, LUNCH_END = 14 * 60;
+      let cursor = DAY_START;
+      let bestDist = Infinity;
+      for (let i = 0; i < localContentStops.length; i++) {
+        const dur = (localContentStops[i] as any).durationMinutes ?? 60;
+        const slotAfter = cursor + dur + TRANSIT;
+        if (slotAfter <= LUNCH_END) {
+          const dist = Math.abs(slotAfter - NOON);
+          if (dist < bestDist) { bestDist = dist; mealInsertAfterIdx = i; }
+        }
+        cursor += dur + TRANSIT;
+      }
+      if (bestDist === Infinity && localContentStops.length > 0) {
+        mealInsertAfterIdx = localContentStops.length - 1;
+      }
+    } else if (mealStops[0]) {
+      // Meal has been explicitly positioned — reflect its actual DB order
+      const _mealProxy = { ...mealStops[0], displayOrder: localMealDisplayOrder };
+      const _allSorted = [...localContentStops, _mealProxy]
+        .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      const _mealIdx = _allSorted.findIndex(s => s.id === mealStops[0].id);
+      if (_mealIdx > 0) {
+        const _contentBefore = _allSorted.slice(0, _mealIdx).filter(s => !isMealStop(s.stopType)).length;
+        mealInsertAfterIdx = Math.max(0, _contentBefore - 1);
+      }
     }
   }
 

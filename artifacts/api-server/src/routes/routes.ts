@@ -8886,12 +8886,14 @@ Return valid JSON only. No markdown.`;
   // POST /api/travel/rescue/food-options
   app.post('/api/travel/rescue/food-options', isAuthenticated, async (req: any, res) => {
     try {
-      const { tripId, cityGroup, lat, lng } = req.body;
+      const { tripId, cityGroup, city, lat, lng } = req.body;
       if (!tripId) return res.status(400).json({ message: 'tripId is required' });
 
       // Prefer stop-level city (cityGroup) over trip-level destination so multi-city
       // trips return restaurants near the *current stop*, not the trip's primary city.
-      let cityRaw: string = cityGroup ? String(cityGroup).split(',')[0].trim() : '';
+      // Also accept plain `city` field sent by the meal suggestion card.
+      let cityRaw: string = cityGroup ? String(cityGroup).split(',')[0].trim()
+        : city ? String(city).split(',')[0].trim() : '';
       if (!cityRaw) {
         const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
         if (!trip) return res.status(404).json({ message: 'Trip not found' });
@@ -9697,22 +9699,23 @@ Return ONLY valid JSON in this exact format:
           const trip = await storage.getTripById(tripId);
           const cityContext = trip?.city || trip?.destination || '';
           const openai = getOpenAI();
+          // gpt-5-mini rejects response_format:json_object — extract JSON with regex instead
           const lookupResponse = await openai.chat.completions.create({
             model: "gpt-5-mini",
             messages: [
-              { role: "system", content: "You are a geography expert. Return ONLY a JSON object with 'address' (full street address), 'lat' (decimal latitude), and 'lon' (decimal longitude) for the given place. If you cannot find a specific address, provide the best known address." },
+              { role: "system", content: 'You are a geography expert. Return ONLY a JSON object (no markdown) with keys "address", "lat", "lon" for the given place.' },
               { role: "user", content: `Find the address and coordinates for: "${name}"${cityContext ? ` in or near ${cityContext}` : ''}` }
             ],
-            response_format: { type: "json_object" },
             max_completion_tokens: 200,
           });
-          const locationData = JSON.parse(lookupResponse.choices[0].message.content || "{}");
+          const raw = lookupResponse.choices[0].message.content || '';
+          const jsonMatch = raw.match(/\{[\s\S]*\}/);
+          const locationData = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
           if (locationData.address) resolvedAddress = locationData.address;
           if (locationData.lat && !resolvedLat) resolvedLat = String(locationData.lat);
           if (locationData.lon && !resolvedLon) resolvedLon = String(locationData.lon);
-          console.log(`📍 [Travel] Auto-resolved "${name}": ${resolvedAddress}`);
         } catch (e) {
-          console.error(`Failed to auto-lookup address for "${name}":`, e);
+          req.log?.warn({ error: e }, `[Travel] Failed to auto-lookup address for "${name}"`);
         }
       }
 
