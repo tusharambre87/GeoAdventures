@@ -85,6 +85,7 @@ export function getOptions(
     ],
     secondary: [
       { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',        subtitle: 'Find indoor options nearby', zone: 'secondary' },
+      { id: 'sick',    icon: '\uD83E\uDD12',       title: 'Someone is sick',        subtitle: 'Find help nearby',          zone: 'secondary' },
       { id: 'done',    icon: '\u2705',              title: "We're done for the day", subtitle: 'Wrap up early',             zone: 'secondary' },
     ],
   };

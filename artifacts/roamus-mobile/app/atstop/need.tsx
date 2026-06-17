@@ -181,6 +181,12 @@ export default function NeedScreen() {
       onPress: () => handleFoodNearby(),
     },
     {
+      icon: '\uD83E\uDD12',
+      title: 'Someone is sick',
+      sub: 'Find help nearby',
+      onPress: () => router.push('/atstop/sos' as never),
+    },
+    {
       icon: '\u23ED',
       title: 'Skip this stop',
       sub: 'Move on to the next one',
