@@ -9720,11 +9720,63 @@ Return ONLY valid JSON in this exact format:
       const allStops = await storage.getStopsByTripId(tripId);
       const sorted = [...allStops].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
+      const MEAL_STOP_TYPES = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+      const isMealStop = MEAL_STOP_TYPES.has((stopType || '').toLowerCase());
+
       let insertAt: number;
       if (typeof insertAtOrder === 'number') {
         // Need-rec insertion: exact position requested by client
         // Round to integer since displayOrder is an integer DB column
         insertAt = Math.round(Math.max(0, insertAtOrder));
+      } else if (isMealStop) {
+        // Auto-slot food stop into lunch window (11am–2pm)
+        // Resolve which day's stops to work with
+        let targetDayIdx: number;
+        if (typeof dayIndex === 'number') {
+          targetDayIdx = dayIndex;
+        } else if (cityGroup) {
+          const anchor = sorted.find(s => s.cityGroup === cityGroup);
+          targetDayIdx = anchor?.dayIndex ?? 0;
+        } else {
+          targetDayIdx = sorted.length > 0 ? (sorted[sorted.length - 1].dayIndex ?? 0) : 0;
+        }
+        const dayStops = sorted.filter(s => (s.dayIndex ?? 0) === targetDayIdx);
+        if (dayStops.length === 0) {
+          insertAt = sorted.length;
+        } else {
+          // Estimate start times assuming 9am start + 15min transit between stops
+          const DAY_START_MIN = 9 * 60;   // 9:00am
+          const TRANSIT_MIN   = 15;
+          const NOON_MIN      = 12 * 60;  // noon as ideal target
+          const LUNCH_END_MIN = 14 * 60;  // 2pm hard cut-off
+          let cursor = DAY_START_MIN;
+          const times: Array<{ stop: typeof sorted[0]; startMin: number; endMin: number }> = [];
+          for (const s of dayStops) {
+            const dur = s.durationMinutes ?? 60;
+            times.push({ stop: s, startMin: cursor, endMin: cursor + dur });
+            cursor += dur + TRANSIT_MIN;
+          }
+          // Find insertion point: after the last stop that ends before LUNCH_END_MIN
+          // and whose end time is closest to noon
+          let bestInsertAfterIdx = -1; // -1 = before all stops
+          let bestDist = Math.abs(DAY_START_MIN - NOON_MIN);
+          for (let i = 0; i < times.length; i++) {
+            const slotStart = times[i].endMin + TRANSIT_MIN;
+            if (slotStart <= LUNCH_END_MIN) {
+              const dist = Math.abs(slotStart - NOON_MIN);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestInsertAfterIdx = i;
+              }
+            }
+          }
+          if (bestInsertAfterIdx === -1) {
+            // All stops are after lunch window — insert before first day stop
+            insertAt = dayStops[0].displayOrder ?? 0;
+          } else {
+            insertAt = (dayStops[bestInsertAfterIdx].displayOrder ?? 0) + 1;
+          }
+        }
       } else if (cityGroup) {
         // Add-stop: append at end of the target city group (day)
         const dayStops = sorted.filter(s => s.cityGroup === cityGroup);
