@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  FlatList,
   Linking,
   Modal,
   Platform,
@@ -1665,11 +1666,10 @@ function DayDetail({
       {/* Body */}
       {/* Body — DraggableFlatList IS the scroll container; no outer ScrollView */}
       {console.log('RENDER localContentStops:', localContentStops?.length, JSON.stringify(localContentStops?.map(s => s.name)))}
-      <DraggableFlatList
+      <FlatList
         data={localContentStops.length > 0 || contentStops.length === 0 ? localContentStops : contentStops}
         keyExtractor={s => s.id}
         extraData={`${mealInsertAfterIdx}-${localContentStops.map(s => s.id).join(',')}`}
-        onDragEnd={handleDragEnd}
         style={{ flex: 1 }}
         contentContainerStyle={[dd.body, { paddingBottom: insets.bottom + 32 + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
@@ -1771,8 +1771,7 @@ function DayDetail({
 
           </>
         }
-        renderItem={({ item: stop, drag, isActive, getIndex }: RenderItemParams<Stop>) => {
-          const i      = getIndex() ?? 0;
+        renderItem={({ item: stop, index: i }) => {
           const isLast = i === localContentStops.length - 1;
           const allSorted = [...localContentStops, ...mealStops]
             .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
@@ -1780,7 +1779,7 @@ function DayDetail({
           const canMoveUp   = isEditable && posInAll > 0;
           const canMoveDown = isEditable && posInAll < allSorted.length - 1;
           return (
-            <ScaleDecorator activeScale={0.97}>
+            <View>
               <StopCard
                 stop={stop}
                 isEditable={isEditable}
@@ -1789,8 +1788,8 @@ function DayDetail({
                 onDetails={onStopDetails}
                 onReplace={onReplaceStop}
                 onDelete={onDelete}
-                drag={isEditable ? drag : undefined}
-                isActive={isActive}
+                drag={undefined}
+                isActive={false}
                 canMoveUp={canMoveUp}
                 canMoveDown={canMoveDown}
                 onMoveUp={isEditable ? () => handleMoveStop(stop.id, 'up') : undefined}
@@ -1820,7 +1819,7 @@ function DayDetail({
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
               )}
-            </ScaleDecorator>
+            </View>
           );
         }}
         ListFooterComponent={
