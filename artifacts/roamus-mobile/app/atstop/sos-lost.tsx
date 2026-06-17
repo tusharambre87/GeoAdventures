@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
@@ -7,14 +8,21 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { G, F } from '@/lib/tokens';
+import { API_BASE } from '@/lib/apiClient';
 
 export default function SosLostScreen() {
   const insets = useSafeAreaInsets();
-  const { hotelName, hotelAddress } = useLocalSearchParams<{ hotelName?: string; hotelAddress?: string }>();
+  const { hotelName, hotelAddress, tripId, destination } = useLocalSearchParams<{
+    hotelName?: string;
+    hotelAddress?: string;
+    tripId?: string;
+    destination?: string;
+  }>();
 
   const [hotelInput, setHotelInput]     = useState('');
   const [coords, setCoords]             = useState<{ lat: number; lon: number } | null>(null);
   const [locationLoading, setLocLoading] = useState(true);
+  const [saving, setSaving]             = useState(false);
 
   useEffect(() => {
     Location.requestForegroundPermissionsAsync().then(({ status }) => {
@@ -31,6 +39,32 @@ export default function SosLostScreen() {
   const openCurrentLocation = () => {
     if (coords) Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lon}`);
   };
+
+  async function saveAndNavigate(dest: string) {
+    if (!tripId || saving) { void navigateToHotel(dest); return; }
+    setSaving(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      await fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          stayLocations: [{
+            cityName: destination ?? '',
+            name: dest,
+            address: dest,
+          }],
+        }),
+      });
+    } catch {
+    } finally {
+      setSaving(false);
+      void navigateToHotel(dest);
+    }
+  }
 
   const savedHotel = hotelName ?? hotelAddress;
 
@@ -63,7 +97,7 @@ export default function SosLostScreen() {
           ) : (
             <>
               <Text style={styles.cardBody}>
-                Enter your hotel name or address to get directions back.
+                Enter your hotel name or address to get directions back. We'll also save it as your starting point.
               </Text>
               <TextInput
                 style={styles.input}
@@ -72,13 +106,16 @@ export default function SosLostScreen() {
                 value={hotelInput}
                 onChangeText={setHotelInput}
                 returnKeyType="go"
-                onSubmitEditing={() => hotelInput.trim() && navigateToHotel(hotelInput.trim())}
+                onSubmitEditing={() => hotelInput.trim() && void saveAndNavigate(hotelInput.trim())}
               />
               <TouchableOpacity
-                style={[styles.navBtn, !hotelInput.trim() && styles.navBtnDisabled]}
-                disabled={!hotelInput.trim()}
-                onPress={() => navigateToHotel(hotelInput.trim())}>
-                <Text style={styles.navBtnText}>{'\uD83D\uDCCD'}  Navigate</Text>
+                style={[styles.navBtn, (!hotelInput.trim() || saving) && styles.navBtnDisabled]}
+                disabled={!hotelInput.trim() || saving}
+                onPress={() => void saveAndNavigate(hotelInput.trim())}>
+                {saving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.navBtnText}>{'\uD83D\uDCCD'}  Save & Navigate</Text>
+                }
               </TouchableOpacity>
             </>
           )}

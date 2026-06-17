@@ -116,6 +116,28 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
+  async function triggerAddressSearch(query: string) {
+    setIsSearchingAddress(true);
+    try {
+      const q = encodeURIComponent(query);
+      const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=3&addressdetails=1`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'RoamUs/1.0', 'Accept-Language': 'en' } });
+      if (!res.ok) { setAddressSuggestions([]); return; }
+      const data = await res.json() as Array<{ display_name?: string }>;
+      const results = data.slice(0, 3).map(r => r.display_name ?? '').filter(Boolean);
+      if (results.length === 1) {
+        setAddress(results[0]);
+        setAddressSuggestions([]);
+      } else {
+        setAddressSuggestions(results);
+      }
+    } catch {
+      setAddressSuggestions([]);
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  }
+
   function handleHotelNameChange(text: string) {
     setHotelName(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -124,22 +146,8 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
       setIsSearchingAddress(false);
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setIsSearchingAddress(true);
-      try {
-        const query = encodeURIComponent(`${text.trim()}, ${destination}`);
-        const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=3&addressdetails=1`;
-        const res = await fetch(url, { headers: { 'User-Agent': 'RoamUs/1.0', 'Accept-Language': 'en' } });
-        if (!res.ok) { setAddressSuggestions([]); return; }
-        const data = await res.json() as Array<{ display_name?: string }>;
-        setAddressSuggestions(
-          data.slice(0, 3).map(r => r.display_name ?? '').filter(Boolean)
-        );
-      } catch {
-        setAddressSuggestions([]);
-      } finally {
-        setIsSearchingAddress(false);
-      }
+    debounceRef.current = setTimeout(() => {
+      void triggerAddressSearch(`${text.trim()}, ${destination}`);
     }, 800);
   }
 
@@ -147,6 +155,7 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
     setHotelName(item.sub);
     setSuggestions([]);
     Keyboard.dismiss();
+    void triggerAddressSearch(item.name);
   }
 
   function selectAddressSuggestion(addr: string) {
@@ -169,7 +178,7 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          stayLocations: [{ cityName: destination, address: combined }],
+          stayLocations: [{ cityName: destination, name: name || addr, address: combined }],
         }),
       });
       setSaved(true);

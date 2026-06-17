@@ -1,14 +1,39 @@
-import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { G, F } from '@/lib/tokens';
+import { API_BASE } from '@/lib/apiClient';
 
 export default function SosScreen() {
   const insets = useSafeAreaInsets();
   const { tripId, destination } = useLocalSearchParams<{ tripId?: string; destination?: string }>();
+
+  const [hotelName,    setHotelName]    = useState<string | undefined>(undefined);
+  const [hotelAddress, setHotelAddress] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!tripId) return;
+    AsyncStorage.getItem('auth_token').then(token => {
+      fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then((data: any) => {
+          if (!data) return;
+          const locs: any[] = data.stayLocations ?? [];
+          if (locs.length > 0) {
+            const loc = locs[0];
+            setHotelName(loc.name || loc.address || undefined);
+            setHotelAddress(loc.address || loc.name || undefined);
+          }
+        })
+        .catch(() => {});
+    }).catch(() => {});
+  }, [tripId]);
 
   const options = [
     {
@@ -30,7 +55,7 @@ export default function SosScreen() {
       emoji: '\uD83D\uDCCD',
       title: "We're lost",
       sub: 'Get back to your hotel or a safe place',
-      onPress: () => router.push({ pathname: '/atstop/sos-lost' as never, params: { tripId, destination } }),
+      onPress: () => router.push({ pathname: '/atstop/sos-lost' as never, params: { tripId, destination, hotelName, hotelAddress } }),
     },
   ];
 

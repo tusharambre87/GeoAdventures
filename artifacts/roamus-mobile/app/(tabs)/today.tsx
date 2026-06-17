@@ -1549,7 +1549,7 @@ export default function TodayScreen() {
               const cities: string[] = (trip as any).cities?.length > 0
                 ? (trip as any).cities
                 : [trip.destination ?? (trip as any).city ?? ''].filter(Boolean);
-              const allLocs = cities.map((c: string) => ({ cityName: c, address: resolvedAddr }));
+              const allLocs = cities.map((c: string) => ({ cityName: c, name, address: resolvedAddr }));
               try {
                 await apiFetch(`/api/travel/trips/${trip.id}`, {
                   method: 'PATCH',
@@ -2168,7 +2168,7 @@ export default function TodayScreen() {
               const cities: string[] = (trip as any).cities?.length > 0
                 ? (trip as any).cities
                 : [trip.destination ?? (trip as any).city ?? ''].filter(Boolean);
-              const allLocs = cities.map((c: string) => ({ cityName: c, address: resolvedAddr }));
+              const allLocs = cities.map((c: string) => ({ cityName: c, name, address: resolvedAddr }));
               try {
                 await apiFetch(`/api/travel/trips/${trip.id}`, {
                   method: 'PATCH',
