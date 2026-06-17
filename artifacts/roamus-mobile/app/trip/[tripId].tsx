@@ -848,12 +848,6 @@ function StopCard({
       {/* Body */}
       <View style={sc.body}>
         <KidFitTag bias={stop.kidFitBias ?? (stop as any).kid_fit_bias ?? null} />
-        {isEditable && (
-          <View style={{ position: 'absolute', bottom: 10, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.35 }}>
-            <Text style={sc.swipeHintText}>Remove  ·  Replace</Text>
-            <Text style={sc.swipeHintText}>{'\u2039'}</Text>
-          </View>
-        )}
         <View style={sc.tagsRow}>
           <View style={sc.tagMuted}>
             <Text style={sc.tagMutedText}>{duration} min</Text>
@@ -4777,8 +4771,6 @@ const sc = StyleSheet.create({
   actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9, paddingHorizontal: 12, paddingBottom: 11 },
   detailsBtn: { backgroundColor: C.deep, borderRadius: 10, paddingHorizontal: 18, paddingVertical: 8 },
   detailsBtnText: { fontFamily: F.bold, fontSize: 12, color: '#fff' },
-  swipeHint: { flexDirection: 'row', alignItems: 'center' },
-  swipeHintText: { fontFamily: F.regular, fontSize: 10, color: C.muted },
   viewOnlyText: { fontFamily: F.regular, fontSize: 10, color: C.muted },
   revealRow: { width: 144, flexDirection: 'row' },
   revBtn: { width: 72, alignItems: 'center', justifyContent: 'center', gap: 5 },
