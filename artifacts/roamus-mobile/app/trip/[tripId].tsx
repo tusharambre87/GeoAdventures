@@ -2444,10 +2444,12 @@ function ReplaceSheet({
     const cached = sugsCache.current.get(stopId);
     if (cached) { setAllSugs(cached); return; }
     setLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 14000);
     try {
       const res = await apiFetch<{ suggestions: SuggestionItem[] }>(
         `/api/travel/stops/${stopId}/replace-suggestions`,
-        { method: 'POST' }
+        { method: 'POST', signal: controller.signal }
       );
       const result = res.suggestions ?? [];
       sugsCache.current.set(stopId, result);
@@ -2455,6 +2457,7 @@ function ReplaceSheet({
     } catch {
       setAllSugs([]);
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   }

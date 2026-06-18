@@ -3565,7 +3565,7 @@ Rules:
 - whyNow: ≤15 words, family-focused reason`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: "Return only valid JSON. No markdown, no explanation." },
       { role: "user", content: prompt },
