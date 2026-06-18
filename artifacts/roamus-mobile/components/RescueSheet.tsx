@@ -5,6 +5,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1067,7 +1068,6 @@ export default function RescueSheet({
           stop={previewItem.stop}
           imageUrl={previewImageUrl}
           imageLoading={previewImageLoading}
-          insetBottom={insets.bottom}
           onClose={() => setPreviewItem(null)}
           onSwap={() => { setPreviewItem(null); previewItem.swapFn(); }}
         />
@@ -1084,13 +1084,16 @@ interface PreviewPanelProps {
   stop: LibraryStop | OtherDayStop;
   imageUrl: string | null;
   imageLoading: boolean;
-  insetBottom: number;
   onClose: () => void;
   onSwap: () => void;
 }
 
-function PreviewPanel({ stop, imageUrl, imageLoading, insetBottom, onClose, onSwap }: PreviewPanelProps) {
+function PreviewPanel({ stop, imageUrl, imageLoading, onClose, onSwap }: PreviewPanelProps) {
   const { height: screenH } = useWindowDimensions();
+  // useSafeAreaInsets() can return 0 inside a RN Modal on iOS (separate window context).
+  // Fall back to 34pt (home-indicator clearance) on iOS so the CTA is never hidden.
+  const safeInsets = useSafeAreaInsets();
+  const bottomSpace = Math.max(safeInsets.bottom, Platform.OS === 'ios' ? 34 : 16);
   return (
     <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
       <Pressable
@@ -1159,7 +1162,7 @@ function PreviewPanel({ stop, imageUrl, imageLoading, insetBottom, onClose, onSw
         <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onSwap}>
           <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
         </TouchableOpacity>
-        <View style={{ height: Math.max(insetBottom, 16) }} />
+        <View style={{ height: bottomSpace }} />
       </View>
     </View>
   );
