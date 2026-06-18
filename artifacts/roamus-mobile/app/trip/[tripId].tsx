@@ -4950,6 +4950,7 @@ export default function TripPlanScreen() {
       {showPreview && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, zIndex: 300, backgroundColor: 'rgba(26,31,46,0.4)', justifyContent: 'flex-end' }}>
           <StopPreviewSheetDemo
+            stop={{ name: '', stopType: 'landmark' }}
             context="add"
             onClose={() => setShowPreview(false)}
             onConfirm={() => setShowPreview(false)}

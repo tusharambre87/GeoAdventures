@@ -1,84 +1,183 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { F } from '@/lib/tokens';
 
-export default function StopPreviewSheet({ onClose, onConfirm, context = 'add' }: {
+interface Props {
+  stop: {
+    name: string;
+    stopType: string;
+    description?: string;
+    address?: string;
+  };
+  imageUrl?: string;
+  imageLoading?: boolean;
+  context: 'replace' | 'add' | 'swap';
   onClose: () => void;
   onConfirm: () => void;
-  context?: 'add' | 'replace' | 'swap';
-}) {
-  const btnLabel = context === 'add' ? 'Add to my day →' : 'Swap this stop →';
-  const ctxLabel = context === 'add' ? 'Adding to Day 1' : 'Swapping for something better';
+}
+
+const STOP_TYPE_EMOJI: Record<string, string> = {
+  restaurant:        '\uD83C\uDF7D',
+  food:              '\uD83C\uDF54',
+  cafe:              '\u2615',
+  lunch:             '\uD83E\uDD6A',
+  dining:            '\uD83C\uDF7D',
+  street_food:       '\uD83E\uDDB4',
+  museum:            '\uD83C\uDFDB',
+  aquarium:          '\uD83D\uDC20',
+  park:              '\uD83C\uDF33',
+  zoo:               '\uD83E\uDD81',
+  landmark:          '\uD83D\uDDFD',
+  science_center:    '\uD83D\uDD2D',
+  theater:           '\uD83C\uDFAD',
+  gallery:           '\uD83D\uDDBC',
+  indoor_attraction: '\uD83C\uDFAB',
+};
+
+function stopEmoji(type: string | null | undefined): string {
+  return STOP_TYPE_EMOJI[type ?? ''] ?? '\uD83D\uDCCD';
+}
+
+export default function StopPreviewSheet({
+  stop,
+  imageUrl,
+  imageLoading,
+  context,
+  onClose,
+  onConfirm,
+}: Props) {
+  const { height: screenH } = useWindowDimensions();
+  const safeInsets = useSafeAreaInsets();
+  const bottomSpace = Math.max(safeInsets.bottom, Platform.OS === 'ios' ? 34 : 16);
+
+  const btnLabel = context === 'add' ? 'Add to my day \u2192' : 'Swap this stop \u2192';
 
   return (
-    <View style={s.sheet}>
-      <View style={s.handle} />
-      <View style={s.header}>
-        <Text style={s.name}>United States Botanic Garden</Text>
-        <TouchableOpacity style={s.close} onPress={onClose}>
-          <Text style={s.closeX}>✕</Text>
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
+      <Pressable
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+        onPress={onClose}
+      />
+      <View style={[s.previewPanel, { maxHeight: screenH * 0.88 }]}>
+        <View style={s.previewHandle} />
+        <View style={s.previewHeader}>
+          <Text style={s.previewName} numberOfLines={2}>{stop.name}</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={s.previewCloseX}>{'\u2715'}</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 4 }}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={s.previewHero}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                {imageLoading
+                  ? <ActivityIndicator color="#E8692A" />
+                  : <Text style={s.previewHeroEmoji}>{stopEmoji(stop.stopType)}</Text>
+                }
+              </View>
+            )}
+          </View>
+          <View style={s.previewBody}>
+            <View style={s.previewPillRow}>
+              {!!stop.stopType && (
+                <View style={s.previewTypePill}>
+                  <Text style={s.previewTypePillText}>
+                    {(stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)).replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {!!stop.description && (
+              <View style={s.previewDescBox}>
+                <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
+                <Text style={s.previewDescText}>{stop.description}</Text>
+              </View>
+            )}
+            {!!stop.address && (
+              <View style={s.previewAddrBox}>
+                <Text style={s.previewAddrText}>{stop.address}</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+        <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onConfirm}>
+          <Text style={s.previewSwapBtnText}>{btnLabel}</Text>
         </TouchableOpacity>
-      </View>
-      <ScrollView style={s.body} showsVerticalScrollIndicator={false}>
-        <View style={s.heroImg} />
-        <View style={s.pillRow}>
-          <View style={s.typePill}><Text style={s.typePillTxt}>Landmark</Text></View>
-          <View style={s.durPill}><Text style={s.durPillTxt}>⏱ 1–2 hours</Text></View>
-          <View style={s.kidPill}><Text style={s.kidPillTxt}>✓ Kid-friendly</Text></View>
-        </View>
-        <View style={s.addrCard}>
-          <Text style={s.addrWarn}>⚠ Estimated — please verify</Text>
-          <Text style={s.addrText}>100 Maryland Ave SW, Washington, DC 20001</Text>
-          <Text style={s.addrLink}>📍 Open in Maps to verify</Text>
-        </View>
-        <View style={s.loveCard}>
-          <Text style={s.loveTitle}>⭐ WHY KIDS LOVE IT</Text>
-          <Text style={s.loveTxt}>Kids are captivated by the towering tropical plants and the chance to walk through a real rainforest — indoors.</Text>
-        </View>
-        <View style={s.infoRow}>
-          <View style={s.infoCell}><Text style={s.infoLabel}>ENTRY</Text><Text style={s.infoVal}>Free entry</Text></View>
-          <View style={s.infoCell}><Text style={s.infoLabel}>BEST TIME</Text><Text style={s.infoVal}>Morning</Text></View>
-        </View>
-      </ScrollView>
-      <View style={s.footer}>
-        <Text style={s.ctxLabel}>{ctxLabel}</Text>
-        <TouchableOpacity style={s.btn} onPress={onConfirm}>
-          <Text style={s.btnTxt}>{btnLabel}</Text>
-        </TouchableOpacity>
+        <View style={{ height: bottomSpace }} />
       </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  sheet:{ backgroundColor:'#F5F2EE', borderTopLeftRadius:24, borderTopRightRadius:24, maxHeight:'85%' },
-  handle:{ width:32, height:3, backgroundColor:'#E0DDD8', borderRadius:2, alignSelf:'center', marginTop:10 },
-  header:{ flexDirection:'row', alignItems:'flex-start', justifyContent:'space-between', padding:16, paddingBottom:0 },
-  name:{ fontSize:19, fontWeight:'800', color:'#1A1F2E', flex:1, paddingRight:10, lineHeight:24 },
-  close:{ width:28, height:28, borderRadius:14, backgroundColor:'#ECEAE6', alignItems:'center', justifyContent:'center' },
-  closeX:{ fontSize:12, color:'#1A1F2E', fontWeight:'700' },
-  body:{ paddingHorizontal:16 },
-  heroImg:{ height:120, backgroundColor:'#3DAA6E', borderRadius:14, marginTop:12 },
-  pillRow:{ flexDirection:'row', gap:7, flexWrap:'wrap', marginTop:11 },
-  typePill:{ paddingHorizontal:11, paddingVertical:4, borderRadius:20, borderWidth:1.5, borderColor:'#E8692A' },
-  typePillTxt:{ fontSize:11, fontWeight:'700', color:'#E8692A' },
-  durPill:{ paddingHorizontal:11, paddingVertical:4, borderRadius:20, borderWidth:1.5, borderColor:'#E0DDD8' },
-  durPillTxt:{ fontSize:11, fontWeight:'600', color:'#8A8FA8' },
-  kidPill:{ paddingHorizontal:11, paddingVertical:4, borderRadius:20, backgroundColor:'rgba(61,170,110,0.1)' },
-  kidPillTxt:{ fontSize:11, fontWeight:'700', color:'#3DAA6E' },
-  addrCard:{ backgroundColor:'#fff', borderRadius:14, padding:12, marginTop:10 },
-  addrWarn:{ fontSize:10, fontWeight:'700', color:'#F5A623', marginBottom:5 },
-  addrText:{ fontSize:12, color:'#1A1F2E', fontWeight:'500', lineHeight:17 },
-  addrLink:{ fontSize:11, color:'#E8692A', fontWeight:'700', marginTop:5 },
-  loveCard:{ backgroundColor:'#fff', borderRadius:14, padding:12, marginTop:8 },
-  loveTitle:{ fontSize:10, fontWeight:'800', color:'#1A1F2E', letterSpacing:0.5, marginBottom:6 },
-  loveTxt:{ fontSize:12, color:'#4A5568', lineHeight:18, fontWeight:'500' },
-  infoRow:{ flexDirection:'row', gap:8, marginTop:8, marginBottom:10 },
-  infoCell:{ flex:1, backgroundColor:'#fff', borderRadius:14, padding:12 },
-  infoLabel:{ fontSize:9, fontWeight:'800', color:'#8A8FA8', letterSpacing:0.8, marginBottom:3 },
-  infoVal:{ fontSize:13, fontWeight:'700', color:'#1A1F2E' },
-  footer:{ padding:14, paddingBottom:16, borderTopWidth:1, borderTopColor:'rgba(0,0,0,0.05)' },
-  ctxLabel:{ fontSize:11, color:'#8A8FA8', fontWeight:'600', textAlign:'center', marginBottom:8 },
-  btn:{ backgroundColor:'#E8692A', borderRadius:13, padding:14, alignItems:'center',
-    shadowColor:'#E8692A', shadowOffset:{width:0,height:4}, shadowOpacity:0.28, shadowRadius:12 },
-  btnTxt:{ color:'#fff', fontSize:14, fontWeight:'700' },
+  previewPanel: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15, shadowRadius: 20, elevation: 24,
+  },
+  previewHandle: {
+    width: 36, height: 4, backgroundColor: '#D0CCC6',
+    borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 2,
+  },
+  previewHeader: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8, gap: 10,
+  },
+  previewName: {
+    flex: 1, fontSize: 18, fontWeight: '800', color: '#1A1F2E',
+    fontFamily: F.bold, lineHeight: 24,
+  },
+  previewCloseX: { fontSize: 16, color: '#B0ADA8', paddingTop: 3 },
+  previewHero: {
+    height: 160, backgroundColor: '#1A1F2E',
+    marginHorizontal: 20, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    overflow: 'hidden',
+  },
+  previewHeroEmoji: { fontSize: 38 },
+  previewBody: { paddingHorizontal: 20 },
+  previewPillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
+  previewTypePill: {
+    backgroundColor: '#F5F2EE', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  previewTypePillText: { fontSize: 12, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  previewDescBox: {
+    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14, marginBottom: 10,
+  },
+  previewDescLabel: {
+    fontSize: 10, fontWeight: '700', color: '#8A8FA8',
+    letterSpacing: 0.8, marginBottom: 5, fontFamily: F.bold,
+  },
+  previewDescText: { fontSize: 13, color: '#1A1F2E', fontFamily: F.regular, lineHeight: 19 },
+  previewAddrBox: {
+    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 12, marginBottom: 10,
+  },
+  previewAddrText: { fontSize: 12, color: '#8A8FA8', fontFamily: F.regular },
+  previewSwapBtn: {
+    marginHorizontal: 20, marginTop: 6,
+    backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 15, alignItems: 'center',
+  },
+  previewSwapBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
 });
