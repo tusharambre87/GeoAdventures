@@ -71,6 +71,7 @@ interface Props {
   onDropStop?: (stopId: string) => Promise<void> | void;
   onWrapDay?: () => Promise<void> | void;
   onStopsChanged?: () => void;
+  onPreviewStop?: (stop: any, imageUrl?: string) => void;
   initialOption?: SheetView;
   stopLat?: string | number | null;
   stopLng?: string | number | null;

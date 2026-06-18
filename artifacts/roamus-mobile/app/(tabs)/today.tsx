@@ -42,6 +42,7 @@ import AddHotelSheet from "@/components/AddHotelSheet";
 import DirectionsSheet from "@/components/DirectionsSheet";
 import DirectionsToAllStopsCard from "@/components/DirectionsToAllStopsCard";
 import RescueSheet from "@/components/RescueSheet";
+import StopPreviewSheet from "@/components/StopPreviewSheet";
 import { Analytics } from "@/services/analytics/analytics";
 import { F, CITY_IMGS } from "@/lib/tokens";
 
@@ -546,6 +547,14 @@ export default function TodayScreen() {
   const [showHotelSheet, setShowHotelSheet]      = useState(false);
   const [showDirections, setShowDirections]      = useState(false);
   const [showRescue, setShowRescue]              = useState(false);
+  const [previewStop, setPreviewStop] = useState<{
+    name: string;
+    stopType: string;
+    description?: string;
+    address?: string;
+  } | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | undefined>();
+  const [previewImageLoading, setPreviewImageLoading] = useState(false);
   const [kidPickerVisible, setKidPickerVisible]  = useState(false);
   const [kidsForPicker, setKidsForPicker]        = useState<PlayerRecord[]>([]);
   const pendingKidsParams = useRef<{ stopId: string; stopName: string; tripId: string } | null>(null);
@@ -1020,6 +1029,18 @@ export default function TodayScreen() {
       try { await loadTrip(); } catch { /* best-effort */ }
     }
   }, [resolvedTripId, trip?.id, loadTrip]);
+
+  const handlePreviewStop = (stop: any, imageUrl?: string) => {
+    setPreviewStop(stop);
+    setPreviewImageUrl(imageUrl);
+    setShowRescue(false);
+  };
+
+  const handlePreviewClose = () => {
+    setPreviewStop(null);
+    setPreviewImageUrl(undefined);
+    setShowRescue(true);
+  };
 
   // ── Submit day rating ──
   async function handleRating(rating: 'okay' | 'good' | 'amazing') {
@@ -2212,8 +2233,19 @@ export default function TodayScreen() {
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
+          onPreviewStop={handlePreviewStop}
           initialOption={rescueInitialOption}
         />
+      {previewStop && (
+        <StopPreviewSheet
+          stop={previewStop}
+          imageUrl={previewImageUrl}
+          imageLoading={false}
+          context="replace"
+          onClose={handlePreviewClose}
+          onConfirm={handlePreviewClose}
+        />
+      )}
       </View>
     );
   }
@@ -2532,7 +2564,18 @@ export default function TodayScreen() {
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
+          onPreviewStop={handlePreviewStop}
         />
+      {previewStop && (
+        <StopPreviewSheet
+          stop={previewStop}
+          imageUrl={previewImageUrl}
+          imageLoading={false}
+          context="replace"
+          onClose={handlePreviewClose}
+          onConfirm={handlePreviewClose}
+        />
+      )}
         {menuOverlay}
       </View>
     );
@@ -2796,7 +2839,18 @@ export default function TodayScreen() {
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
+          onPreviewStop={handlePreviewStop}
         />
+      {previewStop && (
+        <StopPreviewSheet
+          stop={previewStop}
+          imageUrl={previewImageUrl}
+          imageLoading={false}
+          context="replace"
+          onClose={handlePreviewClose}
+          onConfirm={handlePreviewClose}
+        />
+      )}
         {menuOverlay}
       </View>
     );
@@ -2955,7 +3009,18 @@ export default function TodayScreen() {
           onDropStop={handleRescueDrop}
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
+          onPreviewStop={handlePreviewStop}
         />
+      {previewStop && (
+        <StopPreviewSheet
+          stop={previewStop}
+          imageUrl={previewImageUrl}
+          imageLoading={false}
+          context="replace"
+          onClose={handlePreviewClose}
+          onConfirm={handlePreviewClose}
+        />
+      )}
       </View>
     );
   }
