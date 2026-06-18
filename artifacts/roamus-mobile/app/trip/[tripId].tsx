@@ -2413,6 +2413,27 @@ function chipToFilterGroup(c: ReplaceChip): string | null {
   return null;
 }
 
+function SkeletonAltCard() {
+  const opacity = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+  return (
+    <View style={{ height: 100, backgroundColor: C.bg, borderRadius: 14, marginBottom: 9, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={{ opacity }}>
+        <Text style={{ fontSize: 13, fontFamily: F.regular, color: '#8A8FA8' }}>{'Finding something great for you...'}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 function ReplaceSheet({
   stop,
   trip,
@@ -2597,7 +2618,7 @@ function ReplaceSheet({
         {/* Alternatives */}
         <Text style={rep.secLabel}>NEW ALTERNATIVES</Text>
         {loading ? (
-          [0, 1, 2].map(i => <View key={i} style={rep.skeleton} />)
+          [0, 1, 2].map(i => <SkeletonAltCard key={i} />)
         ) : alts.length === 0 ? (
           <Text style={{ color: C.muted, fontSize: 13, fontFamily: F.regular, marginBottom: 16 }}>
             No alternatives found
@@ -3844,7 +3865,7 @@ function AddStopDetailSheet({
   const typeLabel = String(rawType).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
   const durText = opt.duration ?? (opt.durationMinutes ? `${opt.durationMinutes} min` : '1\u20132 hours');
   const whyText: string = (opt as any).whyNow ?? opt.description ?? '';
-  const address: string = opt.address ?? '';
+  const address: string = opt.address ?? (opt as any).gpAddressVerified ?? '';
   const kidFriendly: boolean = (opt as any).kid_friendly === true;
   const gpPriceLevel: number | null = (opt as any).gpPriceLevel ?? null;
   const entryRaw: string = (opt as any).entryCost ?? (opt as any).entry ?? '';
@@ -3925,7 +3946,7 @@ function AddStopDetailSheet({
               </Svg>
               <Text style={asd.addrWarnTxt}>{'Estimated \u2014 please verify'}</Text>
             </View>
-            <Text style={asd.addrTxt}>{address || `${opt.name}, ${city}`}</Text>
+            <Text style={asd.addrTxt}>{address || 'Address not confirmed \u2014 tap to open in Maps'}</Text>
             <Pressable style={asd.addrLink} onPress={() => Linking.openURL(mapsUrl).catch(() => {})}>
               <Svg width={11} height={11} viewBox="0 0 24 24">
                 <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="#E8692A" strokeWidth={2} strokeLinecap="round" fill="none" />
@@ -3958,7 +3979,7 @@ function AddStopDetailSheet({
                   </Pressable>
                 </View>
               ) : (
-                <Text style={asd.infoVal}>{entryRaw || 'Check at gate'}</Text>
+                <Text style={[asd.infoVal, { color: '#8A8FA8' }]}>{'Check at gate'}</Text>
               )}
             </View>
             <View style={asd.infoCell}>
