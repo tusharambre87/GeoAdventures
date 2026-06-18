@@ -3336,19 +3336,20 @@ function parseDurationMins(opt: StopOption, cat: 'food' | 'kids' | 'landmarks'):
 // ─── StopOptionCard ───────────────────────────────────────────────────────────
 
 function StopOptionCard({
-  opt, category, isSelected, onCardPress, onAdd, adding,
+  opt, category, isSelected, onCardPress, onAdd, onPreview, adding,
 }: {
   opt: StopOption;
   category: 'food' | 'kids' | 'landmarks';
   isSelected: boolean;
   onCardPress: () => void;
   onAdd: () => void;
+  onPreview: () => void;
   adding: boolean;
 }) {
   const dur = parseDurationMins(opt, category);
   return (
     <View style={[as.soCard, isSelected && as.soCardSelected]}>
-      <Pressable style={as.soTop} onPress={onCardPress}>
+      <Pressable style={as.soTop} onPress={onPreview}>
         <View style={[as.soIcon, { backgroundColor: iconBgForCategory(category) }]}>
           <Text style={{ fontSize: 20 }}>{opt.icon ?? stopIconForCategory(category)}</Text>
         </View>
@@ -3360,15 +3361,20 @@ function StopOptionCard({
         </View>
         <Text style={as.soDuration}>{dur} min</Text>
       </Pressable>
-      <Pressable
-        style={[as.soAddBtn, isSelected && as.soAddBtnSelected]}
-        onPress={onAdd}
-        disabled={adding || isSelected}
-      >
-        <Text style={[as.soAddBtnText, isSelected && as.soAddBtnTextSelected]}>
-          {isSelected ? '\u2713 Added to plan' : '+ Add to plan'}
-        </Text>
-      </Pressable>
+      <View style={as.soBtnRow}>
+        <Pressable style={as.soPreviewBtn} onPress={onPreview}>
+          <Text style={as.soPreviewBtnText}>{'Preview \u2192'}</Text>
+        </Pressable>
+        <Pressable
+          style={[as.soAddBtn, isSelected && as.soAddBtnSelected]}
+          onPress={onAdd}
+          disabled={adding || isSelected}
+        >
+          <Text style={[as.soAddBtnText, isSelected && as.soAddBtnTextSelected]}>
+            {isSelected ? '\u2713 Added' : '+ Add to plan'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -3701,6 +3707,7 @@ function AddStopSheet({
                   category={category}
                   isSelected={selectedOpt?.name === opt.name}
                   onCardPress={() => setDetailOpt(opt)}
+                  onPreview={() => setDetailOpt(opt)}
                   onAdd={() => openPositionPicker(opt)}
                   adding={adding}
                 />
@@ -3718,6 +3725,7 @@ function AddStopSheet({
                   category={category}
                   isSelected={selectedOpt?.name === opt.name}
                   onCardPress={() => setDetailOpt(opt)}
+                  onPreview={() => setDetailOpt(opt)}
                   onAdd={() => openPositionPicker(opt)}
                   adding={adding}
                 />
@@ -3817,7 +3825,10 @@ const as = StyleSheet.create({
   soName:      { fontSize: 14, fontFamily: F.bold, color: '#1A1F2E' },
   soMeta:      { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular },
   soDuration:  { fontSize: 12, fontFamily: F.bold, color: '#E8692A', flexShrink: 0 },
-  soAddBtn:    { backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  soBtnRow:    { flexDirection: 'row', gap: 8, marginTop: 8 },
+  soPreviewBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: '#E8692A', alignItems: 'center' },
+  soPreviewBtnText: { fontSize: 13, fontFamily: F.bold, color: '#E8692A' },
+  soAddBtn:    { flex: 1.5, backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
   soAddBtnSelected: { backgroundColor: '#3DAA6E' },
   soAddBtnText: { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
   soAddBtnTextSelected: { color: '#fff' },
