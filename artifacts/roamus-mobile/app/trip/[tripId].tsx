@@ -898,16 +898,16 @@ function StopCard({
   }
 
   return (
-    <Swipeable
-      renderRightActions={renderRightActions}
-      overshootRight={false}
-      friction={2}
-    >
-      <View style={sc.wrap}>
+    <View style={sc.wrap}>
+      <Swipeable
+        renderRightActions={renderRightActions}
+        overshootRight={false}
+        friction={2}
+      >
         {card}
-        {actionRow}
-      </View>
-    </Swipeable>
+      </Swipeable>
+      {actionRow}
+    </View>
   );
 }
 
