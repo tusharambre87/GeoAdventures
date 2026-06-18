@@ -168,6 +168,7 @@ export default function RescueSheet({
   const [needRecsLoading, setNeedRecsLoading] = React.useState(false);
   const [needRecsError, setNeedRecsError] = React.useState<string | null>(null);
   const [applyingRec, setApplyingRec] = React.useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<{ stop: LibraryStop | OtherDayStop; swapFn: () => void } | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -192,6 +193,7 @@ export default function RescueSheet({
       setNeedRecsLoading(false);
       setNeedRecsError(null);
       setApplyingRec(null);
+      setPreviewItem(null);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -704,12 +706,7 @@ export default function RescueSheet({
                     <>
                       <Text style={s.sectionLabel}>FROM OTHER DAYS</Text>
                       {otherDayStops.map(stop => (
-                        <TouchableOpacity
-                          key={stop.id}
-                          style={s.otherDayRow}
-                          activeOpacity={0.8}
-                          onPress={() => !applyingPlan && applySwap(stop, 'two_way')}
-                        >
+                        <View key={stop.id} style={s.otherDayRow}>
                           <View style={s.otherDayThumb}>
                             <Text style={{ fontSize: 22 }}>{stopEmoji(stop.stopType)}</Text>
                           </View>
@@ -720,8 +717,15 @@ export default function RescueSheet({
                               {stop.durationMinutes ? ' \u00B7 ' + stop.durationMinutes + ' min' : ''}
                             </Text>
                           </View>
-                          <Text style={s.swapArrowCta}>Swap {'\u2192'}</Text>
-                        </TouchableOpacity>
+                          <View style={s.swapRowActions}>
+                            <TouchableOpacity onPress={() => setPreviewItem({ stop, swapFn: () => applySwap(stop, 'two_way') })}>
+                              <Text style={s.previewCtaMuted}>Preview</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => !applyingPlan && applySwap(stop, 'two_way')}>
+                              <Text style={s.swapArrowCta}>Swap {'\u2192'}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       ))}
                       <View style={s.sectionDivider} />
                     </>
@@ -746,19 +750,21 @@ export default function RescueSheet({
                       ) : (
                         <View style={s.swapGrid}>
                           {newOptions.slice(0, 6).map(opt => (
-                            <TouchableOpacity
-                              key={opt.id}
-                              style={s.swapCard}
-                              activeOpacity={0.8}
-                              onPress={() => !applyingPlan && applySwap(opt, 'one_way')}
-                            >
+                            <View key={opt.id} style={s.swapCard}>
                               <Text style={s.swapCardIcon}>{stopEmoji(opt.stopType)}</Text>
                               <Text style={s.swapCardName} numberOfLines={2}>{opt.name}</Text>
                               <Text style={s.swapCardMeta} numberOfLines={1}>
                                 {opt.stopType ?? 'attraction'}
                               </Text>
-                              <Text style={s.swapCardCta}>Swap in {'\u2192'}</Text>
-                            </TouchableOpacity>
+                              <View style={s.swapCardCtaRow}>
+                                <TouchableOpacity onPress={() => setPreviewItem({ stop: opt, swapFn: () => applySwap(opt, 'one_way') })}>
+                                  <Text style={s.previewCtaMuted}>{'Preview \u2192'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => !applyingPlan && applySwap(opt, 'one_way')}>
+                                  <Text style={s.swapCardCta}>{'Swap in \u2192'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
                           ))}
                         </View>
                       )}
@@ -1019,6 +1025,66 @@ export default function RescueSheet({
             </TouchableOpacity>
           </>
         )}
+        {/* ── STOP PREVIEW PANEL ── */}
+        {previewItem != null && (
+          <View style={[StyleSheet.absoluteFillObject, { zIndex: 50 }]} pointerEvents="box-none">
+            <Pressable
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)' }]}
+              onPress={() => setPreviewItem(null)}
+            />
+            <View style={s.previewPanel}>
+              <View style={s.previewHandle} />
+              <View style={s.previewHeader}>
+                <Text style={s.previewName} numberOfLines={2}>{previewItem.stop.name}</Text>
+                <TouchableOpacity onPress={() => setPreviewItem(null)} hitSlop={10}>
+                  <Text style={s.previewCloseX}>{'\u2715'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.previewHero}>
+                <Text style={s.previewHeroEmoji}>{stopEmoji(previewItem.stop.stopType)}</Text>
+              </View>
+              <View style={s.previewBody}>
+                <View style={s.previewPillRow}>
+                  {!!previewItem.stop.stopType && (
+                    <View style={s.previewTypePill}>
+                      <Text style={s.previewTypePillText}>
+                        {(previewItem.stop.stopType.charAt(0).toUpperCase() + previewItem.stop.stopType.slice(1)).replace(/_/g, ' ')}
+                      </Text>
+                    </View>
+                  )}
+                  {'durationMinutes' in previewItem.stop && previewItem.stop.durationMinutes != null && (
+                    <View style={s.previewDurPill}>
+                      <Text style={s.previewDurPillText}>{'\u23F1 '}{previewItem.stop.durationMinutes}{' min'}</Text>
+                    </View>
+                  )}
+                  {'dayIndex' in previewItem.stop && (
+                    <View style={s.previewDurPill}>
+                      <Text style={s.previewDurPillText}>{'Day ' + (previewItem.stop.dayIndex + 1)}</Text>
+                    </View>
+                  )}
+                </View>
+                {'description' in previewItem.stop && !!previewItem.stop.description && (
+                  <View style={s.previewDescBox}>
+                    <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
+                    <Text style={s.previewDescText}>{previewItem.stop.description}</Text>
+                  </View>
+                )}
+                {'address' in previewItem.stop && !!previewItem.stop.address && (
+                  <View style={s.previewAddrBox}>
+                    <Text style={s.previewAddrText}>{previewItem.stop.address}</Text>
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                style={s.previewSwapBtn}
+                activeOpacity={0.85}
+                onPress={() => { setPreviewItem(null); previewItem.swapFn(); }}
+              >
+                <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </Animated.View>
     </Modal>
   );
@@ -1234,7 +1300,10 @@ const s = StyleSheet.create({
   swapCardIcon: { fontSize: 24, marginBottom: 2 },
   swapCardName: { fontSize: 13, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold, lineHeight: 18 },
   swapCardMeta: { fontSize: 11, color: '#8A8FA8', fontFamily: F.regular, textTransform: 'capitalize' },
-  swapCardCta:  { fontSize: 12, fontWeight: '600', color: '#8A8FA8', fontFamily: F.semibold, marginTop: 6 },
+  swapCardCta:  { fontSize: 12, fontWeight: '600', color: '#E8692A', fontFamily: F.semibold },
+  swapCardCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  swapRowActions: { flexDirection: 'row', alignItems: 'center', gap: 14, flexShrink: 0 },
+  previewCtaMuted: { fontSize: 12, fontWeight: '600', color: '#B0ADA8', fontFamily: F.semibold },
 
   // ── Food rows ──
   foodRow: {
@@ -1360,4 +1429,62 @@ const s = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 20, elevation: 8,
   },
   appliedBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', fontFamily: F.bold },
+
+  // ── Stop preview panel ──
+  previewPanel: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15, shadowRadius: 20, elevation: 24,
+  },
+  previewHandle: {
+    width: 36, height: 4, backgroundColor: '#D0CCC6',
+    borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 2,
+  },
+  previewHeader: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8, gap: 10,
+  },
+  previewName: {
+    flex: 1, fontSize: 18, fontWeight: '800', color: '#1A1F2E',
+    fontFamily: F.bold, lineHeight: 24,
+  },
+  previewCloseX: { fontSize: 16, color: '#B0ADA8', paddingTop: 3 },
+  previewHero: {
+    height: 90, backgroundColor: '#1A1F2E',
+    marginHorizontal: 20, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+  },
+  previewHeroEmoji: { fontSize: 38 },
+  previewBody: { paddingHorizontal: 20 },
+  previewPillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 },
+  previewTypePill: {
+    backgroundColor: '#F5F2EE', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  previewTypePillText: { fontSize: 12, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
+  previewDurPill: {
+    backgroundColor: '#F5F2EE', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  previewDurPillText: { fontSize: 12, color: '#8A8FA8', fontFamily: F.regular },
+  previewDescBox: {
+    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14, marginBottom: 10,
+  },
+  previewDescLabel: {
+    fontSize: 10, fontWeight: '700', color: '#8A8FA8',
+    letterSpacing: 0.8, marginBottom: 5, fontFamily: F.bold,
+  },
+  previewDescText: { fontSize: 13, color: '#1A1F2E', fontFamily: F.regular, lineHeight: 19 },
+  previewAddrBox: {
+    backgroundColor: '#F5F2EE', borderRadius: 12, padding: 12, marginBottom: 10,
+  },
+  previewAddrText: { fontSize: 12, color: '#8A8FA8', fontFamily: F.regular },
+  previewSwapBtn: {
+    marginHorizontal: 20, marginTop: 6,
+    backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 15, alignItems: 'center',
+  },
+  previewSwapBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
 });
