@@ -4070,6 +4070,8 @@ const asd = StyleSheet.create({
   ctaContext:   { fontSize: 11, fontFamily: F.medium, color: '#8A8FA8', textAlign: 'center', marginBottom: 8 },
   ctaBtn:       { backgroundColor: '#E8692A', borderRadius: 13, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', shadowColor: '#E8692A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
   ctaBtnTxt:    { fontSize: 14, fontFamily: F.bold, color: '#fff' },
+  backBtn:      { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
+  backArrow:    { fontSize: 16, color: '#1A1F2E', lineHeight: 20 },
 });
 
 // ─── StopPreviewSheetPanel ────────────────────────────────────────────────────
@@ -4425,6 +4427,7 @@ const pps = StyleSheet.create({
 export default function TripPlanScreen() {
   const { tripId, openAddStop, addStopDefaultFilter } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string }>();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   useFrauncesFonts({ Fraunces_900Black });
 
   // ── Data — declared first so rawTrip can seed localStops synchronously from cache ──

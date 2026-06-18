@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1062,78 +1063,107 @@ export default function RescueSheet({
 
       {/* ── STOP PREVIEW PANEL — sibling of sheet so it's not clipped ── */}
       {previewItem != null && (
-        <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
-          <Pressable
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
-            onPress={() => setPreviewItem(null)}
-          />
-          <View style={s.previewPanel}>
-            <View style={s.previewHandle} />
-            <View style={s.previewHeader}>
-              <Text style={s.previewName} numberOfLines={2}>{previewItem.stop.name}</Text>
-              <TouchableOpacity onPress={() => setPreviewItem(null)} hitSlop={12}>
-                <Text style={s.previewCloseX}>{'\u2715'}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.previewHero}>
-              {previewImageUrl ? (
-                <Image source={{ uri: previewImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-                  {previewImageLoading
-                    ? <ActivityIndicator color="#E8692A" />
-                    : <Text style={s.previewHeroEmoji}>{stopEmoji(previewItem.stop.stopType)}</Text>
-                  }
-                </View>
-              )}
-            </View>
-            <View style={s.previewBody}>
-              <View style={s.previewPillRow}>
-                {!!previewItem.stop.stopType && (
-                  <View style={s.previewTypePill}>
-                    <Text style={s.previewTypePillText}>
-                      {(previewItem.stop.stopType.charAt(0).toUpperCase() + previewItem.stop.stopType.slice(1)).replace(/_/g, ' ')}
-                    </Text>
-                  </View>
-                )}
-                {'durationMinutes' in previewItem.stop && previewItem.stop.durationMinutes != null && (
-                  <View style={s.previewDurPill}>
-                    <Text style={s.previewDurPillText}>{'\u23F1 '}{previewItem.stop.durationMinutes}{' min'}</Text>
-                  </View>
-                )}
-                {'dayIndex' in previewItem.stop && (
-                  <View style={s.previewDurPill}>
-                    <Text style={s.previewDurPillText}>{'Day ' + (previewItem.stop.dayIndex + 1)}</Text>
-                  </View>
-                )}
-              </View>
-              {'description' in previewItem.stop && !!previewItem.stop.description && (
-                <View style={s.previewDescBox}>
-                  <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
-                  <Text style={s.previewDescText}>{previewItem.stop.description}</Text>
-                </View>
-              )}
-              {'address' in previewItem.stop && !!previewItem.stop.address && (
-                <View style={s.previewAddrBox}>
-                  <Text style={s.previewAddrText}>{previewItem.stop.address}</Text>
-                </View>
-              )}
-            </View>
-            <TouchableOpacity
-              style={s.previewSwapBtn}
-              activeOpacity={0.85}
-              onPress={() => { setPreviewItem(null); previewItem.swapFn(); }}
-            >
-              <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <PreviewPanel
+          stop={previewItem.stop}
+          imageUrl={previewImageUrl}
+          imageLoading={previewImageLoading}
+          insetBottom={insets.bottom}
+          onClose={() => setPreviewItem(null)}
+          onSwap={() => { setPreviewItem(null); previewItem.swapFn(); }}
+        />
       )}
     </Modal>
   );
 }
 
 // ─── Shared result-view wrapper ───────────────────────────────────────────────
+
+// ─── Stop Preview Panel ───────────────────────────────────────────────────────
+
+interface PreviewPanelProps {
+  stop: LibraryStop | OtherDayStop;
+  imageUrl: string | null;
+  imageLoading: boolean;
+  insetBottom: number;
+  onClose: () => void;
+  onSwap: () => void;
+}
+
+function PreviewPanel({ stop, imageUrl, imageLoading, insetBottom, onClose, onSwap }: PreviewPanelProps) {
+  const { height: screenH } = useWindowDimensions();
+  return (
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
+      <Pressable
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+        onPress={onClose}
+      />
+      <View style={[s.previewPanel, { maxHeight: screenH * 0.88 }]}>
+        <View style={s.previewHandle} />
+        <View style={s.previewHeader}>
+          <Text style={s.previewName} numberOfLines={2}>{stop.name}</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={s.previewCloseX}>{'\u2715'}</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 4 }}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={s.previewHero}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                {imageLoading
+                  ? <ActivityIndicator color="#E8692A" />
+                  : <Text style={s.previewHeroEmoji}>{stopEmoji(stop.stopType)}</Text>
+                }
+              </View>
+            )}
+          </View>
+          <View style={s.previewBody}>
+            <View style={s.previewPillRow}>
+              {!!stop.stopType && (
+                <View style={s.previewTypePill}>
+                  <Text style={s.previewTypePillText}>
+                    {(stop.stopType.charAt(0).toUpperCase() + stop.stopType.slice(1)).replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              )}
+              {'durationMinutes' in stop && stop.durationMinutes != null && (
+                <View style={s.previewDurPill}>
+                  <Text style={s.previewDurPillText}>{'\u23F1 '}{stop.durationMinutes}{' min'}</Text>
+                </View>
+              )}
+              {'dayIndex' in stop && (
+                <View style={s.previewDurPill}>
+                  <Text style={s.previewDurPillText}>{'Day ' + (stop.dayIndex + 1)}</Text>
+                </View>
+              )}
+            </View>
+            {'description' in stop && !!stop.description && (
+              <View style={s.previewDescBox}>
+                <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
+                <Text style={s.previewDescText}>{stop.description}</Text>
+              </View>
+            )}
+            {'address' in stop && !!stop.address && (
+              <View style={s.previewAddrBox}>
+                <Text style={s.previewAddrText}>{stop.address}</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+        <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onSwap}>
+          <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
+        </TouchableOpacity>
+        <View style={{ height: Math.max(insetBottom, 16) }} />
+      </View>
+    </View>
+  );
+}
 
 interface ResultViewProps {
   plan: RescuePlan;
@@ -1486,7 +1516,6 @@ const s = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingBottom: 24,
     shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15, shadowRadius: 20, elevation: 24,
   },
