@@ -25,7 +25,7 @@ const { Pool } = pg;
 
 const PAUSE_MS    = 2500;
 const CONCURRENCY = 3;
-const FORCE_REGEN = true; // set false after a clean complete run
+const FORCE_REGEN = false; // set true only to regenerate already-completed rows
 
 const MODEL       = 'gpt-4o-mini'; // replaces gpt-5-mini (Replit-proxy-only)
 const STORY_MODEL = 'gpt-4o';
