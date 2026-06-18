@@ -223,7 +223,10 @@ export default function RescueSheet({
       ? `/api/travel/stops/${previewItem.stop.id}/hero-image`
       : `/api/travel/stop-library/${previewItem.stop.id}/hero-image`;
     apiFetch<{ url: string | null }>(endpoint)
-      .then(r => setPreviewImageUrl(r.url ?? null))
+      .then(r => {
+        setPreviewImageUrl(r.url ?? null);
+        onPreviewStop?.(previewItem.stop, r.url ?? undefined);
+      })
       .catch(() => setPreviewImageUrl(null))
       .finally(() => setPreviewImageLoading(false));
   }, [previewItem?.stop.id]);
@@ -751,7 +754,7 @@ export default function RescueSheet({
                             </Text>
                           </View>
                           <View style={s.swapRowActions}>
-                            <TouchableOpacity onPress={() => { setPreviewItem({ stop, swapFn: () => applySwap(stop, 'two_way') }); onPreviewStop?.(stop, previewImageUrl ?? undefined); }}>
+                            <TouchableOpacity onPress={() => setPreviewItem({ stop, swapFn: () => applySwap(stop, 'two_way') })}>
                               <Text style={s.previewCtaMuted}>Preview</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => !applyingPlan && applySwap(stop, 'two_way')}>
@@ -790,7 +793,7 @@ export default function RescueSheet({
                                 {opt.stopType ?? 'attraction'}
                               </Text>
                               <View style={s.swapCardCtaRow}>
-                                <TouchableOpacity onPress={() => { setPreviewItem({ stop: opt, swapFn: () => applySwap(opt, 'one_way') }); onPreviewStop?.(opt, previewImageUrl ?? undefined); }}>
+                                <TouchableOpacity onPress={() => setPreviewItem({ stop: opt, swapFn: () => applySwap(opt, 'one_way') })}>
                                   <Text style={s.previewCtaMuted}>{'Preview \u2192'}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => !applyingPlan && applySwap(opt, 'one_way')}>
@@ -875,7 +878,7 @@ export default function RescueSheet({
                           <View style={s.foodCardBtns}>
                             <Pressable
                               style={s.foodCardPreviewBtn}
-                              onPress={() => { setPreviewItem({ stop: opt, swapFn: () => setSelectedFoodId(opt.id) }); onPreviewStop?.(opt, previewImageUrl ?? undefined); }}
+                              onPress={() => setPreviewItem({ stop: opt, swapFn: () => setSelectedFoodId(opt.id) })}
                             >
                               <Text style={s.foodCardPreviewText}>{'Preview \u2192'}</Text>
                             </Pressable>
