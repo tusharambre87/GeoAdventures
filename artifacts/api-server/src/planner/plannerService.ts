@@ -3551,7 +3551,7 @@ Current stop: "${s.name}" (${s.type}, ${s.durationMinutes} min) in ${destination
 
 Return JSON with exactly 5 groups, 2 real places each:
 {
-  "shorter":    [{"name":"Place Name","type":"landmark","durationMinutes":30,"whyNow":"One sentence why it fits families."},...],
+  "shorter":    [{"name":"Place Name","type":"landmark","durationMinutes":30,"address":"123 Main St, ${destination} 90012","isFree":true,"whyNow":"One sentence why it fits families."},...],
   "easier":     [...],
   "indoor":     [...],
   "moreActive": [...],
@@ -3562,6 +3562,8 @@ Rules:
 - name: a real, specific place in ${destination}
 - type: one of landmark|museum|park|restaurant|activity|beach|zoo|aquarium|garden
 - durationMinutes: integer (shorter group < ${s.durationMinutes}, indoor group any)
+- address: real street address including city and zip code
+- isFree: true if free entry, false if tickets/admission required
 - whyNow: ≤15 words, family-focused reason`;
 
   const response = await openai.chat.completions.create({
@@ -3599,6 +3601,8 @@ Rules:
         name: stopLibrary.name,
         gpPriceLevel: stopLibrary.gpPriceLevel,
         gpWebsite: stopLibrary.gpWebsite,
+        address: stopLibrary.address,
+        gpAddressVerified: stopLibrary.gpAddressVerified,
       }).from(stopLibrary).where(
         and(sql`lower(${stopLibrary.city}) = ${cityName}`, or(...nameConditions))
       );
@@ -3607,7 +3611,12 @@ Rules:
         const enrich = (group: GeneratedStop[]) => group.map(s => {
           const m = libMap.get(s.name.toLowerCase());
           if (!m) return s;
-          return { ...s, gpPriceLevel: m.gpPriceLevel ?? undefined, bookingUrl: m.gpWebsite ?? undefined };
+          return {
+            ...s,
+            gpPriceLevel: m.gpPriceLevel ?? undefined,
+            bookingUrl: m.gpWebsite ?? undefined,
+            address: (s as any).address || m.gpAddressVerified || m.address || undefined,
+          };
         });
         return { shorter: enrich(shorter), easier: enrich(easier), indoor: enrich(indoor), moreActive: enrich(moreActive), sameVibe: enrich(sameVibe) };
       }

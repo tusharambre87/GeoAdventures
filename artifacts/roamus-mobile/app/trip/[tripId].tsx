@@ -3869,8 +3869,9 @@ function AddStopDetailSheet({
   const kidFriendly: boolean = (opt as any).kid_friendly === true;
   const gpPriceLevel: number | null = (opt as any).gpPriceLevel ?? null;
   const entryRaw: string = (opt as any).entryCost ?? (opt as any).entry ?? '';
-  const isFree = gpPriceLevel === 0 || /free/i.test(entryRaw);
-  const isPaid = gpPriceLevel != null && gpPriceLevel > 0;
+  const aiIsFree: boolean | undefined = (opt as any).isFree;
+  const isFree = aiIsFree === true || gpPriceLevel === 0 || /free/i.test(entryRaw);
+  const isPaid = aiIsFree === false || (gpPriceLevel != null && gpPriceLevel > 0);
   const bookTicketsUrl: string = (opt as any).bookingUrl ?? (opt as any).gpWebsite
     ?? `https://www.google.com/search?q=${encodeURIComponent(opt.name + ' tickets')}`;
   const bestTimeVal: string = (opt as any).bestTimeOfDay ?? (opt as any).best_time_of_day
