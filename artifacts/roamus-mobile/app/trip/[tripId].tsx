@@ -769,23 +769,45 @@ function StopCard({
   const renderRightActions = () => (
     <View style={{
       flexDirection: 'column',
-      justifyContent: 'center',
-      alignItems: 'flex-end',
-      paddingHorizontal: 16,
-      gap: 12,
+      height: '100%',
+      overflow: 'hidden',
+      borderRadius: 16,
+      marginVertical: 4,
     }}>
-      <TouchableOpacity onPress={() => onReplace(stop)}>
-        <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Replace ‹</Text>
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          backgroundColor: '#1A1F2E',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 20,
+          borderTopRightRadius: 16,
+        }}
+        onPress={() => onReplace(stop)}
+      >
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 2 }}>{'\u21D4'}</Text>
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Replace</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => Alert.alert(
-        'Remove this stop?',
-        `"${stop.name}" will be removed from your trip.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remove', style: 'destructive', onPress: () => void onDelete(stop.id) },
-        ]
-      )}>
-        <Text style={{ color: '#8A8FA8', fontSize: 14 }}>Remove ‹</Text>
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          backgroundColor: '#E8433A',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 20,
+          borderBottomRightRadius: 16,
+        }}
+        onPress={() => Alert.alert(
+          'Remove this stop?',
+          `"${stop.name}" will be removed from your trip.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Remove', style: 'destructive', onPress: () => void onDelete(stop.id) },
+          ]
+        )}
+      >
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 2 }}>{'\u2715'}</Text>
+        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Remove</Text>
       </TouchableOpacity>
     </View>
   );
