@@ -3732,7 +3732,7 @@ function AddStopSheet({
           insets={insets}
           onBack={() => setDetailOpt(null)}
           onClose={() => { setDetailOpt(null); onClose(); }}
-          onAddToDay={() => { setPositionOpt(detailOpt); }}
+          onAddToDay={() => { console.log('ADD-FLOW onAddToDay fired:', detailOpt?.name); setPositionOpt(detailOpt); }}
         />
       )}
 
@@ -3884,7 +3884,7 @@ function AddStopDetailSheet({
       </ScrollView>
 
       <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]}>
-        <Pressable style={asd.addBtn} onPress={onAddToDay}>
+        <Pressable style={asd.addBtn} onPress={() => { console.log('ASD-BTN tapped, label:', actionLabel); onAddToDay(); }}>
           <Text style={asd.addBtnText}>{actionLabel ?? 'Add to my day \u2192'}</Text>
         </Pressable>
       </View>
