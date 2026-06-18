@@ -3259,7 +3259,9 @@ function SheetModal({
           transform: [{ translateY }],
         }}
       >
-        {children}
+        <Pressable style={{ flex: 1 }} onPress={e => e.stopPropagation()}>
+          {children}
+        </Pressable>
       </Animated.View>
     </View>
   );
