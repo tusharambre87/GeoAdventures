@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Linking,
   Modal,
   Pressable,
@@ -169,6 +170,8 @@ export default function RescueSheet({
   const [needRecsError, setNeedRecsError] = React.useState<string | null>(null);
   const [applyingRec, setApplyingRec] = React.useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<{ stop: LibraryStop | OtherDayStop; swapFn: () => void } | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewImageLoading, setPreviewImageLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -194,6 +197,7 @@ export default function RescueSheet({
       setNeedRecsError(null);
       setApplyingRec(null);
       setPreviewItem(null);
+      setPreviewImageUrl(null);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -205,6 +209,20 @@ export default function RescueSheet({
       ]).start();
     }
   }, [visible]);
+
+  // Fetch hero image when preview opens
+  useEffect(() => {
+    if (!previewItem) { setPreviewImageUrl(null); return; }
+    setPreviewImageUrl(null);
+    setPreviewImageLoading(true);
+    const endpoint = 'dayIndex' in previewItem.stop
+      ? `/api/travel/stops/${previewItem.stop.id}/hero-image`
+      : `/api/travel/stop-library/${previewItem.stop.id}/hero-image`;
+    apiFetch<{ url: string | null }>(endpoint)
+      .then(r => setPreviewImageUrl(r.url ?? null))
+      .catch(() => setPreviewImageUrl(null))
+      .finally(() => setPreviewImageLoading(false));
+  }, [previewItem?.stop.id]);
 
   // Load swap options when fun view opens (skipped in stop context)
   useEffect(() => {
@@ -1025,67 +1043,77 @@ export default function RescueSheet({
             </TouchableOpacity>
           </>
         )}
-        {/* ── STOP PREVIEW PANEL ── */}
-        {previewItem != null && (
-          <View style={[StyleSheet.absoluteFillObject, { zIndex: 50 }]} pointerEvents="box-none">
-            <Pressable
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)' }]}
-              onPress={() => setPreviewItem(null)}
-            />
-            <View style={s.previewPanel}>
-              <View style={s.previewHandle} />
-              <View style={s.previewHeader}>
-                <Text style={s.previewName} numberOfLines={2}>{previewItem.stop.name}</Text>
-                <TouchableOpacity onPress={() => setPreviewItem(null)} hitSlop={10}>
-                  <Text style={s.previewCloseX}>{'\u2715'}</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={s.previewHero}>
-                <Text style={s.previewHeroEmoji}>{stopEmoji(previewItem.stop.stopType)}</Text>
-              </View>
-              <View style={s.previewBody}>
-                <View style={s.previewPillRow}>
-                  {!!previewItem.stop.stopType && (
-                    <View style={s.previewTypePill}>
-                      <Text style={s.previewTypePillText}>
-                        {(previewItem.stop.stopType.charAt(0).toUpperCase() + previewItem.stop.stopType.slice(1)).replace(/_/g, ' ')}
-                      </Text>
-                    </View>
-                  )}
-                  {'durationMinutes' in previewItem.stop && previewItem.stop.durationMinutes != null && (
-                    <View style={s.previewDurPill}>
-                      <Text style={s.previewDurPillText}>{'\u23F1 '}{previewItem.stop.durationMinutes}{' min'}</Text>
-                    </View>
-                  )}
-                  {'dayIndex' in previewItem.stop && (
-                    <View style={s.previewDurPill}>
-                      <Text style={s.previewDurPillText}>{'Day ' + (previewItem.stop.dayIndex + 1)}</Text>
-                    </View>
-                  )}
-                </View>
-                {'description' in previewItem.stop && !!previewItem.stop.description && (
-                  <View style={s.previewDescBox}>
-                    <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
-                    <Text style={s.previewDescText}>{previewItem.stop.description}</Text>
-                  </View>
-                )}
-                {'address' in previewItem.stop && !!previewItem.stop.address && (
-                  <View style={s.previewAddrBox}>
-                    <Text style={s.previewAddrText}>{previewItem.stop.address}</Text>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity
-                style={s.previewSwapBtn}
-                activeOpacity={0.85}
-                onPress={() => { setPreviewItem(null); previewItem.swapFn(); }}
-              >
-                <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
+      </Animated.View>
+
+      {/* ── STOP PREVIEW PANEL — sibling of sheet so it's not clipped ── */}
+      {previewItem != null && (
+        <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+            onPress={() => setPreviewItem(null)}
+          />
+          <View style={s.previewPanel}>
+            <View style={s.previewHandle} />
+            <View style={s.previewHeader}>
+              <Text style={s.previewName} numberOfLines={2}>{previewItem.stop.name}</Text>
+              <TouchableOpacity onPress={() => setPreviewItem(null)} hitSlop={12}>
+                <Text style={s.previewCloseX}>{'\u2715'}</Text>
               </TouchableOpacity>
             </View>
+            <View style={s.previewHero}>
+              {previewImageUrl ? (
+                <Image source={{ uri: previewImageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                  {previewImageLoading
+                    ? <ActivityIndicator color="#E8692A" />
+                    : <Text style={s.previewHeroEmoji}>{stopEmoji(previewItem.stop.stopType)}</Text>
+                  }
+                </View>
+              )}
+            </View>
+            <View style={s.previewBody}>
+              <View style={s.previewPillRow}>
+                {!!previewItem.stop.stopType && (
+                  <View style={s.previewTypePill}>
+                    <Text style={s.previewTypePillText}>
+                      {(previewItem.stop.stopType.charAt(0).toUpperCase() + previewItem.stop.stopType.slice(1)).replace(/_/g, ' ')}
+                    </Text>
+                  </View>
+                )}
+                {'durationMinutes' in previewItem.stop && previewItem.stop.durationMinutes != null && (
+                  <View style={s.previewDurPill}>
+                    <Text style={s.previewDurPillText}>{'\u23F1 '}{previewItem.stop.durationMinutes}{' min'}</Text>
+                  </View>
+                )}
+                {'dayIndex' in previewItem.stop && (
+                  <View style={s.previewDurPill}>
+                    <Text style={s.previewDurPillText}>{'Day ' + (previewItem.stop.dayIndex + 1)}</Text>
+                  </View>
+                )}
+              </View>
+              {'description' in previewItem.stop && !!previewItem.stop.description && (
+                <View style={s.previewDescBox}>
+                  <Text style={s.previewDescLabel}>WHY KIDS LOVE IT</Text>
+                  <Text style={s.previewDescText}>{previewItem.stop.description}</Text>
+                </View>
+              )}
+              {'address' in previewItem.stop && !!previewItem.stop.address && (
+                <View style={s.previewAddrBox}>
+                  <Text style={s.previewAddrText}>{previewItem.stop.address}</Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={s.previewSwapBtn}
+              activeOpacity={0.85}
+              onPress={() => { setPreviewItem(null); previewItem.swapFn(); }}
+            >
+              <Text style={s.previewSwapBtnText}>{'Swap this stop \u2192'}</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </Animated.View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -1453,9 +1481,10 @@ const s = StyleSheet.create({
   },
   previewCloseX: { fontSize: 16, color: '#B0ADA8', paddingTop: 3 },
   previewHero: {
-    height: 90, backgroundColor: '#1A1F2E',
+    height: 160, backgroundColor: '#1A1F2E',
     marginHorizontal: 20, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    overflow: 'hidden',
   },
   previewHeroEmoji: { fontSize: 38 },
   previewBody: { paddingHorizontal: 20 },

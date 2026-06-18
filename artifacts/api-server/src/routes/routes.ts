@@ -10959,6 +10959,25 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // ── GET /api/travel/stop-library/:libId/hero-image ───────────────────────────
+  // Returns a hero image URL for a stop_library entry (sl- prefixed IDs).
+  // Used by the rescue-swap preview panel for "NEW OPTIONS" grid cards.
+  app.get('/api/travel/stop-library/:libId/hero-image', isAuthenticated, async (req: any, res) => {
+    try {
+      const { libId } = req.params;
+      if (heroImageCache[libId]) return res.json({ url: heroImageCache[libId] });
+      const row = await db.query.stopLibrary.findFirst({ where: eq(stopLibrary.id, libId) });
+      if (!row) return res.status(404).json({ url: null });
+      const { generateStopHeroImage } = await import('../exploreContentService');
+      const url = await generateStopHeroImage(row.name, row.stopType ?? 'landmark', row.city ?? '');
+      if (url) heroImageCache[libId] = url;
+      return res.json({ url: url || null });
+    } catch (err) {
+      console.error('[stop-library/hero-image] error:', err);
+      return res.json({ url: null });
+    }
+  });
+
   // ── GET /api/travel/stops/:stopId/nearby ─────────────────────────────────────
   // Generate nearby food, break spots, and kid activities for a stop using GPT-4o.
   // Results are cached in travelStops.metadata.nearbyEssentials so subsequent calls
