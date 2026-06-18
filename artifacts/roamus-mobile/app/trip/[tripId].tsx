@@ -2495,8 +2495,8 @@ function ReplaceSheet({
     .slice(0, 5);
 
   async function useAlt(alt: typeof alts[0]) {
-    console.log('useAlt called for:', alt.name);
-    if (!stop) return;
+    console.log('useAlt entered, alt:', alt?.name);
+    if (!stop) { console.log('useAlt bailed — no stop'); return; }
     const replacedStop = stop;
     try {
       await apiFetch(`/api/travel/trips/${tripId}/stops/${replacedStop.id}/replace`, {
@@ -2650,7 +2650,7 @@ function ReplaceSheet({
           actionLabel={'Swap this stop \u2192'}
           onBack={() => setPreviewAlt(null)}
           onClose={() => { setPreviewAlt(null); onClose(); }}
-          onAddToDay={() => { void useAlt(previewAlt); setPreviewAlt(null); }}
+          onAddToDay={() => { console.log('REPLACE onAddToDay fired, previewAlt:', previewAlt?.name); void useAlt(previewAlt); setPreviewAlt(null); }}
         />
       )}
     </View>
