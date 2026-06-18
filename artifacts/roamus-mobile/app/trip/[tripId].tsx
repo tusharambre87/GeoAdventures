@@ -3241,8 +3241,14 @@ function SheetModal({
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <Pressable
+      {/* Full-screen dim — visual only, no touch interception */}
+      <View
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,30,0.48)' }]}
+        pointerEvents="none"
+      />
+      {/* Tap-to-close target covers only the area ABOVE the sheet */}
+      <Pressable
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '88%' }}
         onPress={onClose}
       />
       <Animated.View
@@ -3259,9 +3265,7 @@ function SheetModal({
           transform: [{ translateY }],
         }}
       >
-        <Pressable style={{ flex: 1 }} onPress={e => e.stopPropagation()}>
-          {children}
-        </Pressable>
+        {children}
       </Animated.View>
     </View>
   );
