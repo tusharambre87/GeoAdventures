@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, or } from "drizzle-orm";
 import {
   plannerTripPlans,
   plannerTripPlanStops,
@@ -3583,13 +3583,38 @@ Rules:
       stopType: item.type ?? item.stopType,
     })) : [];
 
-  return {
-    shorter:    toGroup(parsed.shorter),
-    easier:     toGroup(parsed.easier),
-    indoor:     toGroup(parsed.indoor),
-    moreActive: toGroup(parsed.moreActive),
-    sameVibe:   toGroup(parsed.sameVibe),
-  };
+  const shorter    = toGroup(parsed.shorter);
+  const easier     = toGroup(parsed.easier);
+  const indoor     = toGroup(parsed.indoor);
+  const moreActive = toGroup(parsed.moreActive);
+  const sameVibe   = toGroup(parsed.sameVibe);
+
+  // Best-effort: enrich suggestions with stop_library price/booking data
+  try {
+    const cityName = destination.split(',')[0].trim().toLowerCase();
+    const uniqueNames = [...new Set([shorter, easier, indoor, moreActive, sameVibe].flat().map(s => s.name.toLowerCase()))];
+    if (uniqueNames.length > 0) {
+      const nameConditions = uniqueNames.map(n => sql`lower(${stopLibrary.name}) = ${n}`);
+      const rows = await db.select({
+        name: stopLibrary.name,
+        gpPriceLevel: stopLibrary.gpPriceLevel,
+        gpWebsite: stopLibrary.gpWebsite,
+      }).from(stopLibrary).where(
+        and(sql`lower(${stopLibrary.city}) = ${cityName}`, or(...nameConditions))
+      );
+      if (rows.length > 0) {
+        const libMap = new Map(rows.map(r => [r.name.toLowerCase(), r]));
+        const enrich = (group: GeneratedStop[]) => group.map(s => {
+          const m = libMap.get(s.name.toLowerCase());
+          if (!m) return s;
+          return { ...s, gpPriceLevel: m.gpPriceLevel ?? undefined, bookingUrl: m.gpWebsite ?? undefined };
+        });
+        return { shorter: enrich(shorter), easier: enrich(easier), indoor: enrich(indoor), moreActive: enrich(moreActive), sameVibe: enrich(sameVibe) };
+      }
+    }
+  } catch { /* best-effort enrichment */ }
+
+  return { shorter, easier, indoor, moreActive, sameVibe };
 }
 
 export async function handleSupportAction(

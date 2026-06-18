@@ -3846,10 +3846,33 @@ function AddStopDetailSheet({
   const whyText: string = (opt as any).whyNow ?? opt.description ?? '';
   const address: string = opt.address ?? '';
   const kidFriendly: boolean = (opt as any).kid_friendly === true;
-  const entryVal: string = (opt as any).entryCost ?? (opt as any).entry ?? 'Varies';
-  const bestTimeVal: string = (opt as any).bestTime ?? (opt as any).doThisFirst ?? 'Morning';
+  const gpPriceLevel: number | null = (opt as any).gpPriceLevel ?? null;
+  const entryRaw: string = (opt as any).entryCost ?? (opt as any).entry ?? '';
+  const isFree = gpPriceLevel === 0 || /free/i.test(entryRaw);
+  const isPaid = gpPriceLevel != null && gpPriceLevel > 0;
+  const bookTicketsUrl: string = (opt as any).bookingUrl ?? (opt as any).gpWebsite
+    ?? `https://www.google.com/search?q=${encodeURIComponent(opt.name + ' tickets')}`;
+  const bestTimeVal: string = (opt as any).bestTimeOfDay ?? (opt as any).best_time_of_day
+    ?? (opt as any).bestTime ?? 'Morning';
   const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(`${opt.name} ${city}`)}`;
   const gradColors = heroGradColors(rawType);
+
+  const [heroImageUri, setHeroImageUri] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(opt.name)}&prop=pageimages&format=json&pithumbsize=500&origin=*`
+        );
+        const d = await r.json();
+        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
+        const page = Object.values(pages)[0] as any;
+        if (!cancelled && page?.thumbnail?.source) setHeroImageUri(page.thumbnail.source as string);
+      } catch { /* no image — gradient fallback */ }
+    })();
+    return () => { cancelled = true; };
+  }, [opt.name]);
 
   return (
     <View style={asd.overlay}>
@@ -3867,7 +3890,13 @@ function AddStopDetailSheet({
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={asd.body} showsVerticalScrollIndicator={false}>
-          <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={asd.hero} />
+          <View style={asd.heroWrap}>
+            {heroImageUri ? (
+              <ExpoImage source={{ uri: heroImageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            ) : (
+              <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            )}
+          </View>
 
           <View style={asd.pillRow}>
             <View style={asd.typePill}>
@@ -3919,7 +3948,18 @@ function AddStopDetailSheet({
           <View style={asd.infoRow}>
             <View style={asd.infoCell}>
               <Text style={asd.infoLbl}>{'ENTRY'}</Text>
-              <Text style={asd.infoVal}>{entryVal}</Text>
+              {isFree ? (
+                <Text style={[asd.infoVal, { color: '#3DAA6E' }]}>{'Free entry'}</Text>
+              ) : isPaid ? (
+                <View>
+                  <Text style={[asd.infoVal, { color: '#E8433A' }]}>{'Ticket required'}</Text>
+                  <Pressable onPress={() => Linking.openURL(bookTicketsUrl).catch(() => {})}>
+                    <Text style={asd.bookLink}>{'Book tickets \u2192'}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Text style={asd.infoVal}>{entryRaw || 'Check at gate'}</Text>
+              )}
             </View>
             <View style={asd.infoCell}>
               <Text style={asd.infoLbl}>{'BEST TIME'}</Text>
@@ -3928,7 +3968,7 @@ function AddStopDetailSheet({
           </View>
         </ScrollView>
 
-        <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom, 8) + 12 }]}>
+        <View style={[asd.footer, { paddingBottom: TAB_BAR_H + Math.max(insets.bottom, 8) + 12 }]}>
           {!!contextLabel && <Text style={asd.ctaContext}>{contextLabel}</Text>}
           <Pressable style={asd.ctaBtn} onPress={() => { void onAddToDay(); }}>
             <Text style={asd.ctaBtnTxt}>{actionLabel ?? 'Add to my day \u2192'}</Text>
@@ -3947,7 +3987,8 @@ const asd = StyleSheet.create({
   stopName:     { fontSize: 19, fontFamily: F.bold, color: '#1A1F2E', lineHeight: 23, flex: 1, paddingRight: 10 },
   closeBtn:     { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   body:         { paddingHorizontal: 18, paddingBottom: 10 },
-  hero:         { height: 120, borderRadius: 14, marginTop: 12 },
+  heroWrap:     { height: 120, borderRadius: 14, marginTop: 12, overflow: 'hidden' },
+  bookLink:     { fontSize: 11, fontFamily: F.bold, color: '#E8692A', marginTop: 3 },
   pillRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
   typePill:     { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1.5, borderColor: '#E8692A' },
   typePillTxt:  { fontSize: 11, fontFamily: F.bold, color: '#E8692A' },
