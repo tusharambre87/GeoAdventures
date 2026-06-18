@@ -2650,6 +2650,7 @@ function ReplaceSheet({
           city={trip.city ?? trip.destination ?? 'your destination'}
           insets={insets}
           actionLabel={'Swap this stop \u2192'}
+          contextLabel={stop ? `Replacing ${stop.name}` : 'Choose a replacement'}
           onBack={() => setPreviewAlt(null)}
           onClose={() => { setPreviewAlt(null); onClose(); }}
           onAddToDay={() => { console.log('REPLACE onAddToDay fired, previewAlt:', previewAlt?.name); void useAlt(previewAlt); setPreviewAlt(null); }}
@@ -3811,8 +3812,23 @@ const as = StyleSheet.create({
 
 // ─── AddStopDetailSheet ───────────────────────────────────────────────────────
 
+function heroGradColors(stopType?: string): [string, string] {
+  const t = (stopType ?? '').toLowerCase();
+  if (t.includes('park') || t.includes('garden') || t.includes('zoo') || t.includes('nature'))
+    return ['#3DAA6E', '#7A9E8E'];
+  if (t.includes('museum') || t.includes('gallery') || t.includes('art') || t.includes('history'))
+    return ['#1B3A5C', '#6B4FA8'];
+  if (t.includes('beach') || t.includes('aquarium') || t.includes('water'))
+    return ['#1B5E8E', '#3DAA6E'];
+  if (t.includes('restaurant') || t.includes('food') || t.includes('cafe') || t.includes('dining'))
+    return ['#C0392B', '#E8692A'];
+  if (t.includes('activity') || t.includes('theme') || t.includes('amusement'))
+    return ['#E8692A', '#F5A623'];
+  return ['#1B3A5C', '#2D5A8E'];
+}
+
 function AddStopDetailSheet({
-  opt, category, city, insets, onBack, onClose, onAddToDay, actionLabel,
+  opt, category, city, insets, onBack, onClose, onAddToDay, actionLabel, contextLabel,
 }: {
   opt: StopOption;
   category: 'food' | 'kids' | 'landmarks';
@@ -3822,111 +3838,142 @@ function AddStopDetailSheet({
   onClose: () => void;
   onAddToDay: () => void;
   actionLabel?: string;
+  contextLabel?: string;
 }) {
-  const dur = parseDurationMins(opt, category);
-  const typeLabel = (opt.stopType ?? opt.type ?? category).replace(/_/g, ' ');
+  const rawType = opt.stopType ?? (opt as any).type ?? category;
+  const typeLabel = String(rawType).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+  const durText = opt.duration ?? (opt.durationMinutes ? `${opt.durationMinutes} min` : '1\u20132 hours');
+  const whyText: string = (opt as any).whyNow ?? opt.description ?? '';
+  const address: string = opt.address ?? '';
+  const kidFriendly: boolean = (opt as any).kid_friendly === true;
+  const entryVal: string = (opt as any).entryCost ?? (opt as any).entry ?? 'Varies';
+  const bestTimeVal: string = (opt as any).bestTime ?? (opt as any).doThisFirst ?? 'Morning';
   const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(`${opt.name} ${city}`)}`;
+  const gradColors = heroGradColors(rawType);
 
   return (
-    <View style={asd.wrap}>
-      <View style={as.handle} />
-      <View style={asd.header}>
-        <Pressable style={asd.backBtn} onPress={onBack} hitSlop={8}>
-          <Text style={asd.backArrow}>{'←'}</Text>
-        </Pressable>
-        <Pressable style={as.closeBtn} onPress={onClose} hitSlop={8}>
-          <Text style={as.closeX}>{'\u2715'}</Text>
-        </Pressable>
-      </View>
+    <View style={asd.overlay}>
+      <View style={asd.sheet}>
+        <View style={asd.handle} />
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={asd.body} showsVerticalScrollIndicator={false}>
-        <Text style={asd.name}>{opt.name}</Text>
-        <Text style={asd.subtitle}>{typeLabel}</Text>
+        <View style={asd.header}>
+          <Text style={asd.stopName} numberOfLines={2}>{opt.name}</Text>
+          <Pressable style={asd.closeBtn} onPress={onBack} hitSlop={8}>
+            <Svg width={12} height={12} viewBox="0 0 24 24">
+              <Line x1="18" y1="6" x2="6" y2="18" stroke="#1A1F2E" strokeWidth={2.5} strokeLinecap="round" />
+              <Line x1="6" y1="6" x2="18" y2="18" stroke="#1A1F2E" strokeWidth={2.5} strokeLinecap="round" />
+            </Svg>
+          </Pressable>
+        </View>
 
-        <View style={asd.tagsRow}>
-          <View style={[asd.tag, asd.tagOrange]}>
-            <Text style={asd.tagOrangeTxt}>
-              {category === 'food' ? 'Food' : category === 'kids' ? 'Kids' : 'Landmark'}
-            </Text>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={asd.body} showsVerticalScrollIndicator={false}>
+          <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={asd.hero} />
+
+          <View style={asd.pillRow}>
+            <View style={asd.typePill}>
+              <Text style={asd.typePillTxt}>{typeLabel}</Text>
+            </View>
+            <View style={asd.durPill}>
+              <Svg width={11} height={11} viewBox="0 0 24 24">
+                <Circle cx="12" cy="12" r="10" stroke="#8A8FA8" strokeWidth={2} fill="none" />
+                <Polyline points="12 6 12 12 16 14" stroke="#8A8FA8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+              <Text style={asd.durPillTxt}>{durText}</Text>
+            </View>
+            {kidFriendly && (
+              <View style={asd.kidPill}>
+                <Text style={asd.kidPillTxt}>{'\u2713 Kid-friendly'}</Text>
+              </View>
+            )}
           </View>
-          <View style={[asd.tag, asd.tagAmber]}>
-            <Text style={asd.tagAmberTxt}>{opt.duration ?? `${dur} min`}</Text>
+
+          <View style={asd.addrCard}>
+            <View style={asd.addrWarnRow}>
+              <Svg width={12} height={12} viewBox="0 0 24 24">
+                <Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" fill="none" />
+                <Line x1="12" y1="9" x2="12" y2="13" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" />
+                <Line x1="12" y1="17" x2="12.01" y2="17" stroke="#F5A623" strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+              <Text style={asd.addrWarnTxt}>{'Estimated \u2014 please verify'}</Text>
+            </View>
+            <Text style={asd.addrTxt}>{address || `${opt.name}, ${city}`}</Text>
+            <Pressable style={asd.addrLink} onPress={() => Linking.openURL(mapsUrl).catch(() => {})}>
+              <Svg width={11} height={11} viewBox="0 0 24 24">
+                <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="#E8692A" strokeWidth={2} strokeLinecap="round" fill="none" />
+                <Circle cx="12" cy="10" r="3" stroke="#E8692A" strokeWidth={2} fill="none" />
+              </Svg>
+              <Text style={asd.addrLinkTxt}>{'Open in Maps to verify'}</Text>
+            </Pressable>
           </View>
-          {opt.description && (
-            <View style={[asd.tag, asd.tagGreen]}>
-              <Text style={asd.tagGreenTxt}>Family pick</Text>
+
+          {!!whyText && (
+            <View style={asd.loveCard}>
+              <View style={asd.loveHdr}>
+                <Text style={asd.loveStar}>{'\u2605'}</Text>
+                <Text style={asd.loveTitleTxt}>{'WHY KIDS LOVE IT'}</Text>
+              </View>
+              <Text style={asd.loveTxt}>{whyText}</Text>
             </View>
           )}
-        </View>
 
-        {opt.description ? (
-          <View style={asd.section}>
-            <Text style={asd.sectionLabel}>{'WHY FAMILIES LOVE IT'}</Text>
-            <Text style={asd.sectionText}>{opt.description}</Text>
-          </View>
-        ) : null}
-
-        <View style={asd.infoGrid}>
           <View style={asd.infoRow}>
-            <Text style={asd.infoLabel}>Duration</Text>
-            <Text style={asd.infoVal}>{opt.duration ?? `${dur} min`}</Text>
+            <View style={asd.infoCell}>
+              <Text style={asd.infoLbl}>{'ENTRY'}</Text>
+              <Text style={asd.infoVal}>{entryVal}</Text>
+            </View>
+            <View style={asd.infoCell}>
+              <Text style={asd.infoLbl}>{'BEST TIME'}</Text>
+              <Text style={asd.infoVal}>{bestTimeVal}</Text>
+            </View>
           </View>
-          <View style={asd.infoRow}>
-            <Text style={asd.infoLabel}>Type</Text>
-            <Text style={asd.infoVal}>{typeLabel}</Text>
-          </View>
-          <View style={[asd.infoRow, { borderBottomWidth: 0 }]}>
-            <Text style={asd.infoLabel}>City</Text>
-            <Text style={asd.infoVal}>{city}</Text>
-          </View>
+        </ScrollView>
+
+        <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom, 8) + 12 }]}>
+          {!!contextLabel && <Text style={asd.ctaContext}>{contextLabel}</Text>}
+          <Pressable style={asd.ctaBtn} onPress={() => { void onAddToDay(); }}>
+            <Text style={asd.ctaBtnTxt}>{actionLabel ?? 'Add to my day \u2192'}</Text>
+          </Pressable>
         </View>
-
-        <Pressable style={asd.mapsRow} onPress={() => Linking.openURL(mapsUrl)}>
-          <Text style={asd.mapsAddr} numberOfLines={1}>
-            {'\uD83D\uDCCD '}{opt.address ?? `${opt.name}, ${city}`}
-          </Text>
-          <Text style={asd.mapsLink}>Open in Maps</Text>
-        </Pressable>
-      </ScrollView>
-
-      <View style={[asd.footer, { paddingBottom: Math.max(insets.bottom + 88, 100) }]}>
-        <Pressable style={asd.addBtn} onPress={() => { console.log('ASD-BTN tapped, label:', actionLabel); onAddToDay(); }}>
-          <Text style={asd.addBtnText}>{actionLabel ?? 'Add to my day \u2192'}</Text>
-        </Pressable>
       </View>
     </View>
   );
 }
 
 const asd = StyleSheet.create({
-  wrap:         { position: 'absolute', inset: 0, backgroundColor: '#fff', zIndex: 10 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14 },
-  backBtn:      { width: 32, height: 32, backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  backArrow:    { fontSize: 17, color: '#8A8FA8', marginTop: -1 },
-  body:         { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  name:         { fontFamily: 'Fraunces_900Black', fontSize: 22, color: '#1A1F2E', lineHeight: 27, marginBottom: 4 },
-  subtitle:     { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular, textTransform: 'capitalize', marginBottom: 12 },
-  tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 16 },
-  tag:          { borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
-  tagOrange:    { backgroundColor: '#FDF0E9' },
-  tagOrangeTxt: { fontSize: 12, fontFamily: F.bold, color: '#E8692A' },
-  tagAmber:     { backgroundColor: '#FEF3DC' },
-  tagAmberTxt:  { fontSize: 12, fontFamily: F.bold, color: '#7A5A00' },
-  tagGreen:     { backgroundColor: '#E8F7EF' },
-  tagGreenTxt:  { fontSize: 12, fontFamily: F.bold, color: '#1A6640' },
-  section:      { backgroundColor: '#F5F2EE', borderRadius: 14, padding: 14, marginBottom: 12 },
-  sectionLabel: { fontSize: 10, fontFamily: F.bold, color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 7 },
-  sectionText:  { fontSize: 13, fontFamily: F.regular, color: '#1A1F2E', lineHeight: 20 },
-  infoGrid:     { backgroundColor: '#F5F2EE', borderRadius: 14, paddingHorizontal: 14, marginBottom: 12 },
-  infoRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(26,31,46,0.09)' },
-  infoLabel:    { fontSize: 13, color: '#8A8FA8', fontFamily: F.regular },
-  infoVal:      { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E', textTransform: 'capitalize' },
-  mapsRow:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)', gap: 8 },
-  mapsAddr:     { flex: 1, fontSize: 13, fontFamily: F.regular, color: '#1A1F2E' },
-  mapsLink:     { fontSize: 13, fontFamily: F.bold, color: '#E8692A', flexShrink: 0 },
-  footer:       { paddingHorizontal: 20, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)', flexShrink: 0 },
-  addBtn:       { backgroundColor: '#E8692A', borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
-  addBtnText:   { fontSize: 15, fontFamily: F.bold, color: '#fff' },
+  overlay:      { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.4)', justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%' },
+  handle:       { width: 32, height: 3, backgroundColor: '#E0DDD8', borderRadius: 2, alignSelf: 'center', marginTop: 10, flexShrink: 0 },
+  header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14, flexShrink: 0 },
+  stopName:     { fontSize: 19, fontFamily: F.bold, color: '#1A1F2E', lineHeight: 23, flex: 1, paddingRight: 10 },
+  closeBtn:     { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
+  body:         { paddingHorizontal: 18, paddingBottom: 10 },
+  hero:         { height: 120, borderRadius: 14, marginTop: 12 },
+  pillRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  typePill:     { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1.5, borderColor: '#E8692A' },
+  typePillTxt:  { fontSize: 11, fontFamily: F.bold, color: '#E8692A' },
+  durPill:      { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1.5, borderColor: '#E0DDD8' },
+  durPillTxt:   { fontSize: 11, fontFamily: F.medium, color: '#8A8FA8' },
+  kidPill:      { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, backgroundColor: 'rgba(61,170,110,0.1)' },
+  kidPillTxt:   { fontSize: 11, fontFamily: F.bold, color: '#3DAA6E' },
+  addrCard:     { marginTop: 10, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  addrWarnRow:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  addrWarnTxt:  { fontSize: 10, fontFamily: F.bold, color: '#F5A623', letterSpacing: 0.2 },
+  addrTxt:      { fontSize: 12, fontFamily: F.medium, color: '#1A1F2E', lineHeight: 17 },
+  addrLink:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
+  addrLinkTxt:  { fontSize: 11, fontFamily: F.bold, color: '#E8692A' },
+  loveCard:     { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  loveHdr:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  loveStar:     { fontSize: 15 },
+  loveTitleTxt: { fontSize: 10, fontFamily: F.bold, color: '#1A1F2E', letterSpacing: 0.5, textTransform: 'uppercase' },
+  loveTxt:      { fontSize: 12, fontFamily: F.medium, color: '#4A5568', lineHeight: 18 },
+  infoRow:      { flexDirection: 'row', gap: 8, marginTop: 8 },
+  infoCell:     { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 11 },
+  infoLbl:      { fontSize: 9, fontFamily: F.bold, color: '#8A8FA8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 3 },
+  infoVal:      { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
+  footer:       { paddingHorizontal: 18, paddingTop: 10, backgroundColor: '#F5F2EE', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', flexShrink: 0 },
+  ctaContext:   { fontSize: 11, fontFamily: F.medium, color: '#8A8FA8', textAlign: 'center', marginBottom: 8 },
+  ctaBtn:       { backgroundColor: '#E8692A', borderRadius: 13, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', shadowColor: '#E8692A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
+  ctaBtnTxt:    { fontSize: 14, fontFamily: F.bold, color: '#fff' },
 });
 
 // ─── StopPreviewSheetPanel ────────────────────────────────────────────────────
