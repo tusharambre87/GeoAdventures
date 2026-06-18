@@ -4003,7 +4003,7 @@ function AddStopDetailSheet({
 
 const asd = StyleSheet.create({
   overlay:      { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.4)' },
-  sheet:        { position: 'absolute', left: 0, right: 0, bottom: 0, height: '78%' as any, backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24, flexDirection: 'column' },
+  sheet:        { position: 'absolute', left: 0, right: 0, bottom: 0, height: '88%' as any, backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24, flexDirection: 'column' },
   handle:       { width: 32, height: 3, backgroundColor: '#E0DDD8', borderRadius: 2, alignSelf: 'center', marginTop: 10, flexShrink: 0 },
   header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14, flexShrink: 0 },
   stopName:     { fontSize: 19, fontFamily: F.bold, color: '#1A1F2E', lineHeight: 23, flex: 1, paddingRight: 10 },
