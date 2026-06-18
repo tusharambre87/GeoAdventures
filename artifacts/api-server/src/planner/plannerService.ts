@@ -3545,42 +3545,29 @@ These stops exist and can be suggested — especially in the "sameVibe" group �
 ${lines.join("\n")}`;
   })();
 
-  const prompt = `You are a family travel expert generating replacement suggestions for a trip stop.
+  const prompt = `Family travel expert. Generate replacement stop suggestions for a family trip.
 
-Original Stop:
-- Name: ${s.name}
-- Type: ${s.type}
-- Duration: ${s.durationMinutes} minutes
-- Effort: ${s.effortLevel}
-- Indoor/Outdoor: ${s.indoorOutdoor}
-- Destination: ${destination}
+Current stop: "${s.name}" (${s.type}, ${s.durationMinutes} min) in ${destination}${optionalAlternativesClause}
 
-Generate 5 groups of replacement suggestions (2 suggestions each):
-1. shorter: Shorter alternatives (less time commitment)
-2. easier: Easier alternatives (less physically demanding)
-3. indoor: Indoor alternatives (weather-proof options)
-4. moreActive: More active/energetic alternatives
-5. sameVibe: Same vibe but different experience${optionalAlternativesClause}
-
-Return JSON:
+Return JSON with exactly 5 groups, 2 real places each:
 {
-  "shorter": [{ same stop structure as above }],
-  "easier": [...],
-  "indoor": [...],
+  "shorter":    [{"name":"Place Name","type":"landmark","durationMinutes":30,"whyNow":"One sentence why it fits families."},...],
+  "easier":     [...],
+  "indoor":     [...],
   "moreActive": [...],
-  "sameVibe": [...]
+  "sameVibe":   [...]
 }
 
-Each suggestion must include: name, type, durationMinutes, effortLevel, indoorOutdoor, minAge, whyNow, address, latitude, longitude, parentSupportData, placeReferenceData, placeProfileData (same structure as above).
-Also add for each suggestion:
-- travelMinutes: estimated travel time from original stop (integer)
-- durationDelta: difference in minutes from original (positive = longer, negative = shorter)
-- effortDelta: "same", "easier", or "harder"`;
+Rules:
+- name: a real, specific place in ${destination}
+- type: one of landmark|museum|park|restaurant|activity|beach|zoo|aquarium|garden
+- durationMinutes: integer (shorter group < ${s.durationMinutes}, indoor group any)
+- whyNow: ≤15 words, family-focused reason`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
     messages: [
-      { role: "system", content: "You are a family travel expert. Return only valid JSON." },
+      { role: "system", content: "Return only valid JSON. No markdown, no explanation." },
       { role: "user", content: prompt },
     ],
     response_format: { type: "json_object" },
@@ -3590,13 +3577,18 @@ Also add for each suggestion:
   if (!content) throw new Error("No content from AI");
   const parsed = JSON.parse(content);
 
-  const emptyGroup: GeneratedStop[] = [];
+  const toGroup = (arr: any[]): GeneratedStop[] =>
+    Array.isArray(arr) ? arr.map(item => ({
+      ...item,
+      stopType: item.type ?? item.stopType,
+    })) : [];
+
   return {
-    shorter: parsed.shorter || emptyGroup,
-    easier: parsed.easier || emptyGroup,
-    indoor: parsed.indoor || emptyGroup,
-    moreActive: parsed.moreActive || emptyGroup,
-    sameVibe: parsed.sameVibe || emptyGroup,
+    shorter:    toGroup(parsed.shorter),
+    easier:     toGroup(parsed.easier),
+    indoor:     toGroup(parsed.indoor),
+    moreActive: toGroup(parsed.moreActive),
+    sameVibe:   toGroup(parsed.sameVibe),
   };
 }
 
