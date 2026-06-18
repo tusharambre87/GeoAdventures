@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Image,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -279,6 +279,15 @@ export default function RescueSheet({
     ]).start(({ finished }) => { if (finished) onClose(); });
   }
 
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible]);
+
   function selectOption(id: RescueOptionId) {
     if (id === 'sick') {
       handleClose();
@@ -446,14 +455,16 @@ export default function RescueSheet({
 
   const { primary, secondary } = getOptions(context);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent statusBarTranslucent animationType="none" onRequestClose={handleClose}>
-      <Animated.View style={[s.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
+    <>
+      <Animated.View style={[s.overlay, { opacity: overlayAnim, zIndex: 300 }]} pointerEvents="box-none">
         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
       </Animated.View>
 
       <Animated.View
-        style={[s.sheet, { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetAnim }] }]}
+        style={[s.sheet, { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetAnim }], zIndex: 301 }]}
       >
         <View style={s.handle} />
 
@@ -1072,7 +1083,7 @@ export default function RescueSheet({
           onSwap={() => { setPreviewItem(null); previewItem.swapFn(); }}
         />
       )}
-    </Modal>
+    </>
   );
 }
 
