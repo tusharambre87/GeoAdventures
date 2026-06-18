@@ -2561,15 +2561,14 @@ function ReplaceSheet({
                 style={rep.otherDayRow}
                 onPress={async () => {
                   try {
-                    const targetDayIndex = selectedDay - 1;
-                    const targetDayStops = allStops
-                      .filter(x => x.dayIndex === targetDayIndex && !isMealStop(x.stopType))
-                      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-                    const newDisplayOrder = targetDayStops.length;
+                    // Swap: s takes stop's slot, stop takes s's slot
                     await apiFetch(`/api/travel/trips/${tripId}/reorder-stops`, {
                       method: 'PATCH',
                       body: JSON.stringify({
-                        stopOrders: [{ stopId: s.id, displayOrder: newDisplayOrder, dayIndex: targetDayIndex }],
+                        stopOrders: [
+                          { stopId: s.id,    displayOrder: stop.displayOrder ?? 0, dayIndex: stop.dayIndex ?? 0 },
+                          { stopId: stop.id, displayOrder: s.displayOrder    ?? 0, dayIndex: s.dayIndex    ?? 0 },
+                        ],
                       }),
                     });
                     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
