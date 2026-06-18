@@ -387,20 +387,23 @@ export default function RescueSheet({
   }, [view, isStopContext]);
 
   async function handleNeedRecAction(rec: NeedRec, action: 'add' | 'swap') {
+    console.log('handleNeedRecAction called:', action, rec.name, 'tripId:', tripId, 'dayIndex:', dayIndex);
     if (!tripId) return;
     setApplyingRec(rec.id);
     setApplyError(null);
     try {
       if (action === 'swap') {
         const nextStop = stops.slice(currentStopIndex + 1).find(s => !(s as any).isSkipped && !(s as any).isVisited);
+        console.log('rescue swap: nextStop to skip:', nextStop?.name ?? '(none)');
         if (nextStop) {
-          await apiFetch(`/api/travel/stops/${nextStop.id}`, {
+          const skipResult = await apiFetch(`/api/travel/stops/${nextStop.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ isSkipped: true }),
           });
+          console.log('rescue swap: skip response:', JSON.stringify(skipResult));
         }
       }
-      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+      const addResult = await apiFetch(`/api/travel/trips/${tripId}/stops`, {
         method: 'POST',
         body: JSON.stringify({
           name: rec.name,
@@ -409,9 +412,11 @@ export default function RescueSheet({
           durationMinutes: 60,
         }),
       });
+      console.log('rescue swap: add response:', JSON.stringify(addResult));
       onStopsChanged?.();
       setView('applied');
-    } catch {
+    } catch (err) {
+      console.log('rescue swap: ERROR', String(err));
       setApplyError('Could not add stop — try again.');
       setApplyingRec(null);
     }
