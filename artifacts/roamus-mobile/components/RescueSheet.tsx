@@ -834,31 +834,46 @@ export default function RescueSheet({
                     {foodOptions.map(opt => {
                       const isSelected = opt.id === selectedFoodId;
                       return (
-                        <TouchableOpacity
-                          key={opt.id}
-                          style={[s.foodRow, isSelected && s.foodRowSelected]}
-                          activeOpacity={0.75}
-                          onPress={() => setSelectedFoodId(opt.id === selectedFoodId ? null : opt.id)}
-                        >
-                          <Text style={s.foodRowIcon}>{stopEmoji(opt.stopType)}</Text>
-                          <View style={s.foodRowText}>
-                            <Text style={[s.foodRowName, isSelected && { color: '#E8692A' }]} numberOfLines={1}>{opt.name}</Text>
-                            <Text style={s.foodRowMeta} numberOfLines={1}>
-                              {opt.stopType ?? 'restaurant'}
-                              {opt.address ? ` \u00B7 ${opt.address}` : ''}
-                            </Text>
+                        <View key={opt.id} style={[s.foodCard, isSelected && s.foodCardSelected]}>
+                          <View style={s.foodCardTop}>
+                            <View style={s.foodCardThumb}>
+                              <Text style={s.foodCardIcon}>{stopEmoji(opt.stopType)}</Text>
+                            </View>
+                            <View style={s.foodCardInfo}>
+                              <Text style={[s.foodCardName, isSelected && { color: '#E8692A' }]} numberOfLines={1}>{opt.name}</Text>
+                              <Text style={s.foodCardMeta} numberOfLines={1}>
+                                {(opt.stopType ?? 'restaurant').replace(/_/g, ' ')}
+                                {opt.address ? ' \u00B7 ' + opt.address : ''}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              style={s.foodCardMapBtn}
+                              onPress={() => {
+                                const q = encodeURIComponent(`${opt.name} ${opt.city ?? foodCity}`);
+                                Linking.openURL(`https://maps.google.com/?q=${q}`);
+                              }}
+                            >
+                              <Text style={s.foodCardMapIcon}>{'\u2197\uFE0F'}</Text>
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            onPress={e => {
-                              e.stopPropagation();
-                              const q = encodeURIComponent(`${opt.name} ${opt.city ?? foodCity}`);
-                              Linking.openURL(`https://maps.google.com/?q=${q}`);
-                            }}
-                          >
-                            <Text style={s.foodRowMap}>{'\u2197\uFE0F'}</Text>
-                          </TouchableOpacity>
-                        </TouchableOpacity>
+                          <View style={s.foodCardBtns}>
+                            <Pressable
+                              style={s.foodCardPreviewBtn}
+                              onPress={() => setPreviewItem({ stop: opt, swapFn: () => setSelectedFoodId(opt.id) })}
+                            >
+                              <Text style={s.foodCardPreviewText}>{'Preview \u2192'}</Text>
+                            </Pressable>
+                            <Pressable
+                              style={[s.foodCardAddBtn, isSelected && s.foodCardAddBtnSelected]}
+                              onPress={() => setSelectedFoodId(opt.id === selectedFoodId ? null : opt.id)}
+                            >
+                              <Text style={[s.foodCardAddText, isSelected && s.foodCardAddTextSelected]}>
+                                {isSelected ? '\u2713 Selected' : '+ Add to plan'}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </View>
                       );
                     })}
                   </>
@@ -1334,22 +1349,30 @@ const s = StyleSheet.create({
   previewCtaMuted: { fontSize: 12, fontWeight: '600', color: '#B0ADA8', fontFamily: F.semibold },
 
   // ── Food rows ──
-  foodRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, paddingHorizontal: 10,
-    borderRadius: 10, marginBottom: 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(26,31,46,0.07)',
+  foodCard: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 13, marginBottom: 8,
+    borderWidth: 1.5, borderColor: 'transparent',
+    shadowColor: '#1A1F2E', shadowRadius: 12, shadowOpacity: 0.08, elevation: 2,
   },
-  foodRowSelected: {
-    backgroundColor: 'rgba(232,105,42,0.08)',
-    borderBottomColor: 'rgba(232,105,42,0.2)',
+  foodCardSelected: { borderColor: '#E8692A', backgroundColor: '#FDF0E9' },
+  foodCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  foodCardThumb: {
+    width: 40, height: 40, borderRadius: 10, backgroundColor: '#F5F2EE',
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  foodRowIcon: { fontSize: 22 },
-  foodRowText: { flex: 1 },
-  foodRowName: { fontSize: 14, fontWeight: '600', color: '#1A1F2E', fontFamily: F.semibold },
-  foodRowMeta: { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular, textTransform: 'capitalize' },
-  foodRowMap:  { fontSize: 18, color: '#8A8FA8' },
+  foodCardIcon:    { fontSize: 22 },
+  foodCardInfo:    { flex: 1 },
+  foodCardName:    { fontSize: 14, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold },
+  foodCardMeta:    { fontSize: 12, color: '#8A8FA8', marginTop: 2, fontFamily: F.regular, textTransform: 'capitalize' },
+  foodCardMapBtn:  { padding: 2 },
+  foodCardMapIcon: { fontSize: 18 },
+  foodCardBtns:    { flexDirection: 'row', gap: 8 },
+  foodCardPreviewBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: '#E8692A', alignItems: 'center' },
+  foodCardPreviewText: { fontSize: 13, fontFamily: F.bold, color: '#E8692A' },
+  foodCardAddBtn:  { flex: 1.5, backgroundColor: 'rgba(26,31,46,0.06)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  foodCardAddBtnSelected: { backgroundColor: '#3DAA6E' },
+  foodCardAddText: { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
+  foodCardAddTextSelected: { color: '#fff' },
 
   // ── Weather swap rows ──
   swapRow: {
