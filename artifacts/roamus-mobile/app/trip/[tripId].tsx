@@ -2495,6 +2495,7 @@ function ReplaceSheet({
     .slice(0, 5);
 
   async function useAlt(alt: typeof alts[0]) {
+    console.log('useAlt called for:', alt.name);
     if (!stop) return;
     const replacedStop = stop;
     try {

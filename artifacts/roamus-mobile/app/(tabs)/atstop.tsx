@@ -2006,7 +2006,7 @@ function isMealStop(t?: string | null): boolean {
               body: JSON.stringify({ isSkipped: true }),
             });
           }}
-          onStopsChanged={() => {}}
+          onStopsChanged={() => { void load(); }}
         />
       )}
       <UpgradeSheet
