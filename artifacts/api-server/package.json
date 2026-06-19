@@ -20,7 +20,8 @@
     "backfill:landmarks": "tsx src/planner/seedLandmarkPhotos.ts",
     "backfill:landmarks:dc": "LANDMARK_CITY=\"Washington DC\" tsx src/planner/seedLandmarkPhotos.ts",
     "backfill:library-psi": "tsx src/planner/backfillLibraryPsi.ts",
-    "backfill:google-places": "tsx src/scripts/backfill-google-places.ts"
+    "backfill:google-places": "tsx src/scripts/backfill-google-places.ts",
+    "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
