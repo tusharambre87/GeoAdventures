@@ -8861,6 +8861,61 @@ Return valid JSON only. No markdown.`;
         return true;
       }).slice(0, 6);
 
+      // Lazy-enrich stops missing description: one batch AI call, save to DB async
+      const needEnrich = filtered.filter(s => !s.description);
+      const enrichedOptions: typeof filtered = filtered.map(s => ({ ...s }));
+      if (needEnrich.length > 0) {
+        try {
+          const openai = getOpenAI();
+          const lines = needEnrich
+            .map((s, i) => `${i + 1}. ${s.name} (${s.stopType ?? 'place'})`)
+            .join('\n');
+          const aiRes = await openai.chat.completions.create({
+            model: 'gpt-5-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `Family travel expert. For each numbered place in ${cityRaw}, write a 2-sentence family-friendly description that excites kids and parents, and choose the best time to visit.\nReturn JSON: { "stops": [ { "index": 1, "description": "...", "bestTimeOfDay": "morning|afternoon|evening|anytime" } ] }`,
+              },
+              { role: 'user', content: lines },
+            ],
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 600,
+          });
+          const parsed: { stops?: { index: number; description?: string; bestTimeOfDay?: string }[] } =
+            JSON.parse(aiRes.choices[0]?.message?.content ?? '{}');
+          for (const e of (parsed.stops ?? [])) {
+            const orig = needEnrich[e.index - 1];
+            if (!orig) continue;
+            const idx = enrichedOptions.findIndex(f => f.id === orig.id);
+            if (idx === -1) continue;
+            if (e.description) {
+              enrichedOptions[idx] = { ...enrichedOptions[idx], description: e.description };
+            }
+            if (e.bestTimeOfDay) {
+              const ex = ((enrichedOptions[idx].enrichment as Record<string, unknown> | null) ?? {});
+              enrichedOptions[idx] = { ...enrichedOptions[idx], enrichment: { ...ex, bestTimeOfDay: e.bestTimeOfDay } };
+            }
+            // Persist back to DB — fire and forget
+            void (async () => {
+              try {
+                const upd: Record<string, unknown> = {};
+                if (e.description) upd.description = e.description;
+                if (e.bestTimeOfDay) {
+                  upd.enrichment = {
+                    ...((orig.enrichment as Record<string, unknown> | null) ?? {}),
+                    bestTimeOfDay: e.bestTimeOfDay,
+                  };
+                }
+                if (Object.keys(upd).length > 0) {
+                  await db.update(stopLibrary).set(upd as any).where(eq(stopLibrary.id, orig.id));
+                }
+              } catch { /* non-fatal */ }
+            })();
+          }
+        } catch { /* non-fatal: return unenriched data */ }
+      }
+
       // Other-day stops for two-way swap
       const otherDayStops = (dayIndex != null)
         ? await db.select({
@@ -8877,7 +8932,7 @@ Return valid JSON only. No markdown.`;
             .limit(20)
         : [];
 
-      return res.json({ options: filtered, otherDayStops });
+      return res.json({ options: enrichedOptions, otherDayStops });
     } catch (error: any) {
       console.error('[swap-options] REAL ERROR:', error?.message ?? String(error), error?.stack ?? '');
       req.log?.error({ err: error }, '[Rescue] swap-options error');

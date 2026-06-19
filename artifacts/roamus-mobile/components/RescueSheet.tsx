@@ -39,6 +39,9 @@ interface LibraryStop {
   address: string | null;
   description: string | null;
   city?: string | null;
+  gpAddressVerified?: string | null;
+  gpPriceLevel?: number | null;
+  enrichment?: { bestTimeOfDay?: string } | Record<string, unknown> | null;
 }
 
 interface OtherDayStop {
