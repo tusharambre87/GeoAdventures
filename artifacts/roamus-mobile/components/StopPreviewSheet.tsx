@@ -103,10 +103,9 @@ export default function StopPreviewSheet({
     : null;
   const duration = estimateDuration(stop.stopType);
   const isVerified = !!stop.gpAddressVerified;
-  const entryText = entryLabel(stop.gpPriceLevel);
+  const entryText = entryLabel(stop.gpPriceLevel) ?? 'Check website';
   const enrichmentObj = stop.enrichment as { bestTimeOfDay?: string } | null | undefined;
-  const bestTime = capitalize(enrichmentObj?.bestTimeOfDay);
-  const showMetaGrid = entryText != null || !!bestTime;
+  const bestTime = capitalize(enrichmentObj?.bestTimeOfDay) || 'Anytime';
 
   return (
     <View style={[StyleSheet.absoluteFillObject, { zIndex: 302 }]}>
@@ -175,25 +174,19 @@ export default function StopPreviewSheet({
                 <Text style={s.previewDescText}>{stop.description}</Text>
               </View>
             )}
-            {/* ENTRY + BEST TIME grid */}
-            {showMetaGrid && (
-              <View style={s.previewMetaGrid}>
-                {entryText != null && (
-                  <View style={s.previewMetaCell}>
-                    <Text style={s.previewMetaLabel}>{'ENTRY'}</Text>
-                    <Text style={[s.previewMetaValue, entryText === 'Free entry' ? { color: '#3DAA6E' } : {}]}>
-                      {entryText}
-                    </Text>
-                  </View>
-                )}
-                {!!bestTime && (
-                  <View style={s.previewMetaCell}>
-                    <Text style={s.previewMetaLabel}>{'BEST TIME'}</Text>
-                    <Text style={s.previewMetaValue}>{bestTime}</Text>
-                  </View>
-                )}
+            {/* ENTRY + BEST TIME grid — always rendered */}
+            <View style={s.previewMetaGrid}>
+              <View style={s.previewMetaCell}>
+                <Text style={s.previewMetaLabel}>{'ENTRY'}</Text>
+                <Text style={[s.previewMetaValue, entryText === 'Free entry' ? { color: '#3DAA6E' } : {}]}>
+                  {entryText}
+                </Text>
               </View>
-            )}
+              <View style={s.previewMetaCell}>
+                <Text style={s.previewMetaLabel}>{'BEST TIME'}</Text>
+                <Text style={s.previewMetaValue}>{bestTime}</Text>
+              </View>
+            </View>
           </View>
         </ScrollView>
         {!!replacingName && (
