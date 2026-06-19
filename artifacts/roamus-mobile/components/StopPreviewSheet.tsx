@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { F } from '@/lib/tokens';
 
 interface Props {
@@ -59,8 +57,6 @@ export default function StopPreviewSheet({
   onConfirm,
 }: Props) {
   const { height: screenH } = useWindowDimensions();
-  const safeInsets = useSafeAreaInsets();
-  const bottomSpace = Math.max(safeInsets.bottom, Platform.OS === 'ios' ? 34 : 16);
 
   const btnLabel = context === 'add' ? 'Add to my day \u2192' : 'Swap this stop \u2192';
 
@@ -122,7 +118,7 @@ export default function StopPreviewSheet({
         <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onConfirm}>
           <Text style={s.previewSwapBtnText}>{btnLabel}</Text>
         </TouchableOpacity>
-        <View style={{ height: bottomSpace }} />
+        <View style={{ height: 12 }} />
       </View>
     </View>
   );

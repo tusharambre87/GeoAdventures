@@ -20,3 +20,4 @@
 - [trip personalization pipeline](trip-personalization-pipeline.md) — meals are additive per day (not counted in pace stop target); preview groups by dayNumber not CHUNK; city pool cache must be invalidated when mapper fields change.
 - [stop_library name normalization](stop-library-name-normalization.md) — three normalizers must stay in sync; "U.S."/"United States", "Mt."/"Mount", "St."/"Saint" variants need word-expansion before punct-strip.
 - [Neon pool error handler](neon-pool-error.md) — pg Pool must have pool.on('error',...) or Neon connection drops crash Node hard (bypasses all try/catch); fixed in db.ts.
+- [NativeTabs iOS 26 layout](nativetabs-ios26-layout.md) — NativeTabs bounds content above tab bar; use height:12 spacer NOT safeInsets.bottom on absoluteFillObject sheets
