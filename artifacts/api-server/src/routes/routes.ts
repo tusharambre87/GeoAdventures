@@ -8923,6 +8923,8 @@ Return valid JSON only. No markdown.`;
             name: travelStops.name,
             stopType: travelStops.stopType,
             dayIndex: travelStops.dayIndex,
+            address: travelStops.address,
+            description: travelStops.description,
           }).from(travelStops)
             .where(and(
               eq(travelStops.tripId, tripId),

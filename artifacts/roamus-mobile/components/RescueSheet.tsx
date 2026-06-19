@@ -50,6 +50,8 @@ interface OtherDayStop {
   stopType: string | null;
   dayIndex: number;
   durationMinutes?: number | null;
+  address?: string | null;
+  description?: string | null;
 }
 
 type Context = 'morning' | 'en_route' | 'stop_complete' | 'stop';
