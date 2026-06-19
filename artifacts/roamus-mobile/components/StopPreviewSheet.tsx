@@ -65,7 +65,7 @@ export default function StopPreviewSheet({
   const btnLabel = context === 'add' ? 'Add to my day \u2192' : 'Swap this stop \u2192';
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { zIndex: 99 }]} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: 302 }]} pointerEvents="box-none">
       <Pressable
         style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
         onPress={onClose}
