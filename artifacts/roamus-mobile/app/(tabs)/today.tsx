@@ -549,11 +549,15 @@ export default function TodayScreen() {
   const [showRescue, setShowRescue]              = useState(false);
   const [previewStop, setPreviewStop] = useState<{
     name: string;
-    stopType: string;
-    description?: string;
-    address?: string;
+    stopType: string | null;
+    description?: string | null;
+    address?: string | null;
+    gpAddressVerified?: string | null;
+    gpPriceLevel?: number | null;
+    enrichment?: { bestTimeOfDay?: string } | Record<string, unknown> | null;
   } | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | undefined>();
+  const [previewReplacingName, setPreviewReplacingName] = useState<string | undefined>();
   const [previewImageLoading, setPreviewImageLoading] = useState(false);
   const [kidPickerVisible, setKidPickerVisible]  = useState(false);
   const [kidsForPicker, setKidsForPicker]        = useState<PlayerRecord[]>([]);
@@ -1033,12 +1037,14 @@ export default function TodayScreen() {
   const handlePreviewStop = (stop: any, imageUrl?: string) => {
     setPreviewStop(stop);
     setPreviewImageUrl(imageUrl);
+    setPreviewReplacingName(dayStops[currentStopIndex]?.name);
     setShowRescue(false);
   };
 
   const handlePreviewClose = () => {
     setPreviewStop(null);
     setPreviewImageUrl(undefined);
+    setPreviewReplacingName(undefined);
     setShowRescue(true);
   };
 
@@ -2244,6 +2250,7 @@ export default function TodayScreen() {
           imageUrl={previewImageUrl}
           imageLoading={false}
           context="replace"
+          replacingName={previewReplacingName}
           onClose={handlePreviewClose}
           onConfirm={handlePreviewClose}
         />
@@ -2577,6 +2584,7 @@ export default function TodayScreen() {
           imageUrl={previewImageUrl}
           imageLoading={false}
           context="replace"
+          replacingName={previewReplacingName}
           onClose={handlePreviewClose}
           onConfirm={handlePreviewClose}
         />
@@ -2854,6 +2862,7 @@ export default function TodayScreen() {
           imageUrl={previewImageUrl}
           imageLoading={false}
           context="replace"
+          replacingName={previewReplacingName}
           onClose={handlePreviewClose}
           onConfirm={handlePreviewClose}
         />
@@ -3025,6 +3034,7 @@ export default function TodayScreen() {
           imageUrl={previewImageUrl}
           imageLoading={false}
           context="replace"
+          replacingName={previewReplacingName}
           onClose={handlePreviewClose}
           onConfirm={handlePreviewClose}
         />

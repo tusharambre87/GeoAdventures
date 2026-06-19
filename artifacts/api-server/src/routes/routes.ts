@@ -8846,6 +8846,9 @@ Return valid JSON only. No markdown.`;
         stopType: stopLibrary.stopType,
         address: stopLibrary.address,
         description: stopLibrary.description,
+        gpAddressVerified: stopLibrary.gpAddressVerified,
+        gpPriceLevel: stopLibrary.gpPriceLevel,
+        enrichment: stopLibrary.enrichment,
       }).from(stopLibrary)
         .where(ilike(stopLibrary.city, `%${cityRaw}%`))
         .orderBy(asc(stopLibrary.serveCount))
