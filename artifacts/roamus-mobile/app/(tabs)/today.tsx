@@ -1809,6 +1809,7 @@ export default function TodayScreen() {
       router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex, filter: filterMap[category] ?? 'all' } } as never);
     };
     return (
+      <>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
@@ -2236,6 +2237,7 @@ export default function TodayScreen() {
           onPreviewStop={handlePreviewStop}
           initialOption={rescueInitialOption}
         />
+      </View>
       {previewStop && (
         <StopPreviewSheet
           stop={previewStop}
@@ -2246,7 +2248,7 @@ export default function TodayScreen() {
           onConfirm={handlePreviewClose}
         />
       )}
-      </View>
+      </>
     );
   }
 
@@ -2328,6 +2330,7 @@ export default function TodayScreen() {
       (stop.enrichment?.whyNow !== doFirst ? stop.enrichment?.whyNow ?? null : null);
 
     return (
+      <>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Photo hero with gradient overlay */}
@@ -2566,6 +2569,8 @@ export default function TodayScreen() {
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
         />
+        {menuOverlay}
+      </View>
       {previewStop && (
         <StopPreviewSheet
           stop={previewStop}
@@ -2576,8 +2581,7 @@ export default function TodayScreen() {
           onConfirm={handlePreviewClose}
         />
       )}
-        {menuOverlay}
-      </View>
+      </>
     );
   }
 
@@ -2615,6 +2619,7 @@ export default function TodayScreen() {
       ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
 
     return (
+      <>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           {/* Hero — same as EN_ROUTE, not dimmed */}
@@ -2841,6 +2846,8 @@ export default function TodayScreen() {
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
         />
+        {menuOverlay}
+      </View>
       {previewStop && (
         <StopPreviewSheet
           stop={previewStop}
@@ -2851,8 +2858,7 @@ export default function TodayScreen() {
           onConfirm={handlePreviewClose}
         />
       )}
-        {menuOverlay}
-      </View>
+      </>
     );
   }
 
@@ -2869,6 +2875,7 @@ export default function TodayScreen() {
     const bounceScale = bounceAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
 
     return (
+      <>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <View style={[sc.hero, { paddingTop: insets.top + 24 }]}>
@@ -3011,6 +3018,7 @@ export default function TodayScreen() {
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
         />
+      </View>
       {previewStop && (
         <StopPreviewSheet
           stop={previewStop}
@@ -3021,7 +3029,7 @@ export default function TodayScreen() {
           onConfirm={handlePreviewClose}
         />
       )}
-      </View>
+      </>
     );
   }
 
