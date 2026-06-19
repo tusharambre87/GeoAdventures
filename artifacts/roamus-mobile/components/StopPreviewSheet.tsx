@@ -118,7 +118,7 @@ export default function StopPreviewSheet({
         <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onConfirm}>
           <Text style={s.previewSwapBtnText}>{btnLabel}</Text>
         </TouchableOpacity>
-        <View style={{ height: 12 }} />
+        <View style={{ height: 100 }} />
       </View>
     </View>
   );
