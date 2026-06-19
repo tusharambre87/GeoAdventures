@@ -5411,7 +5411,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fpEffectivePace = ["chill","relaxed","easy","slow","chillout","chill_out"].includes(rawPaceNorm) ? "chill"
               : ["packed","gogetter","go_getter","full","busy","active","intense"].includes(rawPaceNorm) ? "packed"
               : "balanced";
-            const stopsPerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 5 : 4;
+            const fpChildAges = ((fullTrip?.travelers ?? []) as any[])
+              .filter(t => !t.isParent && t.age)
+              .map(t => parseInt(t.age ?? "0", 10))
+              .filter(n => n > 0 && n < 18);
+            const fpHasToddler = fpChildAges.some(a => a <= 4);
+            const fpBasePerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 5 : 4;
+            const stopsPerDay = fpHasToddler ? Math.max(2, fpBasePerDay - 1) : fpBasePerDay;
             const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
@@ -5610,10 +5616,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const toddlerNote = childrenAges.some(a => a <= 5) ? " — toddler nap window active" : "";
         console.log(`[Travel] [bg] childrenAges: [${childrenAges.join(", ")}]${toddlerNote}`);
 
-        // Toddler nap: reduce by 1 stop per day if child under 3
-        const hasToddler = childrenAges.some(a => a < 3);
+        // Toddler nap: reduce by 1 stop per day if youngest child is 4 or under
+        const hasToddler = childrenAges.some(a => a <= 4);
         const effectivePerDay = hasToddler
-          ? Math.max(1, stopsPerDayByPace - 1)
+          ? Math.max(2, stopsPerDayByPace - 1)
           : stopsPerDayByPace;
 
         // Total: arrival day + middle days + last day (each capped separately)
