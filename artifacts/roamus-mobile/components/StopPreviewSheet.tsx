@@ -109,7 +109,7 @@ export default function StopPreviewSheet({
   const showMetaGrid = entryText != null || !!bestTime;
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { zIndex: 302 }]} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: 302 }]}>
       <Pressable
         style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
         onPress={onClose}
