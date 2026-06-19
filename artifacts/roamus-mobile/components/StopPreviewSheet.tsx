@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,6 +49,8 @@ function stopEmoji(type: string | null | undefined): string {
   return STOP_TYPE_EMOJI[type ?? ''] ?? '\uD83D\uDCCD';
 }
 
+const TAB_BAR_H = 49;
+
 export default function StopPreviewSheet({
   stop,
   imageUrl,
@@ -60,7 +61,7 @@ export default function StopPreviewSheet({
 }: Props) {
   const { height: screenH } = useWindowDimensions();
   const safeInsets = useSafeAreaInsets();
-  const bottomSpace = Math.max(safeInsets.bottom, Platform.OS === 'ios' ? 34 : 16);
+  const sheetBottom = TAB_BAR_H + safeInsets.bottom;
 
   const btnLabel = context === 'add' ? 'Add to my day \u2192' : 'Swap this stop \u2192';
 
@@ -70,7 +71,7 @@ export default function StopPreviewSheet({
         style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
         onPress={onClose}
       />
-      <View style={[s.previewPanel, { maxHeight: screenH * 0.88 }]}>
+      <View style={[s.previewPanel, { maxHeight: screenH * 0.72, bottom: sheetBottom }]}>
         <View style={s.previewHandle} />
         <View style={s.previewHeader}>
           <Text style={s.previewName} numberOfLines={2}>{stop.name}</Text>
@@ -122,7 +123,7 @@ export default function StopPreviewSheet({
         <TouchableOpacity style={s.previewSwapBtn} activeOpacity={0.85} onPress={onConfirm}>
           <Text style={s.previewSwapBtnText}>{btnLabel}</Text>
         </TouchableOpacity>
-        <View style={{ height: bottomSpace }} />
+        <View style={{ height: 12 }} />
       </View>
     </View>
   );
