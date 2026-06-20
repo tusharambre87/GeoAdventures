@@ -3269,6 +3269,8 @@ export const plannerStopIntelligence = pgTable("planner_stop_intelligence", {
   scoreUrbanKidFit: integer("score_urban_kid_fit"),
   scoreAdventureFinal: integer("score_adventure_final"),
   scoreAdventureKidFit: integer("score_adventure_kid_fit"),
+  // Manual override — backfill scripts skip rows where this is true
+  manuallyOverridden: boolean("manually_overridden").default(false),
 }, (table) => [index("IDX_planner_stop_intelligence_place").on(table.placeId)]);
 
 export const insertPlannerStopIntelligenceSchema = createInsertSchema(plannerStopIntelligence).omit({ id: true, enrichedAt: true, cachedAt: true });

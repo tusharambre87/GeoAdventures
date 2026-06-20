@@ -166,6 +166,18 @@ async function run(): Promise<void> {
             return;
           }
 
+          // Step 2b — skip if a human has manually corrected this row
+          const existingPsi = await db
+            .select({ manuallyOverridden: plannerStopIntelligence.manuallyOverridden })
+            .from(plannerStopIntelligence)
+            .where(eq(plannerStopIntelligence.placeId, placeId))
+            .limit(1);
+          if (existingPsi[0]?.manuallyOverridden) {
+            totalSkipped++;
+            console.log(`${LOG} Skip (manually overridden): ${stop.name}`);
+            return;
+          }
+
           const destination = stop.country
             ? `${stop.city}, ${stop.country}`
             : stop.city;
