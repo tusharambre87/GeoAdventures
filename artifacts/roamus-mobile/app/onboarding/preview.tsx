@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -294,6 +294,8 @@ export default function PreviewScreen() {
   const { data, set, completeOnboarding } = useOnboarding();
   const { token, user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [savedStops, setSavedStops] = useState<any[] | null>(null);
+  const [savedTripId, setSavedTripId] = useState<string | null>(null);
   const [previewSpots, setPreviewSpots] = useState<DisplayDay[]>([]);
   const mountTimeRef = useRef(Date.now());
 
@@ -346,8 +348,38 @@ export default function PreviewScreen() {
   }, [data.generatedTrip, data.cities, previewSpots]);
 
   const allDays = useMemo<DisplayDay[]>(() => {
+    if (savedStops) {
+      const grouped: Record<number, any[]> = {};
+      savedStops
+        .filter(s => !['restaurant', 'cafe', 'street_food', 'bakery', 'dessert', 'food'].some(ft => (s.stopType ?? '').toLowerCase().includes(ft)))
+        .forEach(s => {
+          const d = s.dayIndex ?? 0;
+          if (!grouped[d]) grouped[d] = [];
+          grouped[d].push(s);
+        });
+      return Object.entries(grouped)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([dayIdx, stops]) => ({
+          label: `Day ${Number(dayIdx) + 1}`,
+          city: primaryCity,
+          stops: stops
+            .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+            .map((stop, si) => {
+              const typeKey = Object.keys(STOP_TAG).find(k => (stop.stopType ?? '').toLowerCase().includes(k));
+              const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: '\u2B50 Stop', color: G.muted };
+              return {
+                time: stop.scheduledTime ?? stop.time ?? '',
+                name: stop.name,
+                desc: stop.description ?? '',
+                tag: tagInfo.label,
+                tagColor: tagInfo.color,
+                img: stopImg(stop.stopType, si),
+              };
+            }),
+        }));
+    }
     return buildAllDays(apiDays, data.startDate, data.endDate, data.cities, data.cityDates);
-  }, [apiDays, data.startDate, data.endDate, data.cities, data.cityDates]);
+  }, [savedStops, apiDays, data.startDate, data.endDate, data.cities, data.cityDates, primaryCity]);
 
   const [activeDay, setActiveDay] = useState(0);
   const curDay = allDays[activeDay];
@@ -373,6 +405,93 @@ export default function PreviewScreen() {
     ? `Your ${data.cities.slice(0,-1).join(", ")} & ${data.cities[data.cities.length-1]} trip is ready \uD83C\uDF89`
     : `Your ${primaryCity} trip is ready \uD83C\uDF89`;
   const routeStr = isMulti ? data.cities.join(" → ") : "";
+
+  const handleSave = async () => {
+    if (!data.returningUser) { router.push("/onboarding/account"); return; }
+    if (!token) { router.push("/onboarding/account"); return; }
+    setSaving(true);
+    try {
+      const city = data.cities[0] ?? "Chicago";
+      const country = deriveCountry(city);
+      const isMultiCity = data.cityMode === "multi" && data.cities.length > 1;
+      const tripName = isMultiCity
+        ? `${data.cities.slice(0, -1).join(", ")} & ${data.cities[data.cities.length - 1]} Family Trip`
+        : `${city} Family Trip`;
+      const players = data.travelers.map(t => ({
+        name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
+      }));
+      const res = await fetch(`${API_BASE}/api/travel/trips`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: tripName,
+          destination: isMultiCity ? data.cities.join(", ") : city,
+          city,
+          country,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          travelers: players,
+          adventureStyle: STYLE_MAP[data.tripStyle ?? ""] ?? "family_explorer",
+          pace: PACE_MAP[data.pace ?? ""] ?? "balanced",
+          adventureContext: "travel",
+          autoGenerateStops: true,
+          templateSlug: data.templateSlug || undefined,
+          tripDays: data.tripDays || undefined,
+          ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
+            cityDates: Object.fromEntries(
+              Object.entries(data.cityDates).map(([c, dates]) => [
+                c,
+                {
+                  startDate: (dates as any).startDate ?? (dates as any).arrive,
+                  endDate:   (dates as any).endDate   ?? (dates as any).leave,
+                },
+              ])
+            ),
+          } : {}),
+          tailoring: {
+            transport: data.transport,
+            stroller: data.stroller,
+            interests: data.interests,
+            indoorOutdoor: data.indoorOutdoor ?? "both",
+            budgetSensitivity: data.budgetLevel ?? "moderate",
+            kidEnergyLevel: data.kidEnergyLevel ?? "mixed",
+            arrivalMethod: data.arrivalMethod ?? null,
+            arrivalTime: data.arrivalTime ?? null,
+            lastDay: data.lastDay ?? "full",
+            cityTransitions: data.cityTransitions ?? {},
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("Trip creation failed");
+      const trip = await res.json();
+      set({ createdTripId: trip.id });
+      set({ templateSlug: null, isTemplate: false, tripDays: null });
+      setSavedTripId(trip.id);
+      fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+      // Poll until stops are ready (max 15 seconds)
+      let attempts = 0;
+      while (attempts < 15) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const detail = await fetch(`${API_BASE}/api/travel/trips/${trip.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json());
+          if (detail.stops && detail.stops.length > 0) {
+            setSavedStops(detail.stops);
+            break;
+          }
+        } catch { /* non-fatal — keep polling */ }
+        attempts++;
+      }
+    } catch {
+      Alert.alert("Couldn't save trip", "Please check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={[s.root, { backgroundColor: "#1A1F2E" }]}>
@@ -478,101 +597,42 @@ export default function PreviewScreen() {
 
       {/* ── CTA ── */}
       <View style={[s.cta, { paddingBottom: insets.bottom + 24 }]}>
-        <Pressable
-          style={({ pressed }) => [s.ctaBtn, { opacity: (pressed || saving) ? 0.88 : 1 }]}
-          onPress={async () => {
-            if (!data.returningUser) {
-              router.push("/onboarding/account");
-              return;
-            }
-            if (!token) {
-              router.push("/onboarding/account");
-              return;
-            }
-            setSaving(true);
-            try {
-              const city = data.cities[0] ?? "Chicago";
-              const country = deriveCountry(city);
-              const isMultiCity = data.cityMode === "multi" && data.cities.length > 1;
-              const tripName = isMultiCity
-                ? `${data.cities.slice(0, -1).join(", ")} & ${data.cities[data.cities.length - 1]} Family Trip`
-                : `${city} Family Trip`;
-              const players = data.travelers.map(t => ({
-                name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
-              }));
-              const res = await fetch(`${API_BASE}/api/travel/trips`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({
-                  name: tripName,
-                  destination: isMultiCity ? data.cities.join(", ") : city,
-                  city,
-                  country,
-                  startDate: data.startDate,
-                  endDate: data.endDate,
-                  travelers: players,
-                  adventureStyle: STYLE_MAP[data.tripStyle ?? ""] ?? "family_explorer",
-                  pace: PACE_MAP[data.pace ?? ""] ?? "balanced",
-                  adventureContext: "travel",
-                  autoGenerateStops: true,
-                  templateSlug: data.templateSlug || undefined,
-                  tripDays: data.tripDays || undefined,
-                  ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
-                    cityDates: Object.fromEntries(
-                      Object.entries(data.cityDates).map(([c, dates]) => [
-                        c,
-                        {
-                          startDate: (dates as any).startDate ?? (dates as any).arrive,
-                          endDate:   (dates as any).endDate   ?? (dates as any).leave,
-                        },
-                      ])
-                    ),
-                  } : {}),
-                  tailoring: {
-                    transport: data.transport,
-                    stroller: data.stroller,
-                    interests: data.interests,
-                    indoorOutdoor: data.indoorOutdoor ?? "both",
-                    budgetSensitivity: data.budgetLevel ?? "moderate",
-                    kidEnergyLevel: data.kidEnergyLevel ?? "mixed",
-                    arrivalMethod: data.arrivalMethod ?? null,
-                    arrivalTime: data.arrivalTime ?? null,
-                    lastDay: data.lastDay ?? "full",
-                    cityTransitions: data.cityTransitions ?? {},
-                  },
-                }),
-              });
-              if (!res.ok) {
-                throw new Error("Trip creation failed");
-              }
-              const trip = await res.json();
-              set({ createdTripId: trip.id });
-              set({ templateSlug: null, isTemplate: false, tripDays: null });
-              fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-              }).catch(() => {});
+        {saving ? (
+          <View style={{ alignItems: 'center', padding: 20 }}>
+            <ActivityIndicator color="#E8692A" />
+            <Text style={{ color: '#8A8FA8', marginTop: 8, fontFamily: 'PlusJakartaSans_500Medium' }}>
+              Building your trip...
+            </Text>
+          </View>
+        ) : savedStops ? (
+          <Pressable
+            style={({ pressed }) => [s.ctaBtn, { opacity: pressed ? 0.88 : 1 }]}
+            onPress={() => {
               if (user?.subscriptionTier && user.subscriptionTier !== "free") {
                 completeOnboarding();
                 router.replace("/(tabs)/today");
               } else {
                 router.push("/onboarding/upgrade");
               }
-            } catch {
-              Alert.alert("Couldn't save trip", "Please check your connection and try again.");
-            } finally {
-              setSaving(false);
-            }
-          }}
-          disabled={saving}
-        >
-          <Text style={s.ctaBtnText}>
-            {saving ? "Saving…" : data.returningUser ? "Save this trip →" : "Save this trip — it's free →"}
-          </Text>
-        </Pressable>
-        <Text style={s.ctaHint}>
-          {data.returningUser ? "Your trip will be added to your journal" : "Free account · All stops visible · No card needed"}
-        </Text>
+            }}
+          >
+            <Text style={s.ctaBtnText}>View full plan →</Text>
+          </Pressable>
+        ) : (
+          <>
+            <Pressable
+              style={({ pressed }) => [s.ctaBtn, { opacity: pressed ? 0.88 : 1 }]}
+              onPress={handleSave}
+            >
+              <Text style={s.ctaBtnText}>
+                {data.returningUser ? "Save this trip →" : "Save this trip — it's free →"}
+              </Text>
+            </Pressable>
+            <Text style={s.ctaHint}>
+              {data.returningUser ? "Your trip will be added to your journal" : "Free account · All stops visible · No card needed"}
+            </Text>
+          </>
+        )}
       </View>
     </View>
   );

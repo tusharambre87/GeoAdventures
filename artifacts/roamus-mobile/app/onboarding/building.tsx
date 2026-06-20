@@ -282,7 +282,7 @@ export default function BuildingScreen() {
         }
         const body = await res.json();
         if (Array.isArray(body.days) && body.days.length > 0) {
-          set(prev => ({ ...prev, generatedTrip: null }));
+          set({ generatedTrip: null });
           set({ generatedTrip: { days: body.days }, previewStopIds: body.previewStopIds ?? [] });
         }
         setApiDone(true);

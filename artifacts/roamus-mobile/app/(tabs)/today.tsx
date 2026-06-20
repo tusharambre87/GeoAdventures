@@ -527,8 +527,6 @@ export default function TodayScreen() {
   // Day-gating flags — derived from trip state, recalculated on every render
   const isDayStarted = typeof trip?.currentDayIndex === 'number'
     && trip.currentDayIndex >= todayDayIndex;
-  console.log('trip after load:', trip?.currentDayIndex, 'isDayStarted:', isDayStarted, 'todayDayIndex:', todayDayIndex);
-
   const tripHasStarted = (() => {
     if (!trip?.startDate) return false;
     const start = parseLocalDate(trip.startDate)!;
