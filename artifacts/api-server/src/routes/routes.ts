@@ -7948,6 +7948,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedAt: new Date(),
         })
         .where(eq(travelTrips.id, tripId));
+      const verify = await db.select({ currentDayIndex: travelTrips.currentDayIndex })
+        .from(travelTrips)
+        .where(eq(travelTrips.id, tripId));
+      req.log.info({ verify }, 'verify current_day_index after update');
       return res.json({ success: true, currentDayIndex: dayIndex });
     } catch (error) {
       req.log.error({ error }, 'Error starting day');
