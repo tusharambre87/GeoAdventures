@@ -90,6 +90,7 @@ export interface PlacePlanningProfile {
   anchorStopFitScore?: number;
 
   // ── Phase 2 — Family evidence ────────────────────────────────────────────
+  familyAnchorType?: string;
   familyEvidenceScore?: number;
   ageMatchConfidenceScore?: number;
   worthTheHassleConfidenceScore?: number;
@@ -462,13 +463,17 @@ export function computeScores(profile: PlacePlanningProfile, family: FamilyProfi
   const delightScore = computeDelightScore(profile, family);
   const familyEvidenceConfidenceScore = computeFamilyEvidenceConfidenceScore(profile, family);
 
+  // Anchor stops: weight iconic evidence over practicality.
+  // Landmarks like Lincoln Memorial score low on restrooms/food but are must-visits.
+  const isAnchor = profile.familyAnchorType === 'anchor';
+
   const finalScore = clamp(
     ageAndKidFitScore * 0.28 +
-    parentPracticalityScore * 0.22 +
+    parentPracticalityScore * (isAnchor ? 0.12 : 0.22) +
     flowAndDayFitScore * 0.20 +
     flexibilityAndRecoveryScore * 0.12 +
     delightScore * 0.10 +
-    familyEvidenceConfidenceScore * 0.08
+    familyEvidenceConfidenceScore * (isAnchor ? 0.18 : 0.08)
   );
 
   const roleAssigned = deriveRole(
