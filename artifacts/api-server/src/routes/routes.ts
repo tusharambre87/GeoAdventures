@@ -11,7 +11,7 @@ import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type Gener
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
-import { eq, and, lte, gt, desc, asc, or, ilike, inArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, lte, gt, desc, asc, or, ilike, inArray, notInArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -6227,7 +6227,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gpPhotoRefs: stopLibrary.gpPhotoRefs,
         })
         .from(stopLibrary)
-        .where(ilike(stopLibrary.city, `%${cityLower}%`))
+        .where(and(
+          ilike(stopLibrary.city, `%${cityLower}%`),
+          notInArray(stopLibrary.stopType, ['restaurant', 'cafe', 'street_food', 'bakery', 'dessert', 'food']),
+        ))
         .orderBy(drizzleSql`RANDOM()`)
         .limit(40);
 
