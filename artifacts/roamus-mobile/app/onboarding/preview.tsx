@@ -167,18 +167,23 @@ function toDisplayDays(previewDays: PreviewDay[], cities: string[]): DisplayDay[
     return {
       label: day.label,
       city,
-      stops: day.stops.map((stop, si) => {
-        const typeKey = Object.keys(STOP_TAG).find(k => stop.stopType?.toLowerCase().includes(k));
-        const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: "\u2B50 Stop", color: G.muted };
-        return {
-          time: stop.time,
-          name: stop.name,
-          desc: stop.description,
-          tag: tagInfo.label,
-          tagColor: tagInfo.color,
-          img: stopImg(stop.stopType, si),
-        };
-      }),
+      stops: day.stops
+        .filter(stop => {
+          const t = (stop.stopType ?? '').toLowerCase();
+          return !['restaurant', 'cafe', 'street_food', 'bakery', 'dessert', 'food'].some(ft => t.includes(ft));
+        })
+        .map((stop, si) => {
+          const typeKey = Object.keys(STOP_TAG).find(k => stop.stopType?.toLowerCase().includes(k));
+          const tagInfo = typeKey ? STOP_TAG[typeKey] : { label: "\u2B50 Stop", color: G.muted };
+          return {
+            time: stop.time,
+            name: stop.name,
+            desc: stop.description,
+            tag: tagInfo.label,
+            tagColor: tagInfo.color,
+            img: stopImg(stop.stopType, si),
+          };
+        }),
     };
   });
 }
