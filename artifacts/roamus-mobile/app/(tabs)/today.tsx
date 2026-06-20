@@ -194,6 +194,7 @@ type TripData = {
   coverImageUrl?: string | null;
   firstPhotoUrl?: string | null;
   stayLocations?: Array<{ cityName: string; address?: string; lat?: number; lng?: number }> | null;
+  currentDayIndex?: number | null;
   stops: Stop[];
 };
 
@@ -522,6 +523,27 @@ export default function TodayScreen() {
     return Math.max(0, Math.min(diff, (trip.tripDays ?? 1) - 1));
   }, [trip?.startDate, trip?.tripDays]);
   const resolvedDayIndex = todayDayIndex;
+
+  // Day-gating flags — derived from trip state, recalculated on every render
+  const isDayStarted = typeof trip?.currentDayIndex === 'number'
+    && trip.currentDayIndex >= todayDayIndex;
+
+  const tripHasStarted = (() => {
+    if (!trip?.startDate) return false;
+    const start = parseLocalDate(trip.startDate)!;
+    start.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return today.getTime() >= start.getTime();
+  })();
+
+  const tripIsUpcoming = (() => {
+    if (!trip?.startDate) return false;
+    const start = parseLocalDate(trip.startDate)!;
+    start.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return start.getTime() > today.getTime();
+  })();
+
   const [viewingDay, setViewingDay]             = useState<number>(0);
   const [activeSheet, setActiveSheet]           = useState<'none' | 'rescue'>('none');
   const [rescueType, setRescueType]             = useState<'behind' | 'tired' | 'skip' | 'fun'>('behind');
@@ -916,6 +938,16 @@ export default function TodayScreen() {
     setCurrentStopIndex(0);
     setTodayState('en_route');
     Analytics.track('day_started', { trip_id: resolvedTripId ?? trip.id, day_index: resolvedDayIndex });
+    // Persist the started day to DB so the gating flag isDayStarted becomes true
+    try {
+      await apiFetch(`/api/travel/trips/${trip.id}/start-day`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dayIndex: resolvedDayIndex }),
+      });
+      await loadTrip();
+    } catch (e) {
+      // Non-fatal — the UI already advanced; DB write failure is logged server-side
+    }
     if (resolvedTripId && dayStops[0]) {
       onEnRoute({
         tripId: resolvedTripId,
@@ -1258,6 +1290,55 @@ export default function TodayScreen() {
           onPress={() => router.push('/onboarding/splash' as never)}
         >
           <Text style={nt.ctaText}>Plan a trip →</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GATE: UPCOMING — trip start date is in the future
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (trip && tripIsUpcoming) {
+    const daysUntil = Math.ceil(
+      (parseLocalDate(trip.startDate!)!.getTime() - new Date().setHours(0, 0, 0, 0))
+      / (1000 * 60 * 60 * 24)
+    );
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: insets.top + 32 }}>
+        <Text style={{ fontFamily: 'Fraunces_900Black', fontSize: 30, color: C.deep, textAlign: 'center', marginBottom: 12 }}>
+          {trip.destination} in {daysUntil} day{daysUntil !== 1 ? 's' : ''}
+        </Text>
+        <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22 }}>
+          {daysUntil === 1 ? 'Your adventure starts tomorrow.' : `Check back in ${daysUntil} days to start Day 1.`}
+        </Text>
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GATE: DAY NOT STARTED — trip date is today or past, waiting for explicit tap
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (trip && tripHasStarted && !isDayStarted && !loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: insets.top + 32 }}>
+        <Text style={{ fontFamily: 'Fraunces_900Black', fontSize: 32, color: C.deep, textAlign: 'center', marginBottom: 10 }}>
+          Day {todayDayIndex + 1}
+        </Text>
+        <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, color: C.muted, textAlign: 'center', marginBottom: 40, lineHeight: 22 }}>
+          Ready to start your day in {trip.destination}?
+        </Text>
+        <TouchableOpacity
+          onPress={handleStartDay}
+          disabled={starting}
+          style={{
+            backgroundColor: C.orange, borderRadius: 14,
+            paddingVertical: 16, paddingHorizontal: 32,
+            width: '100%', alignItems: 'center', opacity: starting ? 0.7 : 1,
+          }}
+        >
+          <Text style={{ color: '#fff', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>
+            {starting ? 'Starting…' : `Start Day ${todayDayIndex + 1} →`}
+          </Text>
         </TouchableOpacity>
       </View>
     );

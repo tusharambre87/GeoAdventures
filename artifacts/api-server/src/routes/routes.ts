@@ -7929,6 +7929,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/travel/trips/:tripId/start-day — persist which day the family has explicitly started
+  app.patch('/api/travel/trips/:tripId/start-day', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+      const { dayIndex } = req.body;
+      if (typeof dayIndex !== 'number') return res.status(400).json({ error: 'dayIndex required' });
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+      await db.update(travelTrips)
+        .set({
+          currentDayIndex: dayIndex,
+          status: dayIndex === 0 ? 'active' : (trip.status ?? 'active'),
+          adventureStartedAt: dayIndex === 0 && !trip.adventureStartedAt ? new Date() : trip.adventureStartedAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(travelTrips.id, tripId));
+      return res.json({ success: true, currentDayIndex: dayIndex });
+    } catch (error) {
+      req.log.error({ error }, 'Error starting day');
+      return res.status(500).json({ message: 'Failed to start day' });
+    }
+  });
+
   app.patch('/api/travel/trips/:tripId/archive', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { tripId } = req.params;
