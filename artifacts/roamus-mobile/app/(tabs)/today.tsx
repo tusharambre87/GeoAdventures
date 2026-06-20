@@ -800,7 +800,7 @@ export default function TodayScreen() {
           const s = parseLocalDate(t.startDate)!; s.setHours(0,0,0,0);
           const e = parseLocalDate(t.endDate)!;   e.setHours(23,59,59,999);
           return todayMs >= s.getTime() && todayMs <= e.getTime();
-        }) ?? data.trips?.[0];
+        }) ?? data.trips?.find(t => t.startDate) ?? data.trips?.[0];
         if (!active) {
           if (!devState) setTodayState('no_trip');
           return;
