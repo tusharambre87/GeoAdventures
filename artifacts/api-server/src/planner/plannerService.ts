@@ -2876,7 +2876,8 @@ export function selectStopsFromPool(
       // Museum hard cap: exactly 1 museum per day regardless of pool size
       if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
       // Immersive cap: max 1 immersive stop per day (zoo, aquarium, activity, palace, museum)
-      if (IMMERSIVE_TYPES.has(c.type ?? '') && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
+      const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
+      if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
       // Anchor hard cap: exactly 1 anchor per day — prevents two big-ticket stops competing
       if (c.familyAnchorType === 'anchor' && anchorsInCurrentDay >= 1) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
@@ -2974,7 +2975,7 @@ export function selectStopsFromPool(
     }
     typesInCurrentDay.add(bestCandidate.type);
     if (bestCandidate.type === 'museum') museumsInCurrentDay++;
-    if (IMMERSIVE_TYPES.has(bestCandidate.type ?? '')) immersivesInCurrentDay++;
+    if (IMMERSIVE_TYPES.has(bestCandidate.type ?? '') && (bestCandidate.durationMinutes ?? 0) >= 90) immersivesInCurrentDay++;
     if (bestCandidate.familyAnchorType === 'anchor') anchorsInCurrentDay++;
     dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
   }
