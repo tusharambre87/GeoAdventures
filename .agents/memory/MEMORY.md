@@ -21,3 +21,4 @@
 - [stop_library name normalization](stop-library-name-normalization.md) — three normalizers must stay in sync; "U.S."/"United States", "Mt."/"Mount", "St."/"Saint" variants need word-expansion before punct-strip.
 - [Neon pool error handler](neon-pool-error.md) — pg Pool must have pool.on('error',...) or Neon connection drops crash Node hard (bypasses all try/catch); fixed in db.ts.
 - [NativeTabs iOS 26 layout](nativetabs-ios26-layout.md) — NativeTabs bounds content above tab bar; use height:12 spacer NOT safeInsets.bottom on absoluteFillObject sheets
+- [interests-trip-tailoring storage](interests-trip-tailoring.md) — top-level `interests` in POST /api/travel/trips was never stored; must destructure + merge into tailoring JSONB so planner reads them

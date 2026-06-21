@@ -6856,7 +6856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/travel/trips', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, templateSlug, previewStopIds } = req.body;
+      const { name, destination, country, state, city, startDate, endDate, travelers, autoGenerateStops, adventureContext, stopCount, tripDays: rawTripDays, adventureStyle: rawStyle, pace: rawPace, cityDates, stayLocations, meals, tailoring: rawTailoring, interests: rawInterests, templateSlug, previewStopIds } = req.body;
       // templateStops is intentionally NOT read from req.body — stops are always sourced server-side
       console.log(`✈️ [Travel] Create trip request: userId=${userId}, name=${name}, destination=${destination}, country=${country}, city=${city}, adventureContext=${adventureContext}`);
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
@@ -6941,7 +6941,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cityDates: cityDates || null,
         stayLocations: stayLocations || null,
         mealPreferences: meals || null,
-        tailoring: rawTailoring && typeof rawTailoring === 'object' ? rawTailoring : null,
+        tailoring: (() => {
+          const base = (rawTailoring && typeof rawTailoring === 'object') ? rawTailoring : {};
+          const merged = (!base.interests && rawInterests && Array.isArray(rawInterests))
+            ? { ...base, interests: rawInterests }
+            : base;
+          return Object.keys(merged).length > 0 ? merged : null;
+        })(),
         allowCompletion: !isHomeAdventure,
         allowKeepsakes: !isHomeAdventure,
         allowMediaCapture: !isHomeAdventure,

@@ -2666,7 +2666,7 @@ export function selectStopsFromPool(
       const stopText = `${stop.name} ${stop.type} ${stop.whyNow ?? ""}`.toLowerCase();
       const stopType = (stop.type ?? "").toLowerCase();
       for (const interest of input.interests) {
-        const key = interest.toLowerCase();
+        const key = interest.replace(/[^\x00-\x7F]/g, '').trim().toLowerCase();
         const mappedTypes = INTEREST_TYPE_MAP[key] ?? [];
         if (mappedTypes.includes(stopType)) {
           // Fix 4: boosted from +3 → +5 so interests meaningfully reorder the stop pool
