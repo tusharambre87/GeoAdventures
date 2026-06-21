@@ -2167,6 +2167,7 @@ export async function generateCityStopPool(
       age8to12Fit: plannerStopIntelligence.age8to12Fit,
       parentEffortScore: plannerStopIntelligence.parentEffortScore,
       psiMinAge: plannerStopIntelligence.minAge,
+      durationMinutes: plannerPlaces.durationMinutes,
       // PSI family-profile vibe scores
       scoreToddlerFinal: plannerStopIntelligence.scoreToddlerFinal,
       scoreClassicFinal: plannerStopIntelligence.scoreClassicFinal,
@@ -2263,7 +2264,7 @@ export async function generateCityStopPool(
       address: row.address ?? undefined,
       stopType,
       type: stopType,
-      durationMinutes: durationByStopType(stopType),
+      durationMinutes: row.durationMinutes ?? durationByStopType(stopType),
       effortLevel,
       indoorOutdoor,
       sensoryLoad,
@@ -2878,8 +2879,11 @@ export function selectStopsFromPool(
       // Immersive cap: max 1 immersive stop per day (zoo, aquarium, activity, palace, museum)
       const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
       if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
-      // Anchor hard cap: exactly 1 anchor per day — prevents two big-ticket stops competing
-      if (c.familyAnchorType === 'anchor' && anchorsInCurrentDay >= 1) continue;
+      // Anchor hard cap: exactly 1 landmark/adventure anchor per day — prevents two big-ticket
+      // non-museum stops competing. Museums, zoos, and aquariums are already gated by their
+      // own per-day caps (museumsInCurrentDay, immersivesInCurrentDay) so they are excluded here.
+      const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
+      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= 1) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Meal stops are additive (not counted against the per-day activity target).
       // They are appended per-day after the main greedy selection finishes.
