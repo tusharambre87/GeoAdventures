@@ -3814,6 +3814,7 @@ export const stopLibrary = pgTable("stop_library", {
   gpPhone: text("gp_phone"),
   gpWebsite: text("gp_website"),
   gpVerifiedAt: timestamp("gp_verified_at"),   // set after lookup; NULL = not yet attempted
+  metroArea: text("metro_area"),               // metro region this stop belongs to (e.g. 'Minneapolis'); NULL = city-only
 }, (table) => [
   index("IDX_stop_library_normalized_key").on(table.normalizedKey),
   // Dedup key: same normalized stop name in same city → update, not duplicate insert

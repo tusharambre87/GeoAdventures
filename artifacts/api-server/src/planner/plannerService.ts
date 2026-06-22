@@ -2173,6 +2173,7 @@ export async function generateCityStopPool(
       scoreClassicFinal: plannerStopIntelligence.scoreClassicFinal,
       scoreUrbanFinal: plannerStopIntelligence.scoreUrbanFinal,
       scoreAdventureFinal: plannerStopIntelligence.scoreAdventureFinal,
+      metroArea: stopLibrary.metroArea,
     })
     .from(stopLibrary)
     .leftJoin(
@@ -2185,7 +2186,10 @@ export async function generateCityStopPool(
     )
     .where(
       and(
-        sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${city}))`,
+        or(
+          sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${city}))`,
+          sql`LOWER(TRIM(${stopLibrary.metroArea})) = LOWER(TRIM(${city}))`,
+        ),
         sql`LOWER(TRIM(${stopLibrary.country})) = LOWER(TRIM(${country}))`,
       ),
     )
