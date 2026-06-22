@@ -2,11 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Notifications from 'expo-notifications'
 
 const ASKED_KEY = '@roamus_notif_permission_asked'
+const DISMISSED_KEY = '@roamus_notif_permission_dismissed'
 
 export async function hasAskedPermission(): Promise<boolean> {
   try {
-    const val = await AsyncStorage.getItem(ASKED_KEY)
-    return val === 'true'
+    const [[, asked], [, dismissed]] = await AsyncStorage.multiGet([ASKED_KEY, DISMISSED_KEY])
+    return asked === 'true' || dismissed !== null
   } catch {
     return false
   }
