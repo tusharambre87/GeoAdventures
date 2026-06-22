@@ -312,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           symbol: '₹',
           geopass: '149',
           trippack: '299',
-          cadence: 'per month · whole family',
+          cadence: 'per month · up to 4 kids',
         });
       }
 
@@ -320,18 +320,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         country: countryCode,
         currency: 'USD',
         symbol: '$',
-        geopass: '4.99',
-        trippack: '9.99',
-        cadence: 'per month · whole family',
+        geopass: '7.99',
+        trippack: '12.99',
+        cadence: 'per month · up to 4 kids',
       });
     } catch (_err) {
       return res.json({
         country: 'US',
         currency: 'USD',
         symbol: '$',
-        geopass: '4.99',
-        trippack: '9.99',
-        cadence: 'per month · whole family',
+        geopass: '7.99',
+        trippack: '12.99',
+        cadence: 'per month · up to 4 kids',
       });
     }
   });
