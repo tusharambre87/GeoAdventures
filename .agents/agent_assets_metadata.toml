@@ -23,3 +23,9 @@ id = "MAb4EsipT_JQD4wIEn5om"
 uri = "file://reports/chicago-qa-audit-2026-06-11.md"
 type = "text"
 title = "Chicago QA Audit — 2026-06-11"
+
+[[outputs]]
+id = "Ov-zVxY5R5Twh6n1Uniew"
+uri = "file://attached_assets/roamus-logo-transparent.png"
+type = "image"
+title = "RoamUs Logo — Transparent Background"
