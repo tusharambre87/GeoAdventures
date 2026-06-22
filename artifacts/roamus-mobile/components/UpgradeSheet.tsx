@@ -32,7 +32,7 @@ export interface UpgradeSheetProps {
 }
 
 const HEADLINES: Record<UpgradeContext, string> = {
-  run_day:    'This is where your trip comes alive.',
+  run_day:    'Day 1 is on us. Keep going?',
   locked_day: 'Unlock your full itinerary.',
   at_stop:    'The full stop experience awaits.',
   story:      'Your family story is waiting.',
@@ -45,7 +45,7 @@ const SHEET_PLANS = [
     id: 'roamus',
     name: 'RoamUs Pass',
     tagline: 'Full experience \u00b7 Whole family',
-    badge: 'MOST POPULAR',
+    badge: undefined, // 'MOST POPULAR' — re-enable with real data post-beta
     features: [
       'Step-by-step guide at every stop',
       'Kids missions + engagement layer',
@@ -224,7 +224,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
           bounces={false}
         >
           <Text style={s.headline}>{HEADLINES[context]}</Text>
-          <Text style={s.sub}>Upgrade to unlock the full RoamUs experience.</Text>
+          <Text style={s.sub}>Your family just had a real day. Unlock the rest of the trip to keep it going.</Text>
 
           {/* Monthly / Annual toggle */}
           <View style={s.toggleRow}>
@@ -299,7 +299,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
             <Text style={s.ctaBtnText}>{ctaLabel}</Text>
           </Pressable>
           <Pressable onPress={onClose} style={s.dismissLink}>
-            <Text style={s.dismissText}>Continue on free plan</Text>
+            <Text style={s.dismissText}>Maybe later — go to my trip</Text>
           </Pressable>
         </View>
       </Animated.View>

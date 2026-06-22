@@ -751,6 +751,14 @@ export default function TodayScreen() {
     Analytics.track('day_completed', { trip_id: resolvedTripId ?? '', day_index: resolvedDayIndex, stops_visited: visited, stops_skipped: skipped });
   }, [todayState]);
 
+  // ── Paywall: show after Day 1 completes for free users ──
+  useEffect(() => {
+    if (todayState !== 'day_complete') return;
+    if (resolvedDayIndex !== 0) return;
+    if (!isFree) return;
+    setUpgradeVisible(true);
+  }, [todayState]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Analytics: rescue sheet opened ──
   useEffect(() => {
     if (!showRescue) return;
@@ -914,7 +922,7 @@ export default function TodayScreen() {
   // ── Start Day handler ──
   async function handleStartDay() {
     if (!trip) return;
-    if (isFree) { setUpgradeVisible(true); return; }
+    if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
     const asked = await hasAskedPermission();
     if (!asked) {
       setShowPermissionModal(true);
@@ -2608,7 +2616,7 @@ export default function TodayScreen() {
               style={er.hereBtn}
               activeOpacity={0.85}
               onPress={() => {
-                if (isFree) { setUpgradeVisible(true); return; }
+                if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setTodayState('at_stop_frozen');
                 AsyncStorage.setItem('atStopFrozen', 'true');
@@ -3059,7 +3067,7 @@ export default function TodayScreen() {
               <TouchableOpacity
                 style={sc.headThereBtn} activeOpacity={0.85}
                 onPress={() => {
-                  if (isFree) { setUpgradeVisible(true); return; }
+                  if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
                   setVisitedPhotos([]);
