@@ -528,11 +528,11 @@ function getPaceConstraints(pace: string): { min: number; max: number; maxHours:
 function getStopsPerDay(pace: string): number {
   const map: Record<string, number> = {
     'relaxed':   3,
-    'moderate':  4,
+    'moderate':  3,
     'go-getter': 5,
     // Legacy mappings — never remove these
     'chill':     3,
-    'balanced':  4,
+    'balanced':  3,
     'packed':    5,
     'busy':      5,
   };
