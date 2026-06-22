@@ -19,7 +19,7 @@ import { upsertExploreCache } from '../storage.js';
 
 const PAUSE_MS    = 2500;
 const CONCURRENCY = 3;
-const FORCE_REGEN = true; // set to false after this run completes
+const FORCE_REGEN = false; // set to false after this run completes
 
 const AGE_BANDS = [
   { band: 'young',  representativeAge: 5  },
