@@ -105,7 +105,28 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
 
 const METRO_RADIUS_KM = 120;
 
+// Set of centroid city names for O(1) lookup — stops whose city is already a
+// metro center belong to their own pool and must never be cross-tagged.
+const METRO_CITY_NAMES = new Set(
+  US_CITY_CENTROIDS.map(c => c.city.toLowerCase().trim())
+);
+
 async function tagMetroStops() {
+  // Step 0: Clear any stale cross-tags from a previous run (stops that are
+  // themselves metro cities but were incorrectly tagged to a neighbour city).
+  const cleared = await db.execute(sql`
+    UPDATE stop_library
+    SET metro_area = NULL, distance_from_metro_km = NULL
+    WHERE LOWER(TRIM(country)) IN ('us', 'united states', 'usa')
+      AND metro_area IS NOT NULL
+      AND LOWER(TRIM(city)) = ANY(
+        ARRAY[${sql.raw(
+          Array.from(METRO_CITY_NAMES).map(c => `'${c.replace(/'/g, "''")}'`).join(', ')
+        )}]
+      )
+  `);
+  console.log(`[MetroTag] Cleared stale cross-tags from metro-city stops: ${(cleared as any).rowCount ?? '?'} rows reset.`);
+
   console.log('[MetroTag] Loading all US stops from stop_library...');
 
   const allStops = await db
@@ -135,6 +156,9 @@ async function tagMetroStops() {
     if (isNaN(stopLat) || isNaN(stopLng)) { skipped++; continue; }
 
     const stopCityNorm = stop.city?.toLowerCase().trim() ?? '';
+
+    // Skip stops whose city is itself a metro center — they belong to their own pool.
+    if (METRO_CITY_NAMES.has(stopCityNorm)) { skipped++; continue; }
 
     let closestCity: string | null = null;
     let closestDist = Infinity;
