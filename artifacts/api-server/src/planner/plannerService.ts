@@ -2935,7 +2935,7 @@ export function selectStopsFromPool(
           const legMins = estimateTravelMins(distKm, input.transportMode ?? 'driving');
 
           // Hard reject: single leg exceeds pace-based travel cap
-          const legCap = input.pace === 'chill' ? 20 : 40;
+          const legCap = input.pace === 'chill' ? 20 : input.pace === 'balanced' || input.pace === 'moderate' ? 25 : 40;
           const dayCap = input.pace === 'chill' ? 60 : input.pace === 'packed' ? 120 : 90;
           if (legMins > legCap) continue;
           if (dailyTravelMins + legMins > dayCap) continue;
