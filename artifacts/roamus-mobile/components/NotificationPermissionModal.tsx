@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react'
 import {
-  Alert,
   Animated,
   Pressable,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { F } from '@/lib/tokens'
 import { requestNotificationPermission } from '@/services/notifications/notificationPermission'
@@ -67,21 +67,14 @@ export default function NotificationPermissionModal({ onClose }: Props) {
     dismiss(true, onClose)
   }
 
-  function handleNotNow() {
-    Alert.alert(
-      '',
-      'You can turn on notifications from the Me tab anytime.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Ok',
-          onPress: () => dismiss(true, onClose),
-        },
-      ],
-    )
+  async function handleNotNow() {
+    try {
+      await AsyncStorage.setItem(
+        '@roamus_notif_permission_dismissed',
+        JSON.stringify({ dismissed: true, dismissedAt: Date.now() }),
+      )
+    } catch { /* non-fatal */ }
+    dismiss(true, onClose)
   }
 
   return (
