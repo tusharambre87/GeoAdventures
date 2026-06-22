@@ -21,6 +21,17 @@ const PAUSE_MS    = 2500;
 const CONCURRENCY = 3;
 const FORCE_REGEN = false; // set to false after this run completes
 
+// Targeted run: only process these stop IDs (empty = process all)
+const TARGET_IDS = new Set([
+  'da793b7d-ac25-490f-8ecc-8888537dea20', // Afton State Park
+  '91f87a65-9cd4-4453-88c4-f19ccecafd7a', // Historic Murphy's Landing
+  '0320d6df-7035-47df-8f16-fb7f5849901f', // Interstate State Park
+  'bc148e76-7695-4e2a-8571-0b063d5236ca', // Minnesota Landscape Arboretum
+  '9b122427-c2a6-4f87-aae1-401efa968c2a', // Minnesota Zoo
+  '99a39bed-8ee2-48c0-b3cd-da17b3ea2633', // Taylors Falls Scenic Boat Tours
+  '485eb048-52ba-4e3d-bd20-b24903cfc3df', // Valleyfair Amusement Park
+]);
+
 const AGE_BANDS = [
   { band: 'young',  representativeAge: 5  },
   { band: 'middle', representativeAge: 8  },
@@ -60,8 +71,13 @@ async function backfillExploreContent() {
       ),
     );
 
-  const total = stops.length * AGE_BANDS.length;
-  console.log(`Total stops: ${stops.length} → ${total} total rows to generate`);
+  const filtered = TARGET_IDS.size > 0 ? stops.filter(s => TARGET_IDS.has(s.id)) : stops;
+  if (TARGET_IDS.size > 0) {
+    console.log(`Targeted run: ${filtered.length}/${stops.length} stops selected by TARGET_IDS`);
+  }
+
+  const total = filtered.length * AGE_BANDS.length;
+  console.log(`Total stops: ${filtered.length} → ${total} total rows to generate`);
 
   // Build skip-set from existing rows so restarts never re-process completed entries
   const existing = await db.$client.query(
@@ -96,7 +112,7 @@ async function backfillExploreContent() {
           continue;
         }
 
-        console.log(`[${stopNum}/${stops.length}] ${band} — ${stop.name} (${stop.city ?? ''})`);
+        console.log(`[${stopNum}/${filtered.length}] ${band} — ${stop.name} (${stop.city ?? ''})`);
 
         try {
           const gpFacts = {
@@ -146,12 +162,12 @@ async function backfillExploreContent() {
   }
 
   // Process stops in chunks of CONCURRENCY — preserves all skip-set logic
-  for (let i = 0; i < stops.length; i += CONCURRENCY) {
-    const chunk = stops.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < filtered.length; i += CONCURRENCY) {
+    const chunk = filtered.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(stop => processStop(stop)));
 
     if ((i / CONCURRENCY) % 10 === 9) {
-      console.log(`--- Progress: ${stopsDone}/${stops.length} stops done | generated=${generated} skipped=${skipped} failed=${failed} ---`);
+      console.log(`--- Progress: ${stopsDone}/${filtered.length} stops done | generated=${generated} skipped=${skipped} failed=${failed} ---`);
     }
   }
 

@@ -290,8 +290,9 @@ footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom))
   <div class="hero-inner">
     <div>
       <div class="badge fu"><span class="badge-dot"></span> Launching soon on iPhone</div>
-      <h1 class="fu fu1">Every trip<br/>becomes <em>a story.</em></h1>
-      <p class="hero-sub fu fu2">Not a trip planner. A trip companion. RoamUs keeps your family present while it handles everything else — stops, timing, kids engaged, memories captured.</p>
+      <h1 class="fu fu1">You planned the trip. Now someone needs to <em>run it.</em></h1>
+      <p class="hero-sub fu fu2">Most family trips fall apart between stop 2 and lunch. Kids hit a wall, someone's hungry, the plan dissolves. RoamUs manages the day's energy — not just the itinerary — so you stay present and nobody hits a wall.</p>
+      <p class="fu fu2" style="font-style:italic;color:#8A8FA8;font-size:14px;max-width:440px;margin-top:-24px;margin-bottom:40px">Built for families with kids 4–12. Especially the ones where one kid can handle a museum and the other has a completely different clock.</p>
       <div class="hero-ctas fu fu3">
         <button onclick="openModal()" class="btn-primary">📱 Get early access</button>
         <a href="#how-it-works" class="btn-secondary">See how it works →</a>
@@ -361,15 +362,15 @@ footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom))
     <p class="section-sub">RoamUs covers the entire trip lifecycle — before, during, and after. Each layer builds on the last.</p>
     <div class="layers-grid">
       <div class="layer-card"><div class="layer-num">01 — BEFORE YOUR TRIP</div><div class="layer-icon">🗓️</div><div class="layer-title">Build</div><p class="layer-body">Tell RoamUs where you're going, who's coming, and how you like to travel. It generates a smart itinerary — family-tested, not just tourist-popular.</p><span class="layer-tag tag-build">Planning layer</span></div>
-      <div class="layer-card dark"><div class="layer-num">02 — ON THE DAY</div><div class="layer-icon">📍</div><div class="layer-title">Run</div><p class="layer-body">This is the whole product. At each stop, RoamUs shows exactly what to do, how long to stay, what to see first. No decisions. No searching. Just be there.</p><span class="layer-tag tag-run">Core experience</span></div>
-      <div class="layer-card"><div class="layer-num">03 — FOR YOUR KIDS</div><div class="layer-icon">🎯</div><div class="layer-title">Engage</div><p class="layer-body">Every stop has age-appropriate missions — challenges, facts, photo hunts. They're not watching YouTube. They're part of the trip.</p><span class="layer-tag tag-engage">Kids layer</span></div>
-      <div class="layer-card"><div class="layer-num">04 — AFTER YOUR TRIP</div><div class="layer-icon">📖</div><div class="layer-title">Remember</div><p class="layer-body">When the trip ends, RoamUs auto-generates your family's story — photos, moments, kid quotes, map replay. Share it in one tap.</p><span class="layer-tag tag-memory">Memory layer</span></div>
+      <div class="layer-card dark"><div class="layer-num">02 — ON THE DAY</div><div class="layer-icon">📍</div><div class="layer-title">Run</div><p class="layer-body">This is the whole product. At each stop, RoamUs tells you what to do, how long to stay, and when to take a break before anyone asks for one. It knows when your youngest needs a playground more than another museum. It manages energy, not just stops.</p><span class="layer-tag tag-run">Core experience</span></div>
+      <div class="layer-card"><div class="layer-num">03 — FOR YOUR KIDS</div><div class="layer-icon">🎯</div><div class="layer-title">Engage</div><p class="layer-body">Every stop has missions built for your kids' specific ages — photo hunts, observation challenges, detective questions. They stop asking 'are we there yet' and start asking 'what's the next mission?' That shift is the whole product working.</p><span class="layer-tag tag-engage">Kids layer</span></div>
+      <div class="layer-card"><div class="layer-num">04 — AFTER YOUR TRIP</div><div class="layer-icon">📖</div><div class="layer-title">Remember</div><p class="layer-body">When the trip ends, RoamUs auto-generates a story of everything your kids found, figured out, and said — photos, their exact quotes, map of everywhere you went. Parents tell us their kids re-read it after getting home with the same enthusiasm as scrolling through photos. Sometimes more.</p><span class="layer-tag tag-memory">Memory layer</span></div>
     </div>
   </div>
 </section>
 
 <!-- TESTIMONIALS -->
-<section style="background:white">
+<section style="background:white;display:none">
   <div class="section-inner">
     <div class="section-label">Early families</div>
     <h2>They tried it.<br/>Here's what <em>happened.</em></h2>
@@ -403,9 +404,9 @@ footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom))
       </div>
       <div class="plan popular">
         <div class="plan-pop-badge">MOST POPULAR</div>
-        <div class="plan-name">GEOPASS MONTHLY</div>
-        <div class="plan-price" id="price-geopass">$4.99</div>
-        <div class="plan-cadence" id="cadence-geopass">per month · whole family</div>
+        <div class="plan-name">ROAMUS MONTHLY</div>
+        <div class="plan-price" id="price-geopass">$7.99</div>
+        <div class="plan-cadence" id="cadence-geopass">per month · whole family, up to 4 kids</div>
         <ul class="plan-features">
           <li><span class="chk">✓</span> Unlimited trips</li>
           <li><span class="chk">✓</span> Full Run layer at every stop</li>
@@ -417,8 +418,8 @@ footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom))
         <button onclick="openModal()" class="btn-plan btn-orange">Join the waitlist</button>
       </div>
       <div class="plan">
-        <div class="plan-name">TRIP PACK</div>
-        <div class="plan-price" id="price-trippack">$9.99</div>
+        <div class="plan-name">ROAMUS SINGLE TRIP</div>
+        <div class="plan-price" id="price-trippack">$12.99</div>
         <div class="plan-cadence">per trip · one-time</div>
         <ul class="plan-features">
           <li><span class="chk">✓</span> One full trip unlock</li>
@@ -426,6 +427,7 @@ footer{padding:36px 24px;padding-bottom:calc(36px + env(safe-area-inset-bottom))
           <li><span class="chk">✓</span> Kids missions included</li>
           <li><span class="chk">✓</span> Trip story auto-generated</li>
           <li><span class="chk">✓</span> Offline access for the trip</li>
+          <li><span class="chk">✓</span> Whole family (up to 4 kids)</li>
         </ul>
         <button onclick="openModal()" class="btn-plan btn-dark">Join the waitlist</button>
       </div>
