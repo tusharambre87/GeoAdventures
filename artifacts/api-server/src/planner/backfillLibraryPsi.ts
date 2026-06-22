@@ -182,10 +182,24 @@ async function run(): Promise<void> {
             ? `${stop.city}, ${stop.country}`
             : stop.city;
 
-          // Step 3 — enrich via AI (idempotent: returns cached if already enriched)
+          // Step 3 — fetch familyAnchorType from plannerPlaces so the AI prompt
+          // gets the correct role context (anchor vs support) rather than defaulting
+          // to "support" for every stop regardless of stop type.
+          const ppMeta = await db
+            .select({ familyAnchorType: plannerPlaces.familyAnchorType })
+            .from(plannerPlaces)
+            .where(eq(plannerPlaces.id, placeId))
+            .limit(1);
+
+          // Step 4 — enrich via AI (idempotent: returns cached if already enriched)
           totalAiCalls++;
           const enriched = await enrichStop(
-            { name: stop.name, type: stop.stopType ?? "landmark", destination },
+            {
+              name: stop.name,
+              type: stop.stopType ?? "landmark",
+              destination,
+              familyAnchorType: ppMeta[0]?.familyAnchorType ?? undefined,
+            },
             placeId,
           );
           totalEnriched++;
