@@ -107,9 +107,11 @@ const METRO_RADIUS_KM = 120;
 
 // Set of centroid city names for O(1) lookup — stops whose city is already a
 // metro center belong to their own pool and must never be cross-tagged.
-const METRO_CITY_NAMES = new Set(
-  US_CITY_CENTROIDS.map(c => c.city.toLowerCase().trim())
-);
+// Aliases cover common data-entry variants that aren't in the centroid list verbatim.
+const METRO_CITY_NAMES = new Set([
+  ...US_CITY_CENTROIDS.map(c => c.city.toLowerCase().trim()),
+  'new york', // variant of 'New York City'
+]);
 
 async function tagMetroStops() {
   // Step 0: Clear any stale cross-tags from a previous run (stops that are
