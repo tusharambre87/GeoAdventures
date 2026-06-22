@@ -2957,6 +2957,22 @@ export function selectStopsFromPool(
 
     if (!bestCandidate) break;
 
+    // Proximity dedup: skip if another selected stop on this day is within 400m
+    const bcLat = bestCandidate.latitude ? parseFloat(String(bestCandidate.latitude)) : null;
+    const bcLon = bestCandidate.longitude ? parseFloat(String(bestCandidate.longitude)) : null;
+    if (bcLat && bcLon) {
+      const tooClose = selected.some(s => {
+        const sLat = s.latitude ? parseFloat(String(s.latitude)) : null;
+        const sLon = s.longitude ? parseFloat(String(s.longitude)) : null;
+        if (!sLat || !sLon) return false;
+        return haversineKm(bcLat, bcLon, sLat, sLon) < 0.4;
+      });
+      if (tooClose) {
+        remaining.delete(bestCandidate);
+        continue;
+      }
+    }
+
     selected.push(bestCandidate);
     usedNormNames.add(normStopName(bestCandidate.name));
     remaining.delete(bestCandidate);
