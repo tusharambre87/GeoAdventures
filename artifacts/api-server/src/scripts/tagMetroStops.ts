@@ -91,6 +91,9 @@ const US_CITY_CENTROIDS: Array<{ city: string; lat: number; lng: number }> = [
   { city: 'Hialeah',         lat: 25.8576, lng: -80.2781 },
   { city: 'Chandler',        lat: 33.3062, lng: -111.8413 },
   { city: 'Baton Rouge',     lat: 30.4515, lng: -91.1871 },
+  { city: 'Santa Barbara',  lat: 34.4208, lng: -119.6982 },
+  { city: 'Monterey',       lat: 36.6002, lng: -121.8947 },
+  { city: 'Asheville',      lat: 35.5951, lng: -82.5515 },
 ];
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
