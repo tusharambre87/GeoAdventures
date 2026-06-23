@@ -389,11 +389,16 @@ function createNapStop(dayNumber: number, displayOrder: number): GeneratedStop {
 }
 
 /**
- * Insert a "Rest / Nap time" stop after the first activity of each day in the list.
- * Used when youngest child is under 3. Re-assigns displayOrders after insertion.
- * Returns a new array — does not mutate the input.
+ * Insert rest stops into the stop list based on the youngest child's age bracket.
+ * - Under 6 : every 1 activity (rest after each activity, except the last of the day)
+ * - 6–8     : every 2 activities (rest after every 2nd activity)
+ * - 9+      : no rest stops inserted
+ * Re-assigns displayOrders after insertion. Returns a new array — does not mutate input.
  */
-function insertNapStopsIntoStopList(stops: GeneratedStop[]): GeneratedStop[] {
+export function insertRestStopsIntoStopList(stops: GeneratedStop[], youngestChildAge: number): GeneratedStop[] {
+  if (youngestChildAge >= 9) return stops;
+  const cadence = youngestChildAge < 6 ? 1 : 2;
+
   const dayMap = new Map<number, GeneratedStop[]>();
   for (const s of stops) {
     if (!dayMap.has(s.dayNumber)) dayMap.set(s.dayNumber, []);
@@ -402,10 +407,16 @@ function insertNapStopsIntoStopList(stops: GeneratedStop[]): GeneratedStop[] {
   const result: GeneratedStop[] = [];
   for (const [day, dayStops] of [...dayMap.entries()].sort((a, b) => a[0] - b[0])) {
     dayStops.sort((a, b) => a.displayOrder - b.displayOrder);
-    const insertAt = Math.min(1, dayStops.length);
-    dayStops.splice(insertAt, 0, createNapStop(day, 0));
-    dayStops.forEach((s, i) => { s.displayOrder = i; });
-    result.push(...dayStops);
+    const withRest: GeneratedStop[] = [];
+    for (let i = 0; i < dayStops.length; i++) {
+      withRest.push(dayStops[i]);
+      // Insert rest after every `cadence` activities, but not after the last activity of the day
+      if ((i + 1) % cadence === 0 && i < dayStops.length - 1) {
+        withRest.push(createNapStop(day, 0));
+      }
+    }
+    withRest.forEach((s, idx) => { s.displayOrder = idx; });
+    result.push(...withRest);
   }
   return result;
 }
@@ -423,7 +434,7 @@ function normalizeNapDayStops(
   pace: string,
   minChildAge: number,
 ): GeneratedStop[] {
-  const stopsPerDay = getStopsPerDay(pace).total;
+  const stopsPerDay = getStopsPerDay(pace, minChildAge).total;
   const effectiveStopsPerDay = Math.min(stopsPerDay, 3);
   const isRelaxed = pace === "relaxed";
   const mealTypes = new Set(["restaurant", "meal", "food", "cafe"]);
@@ -536,12 +547,26 @@ interface StopsPerDayConfig {
   total: number;    // anchors + fillers (excludes food, food is additive)
 }
 
-function getStopsPerDay(pace: string): StopsPerDayConfig {
+export function getStopsPerDay(pace: string, youngestChildAge?: number): StopsPerDayConfig {
   const p = pace?.toLowerCase().trim();
-  if (p === 'relaxed' || p === 'chill')                       return { anchors: 1, fillers: 2, total: 3 };
-  if (p === 'busy' || p === 'packed' || p === 'go-getter')    return { anchors: 3, fillers: 1, total: 4 };
-  // balanced / moderate / default
-  return { anchors: 2, fillers: 2, total: 4 };
+  let base: StopsPerDayConfig;
+  if (p === 'relaxed' || p === 'chill')                        base = { anchors: 1, fillers: 2, total: 3 };
+  else if (p === 'busy' || p === 'packed' || p === 'go-getter') base = { anchors: 3, fillers: 1, total: 4 };
+  else                                                          base = { anchors: 2, fillers: 2, total: 4 };
+
+  if (youngestChildAge == null) return base;
+  // Age bracket adjustment — reduce daily activity capacity for younger children.
+  if (youngestChildAge < 3) {
+    // Under 3: hard cap at 3 total (1 anchor + 2 fillers); nap window occupies a slot
+    return { anchors: Math.min(base.anchors, 1), fillers: 2, total: Math.min(base.total, 3) };
+  }
+  if (youngestChildAge < 6) {
+    // 3–5: reduce total by 1 — frequent rest breaks make full-pace days too long
+    const total = Math.max(2, base.total - 1);
+    return { anchors: base.anchors, fillers: Math.max(0, total - base.anchors), total };
+  }
+  // 6+: no adjustment — rest stop cadence (every 2 activities for 6–8) handles the difference
+  return base;
 }
 
 function getAgeContext(ages: number[]): string {
@@ -2500,15 +2525,16 @@ export function selectStopsFromPool(
   targetCity?: string,
 ): StopPoolResult {
   const IMMERSIVE_TYPES = new Set(['museum', 'zoo', 'aquarium', 'activity', 'palace']);
-  const stopsPerDay = input.stopsPerDayOverride ?? getStopsPerDay(input.pace).total;
-  const paceConfig = getPaceConfig(input.pace);
   const childrenAges = input.childrenAges || [];
   const minChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : 5;
   const maxChildAge = childrenAges.length > 0 ? Math.max(...childrenAges) : 10;
-  // For families with children under 3, a 90-min nap window is added per day, reducing activity capacity.
-  // Capacity rule: relaxed stays at 2 stops/day; balanced/busy cap at 3 (2 main + 1 short <45 min).
+  // stopsPerDayOverride (from routes.ts) already has the age bracket applied via getStopsPerDay.
+  // When no override is given (AI path), compute it fresh with the age bracket.
+  const stopsPerDay = input.stopsPerDayOverride ?? getStopsPerDay(input.pace, minChildAge).total;
+  const paceConfig = getPaceConfig(input.pace);
+  // napActive: under-3 toddler flag — used for per-day last-slot short-stop enforcement only.
   const napActive = minChildAge < 3;
-  const effectiveStopsPerDay = napActive ? Math.min(stopsPerDay, 3) : stopsPerDay;
+  const effectiveStopsPerDay = stopsPerDay; // age reduction already baked in via getStopsPerDay
   const totalStopsNeeded = input.tripDays * effectiveStopsPerDay;
 
   let candidates = [...pool];
@@ -3438,15 +3464,18 @@ export async function generateItinerary(
   planId: string,
   input: PlannerInput
 ): Promise<{ stops: PlannerTripPlanStop[]; canonicalCitiesUsed: string[] }> {
-  const stopsPerDay = getStopsPerDay(input.pace).total;
+  // ── Derive youngest child age first — needed by getStopsPerDay ───────────
+  const itinChildAges = input.childrenAges || [];
+  const itinMinChildAge = itinChildAges.length > 0 ? Math.min(...itinChildAges) : 99;
+  const stopsPerDay = getStopsPerDay(input.pace, itinMinChildAge).total;
   const ageContext = getAgeContext(input.childrenAges);
   const primaryCity = input.destination.split(",")[0]?.trim() || input.destination;
   const countryName = input.destination.split(",").pop()?.trim() || input.destination;
 
-  // ── Nap window: detect toddler families (youngest child under 3) ──────────
-  const itinChildAges = input.childrenAges || [];
-  const itinMinChildAge = itinChildAges.length > 0 ? Math.min(...itinChildAges) : 5;
+  // napActive: under-3 only — governs toddler-specific prompt language + last-slot rules.
+  // restStopsActive: under-9 — governs rest stop insertion cadence.
   const napActive = itinMinChildAge < 3;
+  const restStopsActive = itinMinChildAge < 9;
 
   // ── Quality tuning: load this family's historical stop feedback ───────────
   let qualityProfile: UserStopTypeProfile | undefined;
@@ -3498,14 +3527,14 @@ export async function generateItinerary(
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
           const { stops: cityStops, parentSuggestions: cityParentSuggestions } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
-          let selected = napActive ? insertNapStopsIntoStopList(cityStops) : cityStops;
+          let selected = restStopsActive ? insertRestStopsIntoStopList(cityStops, itinMinChildAge) : cityStops;
           for (const stop of selected) {
             stop.dayNumber += dayOffset;
             const { place, inserted } = await persistStop(stop, planId, city, countryName);
             allInserted.push(inserted);
             if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
           }
-          console.log(`[Planner] Multi-city ${city}: ${selected.length} stops persisted (days ${currentDay}–${currentDay + daysForCity - 1})${napActive ? " [nap windows inserted]" : ""}`);
+          console.log(`[Planner] Multi-city ${city}: ${selected.length} stops persisted (days ${currentDay}–${currentDay + daysForCity - 1})${restStopsActive ? ` [rest stops inserted, age ${itinMinChildAge}]` : ""}`);
           if (cityParentSuggestions && cityParentSuggestions.length > 0) {
             const byDay: Record<string, typeof cityParentSuggestions> = {};
             for (const s of cityParentSuggestions) {
@@ -3550,12 +3579,10 @@ export async function generateItinerary(
           qualityProfile,
           city,
         );
-        // Assign day numbers, then normalize + insert nap stop for toddler families
+        // Assign day numbers, then normalize + insert rest stops based on age bracket
         dayStops.forEach((stop, idx) => { stop.dayNumber = currentDay + day - 1; stop.displayOrder = idx; });
-        if (napActive) {
-          dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
-          dayStops = insertNapStopsIntoStopList(dayStops);
-        }
+        if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
+        if (restStopsActive) dayStops = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
         for (const stop of dayStops) {
           if (stop.type !== "rest") usedStopNames.push(stop.name);
           const { place, inserted } = await persistStop(stop, planId, city, cityCountry);
@@ -3581,7 +3608,7 @@ export async function generateItinerary(
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
       const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
-      const finalStops = napActive ? insertNapStopsIntoStopList(rawSelectedStops) : rawSelectedStops;
+      const finalStops = restStopsActive ? insertRestStopsIntoStopList(rawSelectedStops, itinMinChildAge) : rawSelectedStops;
       const insertedStops: PlannerTripPlanStop[] = [];
       for (const stop of finalStops) {
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
@@ -3620,12 +3647,10 @@ export async function generateItinerary(
         stop.dayNumber = day;
         stop.displayOrder = idx;
       });
-      // Normalize + insert nap stop for toddler families (youngest child under 3)
-      if (napActive) {
-        dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
-        dayStops = insertNapStopsIntoStopList(dayStops);
-      }
-      console.log(`[Planner] Day ${day} generated: ${dayStops.length} stops${napActive ? " [nap window inserted]" : ""}`);
+      // Normalize + insert rest stops based on age bracket
+      if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
+      if (restStopsActive) dayStops = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+      console.log(`[Planner] Day ${day} generated: ${dayStops.length} stops${restStopsActive ? ` [rest stops inserted, age ${itinMinChildAge}]` : ""}`);
 
       for (const stop of dayStops) {
         if (stop.type !== "rest") usedStopNames.push(stop.name);

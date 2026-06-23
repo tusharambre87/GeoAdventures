@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -5415,9 +5415,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .filter(t => !t.isParent && t.age)
               .map(t => parseInt(t.age ?? "0", 10))
               .filter(n => n > 0 && n < 18);
-            const fpHasToddler = fpChildAges.some(a => a <= 4);
-            const fpBasePerDay = fpEffectivePace === "chill" ? 3 : fpEffectivePace === "packed" ? 5 : 4;
-            const stopsPerDay = fpHasToddler ? Math.max(2, fpBasePerDay - 1) : fpBasePerDay;
+            const fpMinChildAge = fpChildAges.length > 0 ? Math.min(...fpChildAges) : 99;
+            const fpPlannerPace: "relaxed" | "moderate" | "busy" = fpEffectivePace === "chill" ? "relaxed" : fpEffectivePace === "packed" ? "busy" : "moderate";
+            const stopsPerDay = getStopsPerDay(fpPlannerPace, fpMinChildAge).total;
             const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
@@ -5613,14 +5613,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .map(t => parseInt(t.age ?? "0", 10))
             .filter(n => n > 0 && n < 18);
         } catch { /* non-fatal */ }
-        const toddlerNote = childrenAges.some(a => a <= 5) ? " — toddler nap window active" : "";
-        console.log(`[Travel] [bg] childrenAges: [${childrenAges.join(", ")}]${toddlerNote}`);
+        const minChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : 99;
+        const ageNote = minChildAge < 99 ? ` — youngest age ${minChildAge}` : "";
+        console.log(`[Travel] [bg] childrenAges: [${childrenAges.join(", ")}]${ageNote}`);
 
-        // Toddler nap: reduce by 1 stop per day if youngest child is 4 or under
-        const hasToddler = childrenAges.some(a => a <= 4);
-        const effectivePerDay = hasToddler
-          ? Math.max(2, stopsPerDayByPace - 1)
-          : stopsPerDayByPace;
+        // Single source of truth for stop count: getStopsPerDay with age bracket
+        const plannerPace: "relaxed" | "moderate" | "busy" =
+          effectivePace === "chill" ? "relaxed" : effectivePace === "packed" ? "busy" : "moderate";
+        const effectivePerDay = getStopsPerDay(plannerPace, minChildAge).total;
 
         // Total: arrival day + middle days + last day (each capped separately)
         const middleDays = tripDays ? Math.max(0, tripDays - 2) : 0;
@@ -5642,8 +5642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (firstWithCoords) {
               await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
-            const plannerPace: "relaxed" | "moderate" | "busy" =
-              effectivePace === "chill" ? "relaxed" : effectivePace === "packed" ? "busy" : "moderate";
             const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (stopsPerDayByPace || 3));
             const plannerInput: PlannerInput = {
               destination: cityName,
@@ -5729,12 +5727,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .trim()
                 .split(' ').slice(0, 5).join(' ');
             const seenWritten = new Set<string>();
-            const distributedPoolStops = rawDistributedPoolStops.filter(s => {
+            const dedupedPoolStops = rawDistributedPoolStops.filter(s => {
               const key = normN(s.name);
               if (seenWritten.has(key)) { console.log(`[Dedup] Skipping duplicate stop: "${s.name}"`); return false; }
               seenWritten.add(key);
               return true;
             });
+            // Insert age-based rest stops into the pool path (previously had no rest stop logic)
+            const distributedPoolStops = minChildAge < 9
+              ? insertRestStopsIntoStopList(dedupedPoolStops, minChildAge)
+              : dedupedPoolStops;
+            if (minChildAge < 9) {
+              console.log(`[Travel] [bg] Rest stops inserted for age ${minChildAge} (cadence: every ${minChildAge < 6 ? 1 : 2} activities)`);
+            }
             for (let i = 0; i < distributedPoolStops.length; i++) {
               const stop = distributedPoolStops[i];
               if (AUTO_MEAL_TYPES.has((stop.type || '').toLowerCase())) continue;
