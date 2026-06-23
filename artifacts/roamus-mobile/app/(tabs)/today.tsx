@@ -1306,11 +1306,13 @@ export default function TodayScreen() {
   // ─────────────────────────────────────────────────────────────────────────────
   // GATE: UPCOMING — trip start date is in the future
   // ─────────────────────────────────────────────────────────────────────────────
-  if (trip && tripIsUpcoming) {
-    const daysUntil = Math.ceil(
-      (parseLocalDate(trip.startDate!)!.getTime() - new Date().setHours(0, 0, 0, 0))
-      / (1000 * 60 * 60 * 24)
-    );
+  const daysUntil = trip?.startDate
+    ? Math.ceil(
+        (parseLocalDate(trip.startDate)!.getTime() - new Date().setHours(0, 0, 0, 0))
+        / (1000 * 60 * 60 * 24)
+      )
+    : 0;
+  if (trip && tripIsUpcoming && daysUntil > 1) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: insets.top + 32 }}>
         <Text style={{ fontFamily: 'Fraunces_900Black', fontSize: 30, color: C.deep, textAlign: 'center', marginBottom: 12 }}>
