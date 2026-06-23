@@ -1478,6 +1478,9 @@ export default function TodayScreen() {
   // STATE: PRE_TRIP_TOMORROW
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'pre_trip_tomorrow') {
+    console.log('[PRE_TRIP_TOMORROW] stops:', JSON.stringify(
+      (trip?.stops ?? []).map(s => ({ name: s.name, dayIndex: s.dayIndex, displayOrder: s.displayOrder }))
+    ));
     const tomorrowStops = (trip?.stops ?? [])
       .filter(s => s.dayIndex === 0)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
