@@ -27,6 +27,21 @@ type StopInput = {
   stopType: string | null;
 };
 
+/**
+ * Derive the correct family anchor type from a stop's type string.
+ * Mirrors the logic in plannerService.anchorTypeByStopType — kept in sync manually.
+ * Used when creating new planner_places entries to avoid the DB default of 'support'
+ * being applied to stops that should be classified as anchors.
+ */
+function deriveAnchorType(stopType: string | null | undefined): string {
+  const t = (stopType ?? "").toLowerCase();
+  if (["museum", "zoo", "aquarium", "landmark", "adventure"].includes(t)) return "anchor";
+  if (["park", "garden", "nature"].includes(t)) return "support";
+  if (["food", "restaurant", "cafe"].includes(t)) return "meal";
+  if (["street"].includes(t)) return "filler";
+  return "support";
+}
+
 export async function findOrCreatePlace(stop: StopInput): Promise<string> {
   const existing = await db
     .select({ id: plannerPlaces.id })
@@ -49,6 +64,7 @@ export async function findOrCreatePlace(stop: StopInput): Promise<string> {
       city: stop.city,
       country: stop.country ?? "Unknown",
       type: stop.stopType ?? "landmark",
+      familyAnchorType: deriveAnchorType(stop.stopType),
     })
     .returning({ id: plannerPlaces.id });
 
