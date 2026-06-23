@@ -3274,9 +3274,11 @@ export function selectStopsFromPool(
 
   // Bucket A — overflow anchors: high-PSI anchor stops not selected for the trip
   const selectedNormNamesForOverflow = new Set(selected.map(c => normStopName(c.name)));
+  const bucketBNames = new Set(parentSuggestions.map(s => normStopName(s.name)));
   const overflowAnchors: GeneratedStop[] = candidates
     .filter(c =>
       !selectedNormNamesForOverflow.has(normStopName(c.name)) &&
+      !bucketBNames.has(normStopName(c.name)) &&
       c.familyAnchorType === 'anchor' &&
       (c.scoreClassicFinal ?? 0) >= 65
     )
