@@ -2952,10 +2952,8 @@ export function selectStopsFromPool(
       // non-museum stops competing. Museums, zoos, and aquariums are already gated by their
       // own per-day caps (museumsInCurrentDay, immersivesInCurrentDay) so they are excluded here.
       const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
-      // Anchor slots filled by Pass 1 pre-selection — skip additional anchors unless Pass 1
-      // came up short (thin pool). The +1 fallback buffer allows one extra anchor per day.
-      const anchorCapForDay = anchorsPerDay + 1;
-      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorCapForDay) continue;
+      // Anchor slots filled by Pass 1 pre-selection — skip additional anchors once the per-day cap is reached.
+      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorsPerDay) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Meal stops are additive (not counted against the per-day activity target).
       // They are appended per-day after the main greedy selection finishes.
