@@ -1,13 +1,6 @@
-import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Calendar, ArrowRight } from "lucide-react";
-
-interface BlogPost {
-  slug: string;
-  title: string;
-  date: string;
-  description: string;
-}
+import { allPosts } from "../data/blogs/index";
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
@@ -18,22 +11,8 @@ function formatDate(dateStr: string): string {
 
 export default function BlogList() {
   const [, setLocation] = useLocation();
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/blog")
-      .then((r) => r.json())
-      .then((data) => {
-        setPosts(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
-  }, []);
+  const posts = allPosts.filter((p) => p.published);
 
   return (
     <div className="min-h-screen" style={{ background: "#F5F2EE" }}>
@@ -68,34 +47,7 @@ export default function BlogList() {
           </p>
         </div>
 
-        {loading && (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="rounded-2xl p-6 animate-pulse"
-                style={{ background: "#EDE9E3" }}
-              >
-                <div className="h-4 w-24 rounded mb-3" style={{ background: "#D8D2C8" }} />
-                <div className="h-6 w-3/4 rounded mb-2" style={{ background: "#D8D2C8" }} />
-                <div className="h-4 w-full rounded mb-1" style={{ background: "#D8D2C8" }} />
-                <div className="h-4 w-2/3 rounded" style={{ background: "#D8D2C8" }} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {error && (
-          <div
-            className="rounded-2xl px-6 py-8 text-center"
-            style={{ background: "#FFF0EB", border: "1px solid #F5C4B0" }}
-          >
-            <p className="font-semibold mb-1" style={{ color: "#1A1F2E" }}>Couldn't load posts</p>
-            <p className="text-sm" style={{ color: "#6B7080" }}>Please try refreshing the page.</p>
-          </div>
-        )}
-
-        {!loading && !error && posts.length === 0 && (
+        {posts.length === 0 && (
           <div
             className="rounded-2xl px-6 py-8 text-center"
             style={{ background: "#EDE9E3" }}
@@ -104,7 +56,7 @@ export default function BlogList() {
           </div>
         )}
 
-        {!loading && !error && posts.length > 0 && (
+        {posts.length > 0 && (
           <div className="space-y-5">
             {posts.map((post) => (
               <button

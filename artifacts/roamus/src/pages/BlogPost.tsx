@@ -1,14 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, Calendar } from "lucide-react";
-
-interface BlogPostData {
-  slug: string;
-  title: string;
-  date: string;
-  description: string;
-  contentHtml: string;
-}
+import { allPosts } from "../data/blogs/index";
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
@@ -22,44 +15,35 @@ export default function BlogPost() {
   const slug = params?.slug ?? "";
   const [, setLocation] = useLocation();
 
-  const [post, setPost] = useState<BlogPostData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const post = allPosts.find((p) => p.slug === slug) ?? null;
 
   useEffect(() => {
-    if (!slug) return;
-    setLoading(true);
-    setNotFound(false);
-    fetch(`/api/blog/${encodeURIComponent(slug)}`)
-      .then((r) => {
-        if (r.status === 404) { setNotFound(true); setLoading(false); return null; }
-        return r.json();
-      })
-      .then((data) => {
-        if (data) { setPost(data); setLoading(false); }
-      })
-      .catch(() => {
-        setNotFound(true);
-        setLoading(false);
-      });
-  }, [slug]);
+    if (!post?.faqs || post.faqs.length === 0) return;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen" style={{ background: "#F5F2EE" }}>
-        <div className="max-w-2xl mx-auto px-4 pt-6 pb-16">
-          <div className="h-5 w-20 rounded animate-pulse mb-10" style={{ background: "#D8D2C8" }} />
-          <div className="h-10 w-3/4 rounded animate-pulse mb-4" style={{ background: "#D8D2C8" }} />
-          <div className="h-4 w-32 rounded animate-pulse mb-8" style={{ background: "#D8D2C8" }} />
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-4 w-full rounded animate-pulse mb-2" style={{ background: "#D8D2C8" }} />
-          ))}
-        </div>
-      </div>
-    );
-  }
+    const script = document.createElement("script");
+    script.id = "faq-jsonld";
+    script.type = "application/ld+json";
+    script.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: post.faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: faq.answer,
+        },
+      })),
+    });
+    document.head.appendChild(script);
 
-  if (notFound || !post) {
+    return () => {
+      const existing = document.getElementById("faq-jsonld");
+      if (existing) existing.remove();
+    };
+  }, [post]);
+
+  if (!post) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: "#F5F2EE" }}>
         <div className="text-4xl mb-4">🗺️</div>
