@@ -5861,6 +5861,16 @@ export class DatabaseStorage implements IStorage {
     const [rowCityOnly] = await db.select().from(cityStopPoolCache).where(eq(cityStopPoolCache.normalizedKey, cityOnlyKey)).limit(1);
     if (rowCityOnly) return rowCityOnly;
 
+    // Second fallback: match by city column directly (case-insensitive).
+    // Catches the common case where `country` is unreliable (e.g. set to the destination
+    // string when a trip is created with only `destination` and no separate country field).
+    const [rowByCityCol] = await db
+      .select()
+      .from(cityStopPoolCache)
+      .where(sql`lower(${cityStopPoolCache.city}) = ${cityOnlyKey}`)
+      .limit(1);
+    if (rowByCityCol) return rowByCityCol;
+
     console.warn(`[Pool] Cache miss for city: "${city}" country: "${country}" — tried keys: ${primaryKey}, ${cityOnlyKey}`);
     return undefined;
   }

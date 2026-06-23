@@ -5764,6 +5764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   anchorScore: null,
                   dropPriority: null,
                   ticketSignal: isFreeAdmission(stop.name) ? false : null,
+                  familyAnchorType: stop.familyAnchorType ?? null,
                 },
               });
             }

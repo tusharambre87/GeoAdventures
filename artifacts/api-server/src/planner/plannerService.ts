@@ -2840,6 +2840,53 @@ export function selectStopsFromPool(
   let lastLat: number | null = null;
   let lastLon: number | null = null;
 
+  // ── Pass 1: Anchor pre-selection ─────────────────────────────────────────────
+  // Select the best N anchors per day FIRST, distributed round-robin across all days.
+  // This guarantees high-quality anchor stops make the plan before filler selection begins.
+  // Anchors are removed from `remaining` here; they are injected into `selected` day-by-day
+  // inside the greedy loop (at the day-reset block) so the flat-index slot model stays correct.
+  const anchorPaceConfig = getStopsPerDay(input.pace);
+  const anchorsPerDay = input.stopsPerDayOverride
+    ? Math.ceil(input.stopsPerDayOverride * 0.5)
+    : anchorPaceConfig.anchors;
+  const totalAnchorsNeeded = anchorsPerDay * input.tripDays;
+
+  const anchorCandidates = candidates
+    .filter(c =>
+      c.familyAnchorType === 'anchor' &&
+      (c.scoreClassicFinal ?? 0) >= 54 &&
+      !usedNormNames.has(normStopName(c.name))
+    )
+    .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0));
+
+  const preSelectedAnchors: CachedStopCandidate[] = [];
+  const anchorsByDay = new Map<number, CachedStopCandidate[]>();
+  for (let day = 0; day < input.tripDays; day++) {
+    anchorsByDay.set(day, []);
+  }
+
+  // Round-robin distribution: best anchor → Day 1, next → Day 2, etc.
+  let anchorDayIndex = 0;
+  for (const anchor of anchorCandidates) {
+    if (preSelectedAnchors.length >= totalAnchorsNeeded) break;
+    const dayAnchors = anchorsByDay.get(anchorDayIndex % input.tripDays)!;
+    if (dayAnchors.length < anchorsPerDay) {
+      dayAnchors.push(anchor);
+      preSelectedAnchors.push(anchor);
+      usedNormNames.add(normStopName(anchor.name));
+      remaining.delete(anchor);
+    }
+    anchorDayIndex++;
+    if (anchorDayIndex >= totalAnchorsNeeded * 2) break;
+  }
+
+  console.log(`[Planner] Pass 1: Pre-selected ${preSelectedAnchors.length} anchors across ${input.tripDays} days`);
+  for (let day = 0; day < input.tripDays; day++) {
+    const dayAnchors = anchorsByDay.get(day) ?? [];
+    console.log(`[Planner] Pass 1 Day ${day + 1}: ${dayAnchors.map(a => `${a.name} (${a.scoreClassicFinal})`).join(', ') || 'no anchors'}`);
+  }
+  // ── End Pass 1 ───────────────────────────────────────────────────────────────
+
   while (selected.length < totalStopsNeeded && remaining.size > 0) {
     const dayPosition = selected.length % effectiveStopsPerDay;
     const currentDayStart = selected.length - dayPosition;
@@ -2860,6 +2907,21 @@ export function selectStopsFromPool(
       dailyTravelMins = 0;
       lastLat = null;
       lastLon = null;
+      // Inject pre-selected anchors for this day before greedy fills fillers.
+      // `continue` forces dayPosition to be recomputed on re-entry so the flat-index
+      // slot model stays correct (injected anchors count as real selected slots).
+      const _injDayIdx = Math.floor(selected.length / effectiveStopsPerDay);
+      const _injAnchors = anchorsByDay.get(_injDayIdx) ?? [];
+      let _injected = 0;
+      for (const anchor of _injAnchors) {
+        if (selected.length >= totalStopsNeeded) break;
+        selected.push(anchor);
+        usedTypes.set(anchor.type, (usedTypes.get(anchor.type) ?? 0) + 1);
+        anchorsInCurrentDay++;
+        if (anchor.neighborhoodZone) zonesInCurrentDay.add(anchor.neighborhoodZone);
+        _injected++;
+      }
+      if (_injected > 0) continue;
     }
 
     const learningLimit = Math.min(
@@ -2890,7 +2952,10 @@ export function selectStopsFromPool(
       // non-museum stops competing. Museums, zoos, and aquariums are already gated by their
       // own per-day caps (museumsInCurrentDay, immersivesInCurrentDay) so they are excluded here.
       const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
-      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= 1) continue;
+      // Anchor slots filled by Pass 1 pre-selection — skip additional anchors unless Pass 1
+      // came up short (thin pool). The +1 fallback buffer allows one extra anchor per day.
+      const anchorCapForDay = anchorsPerDay + 1;
+      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorCapForDay) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Meal stops are additive (not counted against the per-day activity target).
       // They are appended per-day after the main greedy selection finishes.
@@ -3048,9 +3113,9 @@ export function selectStopsFromPool(
   }
 
   // ── Anchor constraint enforcement ─────────────────────────────────────────
-  // Each day must have exactly 1 stop with familyAnchorType === 'anchor'.
+  // Each day must have between 1 and anchorsPerDay stops with familyAnchorType === 'anchor'.
   // - If a day has zero anchors: promote the highest-baseScore stop to 'anchor'.
-  // - If a day has multiple anchors: demote all but the highest-scored one to 'support'.
+  // - If a day has more than anchorsPerDay anchors: demote the excess (lowest-scored) to 'support'.
   // Applied after must-do enforcement so both constraints co-exist cleanly.
   // Skipped for canonical trips (their template already encodes the right roles).
   if (!isCanonicalTripForSelection) {
@@ -3075,20 +3140,17 @@ export function selectStopsFromPool(
         // Mutate the candidate in-place (selected array holds object references)
         (daySlice[bestIdx] as any).familyAnchorType = "anchor";
         console.log(`[AnchorConstraint] Day ${dayIdx + 1}: promoted "${daySlice[bestIdx].name}" to anchor (no anchor in pool).`);
-      } else if (anchorIndices.length > 1) {
-        // Multiple anchors — keep the highest-scored one, demote the rest
-        let keepIdx = anchorIndices[0].i;
-        let keepScore = baseScores.get(anchorIndices[0].s) ?? 0;
+      } else if (anchorIndices.length > anchorsPerDay) {
+        // More anchors than the pace allows — keep the top anchorsPerDay by score, demote the rest
+        const sorted = [...anchorIndices].sort((a, b) => (baseScores.get(b.s) ?? 0) - (baseScores.get(a.s) ?? 0));
+        const keepSet = new Set(sorted.slice(0, anchorsPerDay).map(({ i }) => i));
         for (const { s, i } of anchorIndices) {
-          const sc = baseScores.get(s) ?? 0;
-          if (sc > keepScore) { keepScore = sc; keepIdx = i; }
-        }
-        for (const { s, i } of anchorIndices) {
-          if (i !== keepIdx) {
+          if (!keepSet.has(i)) {
             (s as any).familyAnchorType = "support";
           }
         }
-        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept "${daySlice[keepIdx].name}" as anchor, demoted ${anchorIndices.length - 1} extra(s) to support.`);
+        const kept = sorted.slice(0, anchorsPerDay).map(({ s }) => `"${s.name}"`).join(", ");
+        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept ${anchorsPerDay} anchor(s) [${kept}], demoted ${anchorIndices.length - anchorsPerDay} extra(s) to support.`);
       }
     }
   }
