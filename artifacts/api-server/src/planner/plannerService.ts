@@ -262,6 +262,9 @@ export interface PlannerInput {
   fixedAnchors?: FixedAnchor[];
   experienceTripId?: string;
   userId?: string;
+  /** When set by the caller, overrides getStopsPerDay(pace) so the
+   *  caller is the single source of truth for stop-count per day. */
+  stopsPerDayOverride?: number;
 }
 
 export interface GeneratedStop {
@@ -2480,7 +2483,7 @@ export function selectStopsFromPool(
   targetCity?: string,
 ): StopPoolResult {
   const IMMERSIVE_TYPES = new Set(['museum', 'zoo', 'aquarium', 'activity', 'palace']);
-  const stopsPerDay = getStopsPerDay(input.pace);
+  const stopsPerDay = input.stopsPerDayOverride ?? getStopsPerDay(input.pace);
   const paceConfig = getPaceConfig(input.pace);
   const childrenAges = input.childrenAges || [];
   const minChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : 5;

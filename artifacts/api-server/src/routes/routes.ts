@@ -5659,6 +5659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               indoorLean: tripTailoring?.indoorOutdoor ?? undefined,
               budgetSensitivity: tripTailoring?.budgetSensitivity ?? undefined,
               kidEnergyLevel: tripTailoring?.kidEnergyLevel ?? undefined,
+              stopsPerDayOverride: effectivePerDay,
             };
             await storage.updateTrip(tripId, {
               plannerInputSnapshot: {
