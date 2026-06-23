@@ -416,7 +416,8 @@ function openTicketSearch(stopName: string) {
 function daysUntilDate(dateStr?: string | null): number {
   if (!dateStr) return 0;
   try {
-    const target = new Date(dateStr);
+    const target = parseLocalDate(dateStr);
+    if (!target) return 0;
     target.setHours(0, 0, 0, 0);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
