@@ -2193,7 +2193,19 @@ export async function generateCityStopPool(
           sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${city}))`,
           sql`LOWER(TRIM(${stopLibrary.metroArea})) = LOWER(TRIM(${city}))`,
         ),
-        sql`LOWER(TRIM(${stopLibrary.country})) = LOWER(TRIM(${country}))`,
+        // Normalize US variants so "US" and "USA" both match stop_library rows
+        // stored under either spelling (the seeder uses 'USA', trip input uses 'US').
+        (() => {
+          const lc = (country ?? '').toLowerCase().trim();
+          if (['us', 'usa', 'united states', 'united states of america'].includes(lc)) {
+            return sql`LOWER(TRIM(${stopLibrary.country})) IN ('us', 'usa', 'united states', 'united states of america')`;
+          }
+          const ukVariants = ['uk', 'united kingdom', 'great britain'];
+          if (ukVariants.includes(lc)) {
+            return sql`LOWER(TRIM(${stopLibrary.country})) IN ('uk', 'united kingdom', 'great britain')`;
+          }
+          return sql`LOWER(TRIM(${stopLibrary.country})) = LOWER(TRIM(${country}))`;
+        })(),
       ),
     )
     .orderBy(stopLibrary.name);

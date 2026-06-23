@@ -5688,13 +5688,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               return true;
             });
-            const rawDistributedPoolStops = distributeStopsToDays(
-              activityOnlyStops.slice(0, effectiveStopCount),
-              plannerTripDays,
-              arrivalDayCap,
-              lastDayCap,
-              effectivePerDay,
-            );
+            // Pool path: selectStopsFromPool already assigned dayNumber to every stop
+            // using the anchor-constrained greedy algorithm (exacty anchorsPerDay per day).
+            // Passing these through distributeStopsToDays re-assigns dayNumbers with
+            // arrivalDayCap/lastDayCap which can differ from effectivePerDay, stealing
+            // stops from later days into earlier ones and breaking anchor-per-day balance.
+            // Trust the dayNumber values set by selectStopsFromPool directly.
+            const rawDistributedPoolStops = activityOnlyStops;
             // Free-admission override: certain well-known museums/attractions are always free
             const FREE_ADMISSION_PATTERNS = [
               'minneapolis institute of art',
