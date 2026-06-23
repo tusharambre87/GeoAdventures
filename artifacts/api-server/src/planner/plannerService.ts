@@ -423,7 +423,7 @@ function normalizeNapDayStops(
   pace: string,
   minChildAge: number,
 ): GeneratedStop[] {
-  const stopsPerDay = getStopsPerDay(pace);
+  const stopsPerDay = getStopsPerDay(pace).total;
   const effectiveStopsPerDay = Math.min(stopsPerDay, 3);
   const isRelaxed = pace === "relaxed";
   const mealTypes = new Set(["restaurant", "meal", "food", "cafe"]);
@@ -530,20 +530,18 @@ function getPaceConstraints(pace: string): { min: number; max: number; maxHours:
   };
 }
 
-function getStopsPerDay(pace: string): number {
-  const map: Record<string, number> = {
-    'relaxed':   3,
-    'moderate':  3,
-    'go-getter': 5,
-    // Legacy mappings — never remove these
-    'chill':     3,
-    'balanced':  3,
-    'packed':    5,
-    'busy':      5,
-  };
-  const result = map[pace?.toLowerCase()] ?? 4;
-  console.log('[pace debug]', pace, '→', result);
-  return result;
+interface StopsPerDayConfig {
+  anchors: number;  // primary stops — must-see, high PSI score
+  fillers: number;  // supporting stops — playgrounds, support, local gems
+  total: number;    // anchors + fillers (excludes food, food is additive)
+}
+
+function getStopsPerDay(pace: string): StopsPerDayConfig {
+  const p = pace?.toLowerCase().trim();
+  if (p === 'relaxed' || p === 'chill')                       return { anchors: 1, fillers: 2, total: 3 };
+  if (p === 'busy' || p === 'packed' || p === 'go-getter')    return { anchors: 3, fillers: 1, total: 4 };
+  // balanced / moderate / default
+  return { anchors: 2, fillers: 2, total: 4 };
 }
 
 function getAgeContext(ages: number[]): string {
@@ -2483,7 +2481,7 @@ export function selectStopsFromPool(
   targetCity?: string,
 ): StopPoolResult {
   const IMMERSIVE_TYPES = new Set(['museum', 'zoo', 'aquarium', 'activity', 'palace']);
-  const stopsPerDay = input.stopsPerDayOverride ?? getStopsPerDay(input.pace);
+  const stopsPerDay = input.stopsPerDayOverride ?? getStopsPerDay(input.pace).total;
   const paceConfig = getPaceConfig(input.pace);
   const childrenAges = input.childrenAges || [];
   const minChildAge = childrenAges.length > 0 ? Math.min(...childrenAges) : 5;
@@ -3361,7 +3359,7 @@ export async function generateItinerary(
   planId: string,
   input: PlannerInput
 ): Promise<{ stops: PlannerTripPlanStop[]; canonicalCitiesUsed: string[] }> {
-  const stopsPerDay = getStopsPerDay(input.pace);
+  const stopsPerDay = getStopsPerDay(input.pace).total;
   const ageContext = getAgeContext(input.childrenAges);
   const primaryCity = input.destination.split(",")[0]?.trim() || input.destination;
   const countryName = input.destination.split(",").pop()?.trim() || input.destination;
