@@ -6341,8 +6341,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const validStyles = ['family_explorer', 'nature_expedition', 'history_culture', 'iconic_highlights', 'foodie_adventure', 'city_explorer'];
       const adventureStyle = validStyles.includes(rawStyle) ? rawStyle : 'family_explorer';
+      const normalisedRawPace = rawPace === 'relaxed' ? 'chill' : rawPace === 'go-getter' || rawPace === 'busy' ? 'packed' : rawPace;
       const validPaces = ['chill', 'balanced', 'packed'];
-      const pace = validPaces.includes(rawPace) ? rawPace : 'balanced';
+      const pace = validPaces.includes(normalisedRawPace) ? normalisedRawPace : 'balanced';
 
       const { randomUUID } = await import('node:crypto');
       const guestToken = randomUUID().replace(/-/g, '');
@@ -6870,8 +6871,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         foodie_adventure:  'balanced',
       };
       const tripStyle = ADVENTURE_TO_TRIP_STYLE[adventureStyle] ?? 'balanced';
+      const normalisedRawPace = rawPace === 'relaxed' ? 'chill' : rawPace === 'go-getter' || rawPace === 'busy' ? 'packed' : rawPace;
       const validPaces = ['chill', 'balanced', 'packed'];
-      const pace = validPaces.includes(rawPace) ? rawPace : 'balanced';
+      const pace = validPaces.includes(normalisedRawPace) ? normalisedRawPace : 'balanced';
       
       // Guard required fields and auto-generate name if not supplied
       if (!destination || typeof destination !== 'string' || !destination.trim()) {
