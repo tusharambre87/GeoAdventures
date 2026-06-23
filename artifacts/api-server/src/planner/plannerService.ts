@@ -319,6 +319,8 @@ export interface GeneratedStop {
   recommendedPosition?: number;
   /** Human-readable reason for the recommended position, e.g. "Best before noon · 0.8 mi from Lincoln Memorial". */
   recommendedPositionReason?: string;
+  /** Which parent-suggestion bucket this stop belongs to: overflow_anchor (Bucket A) or age_stretch (Bucket B). */
+  bucketType?: 'overflow_anchor' | 'age_stretch';
 }
 
 /**
@@ -3270,7 +3272,34 @@ export function selectStopsFromPool(
       };
     });
 
-  return { stops: result, parentSuggestions };
+  // Bucket A — overflow anchors: high-PSI anchor stops not selected for the trip
+  const selectedNormNamesForOverflow = new Set(selected.map(c => normStopName(c.name)));
+  const overflowAnchors: GeneratedStop[] = candidates
+    .filter(c =>
+      !selectedNormNamesForOverflow.has(normStopName(c.name)) &&
+      c.familyAnchorType === 'anchor' &&
+      (c.scoreClassicFinal ?? 0) >= 65
+    )
+    .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0))
+    .slice(0, 5)
+    .map(c => {
+      const { selectionReason } = scoredMap.get(c) ?? { selectionReason: 'High-rated anchor stop' };
+      const { position, reason } = getRecommendedPosition(c, day1Stops);
+      return {
+        ...candidateToGeneratedStop(c, 1, position, false, selectionReason),
+        recommendedPosition: position,
+        recommendedPositionReason: reason,
+        bucketType: 'overflow_anchor' as const,
+      };
+    });
+
+  // Combine both buckets — Bucket A first (overflow anchors), then Bucket B (age-stretch)
+  const allParentSuggestions = [
+    ...overflowAnchors,
+    ...parentSuggestions.map(s => ({ ...s, bucketType: 'age_stretch' as const })),
+  ];
+
+  return { stops: result, parentSuggestions: allParentSuggestions };
 }
 
 /** Compute days-per-city for a multi-city trip.
@@ -3386,8 +3415,8 @@ export async function generateItinerary(
       if (pool && pool.stopPool && pool.stopPool.length > 0) {
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
-          let selected = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
-          if (napActive) selected = insertNapStopsIntoStopList(selected);
+          const { stops: cityStops, parentSuggestions: cityParentSuggestions } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+          let selected = napActive ? insertNapStopsIntoStopList(cityStops) : cityStops;
           for (const stop of selected) {
             stop.dayNumber += dayOffset;
             const { place, inserted } = await persistStop(stop, planId, city, countryName);
@@ -3395,6 +3424,22 @@ export async function generateItinerary(
             if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
           }
           console.log(`[Planner] Multi-city ${city}: ${selected.length} stops persisted (days ${currentDay}–${currentDay + daysForCity - 1})${napActive ? " [nap windows inserted]" : ""}`);
+          if (cityParentSuggestions && cityParentSuggestions.length > 0) {
+            const byDay: Record<string, typeof cityParentSuggestions> = {};
+            for (const s of cityParentSuggestions) {
+              const key = String((s.dayNumber ?? 1) - 1);
+              if (!byDay[key]) byDay[key] = [];
+              byDay[key].push(s);
+            }
+            const existingRow = await db.select({ parentSuggestions: travelTrips.parentSuggestions })
+              .from(travelTrips).where(eq(travelTrips.id, planId)).limit(1);
+            const existing = (existingRow[0]?.parentSuggestions as Record<string, any> | null) ?? {};
+            const merged = { ...existing, ...byDay };
+            await db.update(travelTrips)
+              .set({ parentSuggestions: merged })
+              .where(eq(travelTrips.id, planId));
+            console.log(`[Planner] Saved ${cityParentSuggestions.length} parent suggestions for ${city}`);
+          }
           currentDay += daysForCity;
           continue;
         } catch (err) {
@@ -3453,16 +3498,29 @@ export async function generateItinerary(
     try {
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
-      let selectedStops = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
-      if (napActive) selectedStops = insertNapStopsIntoStopList(selectedStops);
+      const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
+      const finalStops = napActive ? insertNapStopsIntoStopList(rawSelectedStops) : rawSelectedStops;
       const insertedStops: PlannerTripPlanStop[] = [];
-      for (const stop of selectedStops) {
+      for (const stop of finalStops) {
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
         insertedStops.push(inserted);
         // Full scoring/enrichment pipeline — skipped for nap placeholder stops
         if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
       }
       console.log(`[Planner] Cache-served itinerary: ${insertedStops.length} stops persisted and scored${napActive ? " [nap windows inserted]" : ""}`);
+      // Save parent suggestions to travel_trips
+      if (poolParentSuggestions && poolParentSuggestions.length > 0) {
+        const byDay: Record<string, typeof poolParentSuggestions> = {};
+        for (const s of poolParentSuggestions) {
+          const key = String((s.dayNumber ?? 1) - 1);
+          if (!byDay[key]) byDay[key] = [];
+          byDay[key].push(s);
+        }
+        await db.update(travelTrips)
+          .set({ parentSuggestions: byDay })
+          .where(eq(travelTrips.id, planId));
+        console.log(`[Planner] Saved ${poolParentSuggestions.length} parent suggestions to trip ${planId}`);
+      }
       return { stops: insertedStops, canonicalCitiesUsed: [] };
     } catch (err) {
       console.error("[Planner] Cache-pool selection failed, falling back to AI generation:", err);

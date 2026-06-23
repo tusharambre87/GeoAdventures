@@ -1945,7 +1945,7 @@ function DayDetail({
           const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
           const children = trip.travelers?.filter(t => !t.isParent && t.age != null) ?? [];
           const youngest = children.sort((a, b) => Number(a.age) - Number(b.age))[0];
-          if (!pmalSuggestions?.length || !youngest) return null;
+          if (!pmalSuggestions?.length) return null;
           return (
             <View style={{ marginBottom: 4 }}>
               <ParentSuggestionsSection
