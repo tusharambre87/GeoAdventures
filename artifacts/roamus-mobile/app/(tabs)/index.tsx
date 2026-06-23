@@ -38,6 +38,13 @@ function greeting() {
   return "Good evening";
 }
 
+function parseLocalDate(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
 function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePress, onDownloadPress }: { trip: Trip; offlineReady?: boolean; isDownloading?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void; onDownloadPress?: () => void }) {
   const isFree = !user?.subscriptionTier || user.subscriptionTier === "free";
   const rawCity = trip.destination ?? "";
@@ -46,12 +53,10 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
 
   // ── Active day computation ──────────────────────────────────────────────────
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
-  const tripStart = trip.startDate
-    ? (() => { const d = new Date(trip.startDate); d.setHours(0, 0, 0, 0); return d; })()
-    : null;
+  const tripStart = trip.startDate ? parseLocalDate(trip.startDate) : null;
   const totalDays = trip.tripDays
     ?? (trip.startDate && trip.endDate
-      ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate!).getTime()) / 86_400_000) + 1
+      ? Math.round((parseLocalDate(trip.endDate)!.getTime() - parseLocalDate(trip.startDate!)!.getTime()) / 86_400_000) + 1
       : 0);
   const isActiveNow   = tripStart ? tripStart <= today : false;
   const daysSince     = tripStart ? Math.floor((today.getTime() - tripStart.getTime()) / 86_400_000) : 0;

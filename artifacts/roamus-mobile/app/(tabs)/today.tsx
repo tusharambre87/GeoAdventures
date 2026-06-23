@@ -1350,6 +1350,9 @@ export default function TodayScreen() {
             {starting ? 'Starting…' : `Start Day ${todayDayIndex + 1} →`}
           </Text>
         </TouchableOpacity>
+        {showPermissionModal && (
+          <NotificationPermissionModal onClose={() => setShowPermissionModal(false)} />
+        )}
       </View>
     );
   }
