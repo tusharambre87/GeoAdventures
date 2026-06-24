@@ -2017,7 +2017,15 @@ function DayDetail({
         {(() => {
           const children = trip.travelers?.filter(t => !t.isParent && t.age != null) ?? [];
           const youngest = children.sort((a, b) => Number(a.age) - Number(b.age))[0];
-          if (!pmalSuggestions?.length) {
+          const allPlanStopNames = new Set(
+            (trip.days ?? []).flatMap((d: any) => d.stops ?? [])
+              .map((s: any) => s.name?.toLowerCase().trim())
+              .filter(Boolean)
+          );
+          const filteredPmalSuggestions = (pmalSuggestions ?? []).filter(
+            (s: any) => !allPlanStopNames.has(s.name?.toLowerCase().trim())
+          );
+          if (!filteredPmalSuggestions.length) {
             if (sotwLoading) return <ActivityIndicator color="#E8692A" style={{ marginVertical: 16 }} />;
             if (!sotwFallback.length) return null;
             return (
@@ -2038,7 +2046,7 @@ function DayDetail({
           return (
             <View style={{ marginBottom: 4 }}>
               <ParentSuggestionsSection
-                suggestions={pmalSuggestions}
+                suggestions={filteredPmalSuggestions}
                 dayStops={dayStops as PmalStop[]}
                 dayIndex={selectedDay - 1}
                 tripId={tripId}
