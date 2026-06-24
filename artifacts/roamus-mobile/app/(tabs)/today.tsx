@@ -2714,7 +2714,7 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
-          {showBreakCard && (travelMins ?? 0) > 5 && (
+          {showBreakCard && (
             <TouchableOpacity
               style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
               activeOpacity={0.85}
