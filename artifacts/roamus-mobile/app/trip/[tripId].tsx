@@ -364,8 +364,17 @@ function getKidFitScore(stops: Stop[]): number {
   return stops.filter(s => KID_FIT_POSITIVE.includes(((s as any).kidFitBias ?? (s as any).kid_fit_bias ?? '').toLowerCase())).length;
 }
 
+// Parse a bare "YYYY-MM-DD" (or ISO with time) as local midnight so device
+// timezone never shifts the calendar date to the previous day.
+function parseLocalDate(s: string | null | undefined): Date | null {
+  if (!s) return null;
+  const ymd = s.split('T')[0].split('-').map(Number);
+  if (ymd.length !== 3 || ymd.some(isNaN)) return new Date(s);
+  return new Date(ymd[0], ymd[1] - 1, ymd[2]);
+}
+
 function formatDate(isoDate: string, dayOffset = 0): string {
-  const d = new Date(isoDate);
+  const d = parseLocalDate(isoDate) ?? new Date(isoDate);
   d.setDate(d.getDate() + dayOffset);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
@@ -4518,7 +4527,7 @@ export default function TripPlanScreen() {
     // always wins over a stale plannerTripDays value from the original AI generation.
     const candidates: number[] = [];
     if (trip.startDate && trip.endDate) {
-      candidates.push(Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000) + 1);
+      candidates.push(Math.round((parseLocalDate(trip.endDate)!.getTime() - parseLocalDate(trip.startDate)!.getTime()) / 86_400_000) + 1);
     }
     if (trip.tripDays)        candidates.push(trip.tripDays);
     if (trip.plannerTripDays) candidates.push(trip.plannerTripDays);
@@ -4526,7 +4535,7 @@ export default function TripPlanScreen() {
     return candidates.length > 0 ? Math.max(...candidates) : 0;
   })();
 
-  const tripStartDate = trip?.startDate ? new Date(trip.startDate) : null;
+  const tripStartDate = trip?.startDate ? parseLocalDate(trip.startDate) : null;
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
 
   const getDayStatus = useCallback((dayNum: number): DayStatus => {

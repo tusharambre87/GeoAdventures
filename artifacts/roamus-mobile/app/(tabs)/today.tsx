@@ -388,7 +388,7 @@ function estimateTotalTime(stops: Stop[], pace: Pace = 'balanced', childrenAges:
 function formatDayDate(startDate?: string | null, dayIndex?: number): string {
   if (!startDate) return '';
   try {
-    const d = new Date(startDate);
+    const d = parseLocalDate(startDate)!;
     d.setDate(d.getDate() + (dayIndex ?? 0));
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return ''; }
@@ -1195,7 +1195,7 @@ export default function TodayScreen() {
     if (trip.tripDays) return trip.tripDays;
     if (trip.startDate && trip.endDate) {
       return Math.round(
-        (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86_400_000
+        (parseLocalDate(trip.endDate)!.getTime() - parseLocalDate(trip.startDate)!.getTime()) / 86_400_000
       ) + 1;
     }
     return 1;
