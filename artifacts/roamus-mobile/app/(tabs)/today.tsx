@@ -1372,6 +1372,7 @@ export default function TodayScreen() {
     .filter(t => !t.isParent && t.age)
     .map(t => parseInt(t.age!, 10))
     .filter(n => n > 0 && n < 18);
+  console.log('[SOTW] childrenAges:', childrenAges, 'travelers:', trip?.travelers?.map(t => ({name: t.name, age: t.age, isParent: t.isParent})));
   const stopTimes = buildStopTimes(dayStops, selectedPace, childrenAges);
   const currentStop = dayStops[currentStopIndex] ?? null;
 
