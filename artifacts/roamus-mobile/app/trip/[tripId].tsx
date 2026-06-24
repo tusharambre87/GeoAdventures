@@ -768,7 +768,7 @@ function BreakMarkerRow({ label }: { label: string }) {
       <Animated.View style={{ overflow: 'hidden', maxHeight: maxH }}>
         <View style={{ backgroundColor: '#EEF4F1', borderRadius: 12, padding: 12, marginTop: 4 }}>
           <Text style={bm.detail}>
-            {'Planned downtime so the day doesn\u2019t overwhelm your youngest. Tap \u2018Need a pit stop?\u2019 while en route to find nearby stops nearby.'}
+            {'Planned downtime so the day doesn\u2019t overwhelm your youngest. Tap \u2018Need a pit stop?\u2019 while en route to find playgrounds and coffee close by.'}
           </Text>
         </View>
       </Animated.View>
