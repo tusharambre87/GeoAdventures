@@ -624,9 +624,6 @@ export default function TodayScreen() {
   }, null as any);
   const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
   const showBreakCard     = todayState === 'en_route' && sotwYoungestAge !== null && sotwYoungestAge < 9;
-  console.log('[SOTW] todayState:', todayState);
-  console.log('[SOTW] youngestChildAge:', trip?.travelers?.filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age })));
-  console.log('[SOTW] showBreakCard:', showBreakCard);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
   // Persist hotel across navigation — load on mount/trip change
@@ -2717,7 +2714,6 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
-          {(() => { console.log('[SOTW] travelMins:', travelMins, 'render condition:', showBreakCard && (travelMins ?? 0) > 5); return null; })()}
           {showBreakCard && (travelMins ?? 0) > 5 && (
             <TouchableOpacity
               style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
