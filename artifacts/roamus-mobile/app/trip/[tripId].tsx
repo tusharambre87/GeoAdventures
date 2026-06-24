@@ -2001,19 +2001,11 @@ function DayDetail({
         {(() => {
           const children = trip.travelers?.filter(t => !t.isParent && t.age != null) ?? [];
           const youngest = children.sort((a, b) => Number(a.age) - Number(b.age))[0];
-          const allPlanStopNames = new Set(
-            (trip.days ?? []).flatMap((d: any) => d.stops ?? [])
-              .map((s: any) => s.name?.toLowerCase().trim())
-              .filter(Boolean)
-          );
-          const filteredPmalSuggestions = (pmalSuggestions ?? []).filter(
-            (s: any) => !allPlanStopNames.has(s.name?.toLowerCase().trim())
-          );
-          if (!filteredPmalSuggestions.length) return null;
+          if (!pmalSuggestions?.length) return null;
           return (
             <View style={{ marginBottom: 4 }}>
               <ParentSuggestionsSection
-                suggestions={filteredPmalSuggestions}
+                suggestions={pmalSuggestions}
                 dayStops={dayStops as PmalStop[]}
                 dayIndex={selectedDay - 1}
                 tripId={tripId}
