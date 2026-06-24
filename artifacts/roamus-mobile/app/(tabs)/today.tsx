@@ -2880,7 +2880,7 @@ export default function TodayScreen() {
           <View style={{ height: '38%', position: 'relative', overflow: 'hidden' }}>
             {sotwUserLoc ? (
               <Image
-                source={{ uri: `${API_BASE}/api/travel/static-map?lat=${sotwUserLoc.lat}&lng=${sotwUserLoc.lng}&zoom=13&width=390&height=300` }}
+                source={{ uri: `${API_BASE}/api/travel/static-map?width=390&height=280&originLat=${currentStop?.latitude}&originLng=${currentStop?.longitude}&destLat=${dayStops[currentStopIndex + 1]?.latitude}&destLng=${dayStops[currentStopIndex + 1]?.longitude}` }}
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
               />

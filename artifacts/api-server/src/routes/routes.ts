@@ -6397,12 +6397,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Static map image proxy — keeps GOOGLE_PLACES_API_KEY server-side
   app.get('/api/travel/static-map', async (req: any, res) => {
-    const { lat, lng, zoom = '13', width = '390', height = '260', markers } = req.query as Record<string, string>;
-    if (!lat || !lng) return res.status(400).end();
+    const { lat, lng, zoom = '13', width = '390', height = '260', markers, originLat, originLng, destLat, destLng } = req.query as Record<string, string>;
+    if (!originLat && !originLng && !lat && !lng) return res.status(400).end();
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(503).end();
-    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&scale=2&key=${apiKey}`;
-    if (markers) url += `&markers=${encodeURIComponent(markers)}`;
+    let url: string;
+    if (originLat && originLng && destLat && destLng) {
+      const midLat = (parseFloat(originLat) + parseFloat(destLat)) / 2;
+      const midLng = (parseFloat(originLng) + parseFloat(destLng)) / 2;
+      url = `https://maps.googleapis.com/maps/api/staticmap?center=${midLat},${midLng}&zoom=11&size=${width}x${height}&scale=2&path=color:0xE8692Aff|weight:5|${originLat},${originLng}|${destLat},${destLng}&markers=color:orange|label:A|${originLat},${originLng}&markers=color:red|label:B|${destLat},${destLng}&key=${apiKey}`;
+    } else {
+      url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&scale=2&key=${apiKey}`;
+      if (markers) url += `&markers=${encodeURIComponent(markers)}`;
+    }
     try {
       const upstream = await fetch(url);
       if (!upstream.ok) return res.status(404).end();
