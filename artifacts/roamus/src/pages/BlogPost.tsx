@@ -79,7 +79,7 @@ export default function BlogPost() {
             className="text-xs font-bold uppercase tracking-widest mb-3"
             style={{ color: "#E8692A" }}
           >
-            GeoAdventures Blog
+            RoamUs
           </p>
 
           <h1

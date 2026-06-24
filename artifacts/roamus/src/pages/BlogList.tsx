@@ -33,7 +33,7 @@ export default function BlogList() {
             className="text-xs font-bold uppercase tracking-widest mb-2"
             style={{ color: "#E8692A" }}
           >
-            GeoAdventures
+            RoamUs
           </p>
           <h1
             className="text-4xl font-black leading-tight mb-3"
