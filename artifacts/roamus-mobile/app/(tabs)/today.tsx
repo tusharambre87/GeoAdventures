@@ -605,6 +605,7 @@ export default function TodayScreen() {
   const [sotwLoading, setSotwLoading]                 = useState(false);
   const [sotwUserLoc, setSotwUserLoc]                 = useState<{ lat: number; lng: number } | null>(null);
   const [activeBreakPlace, setActiveBreakPlace]       = useState<SotwPlace | null>(null);
+  const [selectedPlaceId, setSelectedPlaceId]         = useState<string | null>(null);
   const [breakQuote, setBreakQuote]                   = useState('');
   const [breakPhotos, setBreakPhotos]                 = useState<string[]>([]);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
@@ -1267,7 +1268,9 @@ export default function TodayScreen() {
       const data = await apiFetch<{ results: SotwPlace[] }>(
         `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`
       );
-      setSotwPlaces(data.results ?? []);
+      const results = data.results ?? [];
+      setSotwPlaces(results);
+      setSelectedPlaceId(results[0]?.placeId ?? null);
     } catch {
       setSotwPlaces([]);
     } finally {
@@ -2935,39 +2938,48 @@ export default function TodayScreen() {
               ) : (
                 <>
                   <Text style={sotw.placeCount}>{sotwPlaces.length}{' place'}{sotwPlaces.length !== 1 ? 's' : ''}{' found'}</Text>
-                  {sotwPlaces.map((place, idx) => {
-                    const filterEmoji: Record<string, string> = {
-                      playground: '\uD83D\uDEDD',
-                      beach:      '\uD83C\uDFD6',
-                      coffee:     '\u2615',
-                      food:       '\uD83C\uDF54',
-                      restrooms:  '\uD83D\uDEBB',
-                    };
-                    const fallbackEmoji = filterEmoji[sotwFilter] ?? '\uD83D\uDCCD';
-                    return (
-                      <TouchableOpacity key={place.placeId} style={[sotw.richCard, idx === 0 && sotw.richCardTop]} onPress={() => openBreakCapture(place)} activeOpacity={0.85}>
-                        <View style={sotw.richImg}>
-                          {place.photoReference ? (
-                            <Image source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                          ) : (
-                            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>
-                              <Text style={{ fontSize: 36 }}>{fallbackEmoji}</Text>
+                  {sotwPlaces.map((place) => {
+                    const isSelected = place.placeId === selectedPlaceId;
+                    if (isSelected) {
+                      return (
+                        <TouchableOpacity key={place.placeId} style={[sotw.richCard, { borderColor: '#E8692A' }]} onPress={() => openBreakCapture(place)} activeOpacity={0.92}>
+                          <View style={sotw.richImg}>
+                            {place.photoReference ? (
+                              <Image source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                            ) : (
+                              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>
+                                <Text style={{ fontSize: 36 }}>{'\uD83D\uDCCD'}</Text>
+                              </View>
+                            )}
+                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
+                            <Text style={sotw.richName}>{place.name}</Text>
+                          </View>
+                          <View style={sotw.richBody}>
+                            <View style={sotw.pcMeta}>
+                              {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
+                              <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                              <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
                             </View>
-                          )}
-                          {idx === 0 && <View style={sotw.richBadge}><Text style={sotw.richBadgeText}>Best match</Text></View>}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
-                          <Text style={sotw.richName}>{place.name}</Text>
-                        </View>
-                        <View style={sotw.richBody}>
+                            <TouchableOpacity style={[sotw.goBtn, { marginTop: 8, alignSelf: 'stretch', borderRadius: 13, backgroundColor: '#E8692A' }]} onPress={() => openBreakCapture(place)}>
+                              <Text style={[sotw.goBtnText, { textAlign: 'center' }]}>{'Let\u2019s go'}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }
+                    return (
+                      <TouchableOpacity key={place.placeId} style={[sotw.richCard, { paddingHorizontal: 14, paddingVertical: 12 }]} onPress={() => setSelectedPlaceId(place.placeId)} activeOpacity={0.85}>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.deep }} numberOfLines={1}>{place.name}</Text>
                           <View style={sotw.pcMeta}>
-                            {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
                             <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                            {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
                             <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
                           </View>
-                          <TouchableOpacity style={[sotw.goBtn, { marginTop: 8, alignSelf: 'stretch', borderRadius: 13, backgroundColor: '#1A1F2E' }]} onPress={() => openBreakCapture(place)}>
-                            <Text style={[sotw.goBtnText, { textAlign: 'center' }]}>{'Let\u2019s go'}</Text>
-                          </TouchableOpacity>
                         </View>
+                        <TouchableOpacity style={[sotw.goBtn, { marginLeft: 10, flexShrink: 0 }]} onPress={() => openBreakCapture(place)}>
+                          <Text style={sotw.goBtnText}>Go</Text>
+                        </TouchableOpacity>
                       </TouchableOpacity>
                     );
                   })}
