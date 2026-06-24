@@ -123,7 +123,26 @@ export default function BlogPost() {
         </article>
 
         <div
-          className="mt-12 pt-6 border-t"
+          className="mt-12 rounded-2xl px-8 py-10 text-center"
+          style={{ background: "#E8692A" }}
+        >
+          <h2
+            className="text-2xl font-black mb-4"
+            style={{ color: "#ffffff" }}
+          >
+            Plan your next family trip with RoamUs
+          </h2>
+          <a
+            href="https://roamus.app"
+            className="inline-block rounded-full px-7 py-3 text-sm font-bold transition-opacity hover:opacity-85"
+            style={{ background: "#ffffff", color: "#E8692A" }}
+          >
+            Get early access
+          </a>
+        </div>
+
+        <div
+          className="mt-10 pt-6 border-t"
           style={{ borderColor: "#E8E2D9" }}
         >
           <button

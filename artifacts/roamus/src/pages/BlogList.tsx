@@ -19,7 +19,7 @@ export default function BlogList() {
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-16">
 
         <button
-          onClick={() => setLocation("/geoadventures")}
+          onClick={() => setLocation("/")}
           className="flex items-center gap-1.5 text-sm font-medium mb-8 transition-opacity hover:opacity-70"
           style={{ color: "#1A1F2E" }}
           data-testid="button-blog-back"
