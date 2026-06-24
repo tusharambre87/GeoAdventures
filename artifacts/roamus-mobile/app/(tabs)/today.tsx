@@ -2719,7 +2719,6 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
-          <View style={{ height: 60, backgroundColor: 'red', marginHorizontal: 16, marginBottom: 8 }} />
           {childrenAges.some(a => a < 9) && (
             <TouchableOpacity
               style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
@@ -2727,7 +2726,7 @@ export default function TodayScreen() {
               onPress={() => { void openSotwSheet(); }}
             >
               <View style={sotw.breakIcon}>
-                <Text style={{ fontSize: 24 }}>{'\uD83C\uDF04'}</Text>
+                <Text style={{ fontSize: 24 }}>{'\uD83E\uDDC3'}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sotw.breakTitle}>Stops on the way</Text>
