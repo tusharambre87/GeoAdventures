@@ -6357,7 +6357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
     const typeMap: Record<string, { type: string; keyword?: string }> = {
-      playground: { type: 'playground' },
+      playground: { type: 'playground', keyword: 'playground' },
       beach:      { type: 'park',       keyword: 'beach' },
       coffee:     { type: 'cafe' },
       food:       { type: 'restaurant' },
