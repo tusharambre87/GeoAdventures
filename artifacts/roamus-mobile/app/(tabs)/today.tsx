@@ -606,6 +606,9 @@ export default function TodayScreen() {
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
+  // Once the user enters execution mode (en_route), never let a data refresh
+  // or focus event reset todayState back to morning.
+  const executionStartedRef = useRef(false);
 
   // ── Pulse animation for En Route dot ──
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -874,7 +877,7 @@ export default function TodayScreen() {
       }
 
 
-      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState)) {
+      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const days = daysUntilDate(t.startDate);
         if (days > 7) {
           setTodayState('pre_trip_far');
@@ -894,6 +897,7 @@ export default function TodayScreen() {
             }
           } else if (lastVisited >= 0 && lastVisited < stops.length - 1) {
             setCurrentStopIndex(lastVisited + 1);
+            executionStartedRef.current = true;
             setTodayState('en_route');
           } else {
             setTodayState('morning');
@@ -902,7 +906,7 @@ export default function TodayScreen() {
       }
 
       // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
-      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState)) {
+      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
         const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
         if (frozenFlag === 'true' && frozenTripId === tid) {
@@ -950,6 +954,7 @@ export default function TodayScreen() {
       }
     }
     setCurrentStopIndex(0);
+    executionStartedRef.current = true;
     setTodayState('en_route');
     Analytics.track('day_started', { trip_id: resolvedTripId ?? trip.id, day_index: resolvedDayIndex });
     // Persist the started day to DB so the gating flag isDayStarted becomes true
@@ -1037,6 +1042,7 @@ export default function TodayScreen() {
     Analytics.track('stop_skipped', { trip_id: resolvedTripId ?? '', stop_id: stop.id, reason: 'manual_skip' });
     setDayStops(prev => prev.filter(s => s.id !== stop.id));
     setActiveSheet('none');
+    executionStartedRef.current = true;
     setTodayState('en_route');
   }
 
@@ -3086,6 +3092,7 @@ export default function TodayScreen() {
                   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
                   setVisitedPhotos([]);
+                  executionStartedRef.current = true;
                   setTodayState('en_route');
                 }}
               >
