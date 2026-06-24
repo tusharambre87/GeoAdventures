@@ -9143,7 +9143,7 @@ Return valid JSON only. No markdown.`;
         try {
           const openai = getOpenAI();
           const aiResp = await openai.chat.completions.create({
-            model: 'gpt-5-mini',
+            model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'system',
