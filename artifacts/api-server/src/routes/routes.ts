@@ -182,6 +182,14 @@ function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Parse a bare "YYYY-MM-DD" string as local midnight, not UTC midnight.
+// new Date("2026-06-23") is UTC midnight → in US Central it becomes June 22 at 7 pm.
+// new Date(y, m-1, d) always uses the server's local timezone, preserving the calendar date.
+function parseLocalDateOnly(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function sanitizeUser(user: any) {
   if (!user) return user;
   const { passwordHash, verificationCode, verificationCodeExpiry, passwordResetCode, passwordResetExpiry, ...safeUser } = user;
@@ -6937,8 +6945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Compute intended trip length — prefer explicit param, fall back to date range
       let computedTripDays: number | null = rawTripDays ? Number(rawTripDays) : null;
       if (!computedTripDays && startDate && endDate) {
-        const s = new Date(startDate);
-        const e = new Date(endDate);
+        const s = parseLocalDateOnly(startDate);
+        const e = parseLocalDateOnly(endDate);
         computedTripDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       }
       
@@ -6948,8 +6956,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destination,
         country: country ?? '',
         city: city || null,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
+        startDate: startDate ? parseLocalDateOnly(startDate) : undefined,
+        endDate: endDate ? parseLocalDateOnly(endDate) : undefined,
         travelers: travelers || [],
         adventureContext: adventureContext || 'travel',
         adventureStyle: adventureStyle || 'family_explorer',
@@ -7901,10 +7909,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Convert date strings to Date objects if supplied
       if (updates.startDate && !(updates.startDate instanceof Date)) {
-        updates.startDate = new Date(updates.startDate as unknown as string);
+        updates.startDate = parseLocalDateOnly(updates.startDate as unknown as string);
       }
       if (updates.endDate && !(updates.endDate instanceof Date)) {
-        updates.endDate = new Date(updates.endDate as unknown as string);
+        updates.endDate = parseLocalDateOnly(updates.endDate as unknown as string);
       }
 
       const trip = await storage.updateTrip(tripId, updates);
