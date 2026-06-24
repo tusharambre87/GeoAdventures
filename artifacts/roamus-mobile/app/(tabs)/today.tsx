@@ -622,6 +622,9 @@ export default function TodayScreen() {
     }, null as any);
   const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
   const showBreakCard     = !sotwLocDenied && sotwYoungestAge !== null && sotwYoungestAge < 9;
+  console.log('[SOTW] todayState:', todayState);
+  console.log('[SOTW] youngestChildAge:', trip?.travelers?.filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age })));
+  console.log('[SOTW] showBreakCard:', showBreakCard);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
   // Persist hotel across navigation — load on mount/trip change
