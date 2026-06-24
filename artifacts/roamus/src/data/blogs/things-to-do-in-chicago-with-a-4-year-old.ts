@@ -4,7 +4,8 @@ const post: BlogPost = {
   slug: "things-to-do-in-chicago-with-a-4-year-old",
   title: "Things To Do In Chicago With A 4 Year Old",
   date: "2026-06-22",
-  description: "The honest guide to Chicago with kids 3-5. What actually works, what to skip, and how to protect nap time without losing the day.",
+  description:
+    "The honest guide to Chicago with kids 3-5. What actually works, what to skip, and how to protect nap time without losing the day.",
   published: true,
 
   contentHtml: `
@@ -70,19 +71,20 @@ const post: BlogPost = {
 
 <p>The best family trips aren't the ones where you check off the most attractions. They're the ones where everyone gets home excited to do it again. Chicago is one of those places.</p>
 `,
-
   images: {
     "millennium-park": {
-      url: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=900&auto=format&fit=crop",
+      url: "https://unsplash.com/photos/lighted-water-fountain-near-buildings-sPIKKSxDn_8",
       alt: "Children playing in the Crown Fountain water jets at Millennium Park, Chicago",
-      caption: "The Crown Fountain's water jets are the best free splash pad in the city — arrive before 10am on weekends.",
+      caption:
+        "The Crown Fountain's water jets are the best free splash pad in the city — arrive before 10am on weekends.",
       credit: "Photo by Cynthia Smith on Unsplash",
       credit_url: "https://unsplash.com/photos/chicago-crown-fountain",
     },
     "maggie-daley": {
-      url: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&auto=format&fit=crop",
+      url: "https://unsplash.com/photos/girl-wearing-pink-dress-holding-black-metal-rod--1OhfIkGrZw",
       alt: "Kids climbing and playing at a large outdoor playground in Chicago",
-      caption: "Maggie Daley Park's play garden is free, enormous, and designed for kids under 6.",
+      caption:
+        "Maggie Daley Park's play garden is free, enormous, and designed for kids under 6.",
       credit: "Photo by Charlein Gracia on Unsplash",
       credit_url: "https://unsplash.com/photos/children-playground",
     },
@@ -91,15 +93,18 @@ const post: BlogPost = {
   faqs: [
     {
       question: "Is Chicago good for families with 4 year olds?",
-      answer: "Yes. Chicago has free outdoor spaces like Millennium Park and Maggie Daley Park, affordable museums like the Chicago Children's Museum, and a lakefront that's genuinely easy to navigate with a stroller. The key is going before 10am and protecting the afternoon rest window.",
+      answer:
+        "Yes. Chicago has free outdoor spaces like Millennium Park and Maggie Daley Park, affordable museums like the Chicago Children's Museum, and a lakefront that's genuinely easy to navigate with a stroller. The key is going before 10am and protecting the afternoon rest window.",
     },
     {
       question: "What is the best thing to do in Chicago with a 4 year old?",
-      answer: "Maggie Daley Park's play garden is the single best stop for this age. It's free, enormous, and designed specifically for kids under 6. Combine it with a morning at Millennium Park's Crown Fountain and you have a full day that costs almost nothing.",
+      answer:
+        "Maggie Daley Park's play garden is the single best stop for this age. It's free, enormous, and designed specifically for kids under 6. Combine it with a morning at Millennium Park's Crown Fountain and you have a full day that costs almost nothing.",
     },
     {
       question: "Is the Shedd Aquarium worth it for a 4 year old?",
-      answer: "Yes, but only with a plan. Buy tickets the night before, arrive at 9am, head straight to the Amazon Rising exhibit and the beluga underwater viewing area, and leave by 11am before the crowds arrive. Budget 90 minutes and skip the 4D theater — it's too intense for most kids this age.",
+      answer:
+        "Yes, but only with a plan. Buy tickets the night before, arrive at 9am, head straight to the Amazon Rising exhibit and the beluga underwater viewing area, and leave by 11am before the crowds arrive. Budget 90 minutes and skip the 4D theater — it's too intense for most kids this age.",
     },
   ],
 };

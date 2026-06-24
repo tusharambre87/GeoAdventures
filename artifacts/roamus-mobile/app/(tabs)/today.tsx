@@ -2939,6 +2939,7 @@ export default function TodayScreen() {
                 <>
                   <Text style={sotw.placeCount}>{sotwPlaces.length}{' place'}{sotwPlaces.length !== 1 ? 's' : ''}{' found'}</Text>
                   {sotwPlaces.map((place) => {
+                    console.log('[SOTW photo]', place.name, '→', place.photoReference);
                     const isSelected = place.placeId === selectedPlaceId;
                     if (isSelected) {
                       return (
