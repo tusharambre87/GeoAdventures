@@ -2936,17 +2936,26 @@ export default function TodayScreen() {
                 <>
                   <Text style={sotw.placeCount}>{sotwPlaces.length}{' place'}{sotwPlaces.length !== 1 ? 's' : ''}{' found'}</Text>
                   {sotwPlaces.map((place, idx) => {
-                    const isRich = sotwFilter === 'food' || sotwFilter === 'beach';
-                    return isRich ? (
+                    const filterEmoji: Record<string, string> = {
+                      playground: '\uD83D\uDEDD',
+                      beach:      '\uD83C\uDFD6',
+                      coffee:     '\u2615',
+                      food:       '\uD83C\uDF54',
+                      restrooms:  '\uD83D\uDEBB',
+                    };
+                    const fallbackEmoji = filterEmoji[sotwFilter] ?? '\uD83D\uDCCD';
+                    return (
                       <TouchableOpacity key={place.placeId} style={[sotw.richCard, idx === 0 && sotw.richCardTop]} onPress={() => openBreakCapture(place)} activeOpacity={0.85}>
                         <View style={sotw.richImg}>
                           {place.photoReference ? (
                             <Image source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                           ) : (
-                            <LinearGradient colors={sotwFilter === 'beach' ? ['#7fc8e8', '#4a9bc4'] : ['#d89a5a', '#a85f3a']} style={StyleSheet.absoluteFill} />
+                            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>
+                              <Text style={{ fontSize: 36 }}>{fallbackEmoji}</Text>
+                            </View>
                           )}
                           {idx === 0 && <View style={sotw.richBadge}><Text style={sotw.richBadgeText}>Best match</Text></View>}
-                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.5)']} style={StyleSheet.absoluteFill} />
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
                           <Text style={sotw.richName}>{place.name}</Text>
                         </View>
                         <View style={sotw.richBody}>
@@ -2955,31 +2964,11 @@ export default function TodayScreen() {
                             <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
                             <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
                           </View>
-                          <TouchableOpacity style={[sotw.goBtn, { marginTop: 8 }]} onPress={() => openBreakCapture(place)}>
-                            <Text style={sotw.goBtnText}>{'Let\u2019s go'}</Text>
+                          <TouchableOpacity style={[sotw.goBtn, { marginTop: 8, alignSelf: 'stretch', borderRadius: 13, backgroundColor: '#1A1F2E' }]} onPress={() => openBreakCapture(place)}>
+                            <Text style={[sotw.goBtnText, { textAlign: 'center' }]}>{'Let\u2019s go'}</Text>
                           </TouchableOpacity>
                         </View>
                       </TouchableOpacity>
-                    ) : (
-                      <View key={place.placeId} style={[sotw.simpleCard, idx === 0 && sotw.simpleCardTop]}>
-                        {idx === 0 && <View style={sotw.topBadge}><Text style={sotw.topBadgeText}>{'\u2605 Best match'}</Text></View>}
-                        <View style={sotw.pcRow}>
-                          <View style={[sotw.pcEmoji, sotwFilter === 'coffee' ? sotw.pcEmojiAmber : sotw.pcEmojiGreen]}>
-                            <Text style={{ fontSize: 22 }}>{sotwFilter === 'playground' ? '\uD83D\uDEDD' : sotwFilter === 'coffee' ? '\u2615' : '\uD83D\uDEBB'}</Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={sotw.pcName}>{place.name}</Text>
-                            <View style={sotw.pcMeta}>
-                              {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
-                              <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
-                              <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
-                            </View>
-                          </View>
-                          <TouchableOpacity style={sotw.goBtn} onPress={() => openBreakCapture(place)}>
-                            <Text style={sotw.goBtnText}>Go</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
                     );
                   })}
                 </>
