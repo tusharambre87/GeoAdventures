@@ -623,7 +623,10 @@ export default function TodayScreen() {
     return !acc || a < parseInt(acc.age as string, 10) ? t : acc;
   }, null as any);
   const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
-  const showBreakCard     = todayState === 'en_route' && sotwYoungestAge !== null && sotwYoungestAge < 9;
+  const showBreakCard     = useMemo(
+    () => todayState === 'en_route' && sotwYoungestAge !== null && sotwYoungestAge < 9,
+    [todayState, sotwYoungestAge]
+  );
   console.log('[SOTW] sotwYoungestAge:', sotwYoungestAge, 'trip.children:', trip?.children);
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
