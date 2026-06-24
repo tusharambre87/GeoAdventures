@@ -2722,12 +2722,12 @@ export default function TodayScreen() {
 
           {childrenAges.some(a => a < 9) && (
             <TouchableOpacity
-              style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
+              style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12, marginTop: 8 }]}
               activeOpacity={0.85}
               onPress={() => { void openSotwSheet(); }}
             >
               <View style={sotw.breakIcon}>
-                <Text style={{ fontSize: 24 }}>{'\uD83E\uDDC3'}</Text>
+                <Text style={{ fontSize: 24 }}>{'\uD83D\uDCCD'}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sotw.breakTitle}>Need a pit stop?</Text>
