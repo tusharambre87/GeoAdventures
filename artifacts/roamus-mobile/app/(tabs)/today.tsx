@@ -2730,7 +2730,7 @@ export default function TodayScreen() {
                 <Text style={{ fontSize: 24 }}>{'\uD83E\uDDC3'}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={sotw.breakTitle}>Stops on the way</Text>
+                <Text style={sotw.breakTitle}>Need a pit stop?</Text>
                 <Text style={sotw.breakSub}>{'Playgrounds, coffee \u0026 more nearby'}</Text>
               </View>
               <Text style={sotw.breakArrow}>{'\u203A'}</Text>
@@ -4588,7 +4588,7 @@ const mx = StyleSheet.create({
 });
 
 const sotw = StyleSheet.create({
-  breakCard:    { backgroundColor: '#FFF6EE', borderWidth: 1.5, borderColor: '#F6D3B6', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  breakCard:    { backgroundColor: '#EEF4F1', borderWidth: 1.5, borderColor: '#7A9E8E', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
   breakIcon:    { width: 50, height: 50, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#E8692A', shadowOpacity: 0.18, shadowRadius: 8, elevation: 2 },
   breakTitle:   { fontSize: 16, fontFamily: F.bold, color: C.deep },
   breakSub:     { fontSize: 13, color: '#b87a4e', fontFamily: F.semibold, marginTop: 2 },
