@@ -9139,6 +9139,7 @@ Return valid JSON only. No markdown.`;
 
       // AI fallback when library has no food stops for this city
       if (rows.length === 0) {
+        console.log('[Rescue food-options] library empty for', cityRaw, '— trying AI fallback');
         try {
           const openai = getOpenAI();
           const aiResp = await openai.chat.completions.create({
@@ -9156,6 +9157,7 @@ Return valid JSON only. No markdown.`;
             max_completion_tokens: 300,
           });
           const raw = aiResp.choices[0].message.content ?? '';
+          console.log('[Rescue food-options] AI raw response', raw.slice(0, 300));
           const m = raw.match(/\{[\s\S]*\}/);
           if (m) {
             const parsed = JSON.parse(m[0]);
@@ -9174,6 +9176,7 @@ Return valid JSON only. No markdown.`;
             }
           }
         } catch (aiErr) {
+          console.log('[Rescue food-options] AI fallback error', aiErr);
           req.log?.warn({ error: aiErr }, '[Rescue] food-options AI fallback failed');
         }
       }
