@@ -1263,6 +1263,7 @@ export default function TodayScreen() {
     setSotwFilter(filter);
     setSotwLoading(true);
     try {
+      console.log('[SOTW] fetch URL:', `${API_BASE}/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`);
       const data = await apiFetch<{ results: SotwPlace[] }>(
         `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`
       );
