@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "Navy Pier with Kids: What's Worth It (and What to Skip)",
   date: "2025-07-18",
   description: "Navy Pier is Chicago's most visited attraction, but not everything there earns your time and money. Here's a family-focused breakdown of what to prioritise and what you can safely skip.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>The Honest Take on Navy Pier</h2>
 <p>Navy Pier sits at the top of Chicago tourist lists almost by default — it's big, it's on the lake, and it's easy to find. But it's also uneven. Some experiences there are genuinely excellent for families; others are expensive and underwhelming. Here's a clear-eyed look at what's actually worth your day.</p>

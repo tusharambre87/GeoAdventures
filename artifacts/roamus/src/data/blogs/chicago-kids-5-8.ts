@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "Chicago for Kids Aged 5–8: The Best Stops for Little Explorers",
   date: "2025-09-22",
   description: "Chicago is stuffed with hands-on museums, lakefront parks, and iconic food spots tailor-made for the 5-to-8 set. Here's how to plan a trip your kids will talk about for years.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>Why the 5–8 Age Range Loves Chicago</h2>
 <p>Kids aged 5 to 8 are in a sweet spot for city travel: old enough to walk meaningful distances and retain memories, young enough to be genuinely amazed by things adults take for granted. Chicago delivers on both counts. The city is flat, walkable, and loaded with interactive experiences that don't require a long attention span.</p>

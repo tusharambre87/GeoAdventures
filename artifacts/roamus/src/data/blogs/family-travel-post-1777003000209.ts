@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "How to Plan a Family Trip That Everyone Actually Enjoys",
   date: "2025-06-05",
   description: "Family travel can be chaotic, expensive, and exhausting — or it can be the source of your best shared memories. The difference is almost entirely in the planning. Here's a system that works.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>The Planning Problem</h2>
 <p>Most family trips go wrong in the planning stage, not the execution stage. The classic failure mode is over-ambition: too many destinations, too many activities per day, too little buffer for the reality of travelling with children. The result is a trip that looks great on a spreadsheet and exhausts everyone on the ground.</p>

@@ -469,6 +469,13 @@ const sm = StyleSheet.create({
   },
 });
 
+type SotwFilter = 'playground' | 'beach' | 'coffee' | 'food' | 'restrooms';
+interface SotwPlace {
+  placeId: string; name: string; vicinity: string;
+  lat: number; lng: number;
+  photoReference: string | null; detourMinutes: number; onRoute: boolean;
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 function haversineDistMi(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -551,7 +558,7 @@ export default function TodayScreen() {
   })();
 
   const [viewingDay, setViewingDay]             = useState<number>(0);
-  const [activeSheet, setActiveSheet]           = useState<'none' | 'rescue'>('none');
+  const [activeSheet, setActiveSheet]           = useState<'none' | 'rescue' | 'stopsOnTheWay'>('none');
   const [rescueType, setRescueType]             = useState<'behind' | 'tired' | 'skip' | 'fun'>('behind');
   const [atStopStartTime, setAtStopStartTime]   = useState<number | null>(null);
   const [markingVisited, setMarkingVisited]     = useState(false);
@@ -591,6 +598,30 @@ export default function TodayScreen() {
   const [kidsForPicker, setKidsForPicker]        = useState<PlayerRecord[]>([]);
   const pendingKidsParams = useRef<{ stopId: string; stopName: string; tripId: string } | null>(null);
   const [rescueInitialOption, setRescueInitialOption] = useState<'weather' | undefined>(undefined);
+  // ── Stops on the Way ──────────────────────────────────────────────────────────
+  const [sotwLocDenied, setSotwLocDenied]             = useState(false);
+  const [sotwFilter, setSotwFilter]                   = useState<SotwFilter>('playground');
+  const [sotwPlaces, setSotwPlaces]                   = useState<SotwPlace[]>([]);
+  const [sotwLoading, setSotwLoading]                 = useState(false);
+  const [sotwUserLoc, setSotwUserLoc]                 = useState<{ lat: number; lng: number } | null>(null);
+  const [activeBreakPlace, setActiveBreakPlace]       = useState<SotwPlace | null>(null);
+  const [breakQuote, setBreakQuote]                   = useState('');
+  const [breakPhotos, setBreakPhotos]                 = useState<string[]>([]);
+  const sotwSlideY  = useRef(new Animated.Value(900)).current;
+  const breakSlideY = useRef(new Animated.Value(900)).current;
+  const sotwChildAges     = (trip?.travelers ?? [])
+    .filter((t: any) => !t.isParent && t.age)
+    .map((t: any) => parseInt(t.age as string, 10))
+    .filter((n: number) => n > 0 && n < 18);
+  const sotwYoungestAge   = sotwChildAges.length > 0 ? Math.min(...sotwChildAges) : null;
+  const sotwYoungestKid   = (trip?.travelers ?? []).filter((t: any) => !t.isParent && t.age)
+    .reduce((acc: any, t: any) => {
+      const a = parseInt(t.age as string, 10);
+      if (isNaN(a)) return acc;
+      return !acc || a < parseInt(acc.age as string, 10) ? t : acc;
+    }, null as any);
+  const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
+  const showBreakCard     = !sotwLocDenied && sotwYoungestAge !== null && sotwYoungestAge < 9;
   const [localSavedHotel, setLocalSavedHotel]   = useState<string | null>(null);
 
   // Persist hotel across navigation — load on mount/trip change
@@ -648,6 +679,11 @@ export default function TodayScreen() {
     })();
   }, [dayStops[currentStopIndex]?.id]);
 
+  useEffect(() => {
+    ExpoLocation.getForegroundPermissionsAsync().then(({ status }) => {
+      setSotwLocDenied(status === 'denied');
+    }).catch(() => {});
+  }, []);
 
   // ── Fetch real kid quotes when trip is complete ──
   useEffect(() => {
@@ -1182,6 +1218,116 @@ export default function TodayScreen() {
         { text: 'Cancel', style: 'cancel' },
       ]
     );
+  }
+
+  // ── Stops on the Way helpers ───────────────────────────────────────────────
+  async function openSotwSheet() {
+    let loc: { lat: number; lng: number } | null = null;
+    try {
+      const { status } = await ExpoLocation.getForegroundPermissionsAsync();
+      setSotwLocDenied(status === 'denied');
+      if (status !== 'denied') {
+        let pos: ExpoLocation.LocationObject | null = null;
+        if (status === 'granted') {
+          pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+        } else {
+          const { status: newStatus } = await ExpoLocation.requestForegroundPermissionsAsync();
+          if (newStatus === 'granted') {
+            pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+          }
+        }
+        if (pos) loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      }
+    } catch { /* fall through */ }
+    if (!loc && currentStop?.latitude && currentStop?.longitude) {
+      loc = { lat: parseFloat(currentStop.latitude as string), lng: parseFloat(currentStop.longitude as string) };
+    }
+    setSotwUserLoc(loc);
+    setSotwPlaces([]);
+    setSotwFilter('playground');
+    sotwSlideY.setValue(900);
+    setActiveSheet('stopsOnTheWay');
+    Animated.spring(sotwSlideY, { toValue: 0, useNativeDriver: true, damping: 28, stiffness: 300 }).start();
+    if (loc) void fetchSotwPlaces('playground', loc);
+  }
+
+  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }) {
+    const position = loc ?? sotwUserLoc;
+    if (!position) return;
+    setSotwFilter(filter);
+    setSotwLoading(true);
+    try {
+      const data = await apiFetch<{ results: SotwPlace[] }>(
+        `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`
+      );
+      setSotwPlaces(data.results ?? []);
+    } catch {
+      setSotwPlaces([]);
+    } finally {
+      setSotwLoading(false);
+    }
+  }
+
+  function openBreakCapture(place: SotwPlace) {
+    setActiveBreakPlace(place);
+    breakSlideY.setValue(900);
+    Animated.spring(breakSlideY, { toValue: 0, useNativeDriver: true, damping: 28, stiffness: 300 }).start();
+  }
+
+  function closeBreakCapture() {
+    Animated.timing(breakSlideY, { toValue: 900, duration: 250, useNativeDriver: true }).start(() => setActiveBreakPlace(null));
+  }
+
+  function closeSotwSheet() {
+    Animated.timing(sotwSlideY, { toValue: 900, duration: 250, useNativeDriver: true }).start(() => setActiveSheet('none'));
+    setActiveBreakPlace(null);
+  }
+
+  function getBreakHeroColors(filter: SotwFilter): [string, string] {
+    switch (filter) {
+      case 'beach':   return ['#7fc8e8', '#4a9bc4'];
+      case 'food':    return ['#d89a5a', '#a85f3a'];
+      case 'coffee':  return ['#c8a45a', '#9a7a35'];
+      default:        return ['#5db87a', '#3a8a55'];
+    }
+  }
+
+  async function handleBreakAddPhotos() {
+    Alert.alert('Add photo', 'Choose a source', [
+      { text: 'Camera', onPress: async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permission needed', 'Camera access required.'); return; }
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'] as any, allowsEditing: true, aspect: [4, 3] as [number, number], quality: 0.85 });
+        if (!result.canceled && result.assets[0]) setBreakPhotos(prev => [...prev, result.assets[0].uri]);
+      }},
+      { text: 'Photo Library', onPress: async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') { Alert.alert('Permission needed', 'Photo library access required.'); return; }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as any, allowsMultipleSelection: true, selectionLimit: 10, quality: 0.85 });
+        if (!result.canceled) setBreakPhotos(prev => [...prev, ...result.assets.map((a: any) => a.uri)]);
+      }},
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  async function handleBreakDone() {
+    try {
+      if (trip?.id) {
+        await apiFetch(`/api/travel/trips/${trip.id}/moments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'break',
+            description: breakQuote || null,
+            metadata: JSON.stringify({ breakMoment: true, placeName: activeBreakPlace?.name, placeType: sotwFilter, photoCount: breakPhotos.length }),
+          }),
+        });
+      }
+    } catch { /* best-effort */ }
+    setActiveBreakPlace(null);
+    setBreakQuote('');
+    setBreakPhotos([]);
+    closeSotwSheet();
   }
 
   function removePhoto(source: 'visited' | 'wrap', uri: string) {
@@ -2566,6 +2712,23 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
+          {showBreakCard && (
+            <TouchableOpacity
+              style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
+              activeOpacity={0.85}
+              onPress={() => { void openSotwSheet(); }}
+            >
+              <View style={sotw.breakIcon}>
+                <Text style={{ fontSize: 24 }}>{'\uD83C\uDF04'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={sotw.breakTitle}>Stops on the way</Text>
+                <Text style={sotw.breakSub}>{'Playgrounds, coffee \u0026 more nearby'}</Text>
+              </View>
+              <Text style={sotw.breakArrow}>{'\u203A'}</Text>
+            </TouchableOpacity>
+          )}
+
           {!!doFirst && (
             <View style={er.infoCard}>
               <Text style={er.infoCardLabel}>DO THIS FIRST</Text>
@@ -2698,6 +2861,187 @@ export default function TodayScreen() {
           onConfirm={handlePreviewClose}
         />
       )}
+
+      {activeSheet === 'stopsOnTheWay' && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { transform: [{ translateY: sotwSlideY }], zIndex: 100, elevation: 100, backgroundColor: C.bg },
+          ]}
+        >
+          <View style={{ height: '38%', position: 'relative', overflow: 'hidden' }}>
+            {sotwUserLoc ? (
+              <Image
+                source={{ uri: `${API_BASE}/api/travel/static-map?lat=${sotwUserLoc.lat}&lng=${sotwUserLoc.lng}&zoom=13&width=390&height=300` }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ flex: 1, backgroundColor: '#b0c4b1', alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator color="#fff" />
+              </View>
+            )}
+            <View style={sotw.topBar}>
+              <TouchableOpacity style={sotw.backBtn} onPress={closeSotwSheet}>
+                <Text style={{ fontSize: 18, color: C.deep, fontWeight: '700', lineHeight: 22 }}>{'\u2039'}</Text>
+              </TouchableOpacity>
+              <View style={sotw.etaPill}>
+                <View style={sotw.etaDot} />
+                <Text style={sotw.etaPillText}>{travelMins != null ? `~${travelMins} min` : 'En route'}</Text>
+              </View>
+            </View>
+            <View style={sotw.routeBar}>
+              <Text style={sotw.routeFrom} numberOfLines={1}>{stop.name ?? 'Current stop'}</Text>
+              <Text style={sotw.routeArr}>{' \u2192 '}</Text>
+              <Text style={sotw.routeTo} numberOfLines={1}>{dayStops[currentStopIndex + 1]?.name ?? 'Next stop'}</Text>
+            </View>
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
+            <View style={{ padding: 16, paddingBottom: 0 }}>
+              <Text style={sotw.resultsTitle}>Quick Stops Nearby</Text>
+              <Text style={sotw.resultsSub}>Places close to your route</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sotw.pillsRow} contentContainerStyle={{ paddingHorizontal: 16 }}>
+              {([
+                ['playground', '\uD83D\uDEDD', 'Playgrounds'],
+                ['beach',      '\uD83C\uDFD6', 'Beach'],
+                ['coffee',     '\u2615',        'Coffee'],
+                ['food',       '\uD83C\uDF55',  'Food'],
+                ['restrooms',  '\uD83D\uDEBB',  'Restrooms'],
+              ] as [SotwFilter, string, string][]).map(([f, emoji, label]) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[sotw.pill, sotwFilter === f && sotw.pillOn]}
+                  onPress={() => { setSotwFilter(f); void fetchSotwPlaces(f); }}
+                >
+                  <Text>{emoji}</Text>
+                  <Text style={[sotw.pillText, sotwFilter === f && sotw.pillTextOn]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={{ paddingHorizontal: 16 }}>
+              {sotwLoading ? (
+                <ActivityIndicator color={C.orange} style={{ marginTop: 24 }} />
+              ) : sotwPlaces.length === 0 ? (
+                <Text style={[sotw.resultsSub, { marginTop: 20, textAlign: 'center' }]}>No places found nearby</Text>
+              ) : (
+                <>
+                  <Text style={sotw.placeCount}>{sotwPlaces.length}{' place'}{sotwPlaces.length !== 1 ? 's' : ''}{' found'}</Text>
+                  {sotwPlaces.map((place, idx) => {
+                    const isRich = sotwFilter === 'food' || sotwFilter === 'beach';
+                    return isRich ? (
+                      <TouchableOpacity key={place.placeId} style={[sotw.richCard, idx === 0 && sotw.richCardTop]} onPress={() => openBreakCapture(place)} activeOpacity={0.85}>
+                        <View style={sotw.richImg}>
+                          {place.photoReference ? (
+                            <Image source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                          ) : (
+                            <LinearGradient colors={sotwFilter === 'beach' ? ['#7fc8e8', '#4a9bc4'] : ['#d89a5a', '#a85f3a']} style={StyleSheet.absoluteFill} />
+                          )}
+                          {idx === 0 && <View style={sotw.richBadge}><Text style={sotw.richBadgeText}>Best match</Text></View>}
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.5)']} style={StyleSheet.absoluteFill} />
+                          <Text style={sotw.richName}>{place.name}</Text>
+                        </View>
+                        <View style={sotw.richBody}>
+                          <View style={sotw.pcMeta}>
+                            {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
+                            <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                            <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
+                          </View>
+                          <TouchableOpacity style={[sotw.goBtn, { marginTop: 8 }]} onPress={() => openBreakCapture(place)}>
+                            <Text style={sotw.goBtnText}>{'Let\u2019s go'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </TouchableOpacity>
+                    ) : (
+                      <View key={place.placeId} style={[sotw.simpleCard, idx === 0 && sotw.simpleCardTop]}>
+                        {idx === 0 && <View style={sotw.topBadge}><Text style={sotw.topBadgeText}>{'\u2605 Best match'}</Text></View>}
+                        <View style={sotw.pcRow}>
+                          <View style={[sotw.pcEmoji, sotwFilter === 'coffee' ? sotw.pcEmojiAmber : sotw.pcEmojiGreen]}>
+                            <Text style={{ fontSize: 22 }}>{sotwFilter === 'playground' ? '\uD83D\uDEDD' : sotwFilter === 'coffee' ? '\u2615' : '\uD83D\uDEBB'}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={sotw.pcName}>{place.name}</Text>
+                            <View style={sotw.pcMeta}>
+                              {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
+                              <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                              <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity style={sotw.goBtn} onPress={() => openBreakCapture(place)}>
+                            <Text style={sotw.goBtnText}>Go</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {activeBreakPlace && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { transform: [{ translateY: breakSlideY }], zIndex: 101, elevation: 101 },
+          ]}
+        >
+          <LinearGradient
+            colors={getBreakHeroColors(sotwFilter)}
+            style={[sotw.bcHero, { paddingTop: insets.top + 6 }]}
+          >
+            <View style={sotw.bcTopRow}>
+              <TouchableOpacity style={sotw.bcClose} onPress={closeBreakCapture}>
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 }}>{'\u00D7'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={sotw.bcBadge}>
+              <Text style={sotw.bcBadgeText}>BREAK STOP</Text>
+            </View>
+            <Text style={sotw.bcTitle}>{activeBreakPlace.name}</Text>
+            <Text style={sotw.bcSub}>{activeBreakPlace.vicinity}</Text>
+          </LinearGradient>
+          <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>
+            <TouchableOpacity
+              style={sotw.dirCard}
+              activeOpacity={0.85}
+              onPress={() => { void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${activeBreakPlace.lat},${activeBreakPlace.lng}`); }}
+            >
+              <Text style={sotw.dirCardText}>{'Get Directions \u2192'}</Text>
+            </TouchableOpacity>
+            <View style={sotw.quoteCard}>
+              <Text style={sotw.quoteLabel}>KID QUOTE</Text>
+              <SpeechTextInput
+                placeholder={'What did ' + youngestChildName + ' say?'}
+                value={breakQuote}
+                onChangeText={setBreakQuote}
+                style={sotw.quoteInput}
+                multiline
+              />
+            </View>
+            <View style={sotw.snapCard}>
+              <Text style={sotw.quoteLabel}>QUICK SNAP</Text>
+              <TouchableOpacity style={sotw.snapBtn} activeOpacity={0.8} onPress={() => { void handleBreakAddPhotos(); }}>
+                <Text style={{ fontSize: 22 }}>{'\uD83D\uDCF7'}</Text>
+                <Text style={sotw.snapBtnText}>{breakPhotos.length > 0 ? `${breakPhotos.length} photo${breakPhotos.length !== 1 ? 's' : ''} added` : 'Add a photo'}</Text>
+              </TouchableOpacity>
+              {breakPhotos.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                  {breakPhotos.map((uri, i) => (
+                    <Image key={i} source={{ uri }} style={{ width: 72, height: 72, borderRadius: 10, marginRight: 8 }} />
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+            <TouchableOpacity style={sotw.doneBtn} activeOpacity={0.88} onPress={() => { void handleBreakDone(); }}>
+              <Text style={sotw.doneBtnText}>{'Done with break \u2192'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      )}
+
       </>
     );
   }
@@ -4236,4 +4580,70 @@ const mx = StyleSheet.create({
   dropIcon: { fontSize: 18, lineHeight: 22 },
   dropTitle: { fontFamily: F.bold, fontSize: 13, color: '#1A1F2E' },
   dropSub:   { fontFamily: F.medium, fontSize: 11, color: '#8A8FA8', marginTop: 1 },
+});
+
+const sotw = StyleSheet.create({
+  breakCard:    { backgroundColor: '#FFF6EE', borderWidth: 1.5, borderColor: '#F6D3B6', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  breakIcon:    { width: 50, height: 50, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#E8692A', shadowOpacity: 0.18, shadowRadius: 8, elevation: 2 },
+  breakTitle:   { fontSize: 16, fontFamily: F.bold, color: C.deep },
+  breakSub:     { fontSize: 13, color: '#b87a4e', fontFamily: F.semibold, marginTop: 2 },
+  breakArrow:   { fontSize: 22, color: C.orange },
+  topBar:       { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 52, paddingHorizontal: 16, zIndex: 5 },
+  backBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  etaPill:      { backgroundColor: 'rgba(26,31,46,0.88)', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 15, paddingVertical: 9, borderRadius: 20 },
+  etaDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E8692A' },
+  etaPillText:  { color: '#fff', fontSize: 13, fontFamily: F.bold },
+  routeBar:     { position: 'absolute', bottom: 12, left: 16, right: 16, backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, elevation: 4 },
+  routeFrom:    { fontSize: 13, fontFamily: F.bold, color: '#E8692A', flexShrink: 1 },
+  routeArr:     { color: C.muted, fontSize: 13, marginHorizontal: 4 },
+  routeTo:      { fontSize: 13, fontFamily: F.bold, color: C.deep, flex: 1 },
+  resultsTitle: { fontSize: 22, fontFamily: F.bold, color: C.deep },
+  resultsSub:   { fontSize: 13, color: C.muted, fontFamily: F.medium, marginTop: 2 },
+  pillsRow:     { marginVertical: 12 },
+  pill:         { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 15, paddingVertical: 9, borderRadius: 22, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#ECE8E2', marginRight: 8 },
+  pillOn:       { backgroundColor: '#FDF0E9', borderColor: '#E8692A' },
+  pillText:     { fontSize: 14, fontFamily: F.bold, color: C.muted },
+  pillTextOn:   { color: '#E8692A' },
+  placeCount:   { fontSize: 13, fontFamily: F.bold, color: C.muted, marginBottom: 8 },
+  simpleCard:   { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#ECE8E2', borderRadius: 16, padding: 14, marginBottom: 10 },
+  simpleCardTop:{ borderColor: '#F6D3B6', backgroundColor: '#FFFAF5' },
+  topBadge:     { marginBottom: 8 },
+  topBadgeText: { fontSize: 11, fontFamily: F.bold, color: '#E8692A' },
+  pcRow:        { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pcEmoji:      { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pcEmojiGreen: { backgroundColor: '#E8F7EF' },
+  pcEmojiAmber: { backgroundColor: '#FFF3E0' },
+  pcName:       { fontSize: 16, fontFamily: F.bold, color: C.deep },
+  pcMeta:       { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 3 },
+  tagRoute:     { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 7, backgroundColor: '#E8F7EF' },
+  tagRouteText: { fontSize: 11, fontFamily: F.bold, color: '#3DAA6E' },
+  tagDetour:    { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 7, backgroundColor: '#F5F2EE' },
+  tagDetourText:{ fontSize: 11, fontFamily: F.bold, color: C.muted },
+  pcAmen:       { fontSize: 12, color: C.muted, fontFamily: F.medium, flex: 1 },
+  goBtn:        { backgroundColor: C.deep, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 12, flexShrink: 0 },
+  goBtnText:    { color: '#fff', fontSize: 14, fontFamily: F.bold },
+  richCard:     { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#ECE8E2', borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
+  richCardTop:  { borderColor: '#F6D3B6' },
+  richImg:      { height: 130, position: 'relative' },
+  richBadge:    { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(232,105,42,0.92)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, zIndex: 3 },
+  richBadgeText:{ color: '#fff', fontSize: 11, fontFamily: F.bold },
+  richName:     { position: 'absolute', bottom: 10, left: 12, right: 12, color: '#fff', fontSize: 18, fontFamily: F.bold, zIndex: 2 },
+  richBody:     { padding: 13 },
+  bcHero:       { paddingBottom: 26, paddingHorizontal: 22 },
+  bcTopRow:     { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14 },
+  bcClose:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  bcBadge:      { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, marginBottom: 10 },
+  bcBadgeText:  { color: '#fff', fontSize: 12, fontFamily: F.bold, letterSpacing: 0.8 },
+  bcTitle:      { fontSize: 30, fontFamily: F.bold, color: '#fff', lineHeight: 34, marginBottom: 4 },
+  bcSub:        { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: F.medium },
+  dirCard:      { backgroundColor: '#1D4A42', borderRadius: 16, padding: 18, alignItems: 'center' },
+  dirCardText:  { color: '#fff', fontSize: 17, fontFamily: F.bold },
+  quoteCard:    { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
+  quoteLabel:   { fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 0.6, marginBottom: 10 },
+  quoteInput:   { fontSize: 15, color: C.deep, fontFamily: F.medium, minHeight: 64, paddingRight: 44, backgroundColor: '#F5F2EE', borderRadius: 12, padding: 12 },
+  snapCard:     { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
+  snapBtn:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14 },
+  snapBtnText:  { fontSize: 15, fontFamily: F.semibold, color: C.deep },
+  doneBtn:      { backgroundColor: '#E8692A', borderRadius: 16, padding: 18, alignItems: 'center', marginBottom: 16 },
+  doneBtnText:  { color: '#fff', fontSize: 18, fontFamily: F.bold },
 });

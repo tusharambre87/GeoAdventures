@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "London with Kids in 2026: The Essential Family Guide",
   date: "2026-01-12",
   description: "London remains one of the world's great family travel destinations — with a remarkable number of world-class free museums, royal parks, and iconic sights. Here's how to make the most of a family trip.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>Why London Works for Families</h2>
 <p>London is expensive. There's no getting around that. But the city has a hidden advantage that partially compensates: an extraordinary number of its greatest attractions are completely free. The Natural History Museum, the British Museum, the Science Museum, the V&A, the National Gallery, Tate Modern — all free, all world-class, all excellent for children. If you plan around free attractions and self-cater some meals, London becomes far more manageable than its reputation suggests.</p>

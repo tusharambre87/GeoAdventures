@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "Is the Eiffel Tower Worth It With Kids? An Honest Family Review",
   date: "2025-08-30",
   description: "We visited the Eiffel Tower with three children aged 4, 7, and 10. Here's the real answer to whether it's worth the queues, the cost, and the logistics — plus tips to make the visit smoother.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>The Honest Answer</h2>
 <p>Yes — with caveats. The Eiffel Tower is one of those landmarks that transcends its own hype when you see it in person, and children respond to it viscerally in a way that's hard to predict. Our 4-year-old burst into tears of excitement; our 10-year-old, who had declared it "boring" in advance, went suspiciously quiet when we reached the summit and stared at the city for a full ten minutes without being asked. Our 7-year-old's main priority was the gift shop. All three remembered the visit a year later, unprompted. That's a decent result.</p>

@@ -6350,6 +6350,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stops on the way — nearby Google Places search, no auth required
+  app.get('/api/travel/stops-on-the-way', async (req: any, res) => {
+    const { lat, lng, type } = req.query as Record<string, string>;
+    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
+    const typeMap: Record<string, { type: string; keyword?: string }> = {
+      playground: { type: 'playground' },
+      beach:      { type: 'park',       keyword: 'beach' },
+      coffee:     { type: 'cafe' },
+      food:       { type: 'restaurant' },
+      restrooms:  { type: 'park',       keyword: 'restroom' },
+    };
+    const mapped = typeMap[type ?? 'playground'] ?? { type: 'park' };
+    const lat_n  = parseFloat(lat);
+    const lng_n  = parseFloat(lng);
+    let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat_n},${lng_n}&radius=5000&type=${mapped.type}&key=${apiKey}`;
+    if (mapped.keyword) url += `&keyword=${encodeURIComponent(mapped.keyword)}`;
+    try {
+      const upstream = await fetch(url);
+      const data     = await upstream.json() as { results?: any[]; status?: string };
+      const results  = (data.results ?? []).slice(0, 5).map((p: any) => {
+        const pLat = (p.geometry?.location?.lat ?? lat_n) as number;
+        const pLng = (p.geometry?.location?.lng ?? lng_n) as number;
+        const dx = (pLat - lat_n) * 111000;
+        const dy = (pLng - lng_n) * 111000 * Math.cos(lat_n * Math.PI / 180);
+        const detourMinutes = Math.max(1, Math.round(Math.sqrt(dx * dx + dy * dy) / 500));
+        return {
+          placeId:        p.place_id as string,
+          name:           p.name as string,
+          vicinity:       (p.vicinity ?? '') as string,
+          lat:            pLat,
+          lng:            pLng,
+          photoReference: (p.photos?.[0]?.photo_reference ?? null) as string | null,
+          detourMinutes,
+          onRoute:        detourMinutes < 3,
+        };
+      });
+      res.json({ results });
+    } catch (err) {
+      req.log?.error({ err }, '[StopsOnTheWay] fetch error');
+      res.status(500).json({ error: 'upstream error' });
+    }
+  });
+
+  // Static map image proxy — keeps GOOGLE_PLACES_API_KEY server-side
+  app.get('/api/travel/static-map', async (req: any, res) => {
+    const { lat, lng, zoom = '13', width = '390', height = '260', markers } = req.query as Record<string, string>;
+    if (!lat || !lng) return res.status(400).end();
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return res.status(503).end();
+    let url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&scale=2&key=${apiKey}`;
+    if (markers) url += `&markers=${encodeURIComponent(markers)}`;
+    try {
+      const upstream = await fetch(url);
+      if (!upstream.ok) return res.status(404).end();
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=3600');
+      const buf = await upstream.arrayBuffer();
+      res.end(Buffer.from(buf));
+    } catch (err) {
+      req.log?.error({ err }, '[StaticMap] proxy error');
+      res.status(500).end();
+    }
+  });
+
   // Guest: create a trip without authentication (returns guestToken for later access)
   app.post('/api/travel/trips/guest-create', travelModeGuard, async (req: any, res) => {
     try {

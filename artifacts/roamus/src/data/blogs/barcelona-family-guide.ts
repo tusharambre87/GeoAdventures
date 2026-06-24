@@ -5,7 +5,7 @@ const post: BlogPost = {
   title: "Barcelona with Kids: The Ultimate Family Guide",
   date: "2025-10-15",
   description: "Everything you need to know about visiting Barcelona with children — from Gaudí's fairy-tale architecture to beachside gelato runs and the best family-friendly neighbourhoods.",
-  published: true,
+  published: false,
   contentHtml: `
 <h2>Why Barcelona Is a Dream for Families</h2>
 <p>Barcelona has a rare superpower: it manages to be endlessly exciting for adults while staying completely manageable — even joyful — for kids. Wide pedestrian boulevards, sandy beaches a short metro ride from the old city, and an architectural landscape that looks like it was designed by a friendly giant all conspire to make it one of Europe's top family destinations.</p>
