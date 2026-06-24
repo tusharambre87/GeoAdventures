@@ -462,6 +462,18 @@ export default function WhereScreen() {
           </View>
         )}
 
+        {/* One-city: selection confirmation chip */}
+        {!isMulti && sel.length > 0 && (
+          <View style={s.selChipRow}>
+            <View style={s.selChip}>
+              <Text style={s.selChipText}>Selected: {sel[0]}</Text>
+              <Pressable onPress={() => removeCity(sel[0])} hitSlop={8}>
+                <Text style={s.selChipX}>×</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         {/* Autocomplete dropdown */}
         {showSuggestions && (
           <View style={s.dropdown}>
@@ -507,7 +519,7 @@ export default function WhereScreen() {
       >
         {/* Popular grid (one-city only, no search active) */}
         {showOneCityGrid && (
-          <View style={showOneCityCard ? {} : { flex: 1 }}>
+          <View style={[showOneCityCard ? {} : { flex: 1 }, sel.length > 0 && { opacity: 0.45 }]}>
             <Text style={s.gridLabel}>POPULAR WITH FAMILIES</Text>
             {/* Rows of 2, generated dynamically from API-returned popularCities */}
             <View style={showOneCityCard ? { gap: 10 } : { flex: 1, gap: 10 }}>
@@ -667,4 +679,8 @@ const s = StyleSheet.create({
   cardName: { fontFamily: F.bold, fontSize: 13, fontWeight: "700", color: "#fff" },
   cardSub: { fontFamily: F.regular, fontSize: 11, color: "rgba(255,255,255,0.72)" },
   cta: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, backgroundColor: G.bg, borderTopWidth: 1, borderTopColor: "rgba(26,31,46,0.06)" },
+  selChipRow: { flexDirection: "row", marginBottom: 6 },
+  selChip: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(232,105,42,0.1)", borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12, borderWidth: 1.5, borderColor: "rgba(232,105,42,0.3)" },
+  selChipText: { fontFamily: F.semibold, fontSize: 13, fontWeight: "600", color: G.orange },
+  selChipX: { color: G.orange, fontSize: 16, lineHeight: 18 },
 });
