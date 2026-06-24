@@ -211,6 +211,12 @@ type TodayState =
   | 'day_history'
   | 'day_history_empty';
 
+// States in which the user is actively executing their day — polling must
+// not overwrite todayState with server-derived state while they're in flight.
+const LOCKED_STATES: TodayState[] = [
+  'en_route', 'at_stop_frozen', 'stop_complete', 'day_complete', 'trip_complete',
+];
+
 type Pace = 'balanced' | 'easier' | 'faster';
 
 const ALL_STATES: TodayState[] = [
@@ -868,7 +874,7 @@ export default function TodayScreen() {
       }
 
 
-      if (!devState && override !== 'stop_complete') {
+      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState)) {
         const days = daysUntilDate(t.startDate);
         if (days > 7) {
           setTodayState('pre_trip_far');
@@ -896,7 +902,7 @@ export default function TodayScreen() {
       }
 
       // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
-      if (!devState && override !== 'stop_complete') {
+      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState)) {
         const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
         const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
         if (frozenFlag === 'true' && frozenTripId === tid) {
