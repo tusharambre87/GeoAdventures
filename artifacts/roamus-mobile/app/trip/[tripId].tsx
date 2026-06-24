@@ -742,7 +742,7 @@ function StopReorderControls({
   );
 }
 
-function BreakMarkerRow({ label }: { label: string }) {
+function BreakMarkerRow({ label, youngName }: { label: string; youngName?: string }) {
   const [expanded, setExpanded] = useState(false);
   const maxH = useRef(new Animated.Value(0)).current;
 
@@ -760,7 +760,7 @@ function BreakMarkerRow({ label }: { label: string }) {
       <TouchableOpacity onPress={toggle} activeOpacity={0.82} style={bm.row}>
         <Text style={bm.emoji}>🧒</Text>
         <View style={{ flex: 1 }}>
-          <Text style={bm.title}>{label}</Text>
+          <Text style={bm.title}>{'Built-in break for ' + (youngName ?? 'the kids')}</Text>
           <Text style={bm.sub}>~30 min of downtime</Text>
         </View>
         <Text style={[bm.chevron, expanded && bm.chevronDown]}>›</Text>
@@ -1925,7 +1925,10 @@ function DayDetail({
                 const dayIdx  = selectedDay - 1;
                 const markers = (trip.restBreaks ?? []) as Array<{ dayIndex: number; afterDisplayOrder: number; label: string }>;
                 const marker  = markers.find(m => m.dayIndex === dayIdx && m.afterDisplayOrder === (stop.displayOrder ?? 0));
-                return marker ? <BreakMarkerRow key={`brk-${dayIdx}-${marker.afterDisplayOrder}`} label={marker.label} /> : null;
+                const children = (trip.travelers ?? []).filter((t: any) => !t.isParent && t.age != null);
+                const youngest = children.sort((a: any, b: any) => Number(a.age) - Number(b.age))[0];
+                const youngName = youngest?.name as string | undefined;
+                return marker ? <BreakMarkerRow key={`brk-${dayIdx}-${marker.afterDisplayOrder}`} label={marker.label} youngName={youngName} /> : null;
               })()}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
