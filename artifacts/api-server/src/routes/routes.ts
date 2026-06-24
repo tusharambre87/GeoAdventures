@@ -6395,6 +6395,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Nearby landmarks — tourist attractions, museums, parks for PMAL "Also in this area"
+  app.get('/api/travel/nearby-landmarks', async (req: any, res) => {
+    const { lat, lng, radius = '16000' } = req.query as Record<string, string>;
+    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
+
+    const lat_n = parseFloat(lat);
+    const lng_n = parseFloat(lng);
+
+    const types = ['tourist_attraction', 'museum', 'park'];
+    const seen = new Set<string>();
+    const results: any[] = [];
+
+    for (const type of types) {
+      if (results.length >= 8) break;
+      try {
+        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat_n},${lng_n}&radius=${radius}&type=${type}&key=${apiKey}`;
+        const upstream = await fetch(url);
+        const data = await upstream.json() as { results?: any[] };
+        for (const p of (data.results ?? []).slice(0, 4)) {
+          if (seen.has(p.place_id)) continue;
+          seen.add(p.place_id);
+          results.push({
+            placeId: p.place_id as string,
+            name: p.name as string,
+            vicinity: (p.vicinity ?? '') as string,
+            type,
+            rating: (p.rating ?? 0) as number,
+            photoReference: (p.photos?.[0]?.photo_reference ?? null) as string | null,
+          });
+        }
+      } catch {}
+    }
+
+    results.sort((a, b) => b.rating - a.rating);
+    res.json({ results: results.slice(0, 6) });
+  });
+
   // Static map image proxy — keeps GOOGLE_PLACES_API_KEY server-side
   app.get('/api/travel/static-map', async (req: any, res) => {
     const { lat, lng, zoom = '13', width = '390', height = '260', markers, originLat, originLng, destLat, destLng } = req.query as Record<string, string>;
