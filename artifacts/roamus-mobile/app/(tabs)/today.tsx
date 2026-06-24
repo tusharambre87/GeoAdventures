@@ -614,14 +614,16 @@ export default function TodayScreen() {
     .map((t: any) => parseInt(t.age as string, 10))
     .filter((n: number) => n > 0 && n < 18);
   const sotwYoungestAge   = sotwChildAges.length > 0 ? Math.min(...sotwChildAges) : null;
-  const sotwYoungestKid   = (trip?.travelers ?? []).filter((t: any) => !t.isParent && t.age)
-    .reduce((acc: any, t: any) => {
-      const a = parseInt(t.age as string, 10);
-      if (isNaN(a)) return acc;
-      return !acc || a < parseInt(acc.age as string, 10) ? t : acc;
-    }, null as any);
+  const sotwYoungestKid   = (trip?.travelers ?? []).filter((t: any) => {
+    const a = parseInt(t.age as string, 10);
+    return !t.isParent && !isNaN(a) && a > 0 && a < 18;
+  }).reduce((acc: any, t: any) => {
+    const a = parseInt(t.age as string, 10);
+    if (isNaN(a)) return acc;
+    return !acc || a < parseInt(acc.age as string, 10) ? t : acc;
+  }, null as any);
   const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
-  const showBreakCard     = !sotwLocDenied && sotwYoungestAge !== null && sotwYoungestAge < 9;
+  const showBreakCard     = todayState === 'en_route' && sotwYoungestAge !== null && sotwYoungestAge < 9;
   console.log('[SOTW] todayState:', todayState);
   console.log('[SOTW] youngestChildAge:', trip?.travelers?.filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age })));
   console.log('[SOTW] showBreakCard:', showBreakCard);
@@ -2715,7 +2717,7 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
-          {showBreakCard && (
+          {showBreakCard && (travelMins ?? 0) > 5 && (
             <TouchableOpacity
               style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12 }]}
               activeOpacity={0.85}
