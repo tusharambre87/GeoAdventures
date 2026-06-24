@@ -6403,9 +6403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!apiKey) return res.status(503).end();
     let url: string;
     if (originLat && originLng && destLat && destLng) {
-      const midLat = (parseFloat(originLat) + parseFloat(destLat)) / 2;
-      const midLng = (parseFloat(originLng) + parseFloat(destLng)) / 2;
-      url = `https://maps.googleapis.com/maps/api/staticmap?center=${midLat},${midLng}&zoom=11&size=${width}x${height}&scale=2&path=color:0xE8692Aff|weight:5|${originLat},${originLng}|${destLat},${destLng}&markers=color:orange|label:A|${originLat},${originLng}&markers=color:red|label:B|${destLat},${destLng}&key=${apiKey}`;
+      url = `https://maps.googleapis.com/maps/api/staticmap?size=${width}x${height}&scale=2&markers=color:orange|label:A|${originLat},${originLng}&markers=color:red|label:B|${destLat},${destLng}&key=${apiKey}`;
     } else {
       url = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&scale=2&key=${apiKey}`;
       if (markers) url += `&markers=${encodeURIComponent(markers)}`;
