@@ -5214,7 +5214,7 @@ const bm = StyleSheet.create({
   sub:         { color: '#8A8FA8', fontSize: 12, marginTop: 1 },
   chevron:     { color: '#8A8FA8', fontSize: 18, lineHeight: 20 },
   chevronDown: { transform: [{ rotate: '90deg' }] },
-  detail:      { color: '#6b7185', fontSize: 13, lineHeight: 19.5, paddingTop: 10, paddingBottom: 12, paddingHorizontal: 4 },
+  detail:      { color: '#6b7185', fontSize: 13, lineHeight: 19.5, paddingTop: 10, paddingBottom: 12, paddingHorizontal: 16 },
 });
 
 const dc = StyleSheet.create({
