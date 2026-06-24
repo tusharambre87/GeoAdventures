@@ -187,6 +187,7 @@ type TripData = {
     interests?: string[];
   } | null;
   parentSuggestions?: Record<string, ParentSuggestion[]> | null;
+  restBreaks?: Array<{ dayIndex: number; afterDisplayOrder: number; label: string }> | null;
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
@@ -737,6 +738,38 @@ function StopReorderControls({
       <Pressable onPress={onMoveDown} disabled={!canMoveDown} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: canMoveDown ? '#1A1F2E' : '#8A8FA8' }}>{'\u2193'}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function BreakMarkerRow({ label }: { label: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const maxH = useRef(new Animated.Value(0)).current;
+
+  function toggle() {
+    Animated.timing(maxH, {
+      toValue: expanded ? 0 : 80,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+    setExpanded(e => !e);
+  }
+
+  return (
+    <View style={bm.wrap}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.82} style={bm.row}>
+        <Text style={bm.emoji}>🧒</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={bm.title}>{label}</Text>
+          <Text style={bm.sub}>~30 min of downtime</Text>
+        </View>
+        <Text style={[bm.chevron, expanded && bm.chevronDown]}>›</Text>
+      </TouchableOpacity>
+      <Animated.View style={{ overflow: 'hidden', maxHeight: maxH }}>
+        <Text style={bm.detail}>
+          We've planned in some downtime so the day doesn't overwhelm your youngest. During the trip you can find playgrounds, coffee, and quiet spots nearby.
+        </Text>
+      </Animated.View>
     </View>
   );
 }
@@ -1885,6 +1918,12 @@ function DayDetail({
                     onMoveDown={mealStops[0] ? () => handleMoveStop(mealStops[0].id, 'down') : undefined}
                   />
                 );
+              })()}
+              {(() => {
+                const dayIdx  = selectedDay - 1;
+                const markers = (trip.restBreaks ?? []) as Array<{ dayIndex: number; afterDisplayOrder: number; label: string }>;
+                const marker  = markers.find(m => m.dayIndex === dayIdx && m.afterDisplayOrder === (stop.displayOrder ?? 0));
+                return marker ? <BreakMarkerRow key={`brk-${dayIdx}-${marker.afterDisplayOrder}`} label={marker.label} /> : null;
               })()}
               {!isLast && (
                 <TravelConnector travelMins={localContentStops[i + 1]?.travelMinsFromPrevious} />
@@ -5165,6 +5204,17 @@ const cl = StyleSheet.create({
   badgeTextDone: {
     color: '#3DAA6E',
   },
+});
+
+const bm = StyleSheet.create({
+  wrap:        { marginVertical: 10 },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#F5F2EE', borderWidth: 1, borderColor: '#D9D4CD', borderStyle: 'dashed', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13 },
+  emoji:       { fontSize: 20 },
+  title:       { color: '#6b7185', fontSize: 14, fontWeight: '700' },
+  sub:         { color: '#8A8FA8', fontSize: 12, marginTop: 1 },
+  chevron:     { color: '#8A8FA8', fontSize: 18, lineHeight: 20 },
+  chevronDown: { transform: [{ rotate: '90deg' }] },
+  detail:      { color: '#6b7185', fontSize: 13, lineHeight: 19.5, paddingTop: 10, paddingBottom: 12, paddingHorizontal: 4 },
 });
 
 const dc = StyleSheet.create({
