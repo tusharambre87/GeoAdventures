@@ -2,6 +2,56 @@ import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { allPosts } from "../data/blogs/index";
+import type { BlogPostImage } from "../data/blogs/types";
+
+function renderContent(contentHtml: string, images: Record<string, BlogPostImage>) {
+  const TOKEN_RE = /\[IMAGE_REF:([^\]]+)\]/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let idx = 0;
+
+  while ((match = TOKEN_RE.exec(contentHtml)) !== null) {
+    const before = contentHtml.slice(lastIndex, match.index);
+    if (before) {
+      parts.push(
+        <div key={`html-${idx++}`} dangerouslySetInnerHTML={{ __html: before }} />
+      );
+    }
+
+    const key = match[1];
+    const img = images[key];
+    if (img) {
+      parts.push(
+        <figure key={`fig-${key}`} className="blog-content">
+          <img src={img.url} alt={img.alt} />
+          {(img.caption || img.credit) && (
+            <figcaption>
+              {img.caption}
+              {img.caption && img.credit && " — "}
+              {img.credit && img.credit_url ? (
+                <a href={img.credit_url} target="_blank" rel="noopener noreferrer">
+                  {img.credit}
+                </a>
+              ) : img.credit}
+            </figcaption>
+          )}
+        </figure>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  const tail = contentHtml.slice(lastIndex);
+  if (tail) {
+    parts.push(
+      <div key={`html-${idx}`} dangerouslySetInnerHTML={{ __html: tail }} />
+    );
+  }
+
+  return parts;
+}
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
@@ -117,9 +167,10 @@ export default function BlogPost() {
 
           <div
             className="blog-content"
-            dangerouslySetInnerHTML={{ __html: post.contentHtml }}
             data-testid="block-post-content"
-          />
+          >
+            {renderContent(post.contentHtml, post.images ?? {})}
+          </div>
         </article>
 
         <div

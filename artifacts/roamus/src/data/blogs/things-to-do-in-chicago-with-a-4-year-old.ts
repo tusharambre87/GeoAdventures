@@ -26,6 +26,8 @@ const post: BlogPost = {
 
 <p>Get there before 10am on weekends or you'll be sharing the splash pad with half of Chicago. The Bean (Cloud Gate) is right there, and a 4 year old looking at their distorted reflection is genuinely delighted for about 8-10 minutes — which is honestly the correct amount of time to spend at the Bean. After that, the enormous grass lawn between the fountain and Pritzker Pavilion is completely fine to let a kid run on. No admission fees, no timed entries.</p>
 
+[IMAGE_REF:millennium-park]
+
 <h2>Shedd Aquarium: What Works for Under 5s and What Doesn't</h2>
 
 <p>The Shedd Aquarium is worth it for a 4 year old, but you need a specific plan. General admission runs around $40 per adult, $30 for kids 3-11, free for kids under 3. Buy tickets online the night before — walk-up lines on weekends are long enough to eat through whatever patience your kid arrived with.</p>
@@ -33,6 +35,8 @@ const post: BlogPost = {
 <p>What works for this age: the Amazon Rising exhibit (big fish, low tanks), the Oceanarium beluga viewing at the underwater level (not the stadium seating), and the tide pool touch tank. That's about 90 minutes of genuine engagement for most 4 year olds. The dolphin show runs 25 minutes and keeps most kids locked in.</p>
 
 <p>What doesn't land: the 4D theater is genuinely scary for sensitive kids under 5 — skip it. Arrive when the aquarium opens at 9am, do your 90 minutes, and leave before the 11am crush.</p>
+
+[IMAGE_REF:maggie-daley]
 
 <h2>Maggie Daley Park: The Place Parents End Up Loving More Than Their Kids</h2>
 
@@ -66,6 +70,23 @@ const post: BlogPost = {
 
 <p>The best family trips aren't the ones where you check off the most attractions. They're the ones where everyone gets home excited to do it again. Chicago is one of those places.</p>
 `,
+
+  images: {
+    "millennium-park": {
+      url: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=900&auto=format&fit=crop",
+      alt: "Children playing in the Crown Fountain water jets at Millennium Park, Chicago",
+      caption: "The Crown Fountain's water jets are the best free splash pad in the city — arrive before 10am on weekends.",
+      credit: "Photo by Cynthia Smith on Unsplash",
+      credit_url: "https://unsplash.com/photos/chicago-crown-fountain",
+    },
+    "maggie-daley": {
+      url: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=900&auto=format&fit=crop",
+      alt: "Kids climbing and playing at a large outdoor playground in Chicago",
+      caption: "Maggie Daley Park's play garden is free, enormous, and designed for kids under 6.",
+      credit: "Photo by Charlein Gracia on Unsplash",
+      credit_url: "https://unsplash.com/photos/children-playground",
+    },
+  },
 
   faqs: [
     {
