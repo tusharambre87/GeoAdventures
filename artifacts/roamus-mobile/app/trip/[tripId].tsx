@@ -1570,6 +1570,9 @@ function DayDetail({
   const stopCount = dayStops.length;
   const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
   const [showHotelSheet, setShowHotelSheet] = useState(false);
+  const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
+  const [sotwFallback, setSotwFallback] = useState<any[]>([]);
+  const [sotwLoading, setSotwLoading] = useState(false);
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
@@ -1577,6 +1580,20 @@ function DayDetail({
   const contentKey   = contentStops.map(s => s.id + (s.displayOrder ?? 0)).join(',');
   const [localContentStops, setLocalContentStops] = useState<Stop[]>(contentStops);
   useEffect(() => { setLocalContentStops(contentStops); }, [selectedDay, contentKey]);
+  useEffect(() => {
+    if (pmalSuggestions?.length) return;
+    const firstStop = dayStops[0];
+    if (!firstStop?.latitude || !firstStop?.longitude) return;
+    setSotwLoading(true);
+    apiFetch<any>(`/api/travel/stops-on-the-way?lat=${firstStop.latitude}&lng=${firstStop.longitude}&type=playground&tripId=${trip.id}`)
+      .then(data => {
+        const alreadyOnDay = new Set(dayStops.map((s: any) => s.placeId).filter(Boolean));
+        const filtered = (data.results ?? []).filter((p: any) => !alreadyOnDay.has(p.placeId));
+        setSotwFallback(filtered.slice(0, 4));
+      })
+      .catch(() => {})
+      .finally(() => setSotwLoading(false));
+  }, [selectedDay, pmalSuggestions?.length]);
 
   // Local optimistic meal display order — updated immediately on ↑/↓ tap,
   // synced from server data after each refetch.
@@ -1998,10 +2015,26 @@ function DayDetail({
 
         {/* Parents might also like */}
         {(() => {
-          const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
           const children = trip.travelers?.filter(t => !t.isParent && t.age != null) ?? [];
           const youngest = children.sort((a, b) => Number(a.age) - Number(b.age))[0];
-          if (!pmalSuggestions?.length) return null;
+          if (!pmalSuggestions?.length) {
+            if (sotwLoading) return <ActivityIndicator color="#E8692A" style={{ marginVertical: 16 }} />;
+            if (!sotwFallback.length) return null;
+            return (
+              <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#8A8FA8', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>NEARBY TO ADD</Text>
+                {sotwFallback.map(place => (
+                  <TouchableOpacity key={place.placeId} style={{ backgroundColor: '#fff', borderRadius: 13, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1F2E' }}>{place.name}</Text>
+                      <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>{place.vicinity}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#E8692A' }}>+{place.detourMinutes} min</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          }
           return (
             <View style={{ marginBottom: 4 }}>
               <ParentSuggestionsSection
