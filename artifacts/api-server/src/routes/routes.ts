@@ -6360,7 +6360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       playground: { type: 'playground', keyword: 'playground' },
       beach:      { type: 'park',       keyword: 'beach' },
       coffee:     { type: 'cafe' },
-      food:       { type: 'restaurant' },
+      food:       { type: 'restaurant', keyword: 'restaurant' },
       restrooms:  { type: 'park',       keyword: 'restroom' },
     };
     const mapped = typeMap[type ?? 'playground'] ?? { type: 'park' };
