@@ -1011,6 +1011,7 @@ function MealSuggestionCard({
   async function loadRec(_excludedNames: string[]) {
     setLoading(true);
     setRec(null);
+    console.log('[Lunch] fetching for', destination, cityGroup);
     try {
       // Promise.race timeout — AbortController is unreliable in React Native fetch
       const timeout = new Promise<never>((_, reject) =>
@@ -1026,9 +1027,11 @@ function MealSuggestionCard({
         ),
         timeout,
       ]);
+      console.log('[Lunch] response', JSON.stringify(data).slice(0, 200));
       const first = data.options?.[0] ?? null;
       setRec(first ? { id: first.id, name: first.name, type: first.stopType, description: first.description } : null);
-    } catch {
+    } catch (err) {
+      console.log('[Lunch] error', err);
       setRec(null);
     } finally {
       setLoading(false);
