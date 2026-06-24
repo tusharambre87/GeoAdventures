@@ -766,9 +766,11 @@ function BreakMarkerRow({ label }: { label: string }) {
         <Text style={[bm.chevron, expanded && bm.chevronDown]}>›</Text>
       </TouchableOpacity>
       <Animated.View style={{ overflow: 'hidden', maxHeight: maxH }}>
-        <Text style={bm.detail}>
-          We've planned in some downtime so the day doesn't overwhelm your youngest. During the trip you can find playgrounds, coffee, and quiet spots nearby.
-        </Text>
+        <View style={{ backgroundColor: '#EEF4F1', borderRadius: 12, padding: 12, marginTop: 4 }}>
+          <Text style={bm.detail}>
+            {'Planned downtime so the day doesn\u2019t overwhelm your youngest. Tap \u2018Need a pit stop?\u2019 while en route to find nearby stops nearby.'}
+          </Text>
+        </View>
       </Animated.View>
     </View>
   );
