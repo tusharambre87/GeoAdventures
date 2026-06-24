@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, type PlannerInput, type GeneratedStop, type StopPoolResult } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, type PlannerInput, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -5733,12 +5733,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               seenWritten.add(key);
               return true;
             });
-            // Insert age-based rest stops into the pool path (previously had no rest stop logic)
-            const distributedPoolStops = minChildAge < 9
-              ? insertRestStopsIntoStopList(dedupedPoolStops, minChildAge)
-              : dedupedPoolStops;
+            // Compute break markers — rest stops are no longer persisted to DB
+            let distributedPoolStops: GeneratedStop[];
+            let poolBreakMarkers: BreakMarker[] = [];
             if (minChildAge < 9) {
-              console.log(`[Travel] [bg] Rest stops inserted for age ${minChildAge} (cadence: every ${minChildAge < 6 ? 1 : 2} activities)`);
+              const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dedupedPoolStops, minChildAge);
+              distributedPoolStops = withMarkers;
+              poolBreakMarkers = breakMarkers;
+              console.log(`[Travel] [bg] Break markers computed for age ${minChildAge} (${breakMarkers.length} day(s))`);
+            } else {
+              distributedPoolStops = dedupedPoolStops;
             }
             for (let i = 0; i < distributedPoolStops.length; i++) {
               const stop = distributedPoolStops[i];
@@ -5844,6 +5848,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateTrip(tripId, { parentSuggestions: parentSuggestionsMap });
               const daysWithSuggestions = Object.values(parentSuggestionsMap).filter(a => a.length > 0).length;
               console.log(`[Travel] [bg] Saved ${poolParentSuggestions.length} parent suggestion(s) across ${daysWithSuggestions} day(s)`);
+            }
+            if (poolBreakMarkers.length > 0) {
+              await storage.updateTrip(tripId, { restBreaks: poolBreakMarkers as any });
+              console.log(`[Travel] [bg] Saved ${poolBreakMarkers.length} break marker(s) to rest_breaks`);
             }
 
             console.log(`✅ [Travel] [bg] Pool-served ${selectedStops.length} stops for ${cityName} (0 AI calls)`);

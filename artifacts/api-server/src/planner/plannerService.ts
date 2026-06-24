@@ -326,6 +326,8 @@ export interface GeneratedStop {
   bucketType?: 'overflow_anchor' | 'age_stretch';
 }
 
+export type BreakMarker = { dayIndex: number; afterDisplayOrder: number; label: string };
+
 /**
  * Returns how long a family will realistically spend at a stop given the youngest child's age.
  * Base durations (e.g. AMNH = 180 min) are adult estimates; toddler families leave earlier.
@@ -389,36 +391,59 @@ function createNapStop(dayNumber: number, displayOrder: number): GeneratedStop {
 }
 
 /**
- * Insert rest stops into the stop list based on the youngest child's age bracket.
- * - Under 6 : every 1 activity (rest after each activity, except the last of the day)
- * - 6–8     : every 2 activities (rest after every 2nd activity)
- * - 9+      : no rest stops inserted
- * Re-assigns displayOrders after insertion. Returns a new array — does not mutate input.
+ * Compute where a rest break marker belongs for each day, without inserting any rest stop rows.
+ * Returns stops UNCHANGED (no rest stops inserted, no displayOrder renumbering).
+ *
+ * Break placement per day:
+ *   - First anchor stop (familyAnchorType === "anchor"); if none, longest-duration stop ≥ 90 min.
+ *   - Age gate: under 6 → always place; 6–8 → only if qualifying stop ≥ 90 min; 9+ → never.
  */
-export function insertRestStopsIntoStopList(stops: GeneratedStop[], youngestChildAge: number): GeneratedStop[] {
-  if (youngestChildAge >= 9) return stops;
-  const cadence = youngestChildAge < 6 ? 1 : 2;
+export function insertRestStopsIntoStopList(
+  stops: GeneratedStop[],
+  youngestChildAge: number,
+  youngestChildName?: string,
+): { stops: GeneratedStop[]; breakMarkers: BreakMarker[] } {
+  if (youngestChildAge >= 9) return { stops, breakMarkers: [] };
+
+  const label = youngestChildName
+    ? `Built-in break for ${youngestChildName}`
+    : "Built-in break for the kids";
+
+  const breakMarkers: BreakMarker[] = [];
 
   const dayMap = new Map<number, GeneratedStop[]>();
   for (const s of stops) {
     if (!dayMap.has(s.dayNumber)) dayMap.set(s.dayNumber, []);
     dayMap.get(s.dayNumber)!.push(s);
   }
-  const result: GeneratedStop[] = [];
+
   for (const [day, dayStops] of [...dayMap.entries()].sort((a, b) => a[0] - b[0])) {
     dayStops.sort((a, b) => a.displayOrder - b.displayOrder);
-    const withRest: GeneratedStop[] = [];
-    for (let i = 0; i < dayStops.length; i++) {
-      withRest.push(dayStops[i]);
-      // Insert rest after every `cadence` activities, but not after the last activity of the day
-      if ((i + 1) % cadence === 0 && i < dayStops.length - 1) {
-        withRest.push(createNapStop(day, 0));
+
+    let qualifyingStop: GeneratedStop | null =
+      dayStops.find((s) => s.familyAnchorType === "anchor") ?? null;
+    if (!qualifyingStop) {
+      qualifyingStop =
+        [...dayStops]
+          .filter((s) => s.durationMinutes >= 90)
+          .sort((a, b) => b.durationMinutes - a.durationMinutes)[0] ?? null;
+    }
+
+    if (qualifyingStop) {
+      const meetsAgeGate =
+        youngestChildAge < 6 ||
+        (youngestChildAge <= 8 && qualifyingStop.durationMinutes >= 90);
+      if (meetsAgeGate) {
+        breakMarkers.push({
+          dayIndex: day - 1,
+          afterDisplayOrder: qualifyingStop.displayOrder,
+          label,
+        });
       }
     }
-    withRest.forEach((s, idx) => { s.displayOrder = idx; });
-    result.push(...withRest);
   }
-  return result;
+
+  return { stops, breakMarkers };
 }
 
 /**
@@ -3463,7 +3488,7 @@ function daysPerCity(
 export async function generateItinerary(
   planId: string,
   input: PlannerInput
-): Promise<{ stops: PlannerTripPlanStop[]; canonicalCitiesUsed: string[] }> {
+): Promise<{ stops: PlannerTripPlanStop[]; canonicalCitiesUsed: string[]; breakMarkers: BreakMarker[] }> {
   // ── Derive youngest child age first — needed by getStopsPerDay ───────────
   const itinChildAges = input.childrenAges || [];
   const itinMinChildAge = itinChildAges.length > 0 ? Math.min(...itinChildAges) : 99;
@@ -3476,6 +3501,7 @@ export async function generateItinerary(
   // restStopsActive: under-9 — governs rest stop insertion cadence.
   const napActive = itinMinChildAge < 3;
   const restStopsActive = itinMinChildAge < 9;
+  const allBreakMarkers: BreakMarker[] = [];
 
   // ── Quality tuning: load this family's historical stop feedback ───────────
   let qualityProfile: UserStopTypeProfile | undefined;
@@ -3527,7 +3553,14 @@ export async function generateItinerary(
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
           const { stops: cityStops, parentSuggestions: cityParentSuggestions } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
-          let selected = restStopsActive ? insertRestStopsIntoStopList(cityStops, itinMinChildAge) : cityStops;
+          let selected: GeneratedStop[];
+          if (restStopsActive) {
+            const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(cityStops, itinMinChildAge);
+            selected = withMarkers;
+            allBreakMarkers.push(...breakMarkers);
+          } else {
+            selected = cityStops;
+          }
           for (const stop of selected) {
             stop.dayNumber += dayOffset;
             const { place, inserted } = await persistStop(stop, planId, city, countryName);
@@ -3582,7 +3615,11 @@ export async function generateItinerary(
         // Assign day numbers, then normalize + insert rest stops based on age bracket
         dayStops.forEach((stop, idx) => { stop.dayNumber = currentDay + day - 1; stop.displayOrder = idx; });
         if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
-        if (restStopsActive) dayStops = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+        if (restStopsActive) {
+          const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+          dayStops = withMarkers;
+          allBreakMarkers.push(...breakMarkers);
+        }
         for (const stop of dayStops) {
           if (stop.type !== "rest") usedStopNames.push(stop.name);
           const { place, inserted } = await persistStop(stop, planId, city, cityCountry);
@@ -3594,7 +3631,7 @@ export async function generateItinerary(
     }
 
     console.log(`[Planner] Multi-city itinerary complete: ${allInserted.length} total stops${canonicalCitiesUsed.length > 0 ? `, canonical cities: [${canonicalCitiesUsed.join(", ")}]` : ""}`);
-    return { stops: allInserted, canonicalCitiesUsed };
+    return { stops: allInserted, canonicalCitiesUsed, breakMarkers: allBreakMarkers };
   }
 
   // ── Single-city: original logic ───────────────────────────────────────────
@@ -3608,7 +3645,14 @@ export async function generateItinerary(
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
       const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
-      const finalStops = restStopsActive ? insertRestStopsIntoStopList(rawSelectedStops, itinMinChildAge) : rawSelectedStops;
+      let finalStops: GeneratedStop[];
+      if (restStopsActive) {
+        const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(rawSelectedStops, itinMinChildAge);
+        finalStops = withMarkers;
+        allBreakMarkers.push(...breakMarkers);
+      } else {
+        finalStops = rawSelectedStops;
+      }
       const insertedStops: PlannerTripPlanStop[] = [];
       for (const stop of finalStops) {
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
@@ -3630,7 +3674,7 @@ export async function generateItinerary(
           .where(eq(travelTrips.id, planId));
         console.log(`[Planner] Saved ${poolParentSuggestions.length} parent suggestions to trip ${planId}`);
       }
-      return { stops: insertedStops, canonicalCitiesUsed: [] };
+      return { stops: insertedStops, canonicalCitiesUsed: [], breakMarkers: allBreakMarkers };
     } catch (err) {
       console.error("[Planner] Cache-pool selection failed, falling back to AI generation:", err);
     }
@@ -3649,8 +3693,12 @@ export async function generateItinerary(
       });
       // Normalize + insert rest stops based on age bracket
       if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
-      if (restStopsActive) dayStops = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
-      console.log(`[Planner] Day ${day} generated: ${dayStops.length} stops${restStopsActive ? ` [rest stops inserted, age ${itinMinChildAge}]` : ""}`);
+      if (restStopsActive) {
+        const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+        dayStops = withMarkers;
+        allBreakMarkers.push(...breakMarkers);
+      }
+      console.log(`[Planner] Day ${day} generated: ${dayStops.length} stops`);
 
       for (const stop of dayStops) {
         if (stop.type !== "rest") usedStopNames.push(stop.name);
@@ -3688,7 +3736,7 @@ export async function generateItinerary(
     // For single-city AI path, canonical city key is derived from the destination directly
     const singleCityCanonicalKey = getIndiaCanonicalCityKey(input.destination);
     const canonicalCitiesUsed = singleCityCanonicalKey ? [singleCityCanonicalKey] : [];
-    return { stops: insertedStops, canonicalCitiesUsed };
+    return { stops: insertedStops, canonicalCitiesUsed, breakMarkers: allBreakMarkers };
   } catch (error) {
     console.error("[Planner] Error generating itinerary:", error);
     throw new Error("Failed to generate itinerary");
