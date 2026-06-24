@@ -2968,7 +2968,7 @@ export default function TodayScreen() {
                       );
                     }
                     return (
-                      <TouchableOpacity key={place.placeId} style={[sotw.richCard, { paddingHorizontal: 14, paddingVertical: 12 }]} onPress={() => setSelectedPlaceId(place.placeId)} activeOpacity={0.85}>
+                      <TouchableOpacity key={place.placeId} style={[sotw.richCard, { paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }]} onPress={() => setSelectedPlaceId(place.placeId)} activeOpacity={0.85}>
                         <View style={{ flex: 1, gap: 4 }}>
                           <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.deep }} numberOfLines={1}>{place.name}</Text>
                           <View style={sotw.pcMeta}>
@@ -2977,7 +2977,7 @@ export default function TodayScreen() {
                             <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
                           </View>
                         </View>
-                        <TouchableOpacity style={[sotw.goBtn, { marginLeft: 10, flexShrink: 0 }]} onPress={() => openBreakCapture(place)}>
+                        <TouchableOpacity style={[sotw.goBtn, { marginLeft: 10, width: 72, alignItems: 'center' }]} onPress={() => openBreakCapture(place)}>
                           <Text style={sotw.goBtnText}>Go</Text>
                         </TouchableOpacity>
                       </TouchableOpacity>
