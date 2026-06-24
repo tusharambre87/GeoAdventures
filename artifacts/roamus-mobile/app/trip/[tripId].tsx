@@ -5209,8 +5209,8 @@ const cl = StyleSheet.create({
 });
 
 const bm = StyleSheet.create({
-  wrap:        { marginVertical: 10 },
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: '#EEF4F1', borderWidth: 1, borderColor: '#7A9E8E', borderStyle: 'dashed', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13 },
+  wrap:        { marginVertical: 10, backgroundColor: '#EEF4F1', borderWidth: 1, borderColor: '#7A9E8E', borderStyle: 'dashed', borderRadius: 14, overflow: 'hidden' },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 16, paddingVertical: 13 },
   emoji:       { fontSize: 20 },
   title:       { color: '#6b7185', fontSize: 14, fontWeight: '700' },
   sub:         { color: '#8A8FA8', fontSize: 12, marginTop: 1 },
