@@ -15,6 +15,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    {
+      name: "blog-dev-route",
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url && (req.url === "/blog" || req.url.startsWith("/blog/"))) {
+            req.url = "/blog.html";
+          }
+          next();
+        });
+      },
+    },
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -100,6 +111,12 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, "index.html"),
+        blog: path.resolve(import.meta.dirname, "blog.html"),
+      },
+    },
   },
   server: {
     port,

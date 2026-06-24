@@ -20,7 +20,7 @@ const HIDDEN_ON_ROUTES = [
   "/founding-families", "/support", "/about", "/reviews",
   "/s/", "/itinerary/", "/trip-unlock", "/replay/", "/journal",
   "/geoadventures-landing", "/geogames-landing", "/free-guide",
-  "/free-guide/unsubscribed",
+  "/free-guide/unsubscribed", "/blog",
 ];
 
 export function BottomNav() {
