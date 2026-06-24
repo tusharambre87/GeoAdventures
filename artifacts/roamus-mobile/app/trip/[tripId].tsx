@@ -748,7 +748,7 @@ function BreakMarkerRow({ label }: { label: string }) {
 
   function toggle() {
     Animated.timing(maxH, {
-      toValue: expanded ? 0 : 80,
+      toValue: expanded ? 0 : 160,
       duration: 220,
       useNativeDriver: false,
     }).start();
