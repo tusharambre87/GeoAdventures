@@ -3015,7 +3015,7 @@ export default function TodayScreen() {
             <TouchableOpacity
               style={sotw.dirCard}
               activeOpacity={0.85}
-              onPress={() => { console.log('activeBreakPlace:', JSON.stringify(activeBreakPlace)); void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${activeBreakPlace.lat},${activeBreakPlace.lng}`); }}
+              onPress={() => { console.log('activeBreakPlace:', JSON.stringify(activeBreakPlace)); void Linking.openURL(`https://maps.apple.com/?daddr=${activeBreakPlace.lat},${activeBreakPlace.lng}`); }}
             >
               <Text style={sotw.dirCardText}>{'Get Directions \u2192'}</Text>
             </TouchableOpacity>
