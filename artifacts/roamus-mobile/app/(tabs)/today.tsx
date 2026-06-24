@@ -2946,7 +2946,13 @@ export default function TodayScreen() {
                         <TouchableOpacity key={place.placeId} style={[sotw.richCard, { borderColor: '#E8692A' }]} onPress={() => openBreakCapture(place)} activeOpacity={0.92}>
                           <View style={sotw.richImg}>
                             {place.photoReference ? (
-                              <Image source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                              <Image
+                                source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }}
+                                style={StyleSheet.absoluteFill}
+                                resizeMode="cover"
+                                onError={(e) => console.log('[SOTW img error]', place.name, e.nativeEvent.error)}
+                                onLoad={() => console.log('[SOTW img loaded]', place.name)}
+                              />
                             ) : (
                               <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>
                                 <Text style={{ fontSize: 36 }}>{'\uD83D\uDCCD'}</Text>
