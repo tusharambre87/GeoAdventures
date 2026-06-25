@@ -2056,7 +2056,7 @@ function DayDetail({
                 onExpand={loadAreaLandmarks}
                 onAddLandmark={(placeId, name, type, vicinity, lat, lng) => {
                   onPmalAddRequest?.(
-                    { name, stopType: type || 'landmark', address: vicinity || undefined, latitude: lat ?? undefined, longitude: lng ?? undefined, durationMinutes: 60 } as any,
+                    { name, stopType: type || 'landmark', address: vicinity || undefined, latitude: lat, longitude: lng, durationMinutes: 60 } as any,
                     dayStops as PmalStop[],
                     selectedDay - 1,
                     () => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })
