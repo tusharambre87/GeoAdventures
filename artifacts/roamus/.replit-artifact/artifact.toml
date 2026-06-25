@@ -22,11 +22,6 @@ build = [ "pnpm", "--filter", "@workspace/roamus", "run", "build" ]
 publicDir = "artifacts/roamus/dist/public"
 serve = "static"
 
-[[services.production.redirects]]
-from = "/s/*"
-to = "https://geoquestgame.live/s/:splat"
-status = 301
-
 [[services.production.rewrites]]
 from = "/blog"
 to = "/blog.html"
