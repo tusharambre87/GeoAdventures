@@ -184,7 +184,7 @@ export default function BlogPost() {
             Plan your next family trip with RoamUs
           </h2>
           <a
-            href="https://roamus.app"
+            href="https://roamus.app#signup"
             className="inline-block rounded-full px-7 py-3 text-sm font-bold transition-opacity hover:opacity-85"
             style={{ background: "#ffffff", color: "#E8692A" }}
           >
