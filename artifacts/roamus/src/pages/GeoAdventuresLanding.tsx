@@ -1065,26 +1065,20 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="grid md:grid-cols-4 gap-12">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <SpinningCompass size={40} />
-              <div>
-                <span className="text-lg font-bold block">RoamUs</span>
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">FAMILY TRAVEL</span>
-              </div>
+            <div className="mb-4">
+              <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: '#E8692A' }}>RoamUs</span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Making travel fun, one stop at a time.<br />
-              Join the adventure today!
+              Family travel journaling that turns trips into lasting stories.
             </p>
           </div>
           
           <div>
             <h4 className="font-bold mb-4 text-white">Explore</h4>
             <ul className="space-y-3 text-slate-400 text-sm">
-              <li><a href="https://geoquestgame.live" className="hover:text-white transition-colors">Home</a></li>
-              <li><a href="https://geoquestgame.live/geoadventures-landing" className="hover:text-white transition-colors">GeoAdventure</a></li>
-              <li><a href="https://geoquestgame.live/geogames-landing" className="hover:text-white transition-colors">Guess & Go Game</a></li>
-              <li><a href="https://geoquest.scoreapp.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Scorecard</a></li>
+              <li><a href="#how-it-works" className="hover:text-white transition-colors">How it works</a></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+              <li><a href="/blog" className="hover:text-white transition-colors">Blog</a></li>
             </ul>
           </div>
           
