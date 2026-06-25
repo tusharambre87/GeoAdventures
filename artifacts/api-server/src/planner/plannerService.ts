@@ -575,23 +575,13 @@ interface StopsPerDayConfig {
 export function getStopsPerDay(pace: string, youngestChildAge?: number): StopsPerDayConfig {
   const p = pace?.toLowerCase().trim();
   let base: StopsPerDayConfig;
-  if (p === 'relaxed' || p === 'chill')                        base = { anchors: 1, fillers: 2, total: 3 };
-  else if (p === 'busy' || p === 'packed' || p === 'go-getter') base = { anchors: 3, fillers: 1, total: 4 };
-  else                                                          base = { anchors: 2, fillers: 2, total: 4 };
+  if (p === 'relaxed' || p === 'chill')                        base = { anchors: 1, fillers: 0, total: 1 };
+  else if (p === 'busy' || p === 'packed' || p === 'go-getter') base = { anchors: 2, fillers: 1, total: 3 };
+  else                                                          base = { anchors: 1, fillers: 1, total: 2 };
 
+  console.log('[getStopsPerDay]', pace, '→', base);
   if (youngestChildAge == null) return base;
-  // Age bracket adjustment — reduce daily activity capacity for younger children.
-  if (youngestChildAge < 3) {
-    // Under 3: hard cap at 3 total (1 anchor + 2 fillers); nap window occupies a slot
-    return { anchors: Math.min(base.anchors, 1), fillers: 2, total: Math.min(base.total, 3) };
-  }
-  if (youngestChildAge < 6) {
-    // 3–5: reduce total by 1 — frequent rest breaks make full-pace days too long
-    const total = Math.max(2, base.total - 1);
-    return { anchors: base.anchors, fillers: Math.max(0, total - base.anchors), total };
-  }
-  // 6+: no adjustment — rest stop cadence (every 2 activities for 6–8) handles the difference
-  return base;
+  return base; // age adjustment removed — base values already account for family pace
 }
 
 function getAgeContext(ages: number[]): string {

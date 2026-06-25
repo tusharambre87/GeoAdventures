@@ -81,7 +81,7 @@ const post: BlogPost = {
       credit_url: "https://unsplash.com/@gilleyaguilar",
     },
     "maggie-daley": {
-      url: "/images/maggie-daley-park.jpg",
+      url: "/images/maggie-daley-park.jpeg",
       alt: "Kids playing on the boat structure at Maggie Daley Park with Chicago skyline",
       caption:
         "Maggie Daley's Play Garden is free and worth half a day. Get there by 10am on weekends.",
