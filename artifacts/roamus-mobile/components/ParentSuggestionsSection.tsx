@@ -537,7 +537,7 @@ export function PmalPositionPickerSheet({
           })}
         </ScrollView>
 
-        <View style={pp.ctaWrap}>
+        <View style={[pp.ctaWrap, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable
             style={[pp.cta, adding && pp.ctaDisabled]}
             onPress={handleConfirm}
