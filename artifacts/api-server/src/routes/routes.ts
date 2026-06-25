@@ -5464,7 +5464,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fpEffectivePace = ["chill","relaxed","easy","slow","chillout","chill_out"].includes(rawPaceNorm) ? "chill"
               : ["packed","gogetter","go_getter","full","busy","active","intense"].includes(rawPaceNorm) ? "packed"
               : "balanced";
-            const fpChildAges = ((fullTrip?.travelers ?? []) as any[])
+            const fpTrip = await storage.getTripById(tripId);
+            const fpChildAges = ((fpTrip?.travelers ?? []) as any[])
               .filter(t => !t.isParent && t.age)
               .map(t => parseInt(t.age ?? "0", 10))
               .filter(n => n > 0 && n < 18);
