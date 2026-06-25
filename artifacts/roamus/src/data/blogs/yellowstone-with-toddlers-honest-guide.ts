@@ -82,7 +82,7 @@ export const post = {
 },
  
   // Full article content — edit as needed
-  content: `
+  contentHtml: `
 Your 3 year old will melt down exactly once at Yellowstone, and the odds are high it happens 200 feet from Old Faithful, right before it erupts. That is just the math of traveling with toddlers in a park that runs on its own schedule, not yours. Yellowstone with toddlers is genuinely doable, and some families have the trip of their lives here. But it requires you to stop thinking about what you want to see and start thinking about when your kid last ate, how far you parked, and whether the next attraction has shade. This is the honest guide nobody hands you at the entrance gate.
 
 The good news is that Yellowstone is surprisingly toddler-friendly when you embrace its pace. Boardwalks make many of the major geothermal areas easy to explore, wildlife sightings happen without long hikes, and there are enough picnic areas and open spaces to build real breaks into your day.
