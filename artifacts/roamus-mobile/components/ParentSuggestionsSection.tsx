@@ -244,6 +244,7 @@ export default function ParentSuggestionsSection({
 }: Props) {
   const [expanded, setExpanded]   = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [contentHeight, setContentHeight] = useState(0);
   const expandAnim = useRef(new Animated.Value(0)).current;
 
   const visible = initial.filter(s => !dismissed.has(s.name));
@@ -261,7 +262,7 @@ export default function ParentSuggestionsSection({
     if (next) onExpand?.();
   };
 
-  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1200] });
+  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] });
 
   const handleAddRequest = (s: ParentSuggestion) => {
     if (onAddRequest) {
@@ -291,7 +292,8 @@ export default function ParentSuggestionsSection({
         <Text style={ps.chevron}>{expanded ? '\u2228' : '\u203A'}</Text>
       </Pressable>
 
-      <Animated.View style={{ maxHeight: maxH, overflow: 'hidden' }}>
+      <Animated.View style={{ height: maxH, overflow: 'hidden' }}>
+        <View onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}>
         <View style={ps.whyNote}>
           <Text style={{ fontSize: 13 }}>{'\uD83E\uDDD2'}</Text>
           <Text style={ps.whyText}>
@@ -357,6 +359,7 @@ export default function ParentSuggestionsSection({
           )}
         </View>
 
+        </View>
       </Animated.View>
     </View>
   );
