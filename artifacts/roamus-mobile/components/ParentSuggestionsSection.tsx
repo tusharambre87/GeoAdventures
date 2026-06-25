@@ -226,7 +226,7 @@ type Props = {
   areaLoading?: boolean;
   areaLoaded?: boolean;
   onExpand?: () => void;
-  onAddLandmark?: (placeId: string, name: string, type: string) => void;
+  onAddLandmark?: (placeId: string, name: string, type: string, vicinity: string, lat: number | null, lng: number | null) => void;
 };
 
 export default function ParentSuggestionsSection({
@@ -345,7 +345,7 @@ export default function ParentSuggestionsSection({
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: '#1A1F2E', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
-                onPress={() => onAddLandmark?.(place.placeId, place.name, place.type)}
+                onPress={() => onAddLandmark?.(place.placeId, place.name, place.type, place.vicinity ?? '', place.lat ?? null, place.lng ?? null)}
               >
                 <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{'+ Add'}</Text>
               </TouchableOpacity>

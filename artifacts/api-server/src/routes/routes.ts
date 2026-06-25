@@ -6436,6 +6436,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type,
             rating: (p.rating ?? 0) as number,
             photoReference: (p.photos?.[0]?.photo_reference ?? null) as string | null,
+            lat: (p.geometry?.location?.lat ?? null) as number | null,
+            lng: (p.geometry?.location?.lng ?? null) as number | null,
           });
         }
       } catch {}
