@@ -447,21 +447,25 @@ export function PmalPositionPickerSheet({
         insertAtOrder = (afterStop.displayOrder ?? 0) + 1;
       }
 
-      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+      const body = {
+        name: suggestion.name,
+        stopType: suggestion.stopType ?? suggestion.type ?? 'landmark',
+        latitude: suggestion.latitude != null ? String(suggestion.latitude) : undefined,
+        longitude: suggestion.longitude != null ? String(suggestion.longitude) : undefined,
+        address: suggestion.address,
+        durationMinutes: suggestion.durationMinutes,
+        dayIndex,
+        insertAtOrder,
+        addedByParent: true,
+        ...(sorted[0]?.cityGroup ? { cityGroup: sorted[0].cityGroup } : {}),
+      };
+      console.log('[PmalPicker] POST body:', JSON.stringify(body, null, 2));
+
+      const resp = await apiFetch(`/api/travel/trips/${tripId}/stops`, {
         method: 'POST',
-        body: JSON.stringify({
-          name: suggestion.name,
-          stopType: suggestion.stopType ?? suggestion.type ?? 'landmark',
-          latitude: suggestion.latitude != null ? String(suggestion.latitude) : undefined,
-          longitude: suggestion.longitude != null ? String(suggestion.longitude) : undefined,
-          address: suggestion.address,
-          durationMinutes: suggestion.durationMinutes,
-          dayIndex,
-          insertAtOrder,
-          addedByParent: true,
-          ...(sorted[0]?.cityGroup ? { cityGroup: sorted[0].cityGroup } : {}),
-        }),
+        body: JSON.stringify(body),
       });
+      console.log('[PmalPicker] POST response:', JSON.stringify(resp, null, 2));
 
       onSuccess();
     } catch (err: any) {
