@@ -4660,7 +4660,7 @@ const sotw = StyleSheet.create({
   bcBadgeText:  { color: '#fff', fontSize: 12, fontFamily: F.bold, letterSpacing: 0.8 },
   bcTitle:      { fontSize: 30, fontFamily: F.bold, color: '#fff', lineHeight: 34, marginBottom: 4 },
   bcSub:        { color: 'rgba(255,255,255,0.75)', fontSize: 14, fontFamily: F.medium },
-  dirCard:      { backgroundColor: '#1D4A42', borderRadius: 16, padding: 18, alignItems: 'center' },
+  dirCard:      { backgroundColor: '#E8692A', borderRadius: 16, padding: 18, alignItems: 'center' },
   dirCardText:  { color: '#fff', fontSize: 17, fontFamily: F.bold },
   quoteCard:    { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
   quoteLabel:   { fontSize: 11, fontFamily: F.bold, color: C.muted, letterSpacing: 0.6, marginBottom: 10 },
