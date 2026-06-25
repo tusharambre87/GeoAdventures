@@ -1571,6 +1571,31 @@ function DayDetail({
   const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
   const [showHotelSheet, setShowHotelSheet] = useState(false);
   const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
+  const [areaLandmarks, setAreaLandmarks] = useState<any[]>([]);
+  const [areaLoading, setAreaLoading] = useState(false);
+  const [areaLoaded, setAreaLoaded] = useState(false);
+
+  async function loadAreaLandmarks() {
+    if (areaLoaded || areaLoading) return;
+    const firstStop = dayStops[0];
+    if (!firstStop?.latitude || !firstStop?.longitude) return;
+    setAreaLoading(true);
+    try {
+      const data = await apiFetch<any>(
+        `/api/travel/nearby-landmarks?lat=${firstStop.latitude}&lng=${firstStop.longitude}`
+      );
+      const onPlan = new Set(
+        dayStops.map((s: any) => s.name?.toLowerCase().trim()).filter(Boolean)
+      );
+      setAreaLandmarks(
+        (data.results ?? []).filter(
+          (p: any) => !onPlan.has(p.name?.toLowerCase().trim())
+        )
+      );
+      setAreaLoaded(true);
+    } catch {}
+    finally { setAreaLoading(false); }
+  }
 
   const contentStops = dayStops.filter(s => !isMealStop(s.stopType));
   const mealStops    = dayStops.filter(s => isMealStop(s.stopType));
@@ -2009,11 +2034,23 @@ function DayDetail({
                 dayStops={dayStops as PmalStop[]}
                 dayIndex={selectedDay - 1}
                 tripId={tripId}
-                youngestChildName={youngest.name}
-                youngestChildAge={Number(youngest.age)}
+                youngestChildName={youngest?.name ?? ''}
+                youngestChildAge={Number(youngest?.age ?? 0)}
                 onStopAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
                 onAddRequest={(s, onAdded) => {
                   onPmalAddRequest?.(s, dayStops as PmalStop[], selectedDay - 1, onAdded);
+                }}
+                areaLandmarks={areaLandmarks}
+                areaLoading={areaLoading}
+                areaLoaded={areaLoaded}
+                onExpand={loadAreaLandmarks}
+                onAddLandmark={(placeId, name, type) => {
+                  onPmalAddRequest?.(
+                    { name, stopType: type || 'landmark' } as any,
+                    dayStops as PmalStop[],
+                    selectedDay - 1,
+                    () => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })
+                  );
                 }}
               />
             </View>

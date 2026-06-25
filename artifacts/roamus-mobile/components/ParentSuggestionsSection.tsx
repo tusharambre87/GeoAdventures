@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   ActivityIndicator,
   Alert,
@@ -221,6 +222,11 @@ type Props = {
   youngestChildAge: number;
   onStopAdded: () => void;
   onAddRequest?: (suggestion: ParentSuggestion, onAdded: () => void) => void;
+  areaLandmarks?: any[];
+  areaLoading?: boolean;
+  areaLoaded?: boolean;
+  onExpand?: () => void;
+  onAddLandmark?: (placeId: string, name: string, type: string) => void;
 };
 
 export default function ParentSuggestionsSection({
@@ -230,6 +236,11 @@ export default function ParentSuggestionsSection({
   youngestChildAge,
   onStopAdded,
   onAddRequest,
+  areaLandmarks = [],
+  areaLoading = false,
+  areaLoaded = false,
+  onExpand,
+  onAddLandmark,
 }: Props) {
   const [expanded, setExpanded]   = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -247,9 +258,10 @@ export default function ParentSuggestionsSection({
       friction: 9,
     }).start();
     setExpanded(next);
+    if (next) onExpand?.();
   };
 
-  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 440] });
+  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 760] });
 
   const handleAddRequest = (s: ParentSuggestion) => {
     if (onAddRequest) {
@@ -306,6 +318,45 @@ export default function ParentSuggestionsSection({
             />
           ))}
         </ScrollView>
+
+        {/* Also in this area */}
+        <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(26,31,46,0.07)' }} />
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#8A8FA8', letterSpacing: 0.8, textTransform: 'uppercase' }}>{'Also in this area'}</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(26,31,46,0.07)' }} />
+          </View>
+
+          {areaLoading && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+              <ActivityIndicator size="small" color="#E8692A" />
+              <Text style={{ fontSize: 12, color: '#8A8FA8' }}>{'Finding nearby landmarks...'}</Text>
+            </View>
+          )}
+
+          {!areaLoading && areaLandmarks.map(place => (
+            <View key={place.placeId} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.06)' }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#EEF4F1', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Text style={{ fontSize: 18 }}>{place.type === 'museum' ? '\uD83C\uDFDB\uFE0F' : place.type === 'park' ? '\uD83C\uDF3F' : '\uD83D\uDCCD'}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1A1F2E' }} numberOfLines={1}>{place.name}</Text>
+                <Text style={{ fontSize: 11, color: '#8A8FA8', marginTop: 1 }}>{place.vicinity}</Text>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: '#1A1F2E', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+                onPress={() => onAddLandmark?.(place.placeId, place.name, place.type)}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{'+ Add'}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          {!areaLoading && areaLoaded && areaLandmarks.length === 0 && (
+            <Text style={{ fontSize: 12, color: '#8A8FA8', textAlign: 'center', paddingVertical: 8 }}>{'No additional landmarks found nearby.'}</Text>
+          )}
+        </View>
+
       </Animated.View>
     </View>
   );
