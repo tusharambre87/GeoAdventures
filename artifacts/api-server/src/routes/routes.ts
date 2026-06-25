@@ -5594,22 +5594,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })();
 
         // ── Stop count — arrival/departure-aware ──────────────────────────────
-        const stopsPerDayByPace = effectivePace === "chill" ? 3 : effectivePace === "packed" ? 5 : 4;
-
-        // Read arrival signals from tailoring JSONB
-        const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
-        const lastDayType = tripTailoring?.lastDay as string | null;
-
-        // Arrival day cap: late night = 0 (rest day), evening = 1, afternoon = 2, morning = full
-        const arrivalDayCap = (arrivalTimeSig === "late" || arrivalTimeSig === "late_night") ? 0
-          : arrivalTimeSig === "evening" ? 1
-          : arrivalTimeSig === "afternoon" ? 2
-          : stopsPerDayByPace;
-
-        // Last day cap: travel day = 0 (heading home — no stops), leaving late = 2, full day = normal
-        const lastDayCap = lastDayType === "travel" ? 0
-          : lastDayType === "late" ? 2
-          : stopsPerDayByPace;
 
         // ── Derive children ages for pool selection ───────────────────────────
         // Read ages directly from travelers JSONB — no DB join needed
@@ -5629,6 +5613,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const plannerPace: "relaxed" | "moderate" | "busy" =
           effectivePace === "chill" ? "relaxed" : effectivePace === "packed" ? "busy" : "moderate";
         const effectivePerDay = getStopsPerDay(plannerPace, minChildAge).total;
+
+        // Read arrival signals from tailoring JSONB
+        const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
+        const lastDayType = tripTailoring?.lastDay as string | null;
+
+        // Arrival day cap: late night = 0 (rest day), evening = 1, afternoon = 2, morning = full pace
+        const arrivalDayCap = (arrivalTimeSig === "late" || arrivalTimeSig === "late_night") ? 0
+          : arrivalTimeSig === "evening" ? 1
+          : arrivalTimeSig === "afternoon" ? 2
+          : effectivePerDay;
+
+        // Last day cap: travel day = 0 (heading home — no stops), leaving late = min(2,pace), full day = normal
+        const lastDayCap = lastDayType === "travel" ? 0
+          : lastDayType === "late" ? Math.min(2, effectivePerDay)
+          : effectivePerDay;
 
         // Total: arrival day + middle days + last day (each capped separately)
         const middleDays = tripDays ? Math.max(0, tripDays - 2) : 0;
@@ -5650,7 +5649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (firstWithCoords) {
               await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
-            const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (stopsPerDayByPace || 3));
+            const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (effectivePerDay || 2));
             const plannerInput: PlannerInput = {
               destination: cityName,
               tripDays: plannerTripDays,
