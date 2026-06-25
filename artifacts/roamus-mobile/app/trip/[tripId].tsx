@@ -1574,6 +1574,11 @@ function DayDetail({
   const [areaLandmarks, setAreaLandmarks] = useState<any[]>([]);
   const [areaLoading, setAreaLoading] = useState(false);
   const [areaLoaded, setAreaLoaded] = useState(false);
+  useEffect(() => {
+    setAreaLandmarks([]);
+    setAreaLoading(false);
+    setAreaLoaded(false);
+  }, [selectedDay]);
 
   async function loadAreaLandmarks() {
     if (areaLoaded || areaLoading) return;
