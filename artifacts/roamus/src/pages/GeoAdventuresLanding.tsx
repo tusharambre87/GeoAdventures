@@ -21,32 +21,26 @@ const SpinningCompass = ({ size = 40 }: { size?: number }) => (
 
 const Header = ({ onStart }: { onStart: () => void }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [, setLocation] = useLocation();
   
   return (
     <header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-md border-b border-stone-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
-          <div className="flex items-center gap-2">
-            <SpinningCompass size={40} />
-            <div className="flex flex-col">
-              <span className="text-lg font-bold text-stone-900 tracking-tight leading-none">RoamUs</span>
-              <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">FAMILY TRAVEL</span>
-            </div>
-          </div>
+          <a href="/" className="flex items-center" style={{ textDecoration: 'none' }}>
+            <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: '#E8692A', letterSpacing: '-0.01em' }}>RoamUs</span>
+          </a>
           <nav className="hidden md:flex space-x-8 items-center text-sm font-medium text-stone-600">
-            <a href="#check-fit" className="hover:text-emerald-700 transition-colors">Check Fit</a>
-            <a href="#how-it-works" className="hover:text-emerald-700 transition-colors">How It Works</a>
-            <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why RoamUs</a>
-            <a href="#testimonials" className="hover:text-emerald-700 transition-colors">Testimonials</a>
-            <a href="#pricing" className="hover:text-emerald-700 transition-colors">Pricing</a>
-            <a href="#contact" className="hover:text-emerald-700 transition-colors">Contact</a>
-            <a href="/geogames-landing" className="hover:text-emerald-700 transition-colors">GeoGames</a>
+            <button onClick={() => setLocation('/blog')} className="hover:text-stone-900 transition-colors bg-transparent border-0 cursor-pointer p-0">Blog</button>
+            <a href="#how-it-works" className="hover:text-stone-900 transition-colors">How it works</a>
+            <a href="#pricing" className="hover:text-stone-900 transition-colors">Pricing</a>
             <button 
               onClick={onStart}
-              className="bg-emerald-700 text-white px-5 py-2.5 rounded-full hover:bg-emerald-800 transition-all shadow-sm"
+              className="text-white px-5 py-2.5 rounded-full hover:opacity-90 transition-all shadow-sm font-semibold"
+              style={{ background: '#E8692A' }}
               data-testid="button-start-adventure-header"
             >
-              Start
+              Get early access
             </button>
           </nav>
           
@@ -68,19 +62,16 @@ const Header = ({ onStart }: { onStart: () => void }) => {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-stone-100">
             <nav className="flex flex-col space-y-4 text-sm font-medium text-stone-600">
-              <a href="#check-fit" className="hover:text-emerald-700 transition-colors">Check Fit</a>
-              <a href="#how-it-works" className="hover:text-emerald-700 transition-colors">How It Works</a>
-              <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why RoamUs</a>
-              <a href="#testimonials" className="hover:text-emerald-700 transition-colors">Testimonials</a>
-              <a href="#pricing" className="hover:text-emerald-700 transition-colors">Pricing</a>
-              <a href="#contact" className="hover:text-emerald-700 transition-colors">Contact</a>
-              <a href="/geogames-landing" className="hover:text-emerald-700 transition-colors">GeoGames</a>
+              <button onClick={() => { setLocation('/blog'); setMobileMenuOpen(false); }} className="text-left hover:text-stone-900 transition-colors bg-transparent border-0 cursor-pointer p-0">Blog</button>
+              <a href="#how-it-works" className="hover:text-stone-900 transition-colors" onClick={() => setMobileMenuOpen(false)}>How it works</a>
+              <a href="#pricing" className="hover:text-stone-900 transition-colors" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
               <button 
-                onClick={onStart}
-                className="bg-emerald-700 text-white px-5 py-2.5 rounded-full font-semibold w-full"
+                onClick={() => { onStart(); setMobileMenuOpen(false); }}
+                className="text-white px-5 py-2.5 rounded-full font-semibold w-full"
+                style={{ background: '#E8692A' }}
                 data-testid="button-start-mobile"
               >
-                Start
+                Get early access
               </button>
             </nav>
           </div>
