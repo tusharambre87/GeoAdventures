@@ -4668,6 +4668,6 @@ const sotw = StyleSheet.create({
   snapCard:     { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
   snapBtn:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F5F2EE', borderRadius: 12, padding: 14 },
   snapBtnText:  { fontSize: 15, fontFamily: F.semibold, color: C.deep },
-  doneBtn:      { backgroundColor: '#E8692A', borderRadius: 16, padding: 18, alignItems: 'center', marginBottom: 16 },
-  doneBtnText:  { color: '#fff', fontSize: 18, fontFamily: F.bold },
+  doneBtn:      { backgroundColor: 'transparent', borderRadius: 13, borderWidth: 1.5, borderColor: '#E8692A', padding: 18, alignItems: 'center', marginBottom: 16 },
+  doneBtnText:  { color: '#E8692A', fontSize: 18, fontFamily: F.bold },
 });
