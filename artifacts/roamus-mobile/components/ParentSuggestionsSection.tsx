@@ -261,7 +261,7 @@ export default function ParentSuggestionsSection({
     if (next) onExpand?.();
   };
 
-  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 760] });
+  const maxH = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1200] });
 
   const handleAddRequest = (s: ParentSuggestion) => {
     if (onAddRequest) {
