@@ -291,7 +291,7 @@ export default function ParentSuggestionsSection({
         <Text style={ps.chevron}>{expanded ? '\u2228' : '\u203A'}</Text>
       </Pressable>
 
-      <Animated.View style={{ maxHeight: maxH, overflow: 'hidden' }}>
+      <Animated.View style={{ maxHeight: maxH }}>
         <View style={ps.whyNote}>
           <Text style={{ fontSize: 13 }}>{'\uD83E\uDDD2'}</Text>
           <Text style={ps.whyText}>
