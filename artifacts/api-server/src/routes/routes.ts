@@ -5618,10 +5618,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
         const lastDayType = tripTailoring?.lastDay as string | null;
 
-        // Arrival day cap: late night = 0 (rest day), evening = 1, afternoon = 2, morning = full pace
+        // Arrival day cap: late/late_night = 0, evening = pace-2, afternoon = pace-1, morning = full pace
         const arrivalDayCap = (arrivalTimeSig === "late" || arrivalTimeSig === "late_night") ? 0
-          : arrivalTimeSig === "evening" ? 1
-          : arrivalTimeSig === "afternoon" ? 2
+          : arrivalTimeSig === "evening"   ? Math.max(0, effectivePerDay - 2)
+          : arrivalTimeSig === "afternoon" ? Math.max(0, effectivePerDay - 1)
           : effectivePerDay;
 
         // Last day cap: travel day = 0 (heading home — no stops), leaving late = min(2,pace), full day = normal
