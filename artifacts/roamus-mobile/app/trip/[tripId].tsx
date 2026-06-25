@@ -1238,7 +1238,7 @@ function DayCard({
   const totalMin = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
   const hrs      = (totalMin / 60).toFixed(1).replace('.0', '');
   const dateStr  = startDate ? formatDate(startDate, dayNum - 1) : null;
-  const stopCount = dayStops.length;
+  const stopCount = dayStops.filter(s => !isMealStop(s.stopType)).length;
 
   // Badge
   let badgeLabel = '';
@@ -1248,11 +1248,11 @@ function DayCard({
     badgeLabel = 'Today';
     badgeStyle = dc.badgeToday as unknown as ViewStyle;
     badgeTextStyle = dc.badgeTodayText as unknown as TextStyle;
-  } else if (stopCount >= 4) {
-    badgeLabel = 'Heavy day';
+  } else if (stopCount >= 3) {
+    badgeLabel = 'Full day';
     badgeStyle = dc.badgeHeavy as unknown as ViewStyle;
     badgeTextStyle = dc.badgeHeavyText as unknown as TextStyle;
-  } else if (stopCount >= 3) {
+  } else if (stopCount >= 2) {
     badgeLabel = 'Balanced';
     badgeStyle = dc.badgeGreen as unknown as ViewStyle;
     badgeTextStyle = dc.badgeGreenText as unknown as TextStyle;
@@ -1567,7 +1567,7 @@ function DayDetail({
   const totalMin = dayStops.reduce((s, st) => s + getStopDuration(st), 0);
   const hrs      = (totalMin / 60).toFixed(1).replace('.0', '');
   const dateStr  = trip.startDate ? formatDate(trip.startDate, selectedDay - 1) : null;
-  const stopCount = dayStops.length;
+  const stopCount = dayStops.filter(s => !isMealStop(s.stopType)).length;
   const [disclaimerExpanded, setDisclaimerExpanded] = useState(false);
   const [showHotelSheet, setShowHotelSheet] = useState(false);
   const pmalSuggestions = (trip.parentSuggestions as any)?.[String(selectedDay - 1)] as ParentSuggestion[] | undefined;
