@@ -15,6 +15,8 @@ import { eq, and, lte, gt, desc, asc, or, ilike, inArray, notInArray, isNotNull,
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 import { seedDailyQuestCities, updateCityCoordinates } from "../seedDailyQuestCities";
 import { seedCommunityTrips } from "../seedCommunityTrips";
 import { seedGeoBuddyStories } from "../seedGeoBuddyStories";
@@ -267,6 +269,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Waitlist form endpoint - saves to DB and sends email notification
+  // ── Guide download token helpers ────────────────────────────────────────────
+  const GUIDE_SECRET = process.env.SESSION_SECRET || 'roamus-guide-secret-2024';
+  const GUIDE_PATH   = path.resolve(process.cwd(), 'src', 'assets', 'gps-guide.pdf');
+
+  function generateGuideToken(email: string): string {
+    const exp = Date.now() + 48 * 60 * 60 * 1000;
+    const payload = `${email}:${exp}`;
+    const sig = crypto.createHmac('sha256', GUIDE_SECRET).update(payload).digest('hex');
+    return Buffer.from(`${payload}:${sig}`).toString('base64url');
+  }
+
+  function verifyGuideToken(token: string): boolean {
+    try {
+      const decoded = Buffer.from(token, 'base64url').toString('utf-8');
+      const lastColon = decoded.lastIndexOf(':');
+      const sig = decoded.slice(lastColon + 1);
+      const payload = decoded.slice(0, lastColon);
+      const colonIdx = payload.indexOf(':');
+      const exp = parseInt(payload.slice(colonIdx + 1), 10);
+      if (isNaN(exp) || Date.now() > exp) return false;
+      const expected = crypto.createHmac('sha256', GUIDE_SECRET).update(payload).digest('hex');
+      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    } catch {
+      return false;
+    }
+  }
+
   app.post('/api/waitlist', async (req, res) => {
     try {
       const { name, email, source } = req.body;
@@ -299,11 +328,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await sendWaitlistEmail({ name, email, timestamp });
       } catch (_emailErr) {}
 
-      res.json({ success: true });
+      const downloadToken = generateGuideToken(email.toLowerCase().trim());
+      res.json({ success: true, downloadToken });
     } catch (error) {
       console.error('Waitlist form error:', error);
       res.status(500).json({ error: 'Failed to join waitlist. Please try again.' });
     }
+  });
+
+  // Guide PDF download — requires token issued by POST /api/waitlist
+  app.get('/api/guide/gps-method', (req, res) => {
+    const token = req.query.token as string | undefined;
+    if (!token || !verifyGuideToken(token)) {
+      return res.status(403).json({ error: 'Invalid or expired download link. Please sign up to get a fresh link.' });
+    }
+    if (!fs.existsSync(GUIDE_PATH)) {
+      return res.status(404).json({ error: 'Guide not found.' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="The-GPS-Method-RoamUs.pdf"');
+    res.setHeader('Cache-Control', 'no-store');
+    fs.createReadStream(GUIDE_PATH).pipe(res);
   });
 
   // Public geo-based pricing endpoint for the landing page

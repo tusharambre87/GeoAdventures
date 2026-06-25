@@ -519,9 +519,122 @@ const Testimonials = () => {
   );
 };
 
+const WaitlistModal = ({ onClose }: { onClose: () => void }) => {
+  const [name, setName]               = useState('');
+  const [email, setEmail]             = useState('');
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState('');
+  const [downloadToken, setDownloadToken] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), source: 'pricing_waitlist' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      setDownloadToken(data.downloadToken);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div
+        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-6 text-stone-400 hover:text-stone-700 text-2xl font-light"
+          aria-label="Close"
+          data-testid="waitlist-modal-close"
+        >
+          ×
+        </button>
+
+        {downloadToken ? (
+          <div className="text-center py-4" data-testid="waitlist-success">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: '#FFF0E8' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E8692A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Fraunces', serif", color: '#1A1F2E' }}>You're on the list.</h3>
+            <p className="text-stone-500 mb-8">We'll be in touch.</p>
+            <a
+              href={`/api/guide/gps-method?token=${encodeURIComponent(downloadToken)}`}
+              download="The-GPS-Method-RoamUs.pdf"
+              className="inline-flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold text-white text-base transition-all hover:opacity-90 active:scale-95"
+              style={{ background: '#E8692A' }}
+              data-testid="waitlist-download-btn"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download your free guide: The GPS Method
+            </a>
+          </div>
+        ) : (
+          <>
+            <h3 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Fraunces', serif", color: '#1A1F2E' }}>Join the waitlist</h3>
+            <p className="text-stone-500 text-sm mb-6">Be the first to know when we launch.</p>
+            {error && (
+              <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{error}</div>
+            )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="text"
+                required
+                placeholder="First name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-5 py-4 rounded-2xl border border-stone-200 outline-none focus:ring-2 text-stone-900 placeholder:text-stone-400 transition-all"
+                style={{ focusRingColor: '#E8692A' } as React.CSSProperties}
+                data-testid="waitlist-name-input"
+              />
+              <input
+                type="email"
+                required
+                placeholder="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-5 py-4 rounded-2xl border border-stone-200 outline-none focus:ring-2 text-stone-900 placeholder:text-stone-400 transition-all"
+                data-testid="waitlist-email-input"
+              />
+              <button
+                type="submit"
+                disabled={submitting || !name.trim() || !email.trim()}
+                className="w-full py-4 rounded-2xl font-bold text-white text-base transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                style={{ background: '#E8692A' }}
+                data-testid="waitlist-submit-btn"
+              >
+                {submitting ? 'Reserving…' : 'Reserve my spot'}
+              </button>
+            </form>
+            <p className="text-[11px] text-stone-400 text-center mt-4">No spam, ever. Unsubscribe anytime.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const PricingSection = () => {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [hovered, setHovered] = useState<string | null>(null);
+  const [showWaitlist, setShowWaitlist] = useState(false);
 
   const geopassPrice = billing === 'annual' ? '$39.99' : '$4.99';
   const geopassCadence = billing === 'annual'
@@ -580,6 +693,7 @@ const PricingSection = () => {
   ];
 
   return (
+    <>
     <section id="pricing" className="py-24" style={{ background: '#EEF5F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -764,6 +878,7 @@ const PricingSection = () => {
 
                 {/* CTA */}
                 <button
+                  onClick={() => plan.cta === 'Join the waitlist' ? setShowWaitlist(true) : undefined}
                   className="w-full h-12 rounded-3xl text-sm font-bold transition-all duration-200"
                   style={
                     plan.id === 'geopass'
@@ -772,6 +887,7 @@ const PricingSection = () => {
                       ? { background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }
                       : { background: '#1A1F2E', color: '#fff' }
                   }
+                  data-testid={`pricing-cta-${plan.id}`}
                 >
                   {plan.cta}
                 </button>
@@ -815,6 +931,8 @@ const PricingSection = () => {
 
       </div>
     </section>
+    {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
+    </>
   );
 };
 
