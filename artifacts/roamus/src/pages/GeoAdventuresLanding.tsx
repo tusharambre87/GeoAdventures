@@ -29,14 +29,14 @@ const Header = ({ onStart }: { onStart: () => void }) => {
           <div className="flex items-center gap-2">
             <SpinningCompass size={40} />
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-stone-900 tracking-tight leading-none">GeoQuest</span>
-              <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">GEOADVENTURES</span>
+              <span className="text-lg font-bold text-stone-900 tracking-tight leading-none">RoamUs</span>
+              <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">FAMILY TRAVEL</span>
             </div>
           </div>
           <nav className="hidden md:flex space-x-8 items-center text-sm font-medium text-stone-600">
             <a href="#check-fit" className="hover:text-emerald-700 transition-colors">Check Fit</a>
             <a href="#how-it-works" className="hover:text-emerald-700 transition-colors">How It Works</a>
-            <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why GeoAdventures</a>
+            <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why RoamUs</a>
             <a href="#testimonials" className="hover:text-emerald-700 transition-colors">Testimonials</a>
             <a href="#pricing" className="hover:text-emerald-700 transition-colors">Pricing</a>
             <a href="#contact" className="hover:text-emerald-700 transition-colors">Contact</a>
@@ -70,7 +70,7 @@ const Header = ({ onStart }: { onStart: () => void }) => {
             <nav className="flex flex-col space-y-4 text-sm font-medium text-stone-600">
               <a href="#check-fit" className="hover:text-emerald-700 transition-colors">Check Fit</a>
               <a href="#how-it-works" className="hover:text-emerald-700 transition-colors">How It Works</a>
-              <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why GeoAdventures</a>
+              <a href="#why-geoadventures" className="hover:text-emerald-700 transition-colors">Why RoamUs</a>
               <a href="#testimonials" className="hover:text-emerald-700 transition-colors">Testimonials</a>
               <a href="#pricing" className="hover:text-emerald-700 transition-colors">Pricing</a>
               <a href="#contact" className="hover:text-emerald-700 transition-colors">Contact</a>
@@ -104,7 +104,7 @@ const Hero = ({ onStart }: { onStart: () => void }) => (
         Turn real-world trips into <span className="text-emerald-700 italic">kid-led adventures.</span>
       </h1>
       <p className="text-xl md:text-2xl text-stone-600 mb-12 max-w-3xl mx-auto leading-relaxed">
-        Before, during, and after travel — GeoQuest helps kids explore places through curiosity, not screens that numb.
+        Before, during, and after travel — RoamUs helps families explore places through curiosity, not screens that numb.
       </p>
       <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
         <button 
@@ -196,7 +196,7 @@ const HowItWorks = () => (
       <div className="grid md:grid-cols-3 gap-16">
         {[
           { num: "1", title: "Pick a place", desc: "Choose where you're going (or dreaming about)." },
-          { num: "2", title: "Explore together", desc: "GeoQuest guides kids to notice patterns and stories." },
+          { num: "2", title: "Explore together", desc: "RoamUs guides kids to notice patterns and stories." },
           { num: "3", title: "Keep playing", desc: "After the trip, return to the place through games." }
         ].map((step, idx) => (
           <div key={idx} className="relative flex flex-col items-center text-center">
@@ -347,7 +347,7 @@ const TripFitSection = ({ onStartAdventure }: { onStartAdventure: () => void }) 
   return (
     <section id="check-fit" className="py-24 bg-white border-y border-stone-100">
       <div className="max-w-4xl mx-auto px-4 text-center">
-        <h2 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4" style={{ fontFamily: "'Fraunces', serif" }}>Is GeoAdventures right for your next trip?</h2>
+        <h2 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4" style={{ fontFamily: "'Fraunces', serif" }}>Is RoamUs right for your next trip?</h2>
         <p className="text-lg text-stone-500 mb-10">Take 20 seconds to see if this fits your family.</p>
         <button 
           onClick={() => setIsOpen(true)} 
@@ -367,7 +367,7 @@ const SafetySection = () => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-20">
         <h2 className="text-5xl font-bold text-stone-900 mb-4" style={{ fontFamily: "'Fraunces', serif" }}>Built with families in mind</h2>
-        <p className="text-xl text-stone-600 max-w-2xl mx-auto">GeoQuest is designed for real-world exploration, not screen addiction.</p>
+        <p className="text-xl text-stone-600 max-w-2xl mx-auto">RoamUs is designed for real-world exploration, not screen addiction.</p>
       </div>
       <div className="grid md:grid-cols-3 gap-10">
         {[
@@ -959,8 +959,8 @@ const Footer = () => {
             <div className="flex items-center gap-3 mb-4">
               <SpinningCompass size={40} />
               <div>
-                <span className="text-lg font-bold block">GeoQuest</span>
-                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">GEOADVENTURES</span>
+                <span className="text-lg font-bold block">RoamUs</span>
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">FAMILY TRAVEL</span>
               </div>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
@@ -1005,7 +1005,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-slate-800 mt-12 pt-8 text-center text-slate-500 text-sm">
-          © {new Date().getFullYear()} GeoQuest Games. All rights reserved.
+          © {new Date().getFullYear()} RoamUs. All rights reserved.
         </div>
       </div>
     </footer>
