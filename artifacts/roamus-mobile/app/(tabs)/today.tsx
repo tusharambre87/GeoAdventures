@@ -875,14 +875,19 @@ export default function TodayScreen() {
             return;
           }
         }
+        const sortedTrips = [...(data.trips ?? [])].sort((a, b) => {
+          if (!a.startDate) return 1;
+          if (!b.startDate) return -1;
+          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+        });
         const todayMs = new Date().setHours(0,0,0,0);
-        const active = data.trips?.find(t => {
+        const active = sortedTrips.find(t => {
           if (t.status === 'active' || t.status === 'in_progress') return true;
           if (!t.startDate || !t.endDate) return false;
           const s = parseLocalDate(t.startDate)!; s.setHours(0,0,0,0);
           const e = parseLocalDate(t.endDate)!;   e.setHours(23,59,59,999);
           return todayMs >= s.getTime() && todayMs <= e.getTime();
-        }) ?? data.trips?.find(t => t.startDate) ?? data.trips?.[0];
+        }) ?? sortedTrips.find(t => t.startDate) ?? sortedTrips[0];
         if (!active) {
           if (!devState) setTodayState('no_trip');
           return;
