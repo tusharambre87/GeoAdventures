@@ -635,17 +635,20 @@ const PhysicalDeckWaitlist = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [downloadToken, setDownloadToken] = useState('');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      await fetch('/api/waitlist', {
+      const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email }),
       });
+      const data = await res.json();
+      if (data.downloadToken) setDownloadToken(data.downloadToken);
       setSubmitted(true);
       setName('');
       setEmail('');
@@ -687,6 +690,18 @@ const PhysicalDeckWaitlist = () => {
                 <div className="text-3xl mb-2">🎉</div>
                 <h3 className="text-lg font-bold text-green-800 mb-1">You're on the list!</h3>
                 <p className="text-green-700 text-sm">We'll email you when the deck is ready.</p>
+                {downloadToken && (
+                  <a
+                    href={`/api/guide/download?token=${downloadToken}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-full transition-all shadow-md"
+                    data-testid="waitlist-download-btn"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Download your family travel guide
+                  </a>
+                )}
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
