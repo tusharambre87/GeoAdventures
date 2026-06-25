@@ -1578,11 +1578,21 @@ function DayDetail({
   async function loadAreaLandmarks() {
     if (areaLoaded || areaLoading) return;
     const firstStop = dayStops[0];
-    if (!firstStop?.latitude || !firstStop?.longitude) return;
+    const stopLat = firstStop?.latitude;
+    const stopLng = firstStop?.longitude;
+    const stayLat = (trip as any).stayLocations?.[0]?.lat;
+    const stayLng = (trip as any).stayLocations?.[0]?.lng;
+    const lat = stopLat ?? stayLat;
+    const lng = stopLng ?? stayLng;
+    const city = trip.destination ?? (trip as any).city ?? null;
+    if (!lat && !lng && !city) return;
     setAreaLoading(true);
+    const params = lat && lng
+      ? `lat=${lat}&lng=${lng}`
+      : `city=${encodeURIComponent(city!)}`;
     try {
       const data = await apiFetch<any>(
-        `/api/travel/nearby-landmarks?lat=${firstStop.latitude}&lng=${firstStop.longitude}`
+        `/api/travel/nearby-landmarks?${params}`
       );
       const onPlan = new Set(
         dayStops.map((s: any) => s.name?.toLowerCase().trim()).filter(Boolean)

@@ -6397,10 +6397,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Nearby landmarks — tourist attractions, museums, parks for PMAL "Also in this area"
   app.get('/api/travel/nearby-landmarks', async (req: any, res) => {
-    const { lat, lng, radius = '16000' } = req.query as Record<string, string>;
-    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    let { lat, lng, city, radius = '16000' } = req.query as Record<string, string>;
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
+
+    if ((!lat || !lng) && city) {
+      try {
+        const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city)}&key=${apiKey}`;
+        const geoRes = await fetch(geoUrl);
+        const geoData = await geoRes.json() as { results?: Array<{ geometry: { location: { lat: number; lng: number } } }> };
+        const loc = geoData.results?.[0]?.geometry?.location;
+        if (loc) { lat = String(loc.lat); lng = String(loc.lng); }
+      } catch {}
+    }
+
+    if (!lat || !lng) return res.status(400).json({ error: 'lat/lng or city required' });
 
     const lat_n = parseFloat(lat);
     const lng_n = parseFloat(lng);
