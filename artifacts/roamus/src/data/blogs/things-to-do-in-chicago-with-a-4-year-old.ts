@@ -73,20 +73,20 @@ const post: BlogPost = {
 `,
   images: {
     "millennium-park": {
-      url: "https://unsplash.com/photos/lighted-water-fountain-near-buildings-sPIKKSxDn_8",
-      alt: "Children playing in the Crown Fountain water jets at Millennium Park, Chicago",
+      url: "https://images.unsplash.com/photo-1719977913744-640006e431c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODQ3ODN8MHwxfHNlYXJjaHwxfHxDcm93biUyMEZvdW50YWluJTIwQ2hpY2FnbyUyMGtpZHMlMjB3YXRlciUyMHNwbGFzaHxlbnwwfHx8fDE3ODIzOTk3OTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      alt: "People playing in Crown Fountain Chicago",
       caption:
         "The Crown Fountain's water jets are the best free splash pad in the city — arrive before 10am on weekends.",
-      credit: "Photo by Cynthia Smith on Unsplash",
-      credit_url: "https://unsplash.com/photos/chicago-crown-fountain",
+      credit: "Gilley Aguilar",
+      credit_url: "https://unsplash.com/@gilleyaguilar",
     },
     "maggie-daley": {
-      url: "https://unsplash.com/photos/girl-wearing-pink-dress-holding-black-metal-rod--1OhfIkGrZw",
-      alt: "Kids climbing and playing at a large outdoor playground in Chicago",
+      url: "/images/maggie-daley-park.jpg",
+      alt: "Kids playing on the boat structure at Maggie Daley Park with Chicago skyline",
       caption:
-        "Maggie Daley Park's play garden is free, enormous, and designed for kids under 6.",
-      credit: "Photo by Charlein Gracia on Unsplash",
-      credit_url: "https://unsplash.com/photos/children-playground",
+        "Maggie Daley's Play Garden is free and worth half a day. Get there by 10am on weekends.",
+      credit: "RoamUs",
+      credit_url: "https://roamus.app",
     },
   },
 
