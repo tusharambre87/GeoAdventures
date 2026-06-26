@@ -3143,15 +3143,15 @@ export function selectStopsFromPool(
   }
 
   // Fill if we still need more stops (pool exhausted before totalStopsNeeded)
-  // TODO(pre-scaling): this fill-up bypasses ALL constraints — leg cap, museum cap,
-  // type diversity. For Yellowstone it only catches 2 non-museum stops (Lamar Valley,
-  // Tower Fall) so no harm. Before running on other cities, make the fill-up respect
-  // at least the museum cap (apply museumsTotal < maxMuseumsPerTrip check here) to
-  // prevent a 3rd visitor center sneaking in via fill-up in museum-heavy city pools.
+  // TODO(pre-scaling): museum cap is now enforced in fill-up (see below). Leg-cap and
+  // type-diversity are deliberately deferred — they collide with positional day-slicing
+  // and belong in a future post-selection resequencing pass, not here.
   if (selected.length < totalStopsNeeded) {
     for (const stop of remaining) {
       if (selected.length >= totalStopsNeeded) break;
+      if (stop.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
       selected.push(stop);
+      if (stop.type === 'museum') museumsTotal++;
     }
   }
 
