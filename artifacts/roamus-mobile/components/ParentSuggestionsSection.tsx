@@ -85,26 +85,6 @@ function getSuggestionDurationMins(s: ParentSuggestion): number {
   return s.durationMinutes ?? 60;
 }
 
-function formatMinsAsTime(totalMins: number): string {
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  const period = h < 12 ? 'am' : 'pm';
-  const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  const paddedM = m.toString().padStart(2, '0');
-  return `~${displayH}:${paddedM}${period}`;
-}
-
-function computeSlotTimes(dayStops: PmalStop[]): number[] {
-  const START = 9 * 60;
-  const TRAVEL = 15;
-  const times: number[] = [START];
-  let cur = START;
-  for (const stop of dayStops) {
-    cur += getStopDurationMins(stop) + TRAVEL;
-    times.push(cur);
-  }
-  return times;
-}
 
 function suggestionNeedsTicket(s: ParentSuggestion): boolean {
   const TICKET_TYPES = ['museum', 'zoo', 'aquarium', 'palace', 'castle', 'theater', 'theatre',
@@ -415,18 +395,14 @@ export function PmalPositionPickerSheet({
     }).start();
   }, []);
 
-  const slotTimes = computeSlotTimes(sorted);
-
   const slots = [
     {
       label: 'First stop of the day',
-      sub: sorted.length > 0
-        ? `Before ${sorted[0].name} \u00B7 ${formatMinsAsTime(slotTimes[0])} start`
-        : `${formatMinsAsTime(slotTimes[0])} start`,
+      sub: sorted.length > 0 ? `Before ${sorted[0].name}` : '',
     },
     ...sorted.map((stop, i) => ({
       label: `After ${stop.name}`,
-      sub: `${formatMinsAsTime(slotTimes[i + 1])}${sorted[i + 1] ? ` \u00B7 then ${sorted[i + 1].name}` : ' \u00B7 last stop'}`,
+      sub: sorted[i + 1] ? `then ${sorted[i + 1].name}` : 'last stop',
     })),
   ];
 
