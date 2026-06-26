@@ -23,6 +23,7 @@
     "backfill:library-psi": "tsx src/planner/backfillLibraryPsi.ts",
     "backfill:pmal": "tsx src/planner/backfillPmal.ts",
     "backfill:google-places": "tsx src/scripts/backfill-google-places.ts",
+    "backfill:recompute-gp-floor": "tsx src/scripts/recompute-gp-floor.ts",
     "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts",
     "script:tag-metro": "tsx src/scripts/tagMetroStops.ts"
   },
