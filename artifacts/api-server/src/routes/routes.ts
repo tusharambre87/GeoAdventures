@@ -5533,6 +5533,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             console.log(`[Travel] [bg] Inserted ${insertCount} preview-parity stops for trip ${tripId}`);
+            // Generate PMAL fire-and-forget — fast-path skips the pool path so we do it here
+            ;(async () => {
+              try {
+                const [poolRow, tripRow] = await Promise.all([
+                  storage.getCityStopPool(cityName, country),
+                  storage.getTripById(tripId),
+                ]);
+                if (!poolRow || !Array.isArray(poolRow.stopPool) || poolRow.stopPool.length === 0) return;
+                const travelers = ((tripRow?.travelers ?? []) as any[]);
+                const childAges = travelers
+                  .filter((t: any) => !t.isParent && t.age)
+                  .map((t: any) => parseInt(t.age ?? '0', 10))
+                  .filter((n: number) => n > 0 && n < 18);
+                const tripTail = tripRow?.tailoring as any;
+                const normP = (raw: string | null | undefined): "relaxed" | "moderate" | "busy" => {
+                  const p = (raw ?? '').toLowerCase().replace(/[^a-z_]/g, '');
+                  if (['chill','relaxed','easy','slow'].includes(p)) return 'relaxed';
+                  if (['packed','gogetter','go_getter','full','busy','active'].includes(p)) return 'busy';
+                  return 'moderate';
+                };
+                const fpPace = normP(pace) !== 'moderate' ? normP(pace) : normP(tripTail?.pace);
+                const fpMinAge = childAges.length > 0 ? Math.min(...childAges) : 99;
+                const fpPerDay = getStopsPerDay(fpPace, fpMinAge).total;
+                const pmalInput: PlannerInput = {
+                  destination: cityName,
+                  tripDays: tripDays ?? 2,
+                  childrenAges: childAges,
+                  pace: fpPace,
+                  tripStyle: tripStyle ?? undefined,
+                  adventureStyle: adventureStyle ?? undefined,
+                  interests: ((tripTail?.interests ?? []) as string[])
+                    .map((i: string) => i.replace(/\s*[^\w\s].*$/, '').trim().toLowerCase())
+                    .filter((i: string) => i.length > 0),
+                  strollerNeeded: tripTail?.stroller ?? false,
+                  indoorLean: tripTail?.indoorOutdoor ?? undefined,
+                  budgetSensitivity: tripTail?.budgetSensitivity ?? undefined,
+                  kidEnergyLevel: tripTail?.kidEnergyLevel ?? undefined,
+                  stopsPerDayOverride: fpPerDay,
+                };
+                const { parentSuggestions: fpSuggestions } = selectStopsFromPool(poolRow.stopPool as any[], pmalInput, undefined, cityName);
+                if (fpSuggestions.length === 0) return;
+                const tripStopRows = await db
+                  .select({ name: travelStops.name, latitude: travelStops.latitude, longitude: travelStops.longitude, dayIndex: travelStops.dayIndex, displayOrder: travelStops.displayOrder })
+                  .from(travelStops)
+                  .where(eq(travelStops.tripId, tripId));
+                const fpGeneratedStops: GeneratedStop[] = tripStopRows.map(s => ({
+                  name: s.name ?? '',
+                  type: 'landmark' as const,
+                  stopType: 'landmark',
+                  dayNumber: (s.dayIndex ?? 0) + 1,
+                  displayOrder: s.displayOrder ?? 0,
+                  latitude: s.latitude ? parseFloat(s.latitude) : undefined,
+                  longitude: s.longitude ? parseFloat(s.longitude) : undefined,
+                  durationMinutes: 60,
+                  familyAnchorType: 'support' as const,
+                  minAge: 0,
+                }));
+                const fpMap = assignSuggestionsByProximity(fpGeneratedStops, fpSuggestions, tripDays ?? 2);
+                await storage.updateTrip(tripId, { parentSuggestions: fpMap as any });
+                const fpDays = Object.values(fpMap).filter((a: any) => a.length > 0).length;
+                console.log(`[Travel] [bg] Fast-path PMAL: ${fpSuggestions.length} suggestion(s) across ${fpDays} day(s) for ${tripId}`);
+              } catch (pmalErr) {
+                console.error('[Travel] [bg] Fast-path PMAL generation failed (non-fatal):', pmalErr);
+              }
+            })();
             return;
           }
         } catch (e) {
