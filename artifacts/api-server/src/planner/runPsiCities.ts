@@ -7,6 +7,8 @@ import { runPsiForCity } from "./psiTrigger.js";
 const CITIES: { city: string; country: string }[] = [
   { city: "Washington DC", country: "USA" },
   { city: "Minneapolis", country: "USA" },
+  { city: "Yellowstone", country: "USA" },
+  { city: "Dallas", country: "USA" },
 ];
 
 async function main(): Promise<void> {

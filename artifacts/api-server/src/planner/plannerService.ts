@@ -3394,6 +3394,9 @@ export function selectStopsFromPool(
     });
 
   // Bucket A — overflow anchors: high-PSI anchor stops not selected for the trip
+  // For small pools (< 30 stops, e.g. national parks) lower the gate to 50 so
+  // landmark anchors like Old Faithful still surface even with flat 54 PSI scores.
+  const bucketAThreshold = candidates.length < 30 ? 50 : 65;
   const selectedNormNamesForOverflow = new Set(selected.map(c => normStopName(c.name)));
   const bucketBNames = new Set(parentSuggestions.map(s => normStopName(s.name)));
   const overflowAnchors: GeneratedStop[] = candidates
@@ -3401,7 +3404,7 @@ export function selectStopsFromPool(
       !selectedNormNamesForOverflow.has(normStopName(c.name)) &&
       !bucketBNames.has(normStopName(c.name)) &&
       c.familyAnchorType === 'anchor' &&
-      (c.scoreClassicFinal ?? 0) >= 65
+      (c.scoreClassicFinal ?? 0) >= bucketAThreshold
     )
     .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0))
     .slice(0, 5)
