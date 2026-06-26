@@ -6,7 +6,6 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +31,15 @@ const SEARCH_ICON = "\uD83D\uDD0D";
 const TARGET_ICON = "\uD83C\uDFAF";
 const STAR_ICON = "\u2B50";
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function WhatAmIGame() {
   const insets = useSafeAreaInsets();
   const kids = useKids();
@@ -42,8 +50,9 @@ export default function WhatAmIGame() {
   const [gameState, setGameState] = useState<GameState>("mode_select");
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [puzzle, setPuzzle] = useState<WhatAmIPuzzle | null>(null);
-  const [clueIndex, setClueIndex] = useState(0);
-  const [greyed, setGreyed] = useState<Set<string>>(new Set());
+  const [currentClue, setCurrentClue] = useState(0);
+  const [eliminatedOptions, setEliminatedOptions] = useState<string[]>([]);
+  const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [hardInput, setHardInput] = useState("");
   const [scoreEarned, setScoreEarned] = useState(0);
   const [clueOnWin, setClueOnWin] = useState(1);
@@ -69,8 +78,9 @@ export default function WhatAmIGame() {
     try {
       const p = await pickPuzzle(effectiveTripId);
       setPuzzle(p);
-      setClueIndex(0);
-      setGreyed(new Set());
+      setCurrentClue(0);
+      setEliminatedOptions([]);
+      setShuffledOptions(shuffle([...p.easyOptions]));
       setHardInput("");
       setScoreEarned(0);
       setClueOnWin(1);
@@ -80,50 +90,53 @@ export default function WhatAmIGame() {
     }
   }, [effectiveTripId]);
 
-  const handleCorrect = useCallback(() => {
+  const handleOptionTap = useCallback((option: string) => {
     if (!puzzle) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const pts = CLUE_POINTS[clueIndex] ?? 1;
-    setScoreEarned(pts);
-    setClueOnWin(clueIndex + 1);
-    setGameState("correct");
-  }, [puzzle, clueIndex]);
+    if (option === puzzle.answer) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const pts = CLUE_POINTS[currentClue] ?? 1;
+      setScoreEarned(pts);
+      setClueOnWin(currentClue + 1);
+      setGameState("correct");
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const newEliminated = [...eliminatedOptions, option];
+    setEliminatedOptions(newEliminated);
+    if (currentClue < 2) {
+      setCurrentClue(prev => prev + 1);
+    } else {
+      setGameState("revealed");
+    }
+  }, [puzzle, currentClue, eliminatedOptions]);
 
   const advanceClue = useCallback(() => {
     if (!puzzle) return;
-    const nextIdx = clueIndex + 1;
-    if (nextIdx >= puzzle.clues.length) {
+    if (currentClue >= 2) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setGameState("revealed");
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setClueIndex(nextIdx);
+      setCurrentClue(prev => prev + 1);
       setHardInput("");
     }
-  }, [puzzle, clueIndex]);
-
-  const handleOptionPress = useCallback((option: string) => {
-    if (!puzzle) return;
-    if (option === puzzle.answer) {
-      handleCorrect();
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setGreyed(prev => new Set([...prev, option]));
-      advanceClue();
-    }
-  }, [puzzle, handleCorrect, advanceClue]);
+  }, [puzzle, currentClue]);
 
   const handleHardSubmit = useCallback(() => {
     if (!puzzle) return;
     const cleaned = hardInput.trim().toUpperCase();
     if (cleaned === puzzle.answer) {
-      handleCorrect();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const pts = CLUE_POINTS[currentClue] ?? 1;
+      setScoreEarned(pts);
+      setClueOnWin(currentClue + 1);
+      setGameState("correct");
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setHardInput("");
       advanceClue();
     }
-  }, [puzzle, hardInput, handleCorrect, advanceClue]);
+  }, [puzzle, hardInput, currentClue, advanceClue]);
 
   // ── MODE SELECT ─────────────────────────────────────────────────────────────
   if (gameState === "mode_select") {
@@ -154,10 +167,8 @@ export default function WhatAmIGame() {
 
           {/* Body */}
           <View style={ms.body}>
-            {/* Difficulty label */}
             <Text style={ms.sectionLabel}>CHOOSE MODE</Text>
 
-            {/* Toggle */}
             <View style={ms.toggleRow}>
               <Pressable
                 style={[ms.diffCard, ms.diffEasy, difficulty === "easy" && ms.diffEasyOn]}
@@ -168,7 +179,7 @@ export default function WhatAmIGame() {
               >
                 <Text style={ms.diffIcon}>{"\uD83D\uDC40"}</Text>
                 <Text style={[ms.diffTitle, { color: "#065F46" }]}>Easy</Text>
-                <Text style={[ms.diffHint, { color: "#065F46" }]}>Pick from 3 options</Text>
+                <Text style={[ms.diffHint, { color: "#065F46" }]}>Pick from 4 options</Text>
                 {difficulty === "easy" && (
                   <View style={[ms.diffCheck, { backgroundColor: "#16A34A" }]}>
                     <Text style={ms.diffCheckText}>{"\u2713"}</Text>
@@ -193,12 +204,11 @@ export default function WhatAmIGame() {
               </Pressable>
             </View>
 
-            {/* How it works */}
             <Text style={[ms.sectionLabel, { marginTop: 8 }]}>HOW IT WORKS</Text>
             <View style={ms.howCard}>
               <View style={ms.howRow}>
                 <View style={[ms.howDot, { backgroundColor: "#7C3AED" }]} />
-                <Text style={ms.howText}>Up to 5 clues are revealed one at a time</Text>
+                <Text style={ms.howText}>Up to 3 clues revealed one at a time</Text>
               </View>
               <View style={ms.howRow}>
                 <View style={[ms.howDot, { backgroundColor: "#7C3AED" }]} />
@@ -210,7 +220,6 @@ export default function WhatAmIGame() {
               </View>
             </View>
 
-            {/* Points table */}
             <Text style={[ms.sectionLabel, { marginTop: 8 }]}>POINTS PER CLUE</Text>
             <View style={ms.pointsCard}>
               {CLUE_POINTS.map((pts, i) => (
@@ -228,7 +237,6 @@ export default function WhatAmIGame() {
               ))}
             </View>
 
-            {/* CTA */}
             <Pressable
               style={({ pressed }) => [ms.cta, pressed && { opacity: 0.88 }]}
               onPress={() => {
@@ -249,57 +257,57 @@ export default function WhatAmIGame() {
 
   // ── PLAYING ─────────────────────────────────────────────────────────────────
   if (gameState === "playing" && puzzle) {
-    const currentPoints = CLUE_POINTS[clueIndex] ?? 1;
-    const previousClues = puzzle.clues.slice(0, clueIndex);
-    const activeClue = puzzle.clues[clueIndex];
+    const currentPoints = CLUE_POINTS[currentClue] ?? 1;
+    const previousClues = puzzle.clues.slice(0, currentClue);
+    const activeClue = puzzle.clues[currentClue];
+    const isLastClue = currentClue >= 2;
 
     return (
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: "#2D1B69" }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-        >
-          {/* Top bar */}
-          <View style={[pl.topBar, { paddingTop: insets.top + 12 }]}>
-            <Pressable
-              style={pl.quitBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setGameState("mode_select");
-              }}
-            >
-              <Text style={pl.quitText}>{"\u2190"} Quit</Text>
-            </Pressable>
+      <View style={{ flex: 1, backgroundColor: "#2D1B69" }}>
+        {/* Top bar */}
+        <View style={[pl.topBar, { paddingTop: insets.top + 12 }]}>
+          <Pressable
+            style={pl.quitBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setGameState("mode_select");
+            }}
+          >
+            <Text style={pl.quitText}>{"\u2190"} Quit</Text>
+          </Pressable>
 
-            {/* 5 progress dots */}
-            <View style={pl.dotsRow}>
-              {puzzle.clues.map((_, i) => {
-                const isDone = i < clueIndex;
-                const isActive = i === clueIndex;
-                return (
-                  <View
-                    key={i}
-                    style={[
-                      pl.dot,
-                      isDone && pl.dotDone,
-                      isActive && pl.dotActive,
-                      !isDone && !isActive && pl.dotNext,
-                    ]}
-                  />
-                );
-              })}
-            </View>
-
-            {/* Score badge */}
-            <View style={pl.scoreBadge}>
-              <Text style={pl.scoreText}>{currentPoints}pt</Text>
-            </View>
+          {/* 3 progress dots */}
+          <View style={pl.dotsRow}>
+            {puzzle.clues.map((_, i) => {
+              const isDone = i < currentClue;
+              const isActive = i === currentClue;
+              return (
+                <View
+                  key={i}
+                  style={[
+                    pl.dot,
+                    isDone && pl.dotDone,
+                    isActive && pl.dotActive,
+                    !isDone && !isActive && pl.dotNext,
+                  ]}
+                />
+              );
+            })}
           </View>
 
+          {/* Score badge */}
+          <View style={pl.scoreBadge}>
+            <Text style={pl.scoreText}>{currentPoints}pt</Text>
+          </View>
+        </View>
+
+        {/* Scrollable clue area — fills remaining space */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={pl.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Clue history */}
           {previousClues.length > 0 && (
             <View style={pl.historyWrap}>
@@ -318,31 +326,34 @@ export default function WhatAmIGame() {
           <View style={pl.bubbleWrap}>
             <View style={pl.bubbleTail} />
             <View style={pl.bubble}>
-              <Text style={pl.clueNum}>Clue {clueIndex + 1}</Text>
+              <Text style={pl.clueNum}>CLUE {currentClue + 1}</Text>
               <Text style={pl.clueText}>{activeClue}</Text>
             </View>
           </View>
 
-          {/* Easy mode: 3 option buttons */}
+          {/* Spacer so options push to bottom */}
+          <View style={{ flex: 1, minHeight: 16 }} />
+
+          {/* Easy mode: 4 option buttons */}
           {difficulty === "easy" && (
             <View style={pl.optionsWrap}>
-              {puzzle.easyOptions.map((opt) => {
-                const isGreyed = greyed.has(opt);
+              {shuffledOptions.map((opt) => {
+                const isElim = eliminatedOptions.includes(opt);
                 return (
                   <Pressable
                     key={opt}
-                    disabled={isGreyed}
+                    disabled={isElim}
                     style={({ pressed }) => [
                       pl.optBtn,
-                      isGreyed && pl.optBtnGreyed,
-                      !isGreyed && pressed && pl.optBtnPressed,
+                      isElim && pl.optBtnElim,
+                      !isElim && pressed && pl.optBtnPressed,
                     ]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      handleOptionPress(opt);
+                      handleOptionTap(opt);
                     }}
                   >
-                    <Text style={[pl.optText, isGreyed && pl.optTextGreyed]}>
+                    <Text style={[pl.optText, isElim && pl.optTextElim]}>
                       {opt}
                     </Text>
                   </Pressable>
@@ -374,18 +385,23 @@ export default function WhatAmIGame() {
             </View>
           )}
 
-          {/* Skip button */}
-          <Pressable
-            style={({ pressed }) => [pl.skipBtn, pressed && { opacity: 0.7 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              advanceClue();
-            }}
-          >
-            <Text style={pl.skipText}>Not sure? Next clue {"\u2192"}</Text>
-          </Pressable>
+          {/* Next clue button — hidden on last clue */}
+          {!isLastClue && (
+            <Pressable
+              style={({ pressed }) => [pl.skipBtn, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                advanceClue();
+              }}
+            >
+              <Text style={pl.skipText}>Not sure? Next clue {"\u2192"}</Text>
+            </Pressable>
+          )}
+
+          {/* Bottom safe area padding */}
+          <View style={{ height: insets.bottom + 16 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     );
   }
 
@@ -423,11 +439,13 @@ export default function WhatAmIGame() {
             </Animated.View>
             <Text style={cr.headline}>Nailed it!</Text>
             <Text style={cr.answer}>{puzzle.answer}</Text>
-            <Text style={cr.clueLabel}>You got it on clue {clueOnWin}</Text>
+            <Text style={cr.clueLabel}>
+              You got it on clue {clueOnWin} {"\u2014"} {scoreEarned} {scoreEarned === 1 ? "pt" : "pts"}
+            </Text>
             <View style={cr.scoreBadge}>
               <Text style={cr.scoreText}>
                 {STAR_ICON}{" "}
-                <Text style={cr.scoreVal}>{scoreEarned} pts</Text>
+                <Text style={cr.scoreVal}>{scoreEarned} {scoreEarned === 1 ? "pt" : "pts"}</Text>
                 {"  \u00B7  clue "}
                 {clueOnWin}
               </Text>
@@ -507,9 +525,9 @@ export default function WhatAmIGame() {
             <Text style={rv.answerLabel}>The answer was</Text>
           </View>
 
-          {/* All 5 clues */}
+          {/* All 3 clues */}
           <View style={rv.cluesCard}>
-            <Text style={rv.cluesLabel}>ALL 5 CLUES</Text>
+            <Text style={rv.cluesLabel}>ALL 3 CLUES</Text>
             {puzzle.clues.map((clue, i) => (
               <View key={i} style={rv.clueRow}>
                 <View style={rv.clueNum}>
@@ -662,7 +680,12 @@ const pl = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6,
   },
   scoreText: { fontFamily: F.bold, fontSize: 13, color: "#FCD34D" },
-  historyWrap: { paddingHorizontal: 20, marginBottom: 8, gap: 8 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+  },
+  historyWrap: { marginBottom: 8, gap: 8 },
   historyRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   historyNum: {
     width: 20, height: 20, borderRadius: 10,
@@ -672,7 +695,7 @@ const pl = StyleSheet.create({
   },
   historyNumText: { fontFamily: F.bold, fontSize: 10, color: "rgba(255,255,255,0.5)" },
   historyText: { fontFamily: F.medium, fontSize: 12, color: "rgba(255,255,255,0.4)", flex: 1, lineHeight: 18 },
-  bubbleWrap: { paddingHorizontal: 20, marginBottom: 20, position: "relative" },
+  bubbleWrap: { marginBottom: 8, position: "relative" },
   bubbleTail: {
     width: 0, height: 0, marginLeft: 28,
     borderLeftWidth: 8, borderRightWidth: 8, borderBottomWidth: 10,
@@ -682,7 +705,8 @@ const pl = StyleSheet.create({
   bubble: {
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 16, padding: 20,
+    borderRadius: 16, padding: 20, minHeight: 100,
+    justifyContent: "center",
   },
   clueNum: {
     fontFamily: F.bold, fontSize: 10,
@@ -693,21 +717,33 @@ const pl = StyleSheet.create({
     fontFamily: "Fraunces_900Black",
     fontSize: 18, color: "#fff", lineHeight: 26, fontStyle: "italic",
   },
-  optionsWrap: { paddingHorizontal: 20, gap: 10, marginBottom: 16 },
+  optionsWrap: { gap: 10, marginBottom: 10 },
   optBtn: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 14, paddingVertical: 16, paddingHorizontal: 20,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
     alignItems: "center",
   },
-  optBtnGreyed: {
+  optBtnElim: {
+    opacity: 0.25,
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  optBtnPressed: { backgroundColor: "rgba(255,255,255,0.2)" },
-  optText: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
-  optTextGreyed: { color: "rgba(255,255,255,0.25)" },
-  inputWrap: { paddingHorizontal: 20, gap: 10, marginBottom: 16 },
+  optBtnPressed: { backgroundColor: "rgba(255,255,255,0.22)" },
+  optText: {
+    fontSize: 17,
+    fontFamily: F.bold,
+    color: "#fff",
+    letterSpacing: 1,
+  },
+  optTextElim: {
+    textDecorationLine: "line-through",
+    color: "rgba(255,255,255,0.4)",
+  },
+  inputWrap: { gap: 10, marginBottom: 10 },
   textInput: {
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
@@ -721,10 +757,13 @@ const pl = StyleSheet.create({
   },
   submitText: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
   skipBtn: {
-    marginHorizontal: 20, borderRadius: 12,
+    borderRadius: 12,
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.18)",
-    borderStyle: "dashed", paddingVertical: 14,
+    borderStyle: "dashed",
+    height: 48,
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 0,
   },
   skipText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.5)" },
 });
