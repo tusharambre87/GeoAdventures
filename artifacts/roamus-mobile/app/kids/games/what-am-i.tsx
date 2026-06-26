@@ -440,7 +440,7 @@ export default function WhatAmIGame() {
               style={cr.closeBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/kids/games" as never);
+                router.back();
               }}
             >
               <Text style={cr.closeTxt}>Done</Text>
@@ -495,7 +495,7 @@ export default function WhatAmIGame() {
               style={({ pressed }) => [cr.btnGhost, pressed && { opacity: 0.75 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/kids/games" as never);
+                router.back();
               }}
             >
               <Text style={cr.btnGhostTxt}>Back to Games</Text>
@@ -527,7 +527,7 @@ export default function WhatAmIGame() {
               style={rv.closeBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/kids/games" as never);
+                router.back();
               }}
             >
               <Text style={rv.closeTxt}>Done</Text>
@@ -575,7 +575,7 @@ export default function WhatAmIGame() {
               style={({ pressed }) => [rv.btnGhost, pressed && { opacity: 0.75 }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/kids/games" as never);
+                router.back();
               }}
             >
               <Text style={rv.btnGhostTxt}>Back to Games</Text>
