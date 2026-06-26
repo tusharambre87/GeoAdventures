@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, Calendar } from "lucide-react";
+import { marked } from "marked";
 import { allPosts } from "../data/blogs/index";
 import type { BlogPostImage } from "../data/blogs/types";
 
 function renderContent(contentHtml: string, images: Record<string, BlogPostImage>) {
+  contentHtml = contentHtml.replace(/\[CTA:[^\]]*\]/g, "");
   const TOKEN_RE = /\[IMAGE_REF:([^\]]+)\]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -15,7 +17,7 @@ function renderContent(contentHtml: string, images: Record<string, BlogPostImage
     const before = contentHtml.slice(lastIndex, match.index);
     if (before) {
       parts.push(
-        <div key={`html-${idx++}`} dangerouslySetInnerHTML={{ __html: before }} />
+        <div key={`html-${idx++}`} dangerouslySetInnerHTML={{ __html: marked.parse(before) as string }} />
       );
     }
 
@@ -46,7 +48,7 @@ function renderContent(contentHtml: string, images: Record<string, BlogPostImage
   const tail = contentHtml.slice(lastIndex);
   if (tail) {
     parts.push(
-      <div key={`html-${idx}`} dangerouslySetInnerHTML={{ __html: tail }} />
+      <div key={`html-${idx}`} dangerouslySetInnerHTML={{ __html: marked.parse(tail) as string }} />
     );
   }
 

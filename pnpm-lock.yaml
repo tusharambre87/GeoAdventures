@@ -531,6 +531,9 @@ importers:
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
+      marked:
+        specifier: ^18.0.4
+        version: 18.0.4
       react-globe.gl:
         specifier: ^2.38.0
         version: 2.38.0(react@19.1.0)
