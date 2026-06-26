@@ -4381,39 +4381,17 @@ function PositionPickerSheet({
   onClose: () => void;
   onInsertAt: (afterStopId: string) => void;
 }) {
-  const optDur = parseDurationMins(opt, category);
-
-  const BASE_MINS = 9 * 60; // 9:00 AM
-  const TRAVEL_MINS = 15;
-  const DAY_CAP_MINS = 18 * 60; // 6:00 PM
-
-  function toTimeStr(mins: number): string {
-    const h = Math.floor(mins / 60) % 24;
-    const m = mins % 60;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${ampm}`;
-  }
-
-  type PosRow = { stopId: string; label: string; timeSub: string; warning?: string };
+  type PosRow = { stopId: string; label: string };
   const rows: PosRow[] = [];
-  let acc = BASE_MINS;
 
   dayStops.forEach((s, i) => {
-    const dur = s.durationMinutes ?? 60;
-    const newStopStart = acc + dur + TRAVEL_MINS;
-    const newStopEnd = newStopStart + optDur;
+    const isFirst = i === 0;
     const isEnd = i === dayStops.length - 1;
-    const warning = newStopEnd > DAY_CAP_MINS
-      ? `Pushes day end to ${toTimeStr(newStopEnd)}`
-      : undefined;
 
     rows.push({
       stopId: s.id,
-      label: isEnd ? 'End of day' : `After ${s.name}`,
-      timeSub: `New stop around ${toTimeStr(newStopStart)}`,
-      warning,
+      label: isEnd ? 'Last stop of the day' : isFirst ? 'First stop of the day' : `After ${s.name}`,
     });
-    acc += dur + TRAVEL_MINS;
   });
 
   return (
@@ -4456,10 +4434,6 @@ function PositionPickerSheet({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={pps.rowLabel}>{row.label}</Text>
-                <Text style={pps.rowSub}>{row.timeSub}</Text>
-                {row.warning ? (
-                  <Text style={pps.rowWarn}>{'\u26A0\uFE0F '}{row.warning}</Text>
-                ) : null}
               </View>
               {adding ? (
                 <ActivityIndicator color={C.orange} size="small" />
