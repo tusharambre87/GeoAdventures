@@ -455,7 +455,11 @@ function deriveRole(
 // Main export
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function computeScores(profile: PlacePlanningProfile, family: FamilyProfile): ComponentScores {
+export function computeScores(
+  profile: PlacePlanningProfile,
+  family: FamilyProfile,
+  gpData?: { gpRating: string | null; gpRatingsTotal: number | null } | null,
+): ComponentScores {
   const ageAndKidFitScore = computeAgeAndKidFitScore(profile, family);
   const parentPracticalityScore = computeParentPracticalityScore(profile, family);
   const flowAndDayFitScore = computeFlowAndDayFitScore(profile, family);
@@ -475,6 +479,17 @@ export function computeScores(profile: PlacePlanningProfile, family: FamilyProfi
     delightScore * 0.10 +
     familyEvidenceConfidenceScore * (isAnchor ? 0.18 : 0.08)
   );
+
+  // Post-composite GP floor: well-reviewed stops earn a minimum score floor
+  // so that high community confidence isn't buried by conservative heuristics.
+  let flooredScore = finalScore;
+  if (gpData?.gpRatingsTotal != null && gpData?.gpRating != null) {
+    const { gpRatingsTotal } = gpData;
+    const gpRating = parseFloat(gpData.gpRating);
+    if      (gpRatingsTotal >= 5000)                     flooredScore = Math.max(finalScore, 80);
+    else if (gpRatingsTotal >= 1000 && gpRating >= 4.5)  flooredScore = Math.max(finalScore, 72);
+    else if (gpRatingsTotal >= 500  && gpRating >= 4.3)  flooredScore = Math.max(finalScore, 65);
+  }
 
   const roleAssigned = deriveRole(
     {
@@ -496,7 +511,7 @@ export function computeScores(profile: PlacePlanningProfile, family: FamilyProfi
     flexibilityAndRecoveryScore,
     delightScore,
     familyEvidenceConfidenceScore,
-    finalScore,
+    finalScore: flooredScore,
     roleAssigned,
   };
 }
