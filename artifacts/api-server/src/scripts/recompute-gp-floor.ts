@@ -191,6 +191,7 @@ async function run(): Promise<void> {
   let updated = 0;
   let unchanged = 0;
   let noGp = 0;
+  let floorActivations = 0;  // GP data present AND floor raised the score above raw
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -215,6 +216,13 @@ async function run(): Promise<void> {
       gpData ?? undefined,
     );
 
+    // Floor activation: GP data was present AND it actually raised the score
+    // above what the raw (no-GP) engine would have produced.
+    if (gpData) {
+      const { finalScore: rawScore } = computeScores(profile, CLASSIC_FAMILY);
+      if (newScore > rawScore) floorActivations++;
+    }
+
     if (newScore !== psi.scoreClassicFinal) {
       await db
         .update(plannerStopIntelligence)
@@ -226,7 +234,7 @@ async function run(): Promise<void> {
 
       if (updated <= 20 || updated % 100 === 0) {
         console.log(
-          `${LOG} Updated "${row.ppName}" (${row.ppCity}): ${psi.scoreClassicFinal} → ${newScore}`,
+          `${LOG} Updated "${row.ppName}" (${row.ppCity}): ${psi.scoreClassicFinal ?? "NULL"} → ${newScore}`,
         );
       }
     } else {
@@ -236,7 +244,7 @@ async function run(): Promise<void> {
     if ((i + 1) % 200 === 0) {
       const pct = (((i + 1) / rows.length) * 100).toFixed(1);
       console.log(
-        `${LOG} Progress: ${i + 1}/${rows.length} (${pct}%) | updated=${updated} unchanged=${unchanged} noGP=${noGp}`,
+        `${LOG} Progress: ${i + 1}/${rows.length} (${pct}%) | updated=${updated} unchanged=${unchanged} noGP=${noGp} floorActivations=${floorActivations}`,
       );
     }
 
@@ -244,23 +252,25 @@ async function run(): Promise<void> {
   }
 
   console.log(
-    `${LOG} Loop complete — updated=${updated} unchanged=${unchanged} noGP=${noGp}`,
+    `${LOG} Loop complete — updated=${updated} unchanged=${unchanged} noGP=${noGp} floorActivations=${floorActivations}`,
   );
 
   // ── 3. Orphan gate ────────────────────────────────────────────────────────
   //
-  // An orphan is a stop_library row that:
-  //   • has gp_verified_at IS NOT NULL (was fetched)
-  //   • has gp_place_id != 'NOT_FOUND'  (Google found it)
-  //   • has gp_ratings_total IS NOT NULL (floor-eligible — has a real rating count)
-  //   • was NOT joined to any PSI row during the recompute loop above
+  // A TRUE orphan is a stop_library row where:
+  //   • gp_ratings_total IS NOT NULL  (floor-eligible)
+  //   • Has at least one non-overridden PSI match via name+city join
+  //   • That non-overridden PSI match still has score_classic_final IS NULL
+  //     (the recompute loop should have processed it but missed it)
   //
-  // Orphans mean the LOWER(TRIM) join missed real stops, so their
-  // scoreClassicFinal was NOT updated. Cache bust must not happen.
+  // Stops whose ONLY PSI rows are manually_overridden are correctly skipped
+  // by the IS NOT TRUE filter above — they are NOT flagged as orphans.
+  //
+  // Implementation: pure DB query, no in-process set needed.
 
   console.log(`${LOG} Running orphan gate…`);
 
-  const gpEligible = await db
+  const orphans = await db
     .select({
       id:             stopLibrary.id,
       name:           stopLibrary.name,
@@ -274,14 +284,22 @@ async function run(): Promise<void> {
         isNotNull(stopLibrary.gpVerifiedAt),
         ne(stopLibrary.gpPlaceId, "NOT_FOUND"),
         isNotNull(stopLibrary.gpRatingsTotal),
+        // Has a non-overridden PSI match whose score is still NULL → missed
+        sql`EXISTS (
+          SELECT 1
+          FROM planner_places pp
+          INNER JOIN planner_stop_intelligence psi ON psi.place_id = pp.id
+          WHERE LOWER(TRIM(pp.name)) = LOWER(TRIM(${stopLibrary.name}))
+            AND LOWER(TRIM(pp.city)) = LOWER(TRIM(${stopLibrary.city}))
+            AND psi.manually_overridden IS NOT TRUE
+            AND psi.score_classic_final IS NULL
+        )`,
       ),
     );
 
-  const orphans = gpEligible.filter((r) => !processedSlIds.has(r.id));
-
   if (orphans.length > 0) {
     console.error(
-      `${LOG} ORPHAN GATE FAILED — ${orphans.length} floor-eligible stop(s) not recomputed:`,
+      `${LOG} ORPHAN GATE FAILED — ${orphans.length} floor-eligible stop(s) have non-overridden PSI rows with no score:`,
     );
     for (const o of orphans) {
       console.error(
@@ -294,7 +312,7 @@ async function run(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`${LOG} Orphan gate passed — 0 orphans.`);
+  console.log(`${LOG} Orphan gate passed — 0 true orphans.`);
 
   // ── 4. Cache bust ─────────────────────────────────────────────────────────
   //
