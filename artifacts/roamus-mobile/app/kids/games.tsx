@@ -28,6 +28,7 @@ const GRID_GAMES = [
     cardBg: "#ECFDF5",
     border: "#6EE7B7",
     titleColor: "#065F46",
+    route: undefined as string | undefined,
   },
   {
     type: "geoguess",
@@ -40,6 +41,7 @@ const GRID_GAMES = [
     cardBg: "#EFF6FF",
     border: "#93C5FD",
     titleColor: "#1E40AF",
+    route: undefined as string | undefined,
   },
   {
     type: "bag",
@@ -52,6 +54,7 @@ const GRID_GAMES = [
     cardBg: "#FEF3C7",
     border: "#F59E0B",
     titleColor: "#78350F",
+    route: undefined as string | undefined,
   },
   {
     type: "geospy",
@@ -64,8 +67,22 @@ const GRID_GAMES = [
     cardBg: "#F5F3FF",
     border: "#C4B5FD",
     titleColor: "#5B21B6",
+    route: undefined as string | undefined,
   },
-] as const;
+  {
+    type: "what-am-i",
+    icon: "\uD83D\uDD0D",
+    name: "What Am I?",
+    desc: "Read the clues. Guess what I am.",
+    tag: "SOLO",
+    tagBg: "#DBEAFE",
+    tagColor: "#1E40AF",
+    cardBg: "#EFF6FF",
+    border: "#BFDBFE",
+    titleColor: "#1E40AF",
+    route: "kids/games/what-am-i" as string | undefined,
+  },
+];
 
 export default function GameHub() {
   const insets = useSafeAreaInsets();
@@ -176,7 +193,11 @@ export default function GameHub() {
                 ]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push({ pathname: "/kids/game-play", params: { type: game.type, stopId, stopName: kids.stopName, gameContentJson: JSON.stringify(gameContent ?? {}) } } as never);
+                  if (game.route) {
+                    router.push(`/${game.route}` as never);
+                  } else {
+                    router.push({ pathname: "/kids/game-play", params: { type: game.type, stopId, stopName: kids.stopName, gameContentJson: JSON.stringify(gameContent ?? {}) } } as never);
+                  }
                 }}
               >
                 <Text style={s.gridIcon}>{game.icon}</Text>
