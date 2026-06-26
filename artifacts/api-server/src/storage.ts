@@ -2836,7 +2836,7 @@ export class DatabaseStorage implements IStorage {
   async createStop(stopData: InsertTravelStop): Promise<TravelStop> {
     let heroImageUrl = stopData.heroImageUrl ?? null;
     if (!heroImageUrl) {
-      const normalizedName = stopData.name.toLowerCase().trim();
+      const normalizedName = stopData.name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
       const [libRow] = await db
         .select({ imageUrl: stopLibrary.imageUrl })
         .from(stopLibrary)

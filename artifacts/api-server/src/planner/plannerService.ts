@@ -4010,7 +4010,7 @@ export async function startAdventure(
 
   // Pre-fetch library hero images for all stops in one query so we can
   // populate heroImageUrl at insert time and skip DALL-E for seeded stops.
-  const allNormalizedNames = sortedStops.map(s => s.name.toLowerCase().trim());
+  const allNormalizedNames = sortedStops.map(s => s.name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim());
   const libImageRows = allNormalizedNames.length > 0
     ? await db
         .select({ normalizedName: stopLibrary.normalizedName, imageUrl: stopLibrary.imageUrl })
@@ -4040,7 +4040,7 @@ export async function startAdventure(
       cityGroup: (s as any)._placeCity || plan.destination.split(",")[0]?.trim() || plan.destination,
       reviewRequired: s.reviewRequired ?? false,
       reviewNote: s.reviewNote ?? null,
-      heroImageUrl: libImageMap.get(s.name.toLowerCase().trim()) ?? undefined,
+      heroImageUrl: libImageMap.get(s.name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim()) ?? undefined,
     }).returning({ id: travelStops.id });
 
     // Track for snapshot enrichment (no enrichment yet — just record the pairing)
