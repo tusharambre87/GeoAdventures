@@ -120,6 +120,25 @@ export default function GameHub() {
 
         {/* ── Hub body ── */}
         <View style={s.body}>
+          {/* Hero — Hangman */}
+          <Pressable
+            style={({ pressed }) => [s.hangmanCard, pressed && { transform: [{ scale: 0.98 }] }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push('/kids/games/hangman' as never);
+            }}
+          >
+            <Text style={s.hangmanBg}>{'\uD83E\uDEA2'}</Text>
+            <View style={s.hangmanBadge}>
+              <Text style={s.hangmanBadgeText}>WORD GAME</Text>
+            </View>
+            <Text style={s.hangmanTitle}>Hangman</Text>
+            <Text style={s.hangmanDesc}>Guess travel words before the figure appears</Text>
+            <View style={s.hangmanPill}>
+              <Text style={s.hangmanPillText}>Play now {'\u2192'}</Text>
+            </View>
+          </Pressable>
+
           {/* Hero — Think Fast */}
           <Pressable
             style={({ pressed }) => [s.heroCard, pressed && { transform: [{ scale: 0.98 }] }]}
@@ -177,6 +196,33 @@ export default function GameHub() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFF8F0" },
+  // Hangman hero card
+  hangmanCard: {
+    borderRadius: 20, overflow: "hidden", padding: 24,
+    marginBottom: 12, backgroundColor: "#7C3AED",
+    minHeight: 170, position: "relative",
+  },
+  hangmanBg: {
+    position: "absolute", right: 12, top: "50%",
+    fontSize: 80, opacity: 0.14,
+  },
+  hangmanBadge: {
+    backgroundColor: "rgba(0,0,0,0.2)", borderRadius: 6,
+    paddingHorizontal: 10, paddingVertical: 4,
+    alignSelf: "flex-start", marginBottom: 10,
+  },
+  hangmanBadgeText: {
+    fontFamily: F.bold, fontSize: 10,
+    color: "rgba(255,255,255,0.9)", letterSpacing: 0.8,
+  },
+  hangmanTitle: { fontFamily: F.bold, fontSize: 30, color: "#fff", marginBottom: 4 },
+  hangmanDesc: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.8)", marginBottom: 16 },
+  hangmanPill: {
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12,
+    paddingHorizontal: 18, paddingVertical: 10, alignSelf: "flex-start",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.25)",
+  },
+  hangmanPillText: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
   // Header
   header: {
     backgroundColor: "#7C3AED",
