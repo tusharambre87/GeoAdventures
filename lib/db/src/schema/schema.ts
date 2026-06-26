@@ -3817,6 +3817,7 @@ export const stopLibrary = pgTable("stop_library", {
   gpVerifiedAt: timestamp("gp_verified_at"),   // set after lookup; NULL = not yet attempted
   metroArea: text("metro_area"),               // metro region this stop belongs to (e.g. 'Minneapolis'); NULL = city-only
   distanceFromMetroKm: numeric("distance_from_metro_km", { precision: 6, scale: 1 }), // haversine km from city center
+  imageUrl: text("image_url"),               // hero image stored in object storage (stop-images/...)
 }, (table) => [
   index("IDX_stop_library_normalized_key").on(table.normalizedKey),
   // Dedup key: same normalized stop name in same city → update, not duplicate insert

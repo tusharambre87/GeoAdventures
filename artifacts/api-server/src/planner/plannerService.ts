@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { db } from "../db";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, sql, or, inArray } from "drizzle-orm";
 import {
   plannerTripPlans,
   plannerTripPlanStops,
@@ -4008,6 +4008,17 @@ export async function startAdventure(
     return a.displayOrder - b.displayOrder;
   });
 
+  // Pre-fetch library hero images for all stops in one query so we can
+  // populate heroImageUrl at insert time and skip DALL-E for seeded stops.
+  const allNormalizedNames = sortedStops.map(s => s.name.toLowerCase().trim());
+  const libImageRows = allNormalizedNames.length > 0
+    ? await db
+        .select({ normalizedName: stopLibrary.normalizedName, imageUrl: stopLibrary.imageUrl })
+        .from(stopLibrary)
+        .where(inArray(stopLibrary.normalizedName, allNormalizedNames))
+    : [];
+  const libImageMap = new Map(libImageRows.map(r => [r.normalizedName, r.imageUrl]));
+
   // Phase 2: collect created stop IDs alongside their planner stop data
   // so the snapshot pass can enrich them after all inserts complete.
   const createdStopsForSnapshot: Array<{
@@ -4029,6 +4040,7 @@ export async function startAdventure(
       cityGroup: (s as any)._placeCity || plan.destination.split(",")[0]?.trim() || plan.destination,
       reviewRequired: s.reviewRequired ?? false,
       reviewNote: s.reviewNote ?? null,
+      heroImageUrl: libImageMap.get(s.name.toLowerCase().trim()) ?? undefined,
     }).returning({ id: travelStops.id });
 
     // Track for snapshot enrichment (no enrichment yet — just record the pairing)

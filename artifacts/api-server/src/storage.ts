@@ -2834,7 +2834,17 @@ export class DatabaseStorage implements IStorage {
   
   // Stops
   async createStop(stopData: InsertTravelStop): Promise<TravelStop> {
-    const [stop] = await db.insert(travelStops).values(stopData).returning();
+    let heroImageUrl = stopData.heroImageUrl ?? null;
+    if (!heroImageUrl) {
+      const normalizedName = stopData.name.toLowerCase().trim();
+      const [libRow] = await db
+        .select({ imageUrl: stopLibrary.imageUrl })
+        .from(stopLibrary)
+        .where(eq(stopLibrary.normalizedName, normalizedName))
+        .limit(1);
+      heroImageUrl = libRow?.imageUrl ?? null;
+    }
+    const [stop] = await db.insert(travelStops).values({ ...stopData, heroImageUrl: heroImageUrl ?? undefined } as InsertTravelStop).returning();
     return stop;
   }
   
