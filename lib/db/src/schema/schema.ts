@@ -3807,6 +3807,7 @@ export const stopLibrary = pgTable("stop_library", {
   gpPlaceId: varchar("gp_place_id"),           // Places place_id; 'NOT_FOUND' if no match
   gpHours: jsonb("gp_hours"),                  // opening_hours object from Places Details
   gpRating: numeric("gp_rating"),              // 0.0–5.0
+  gpRatingsTotal: integer("gp_ratings_total"), // user_ratings_total from Places API
   gpPhotoRefs: text("gp_photo_refs").array(),  // photo_reference tokens only (no key embedded)
   gpPriceLevel: integer("gp_price_level"),     // 0–4
   gpAddressVerified: text("gp_address_verified"),
