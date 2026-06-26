@@ -709,19 +709,23 @@ export function getCategoriesForTrip(
   return [...new Set(categories)];
 }
 
+function toAlphaOnly(s: string): string {
+  return s.toUpperCase().replace(/[^A-Z]/g, '');
+}
+
 export function getDestinationWords(trip: {
   city?: string;
   state?: string;
   stops?: { name?: string }[];
 }): HangmanWord[] {
   const words: HangmanWord[] = [];
-  const city = trip.city?.toUpperCase().replace(/\s/g, '');
-  const state = trip.state?.toUpperCase().replace(/\s/g, '');
+  const city = trip.city ? toAlphaOnly(trip.city) : undefined;
+  const state = trip.state ? toAlphaOnly(trip.state) : undefined;
 
   if (city && city.length >= 3 && city.length <= 12) {
     words.push({
       word: city,
-      category: 'Geography — Destination',
+      category: 'Geography \u2014 Destination',
       difficulty: city.length > 6 ? 'hard' : 'easy',
       definition: 'The city you are visiting on this trip!',
       usageExample: `We are going to ${trip.city} for our family vacation.`,
@@ -732,7 +736,7 @@ export function getDestinationWords(trip: {
   if (state && state !== city && state.length >= 3 && state.length <= 12) {
     words.push({
       word: state,
-      category: 'Geography — Destination',
+      category: 'Geography \u2014 Destination',
       difficulty: state.length > 6 ? 'hard' : 'easy',
       definition: `The state where ${trip.city} is located.`,
       usageExample: `${trip.city} is in the state of ${trip.state}.`,
@@ -742,11 +746,11 @@ export function getDestinationWords(trip: {
 
   const stops = trip.stops?.slice(0, 3) ?? [];
   stops.forEach((stop) => {
-    const w = stop.name?.toUpperCase().replace(/\s/g, '');
+    const w = stop.name ? toAlphaOnly(stop.name) : undefined;
     if (w && w.length >= 4 && w.length <= 12) {
       words.push({
         word: w,
-        category: 'Geography — Destination',
+        category: 'Geography \u2014 Destination',
         difficulty: w.length > 6 ? 'hard' : 'easy',
         definition: 'A place you will visit on this trip!',
         usageExample: `We are going to ${stop.name} today.`,
