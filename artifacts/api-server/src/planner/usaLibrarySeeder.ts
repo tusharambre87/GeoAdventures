@@ -1,12 +1,17 @@
 /**
  * USA Library Seeder
  *
- * For each of the 60 USA cities in CITIES_TO_SEED, checks whether stop_library
- * already has ≥20 stops. If not, calls generateCityStops to generate the
- * shortfall and upserts them via saveStopLibraryEntries.
+ * For each of the 60 USA cities in USA_CITIES, checks whether stop_library
+ * already has ≥ the city's target stop count. If not, calls generateCityStops
+ * to generate the shortfall and upserts them via saveStopLibraryEntries.
  *
- * Fully idempotent — cities already at ≥20 stops are skipped.
- * Processes cities sequentially with a 500ms delay to respect rate limits.
+ * Most cities default to DEFAULT_TARGET (20 stops). National parks and large
+ * multi-day outdoor destinations override to a higher target via
+ * CITY_TARGET_OVERRIDES — one config change raises pool depth for the whole
+ * category without manual inserts.
+ *
+ * Fully idempotent — cities already at their target are skipped.
+ * Processes cities sequentially with a 500 ms delay to respect rate limits.
  *
  * After seeding completes, kicks off startEnrichmentQueue("USA") to enrich all
  * newly added stops.
@@ -14,8 +19,34 @@
 
 import { storage } from "../storage";
 
-const TARGET_STOPS = 20;
+const DEFAULT_TARGET = 20;
 const DELAY_BETWEEN_CITIES_MS = 500;
+
+/**
+ * Per-city stop-count targets.
+ *
+ * Rationale for higher targets:
+ *   National parks (40): genuinely have 40+ named family destinations; a
+ *     5–7 day trip at moderate pace consumes 12–14 stops, so 20 exhausts
+ *     the pool and kills trip variety on repeat visits.
+ *   Large outdoor destinations (35): week-long trips are common; 20 stops
+ *     leaves almost no selection headroom after the planner picks anchors.
+ *   Compact nature destinations (30): smaller footprint but still richer
+ *     than a metro city — 30 gives the planner meaningful choice.
+ *
+ * All other cities stay at DEFAULT_TARGET = 20.
+ */
+const CITY_TARGET_OVERRIDES: Record<string, number> = {
+  "Yellowstone":   40,
+  "Grand Canyon":  40,
+  "Bar Harbor":    35,   // Acadia National Park gateway
+  "Gatlinburg":    35,   // Great Smoky Mountains
+  "Jackson Hole":  35,
+  "Big Island":    35,   // Hawaii Volcanoes NP + Mauna Kea
+  "Anchorage":     35,
+  "Sedona":        30,
+  "Park City":     30,
+};
 
 const USA_CITIES = [
   "Orlando",
@@ -84,6 +115,10 @@ function normalizeKey(city: string, country: string): string {
   return `${city.toLowerCase().trim()}:${country.toLowerCase().trim()}`;
 }
 
+function targetForCity(city: string): number {
+  return CITY_TARGET_OVERRIDES[city] ?? DEFAULT_TARGET;
+}
+
 let usaSeedRunning = false;
 
 export async function seedUSACityLibrary(): Promise<void> {
@@ -93,7 +128,7 @@ export async function seedUSACityLibrary(): Promise<void> {
   }
   usaSeedRunning = true;
 
-  console.log(`[USALibrarySeeder] Starting — ${USA_CITIES.length} cities to check (target: ${TARGET_STOPS} stops each)`);
+  console.log(`[USALibrarySeeder] Starting — ${USA_CITIES.length} cities to check`);
 
   let citiesSeeded = 0;
   let citiesSkipped = 0;
@@ -103,16 +138,17 @@ export async function seedUSACityLibrary(): Promise<void> {
     const { generateCityStops } = await import("../travelContent.js");
 
     for (const city of USA_CITIES) {
+      const target = targetForCity(city);
       try {
         const existing = await storage.getStopLibraryByCity(city, "USA");
-        if (existing.length >= TARGET_STOPS) {
-          console.log(`[USALibrarySeeder] ✓ ${city} — ${existing.length} stops already (skipping)`);
+        if (existing.length >= target) {
+          console.log(`[USALibrarySeeder] ✓ ${city} — ${existing.length}/${target} stops already (skipping)`);
           citiesSkipped++;
           continue;
         }
 
-        const needed = TARGET_STOPS - existing.length;
-        console.log(`[USALibrarySeeder] → ${city} — ${existing.length}/${TARGET_STOPS} stops, generating ${needed} more…`);
+        const needed = target - existing.length;
+        console.log(`[USALibrarySeeder] → ${city} — ${existing.length}/${target} stops, generating ${needed} more…`);
 
         const generatedStops = await generateCityStops(city, null, "USA", needed, "family_explorer");
 

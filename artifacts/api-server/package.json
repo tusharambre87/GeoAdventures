@@ -26,7 +26,10 @@
     "backfill:recompute-gp-floor": "tsx src/scripts/recompute-gp-floor.ts",
     "backfill:recompute-gp-floor-cache-bust": "tsx src/scripts/recompute-gp-floor-cache-bust.ts",
     "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts",
-    "script:tag-metro": "tsx src/scripts/tagMetroStops.ts"
+    "script:tag-metro": "tsx src/scripts/tagMetroStops.ts",
+    "seed:yellowstone": "tsx src/scripts/seed-yellowstone.ts",
+    "dedup:gp-place-id": "tsx src/scripts/dedup-gp-place-id.ts",
+    "dedup:gp-place-id:yellowstone": "DEDUP_CITY=Yellowstone tsx src/scripts/dedup-gp-place-id.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
