@@ -2600,7 +2600,7 @@ export function selectStopsFromPool(
         const a2 = c.age2to4Fit ?? 0;
         const a8 = c.age8to12Fit ?? 0;
         if (a2 >= 75) return false;
-        if (a8 - a2 < 20) return false;
+        if (a8 - a2 < 10) return false;
         if (input.indoorLean === 'indoor' && c.indoorOutdoor !== 'indoor' && c.indoorOutdoor !== 'both') return false;
         if (input.indoorLean === 'outdoor' && c.indoorOutdoor !== 'outdoor' && c.indoorOutdoor !== 'both') return false;
         return true;

@@ -5712,19 +5712,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               kidEnergyLevel: tripTailoring?.kidEnergyLevel ?? undefined,
               stopsPerDayOverride: effectivePerDay,
             };
-            await storage.updateTrip(tripId, {
-              plannerInputSnapshot: {
-                childrenAges,
-                pace: plannerPace,
-                tripStyle,
-                interests: plannerInput.interests,
-                strollerNeeded: plannerInput.strollerNeeded,
-                indoorLean: plannerInput.indoorLean,
-                budgetSensitivity: tripTailoring?.budgetSensitivity,
-                kidEnergyLevel: tripTailoring?.kidEnergyLevel,
-                generatedAt: new Date().toISOString(),
-              },
-            });
+            try {
+              await storage.updateTrip(tripId, {
+                plannerInputSnapshot: {
+                  childrenAges,
+                  pace: plannerPace,
+                  tripStyle,
+                  interests: plannerInput.interests,
+                  strollerNeeded: plannerInput.strollerNeeded,
+                  indoorLean: plannerInput.indoorLean,
+                  budgetSensitivity: tripTailoring?.budgetSensitivity,
+                  kidEnergyLevel: tripTailoring?.kidEnergyLevel,
+                  generatedAt: new Date().toISOString(),
+                },
+              });
+            } catch (snapshotErr) {
+              console.error(`[Travel] [bg] plannerInputSnapshot write failed (non-fatal):`, snapshotErr);
+            }
             const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             // Separate meals from activity stops BEFORE slicing so meal stops from all
             // days are captured regardless of effectiveStopCount.
