@@ -52,6 +52,9 @@ import {
 const LOG = "[RecomputeGpFloor]";
 const PAUSE_MS = 200;
 
+/** Optional city scope — set CITY_FILTER=yellowstone to process one city only. */
+const CITY_FILTER = process.env.CITY_FILTER?.trim().toLowerCase() ?? null;
+
 /**
  * Canonical "classic" family profile — identical to CANONICAL_PROFILES[1]
  * used in backfillLibraryPsi.ts. No per-stop overrides; stop-specific data
@@ -159,7 +162,11 @@ async function run(): Promise<void> {
   // (they get gpData = null, so the floor doesn't fire — correct behaviour).
   // The orphan gate then flags stop_library rows with GP data that were missed.
 
-  console.log(`${LOG} Loading PSI rows…`);
+  console.log(`${LOG} Loading PSI rows… ${CITY_FILTER ? `(city filter: ${CITY_FILTER})` : "(full library)"}`);
+
+  const cityWhereClause = CITY_FILTER
+    ? sql`${plannerStopIntelligence.manuallyOverridden} IS NOT TRUE AND LOWER(TRIM(${plannerPlaces.city})) LIKE ${'%' + CITY_FILTER + '%'}`
+    : sql`${plannerStopIntelligence.manuallyOverridden} IS NOT TRUE`;
 
   const rows = await db
     .select({
@@ -180,7 +187,7 @@ async function run(): Promise<void> {
         sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${plannerPlaces.city}))`,
       ),
     )
-    .where(sql`${plannerStopIntelligence.manuallyOverridden} IS NOT TRUE`);
+    .where(cityWhereClause);
 
   console.log(`${LOG} ${rows.length} PSI rows to process.`);
 
