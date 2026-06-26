@@ -14,10 +14,12 @@ import {
 import Svg, { Circle, Line, Path, Rect } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { API_BASE } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 import {
   getCategoriesForTrip,
+  getDestinationWords,
   HANGMAN_WORDS,
   type HangmanWord,
 } from "@/constants/hangmanWords";
@@ -139,14 +141,46 @@ export default function HangmanGame() {
     "Road Trip",
     "Geography \u2014 World",
   ]);
+  const [destWords, setDestWords] = useState<HangmanWord[]>([]);
 
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const bounceRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    const cats = getCategoriesForTrip(stopName || "", [], []);
-    setCategories(cats);
-  }, [stopName]);
+    if (!tripId) {
+      const cats = getCategoriesForTrip(stopName || "", [], []);
+      setCategories(cats);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("authToken");
+        const res = await fetch(`${API_BASE}/api/travel/trips/${tripId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok || cancelled) return;
+        const trip = await res.json();
+        if (cancelled) return;
+        const cityName: string = trip.destination || stopName || "";
+        const stopTypes: string[] = (trip.stops ?? [])
+          .map((s: { stopType?: string | null }) => s.stopType)
+          .filter(Boolean) as string[];
+        const cats = getCategoriesForTrip(cityName, stopTypes, []);
+        setCategories(cats);
+        const dWords = getDestinationWords({
+          city: cityName,
+          state: undefined,
+          stops: (trip.stops ?? []).map((s: { name?: string }) => ({ name: s.name })),
+        });
+        setDestWords(dWords);
+      } catch {
+        const cats = getCategoriesForTrip(stopName || "", [], []);
+        setCategories(cats);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tripId, stopName]);
 
   useEffect(() => {
     if (gameState === "won") {
@@ -181,7 +215,7 @@ export default function HangmanGame() {
   const isLost = wrongGuesses.length >= maxWrong;
 
   const startGame = useCallback(async () => {
-    const storageKey = `hangman_seen_${tripId || "default"}_${difficulty}`;
+    const storageKey = `hangman_seen_${tripId || "default"}`;
     let seen: string[] = [];
     try {
       const raw = await AsyncStorage.getItem(storageKey);
@@ -190,13 +224,16 @@ export default function HangmanGame() {
       seen = [];
     }
 
-    const pool = HANGMAN_WORDS.filter(
+    const staticPool = HANGMAN_WORDS.filter(
       (w) =>
         w.difficulty === difficulty &&
-        categories.some(
-          (c) => c === w.category || w.category === "Geography \u2014 Destination"
-        )
+        categories.some((c) => c === w.category)
     );
+    const destPool = destWords.filter((w) => w.difficulty === difficulty);
+    const wordSet = new Map<string, HangmanWord>();
+    for (const w of staticPool) wordSet.set(w.word, w);
+    for (const w of destPool) wordSet.set(w.word, w);
+    const pool = [...wordSet.values()];
 
     let unseen = pool.filter((w) => !seen.includes(w.word));
     if (unseen.length === 0) {
@@ -218,7 +255,7 @@ export default function HangmanGame() {
     setCurrentWord(pick);
     setGuessedLetters(new Set());
     setGameState("playing");
-  }, [difficulty, categories, tripId]);
+  }, [difficulty, categories, destWords, tripId]);
 
   const guessLetter = useCallback(
     (letter: string) => {
