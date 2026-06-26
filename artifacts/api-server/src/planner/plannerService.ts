@@ -2983,6 +2983,12 @@ export function selectStopsFromPool(
         usedTypes.set(anchor.type, (usedTypes.get(anchor.type) ?? 0) + 1);
         anchorsInCurrentDay++;
         if (anchor.neighborhoodZone) zonesInCurrentDay.add(anchor.neighborhoodZone);
+        // Propagate anchor coordinates so the geographic leg-cap fires for slot 1.
+        // Without this, lastLat stays null (reset at day boundary) and the 25-min cap
+        // is never evaluated for the second stop on any 2-stop day.
+        const _aLat = anchor.latitude ? parseFloat(String(anchor.latitude)) : null;
+        const _aLon = anchor.longitude ? parseFloat(String(anchor.longitude)) : null;
+        if (_aLat && _aLon) { lastLat = _aLat; lastLon = _aLon; }
         _injected++;
       }
       if (_injected > 0) continue;
@@ -3137,6 +3143,11 @@ export function selectStopsFromPool(
   }
 
   // Fill if we still need more stops (pool exhausted before totalStopsNeeded)
+  // TODO(pre-scaling): this fill-up bypasses ALL constraints — leg cap, museum cap,
+  // type diversity. For Yellowstone it only catches 2 non-museum stops (Lamar Valley,
+  // Tower Fall) so no harm. Before running on other cities, make the fill-up respect
+  // at least the museum cap (apply museumsTotal < maxMuseumsPerTrip check here) to
+  // prevent a 3rd visitor center sneaking in via fill-up in museum-heavy city pools.
   if (selected.length < totalStopsNeeded) {
     for (const stop of remaining) {
       if (selected.length >= totalStopsNeeded) break;
