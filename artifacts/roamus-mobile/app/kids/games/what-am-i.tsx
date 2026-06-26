@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 import {
-  CLUE_POINTS,
   pickPuzzle,
   type WhatAmIPuzzle,
 } from "@/constants/whatAmIData";
@@ -30,6 +29,9 @@ type Difficulty = "easy" | "hard";
 const SEARCH_ICON = "\uD83D\uDD0D";
 const TARGET_ICON = "\uD83C\uDFAF";
 const STAR_ICON = "\u2B50";
+
+const EASY_POINTS = [3, 2, 1] as const;
+const HARD_POINTS = [5, 4, 3, 2, 1] as const;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -92,9 +94,12 @@ export default function WhatAmIGame() {
 
   const handleOptionTap = useCallback((option: string) => {
     if (!puzzle) return;
+    const activeClues = difficulty === "hard" ? puzzle.hardClues : puzzle.clues;
+    const maxClues = activeClues.length;
     if (option === puzzle.answer) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const pts = CLUE_POINTS[currentClue] ?? 1;
+      const cluePoints = difficulty === "hard" ? HARD_POINTS : EASY_POINTS;
+      const pts = cluePoints[currentClue] ?? 1;
       setScoreEarned(pts);
       setClueOnWin(currentClue + 1);
       setGameState("correct");
@@ -103,16 +108,18 @@ export default function WhatAmIGame() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const newEliminated = [...eliminatedOptions, option];
     setEliminatedOptions(newEliminated);
-    if (currentClue < 2) {
+    if (currentClue < maxClues - 1) {
       setCurrentClue(prev => prev + 1);
     } else {
       setGameState("revealed");
     }
-  }, [puzzle, currentClue, eliminatedOptions]);
+  }, [puzzle, currentClue, eliminatedOptions, difficulty]);
 
   const advanceClue = useCallback(() => {
     if (!puzzle) return;
-    if (currentClue >= 2) {
+    const activeClues = difficulty === "hard" ? puzzle.hardClues : puzzle.clues;
+    const maxClues = activeClues.length;
+    if (currentClue >= maxClues - 1) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setGameState("revealed");
     } else {
@@ -120,14 +127,15 @@ export default function WhatAmIGame() {
       setCurrentClue(prev => prev + 1);
       setHardInput("");
     }
-  }, [puzzle, currentClue]);
+  }, [puzzle, currentClue, difficulty]);
 
   const handleHardSubmit = useCallback(() => {
     if (!puzzle) return;
     const cleaned = hardInput.trim().toUpperCase();
     if (cleaned === puzzle.answer) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const pts = CLUE_POINTS[currentClue] ?? 1;
+      const cluePoints = HARD_POINTS;
+      const pts = cluePoints[currentClue] ?? 1;
       setScoreEarned(pts);
       setClueOnWin(currentClue + 1);
       setGameState("correct");
@@ -140,6 +148,7 @@ export default function WhatAmIGame() {
 
   // ── MODE SELECT ─────────────────────────────────────────────────────────────
   if (gameState === "mode_select") {
+    const cluePoints = difficulty === "hard" ? HARD_POINTS : EASY_POINTS;
     return (
       <View style={{ flex: 1, backgroundColor: "#FFF8F0" }}>
         <ScrollView
@@ -208,7 +217,9 @@ export default function WhatAmIGame() {
             <View style={ms.howCard}>
               <View style={ms.howRow}>
                 <View style={[ms.howDot, { backgroundColor: "#7C3AED" }]} />
-                <Text style={ms.howText}>Up to 3 clues revealed one at a time</Text>
+                <Text style={ms.howText}>
+                  Up to {difficulty === "hard" ? "5" : "3"} clues revealed one at a time
+                </Text>
               </View>
               <View style={ms.howRow}>
                 <View style={[ms.howDot, { backgroundColor: "#7C3AED" }]} />
@@ -222,7 +233,7 @@ export default function WhatAmIGame() {
 
             <Text style={[ms.sectionLabel, { marginTop: 8 }]}>POINTS PER CLUE</Text>
             <View style={ms.pointsCard}>
-              {CLUE_POINTS.map((pts, i) => (
+              {cluePoints.map((pts, i) => (
                 <View
                   key={i}
                   style={[ms.pointsRow, i === 0 && ms.pointsRowHighlight]}
@@ -257,10 +268,13 @@ export default function WhatAmIGame() {
 
   // ── PLAYING ─────────────────────────────────────────────────────────────────
   if (gameState === "playing" && puzzle) {
-    const currentPoints = CLUE_POINTS[currentClue] ?? 1;
-    const previousClues = puzzle.clues.slice(0, currentClue);
-    const activeClue = puzzle.clues[currentClue];
-    const isLastClue = currentClue >= 2;
+    const activeClues = difficulty === "hard" ? puzzle.hardClues : puzzle.clues;
+    const maxClues = activeClues.length;
+    const cluePoints = difficulty === "hard" ? HARD_POINTS : EASY_POINTS;
+    const currentPoints = cluePoints[currentClue] ?? 1;
+    const previousClues = activeClues.slice(0, currentClue);
+    const activeClue = activeClues[currentClue];
+    const isLastClue = currentClue >= maxClues - 1;
 
     return (
       <View style={{ flex: 1, backgroundColor: "#2D1B69" }}>
@@ -276,9 +290,9 @@ export default function WhatAmIGame() {
             <Text style={pl.quitText}>{"\u2190"} Quit</Text>
           </Pressable>
 
-          {/* 3 progress dots */}
+          {/* progress dots */}
           <View style={pl.dotsRow}>
-            {puzzle.clues.map((_, i) => {
+            {activeClues.map((_, i) => {
               const isDone = i < currentClue;
               const isActive = i === currentClue;
               return (
@@ -301,106 +315,107 @@ export default function WhatAmIGame() {
           </View>
         </View>
 
-        {/* Scrollable clue area — fills remaining space */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={pl.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Clue history */}
-          {previousClues.length > 0 && (
-            <View style={pl.historyWrap}>
-              {previousClues.map((clue, i) => (
-                <View key={i} style={pl.historyRow}>
-                  <View style={pl.historyNum}>
-                    <Text style={pl.historyNumText}>{i + 1}</Text>
+        {/* Main content — clues top, input bottom */}
+        <View style={{ flex: 1, justifyContent: "space-between", paddingBottom: insets.bottom + 20 }}>
+
+          {/* TOP — clue history + active clue */}
+          <ScrollView
+            style={{ flexShrink: 1 }}
+            contentContainerStyle={{ padding: 20, gap: 8 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Previous clues greyed */}
+            {previousClues.length > 0 && (
+              <View style={pl.historyWrap}>
+                {previousClues.map((clue, i) => (
+                  <View key={i} style={pl.historyRow}>
+                    <View style={pl.historyNum}>
+                      <Text style={pl.historyNumText}>{i + 1}</Text>
+                    </View>
+                    <Text style={pl.historyText}>{clue}</Text>
                   </View>
-                  <Text style={pl.historyText}>{clue}</Text>
-                </View>
-              ))}
+                ))}
+              </View>
+            )}
+
+            {/* Active clue bubble */}
+            <View style={pl.bubbleWrap}>
+              <View style={pl.bubbleTail} />
+              <View style={pl.bubble}>
+                <Text style={pl.clueNum}>CLUE {currentClue + 1}</Text>
+                <Text style={pl.clueText}>{activeClue}</Text>
+              </View>
             </View>
-          )}
+          </ScrollView>
 
-          {/* Active clue bubble */}
-          <View style={pl.bubbleWrap}>
-            <View style={pl.bubbleTail} />
-            <View style={pl.bubble}>
-              <Text style={pl.clueNum}>CLUE {currentClue + 1}</Text>
-              <Text style={pl.clueText}>{activeClue}</Text>
-            </View>
-          </View>
+          {/* BOTTOM — input + submit + next clue */}
+          <View style={{ paddingHorizontal: 20, gap: 10 }}>
+            {/* Easy mode: 4 option buttons */}
+            {difficulty === "easy" && (
+              <View style={pl.optionsWrap}>
+                {shuffledOptions.map((opt) => {
+                  const isElim = eliminatedOptions.includes(opt);
+                  return (
+                    <Pressable
+                      key={opt}
+                      disabled={isElim}
+                      style={({ pressed }) => [
+                        pl.optBtn,
+                        isElim && pl.optBtnElim,
+                        !isElim && pressed && pl.optBtnPressed,
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        handleOptionTap(opt);
+                      }}
+                    >
+                      <Text style={[pl.optText, isElim && pl.optTextElim]}>
+                        {opt}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
 
-          {/* Spacer so options push to bottom */}
-          <View style={{ flex: 1, minHeight: 16 }} />
+            {/* Hard mode: text input + submit */}
+            {difficulty === "hard" && (
+              <View style={pl.inputWrap}>
+                <TextInput
+                  ref={inputRef}
+                  style={pl.textInput}
+                  value={hardInput}
+                  onChangeText={setHardInput}
+                  placeholder="Type your answer..."
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  autoCapitalize="characters"
+                  returnKeyType="done"
+                  onSubmitEditing={handleHardSubmit}
+                />
+                <Pressable
+                  style={({ pressed }) => [pl.submitBtn, pressed && { opacity: 0.85 }]}
+                  onPress={handleHardSubmit}
+                >
+                  <Text style={pl.submitText}>Submit</Text>
+                </Pressable>
+              </View>
+            )}
 
-          {/* Easy mode: 4 option buttons */}
-          {difficulty === "easy" && (
-            <View style={pl.optionsWrap}>
-              {shuffledOptions.map((opt) => {
-                const isElim = eliminatedOptions.includes(opt);
-                return (
-                  <Pressable
-                    key={opt}
-                    disabled={isElim}
-                    style={({ pressed }) => [
-                      pl.optBtn,
-                      isElim && pl.optBtnElim,
-                      !isElim && pressed && pl.optBtnPressed,
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      handleOptionTap(opt);
-                    }}
-                  >
-                    <Text style={[pl.optText, isElim && pl.optTextElim]}>
-                      {opt}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Hard mode: text input */}
-          {difficulty === "hard" && (
-            <View style={pl.inputWrap}>
-              <TextInput
-                ref={inputRef}
-                style={pl.textInput}
-                value={hardInput}
-                onChangeText={setHardInput}
-                placeholder="Type your answer..."
-                placeholderTextColor="rgba(255,255,255,0.35)"
-                autoCapitalize="characters"
-                returnKeyType="done"
-                onSubmitEditing={handleHardSubmit}
-              />
+            {/* Next clue button — hidden on last clue */}
+            {!isLastClue && (
               <Pressable
-                style={({ pressed }) => [pl.submitBtn, pressed && { opacity: 0.85 }]}
-                onPress={handleHardSubmit}
+                style={({ pressed }) => [pl.skipBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  advanceClue();
+                }}
               >
-                <Text style={pl.submitText}>Submit</Text>
+                <Text style={pl.skipText}>Not sure? Next clue {"\u2192"}</Text>
               </Pressable>
-            </View>
-          )}
-
-          {/* Next clue button — hidden on last clue */}
-          {!isLastClue && (
-            <Pressable
-              style={({ pressed }) => [pl.skipBtn, pressed && { opacity: 0.7 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                advanceClue();
-              }}
-            >
-              <Text style={pl.skipText}>Not sure? Next clue {"\u2192"}</Text>
-            </Pressable>
-          )}
-
-          {/* Bottom safe area padding */}
-          <View style={{ height: insets.bottom + 16 }} />
-        </ScrollView>
+            )}
+          </View>
+        </View>
       </View>
     );
   }
@@ -493,6 +508,7 @@ export default function WhatAmIGame() {
 
   // ── REVEALED ─────────────────────────────────────────────────────────────────
   if (gameState === "revealed" && puzzle) {
+    const activeClues = difficulty === "hard" ? puzzle.hardClues : puzzle.clues;
     return (
       <LinearGradient
         colors={["#1C0A0A", "#2D1515", "#3D1A1A"]}
@@ -525,10 +541,10 @@ export default function WhatAmIGame() {
             <Text style={rv.answerLabel}>The answer was</Text>
           </View>
 
-          {/* All 3 clues */}
+          {/* All clues */}
           <View style={rv.cluesCard}>
-            <Text style={rv.cluesLabel}>ALL 3 CLUES</Text>
-            {puzzle.clues.map((clue, i) => (
+            <Text style={rv.cluesLabel}>ALL {activeClues.length} CLUES</Text>
+            {activeClues.map((clue, i) => (
               <View key={i} style={rv.clueRow}>
                 <View style={rv.clueNum}>
                   <Text style={rv.clueNumText}>{i + 1}</Text>
@@ -573,317 +589,216 @@ export default function WhatAmIGame() {
   return null;
 }
 
-// ── MODE SELECT STYLES ────────────────────────────────────────────────────────
+// ── STYLES ───────────────────────────────────────────────────────────────────
+
 const ms = StyleSheet.create({
   header: {
-    backgroundColor: "#7C3AED",
-    paddingHorizontal: 20,
-    paddingBottom: 28,
+    backgroundColor: "#2D1B69",
+    paddingHorizontal: 24,
+    paddingBottom: 32,
     overflow: "hidden",
-    position: "relative",
   },
   circle1: {
-    position: "absolute", top: -60, right: -40,
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    position: "absolute", width: 200, height: 200, borderRadius: 100,
+    backgroundColor: "rgba(124,58,237,0.18)", top: -60, right: -60,
   },
   circle2: {
-    position: "absolute", bottom: -40, left: -20,
-    width: 140, height: 140, borderRadius: 70,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    position: "absolute", width: 140, height: 140, borderRadius: 70,
+    backgroundColor: "rgba(167,139,250,0.12)", bottom: -40, left: 20,
   },
-  watermark: {
-    position: "absolute", right: -10, top: 20,
-    fontSize: 110, opacity: 0.12,
-  },
-  backRow: { marginBottom: 16 },
-  backText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.7)" },
-  eyebrow: {
-    fontFamily: F.bold, fontSize: 11,
-    color: "rgba(255,255,255,0.5)", letterSpacing: 0.12 * 11,
-    marginBottom: 6,
-  },
-  title: { fontFamily: F.bold, fontSize: 34, color: "#fff", lineHeight: 40, marginBottom: 4 },
-  sub: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)" },
+  watermark: { position: "absolute", fontSize: 120, opacity: 0.06, right: -10, top: 10 },
+  backRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  backText: { fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.7)" },
+  eyebrow: { fontFamily: F.bold, fontSize: 11, letterSpacing: 2, color: "#A78BFA", marginBottom: 6 },
+  title: { fontFamily: F.bold, fontSize: 36, color: "#FFFFFF", lineHeight: 42, marginBottom: 8 },
+  sub: { fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.65)" },
   body: { padding: 20, gap: 12 },
-  sectionLabel: {
-    fontFamily: F.bold, fontSize: 11, color: "#78716C",
-    letterSpacing: 0.1 * 11,
-  },
+  sectionLabel: { fontFamily: F.bold, fontSize: 11, letterSpacing: 2, color: "#9CA3AF" },
   toggleRow: { flexDirection: "row", gap: 10 },
   diffCard: {
-    flex: 1, borderRadius: 18, padding: 18,
-    borderWidth: 2.5, borderColor: "transparent",
-    position: "relative", overflow: "hidden",
+    flex: 1, borderRadius: 16, padding: 16, borderWidth: 2, borderColor: "transparent",
+    backgroundColor: "#F9FAFB", position: "relative",
   },
-  diffEasy: { backgroundColor: "#ECFDF5", borderColor: "#D1FAE5" },
-  diffEasyOn: { borderColor: "#16A34A", backgroundColor: "#DCFCE7" },
-  diffHard: { backgroundColor: "#FEF3C7", borderColor: "#FDE68A" },
-  diffHardOn: { borderColor: "#D97706", backgroundColor: "#FEF9C3" },
-  diffIcon: { fontSize: 32, marginBottom: 10 },
-  diffTitle: { fontFamily: F.bold, fontSize: 16, marginBottom: 4 },
-  diffHint: { fontFamily: F.medium, fontSize: 11, lineHeight: 15, opacity: 0.8 },
+  diffEasy: { backgroundColor: "#ECFDF5" },
+  diffEasyOn: { borderColor: "#16A34A" },
+  diffHard: { backgroundColor: "#FFFBEB" },
+  diffHardOn: { borderColor: "#D97706" },
+  diffIcon: { fontSize: 28, marginBottom: 6 },
+  diffTitle: { fontFamily: F.bold, fontSize: 18, marginBottom: 2 },
+  diffHint: { fontFamily: F.medium, fontSize: 12 },
   diffCheck: {
-    position: "absolute", top: 12, right: 12,
-    width: 22, height: 22, borderRadius: 11,
-    alignItems: "center", justifyContent: "center",
+    position: "absolute", top: 8, right: 8, width: 22, height: 22,
+    borderRadius: 11, justifyContent: "center", alignItems: "center",
   },
-  diffCheckText: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
-  howCard: {
-    backgroundColor: "#fff", borderRadius: 16, padding: 16,
-    borderWidth: 1.5, borderColor: "rgba(0,0,0,0.06)", gap: 10,
-  },
-  howRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  howDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  howText: { fontFamily: F.medium, fontSize: 13, color: "#44403C", flex: 1, lineHeight: 19 },
-  pointsCard: {
-    backgroundColor: "#fff", borderRadius: 16,
-    borderWidth: 1.5, borderColor: "rgba(0,0,0,0.06)", overflow: "hidden",
-  },
+  diffCheckText: { fontFamily: F.bold, fontSize: 13, color: "#FFFFFF" },
+  howCard: { backgroundColor: "#F9FAFB", borderRadius: 14, padding: 16, gap: 10 },
+  howRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  howDot: { width: 8, height: 8, borderRadius: 4 },
+  howText: { fontFamily: F.medium, fontSize: 14, color: "#374151", flex: 1 },
+  pointsCard: { backgroundColor: "#F9FAFB", borderRadius: 14, overflow: "hidden" },
   pointsRow: {
-    flexDirection: "row", justifyContent: "space-between",
-    alignItems: "center", paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.05)",
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
   },
-  pointsRowHighlight: { backgroundColor: "#7C3AED" },
-  pointsClue: { fontFamily: F.medium, fontSize: 13, color: "#44403C" },
-  pointsVal: { fontFamily: F.bold, fontSize: 14, color: "#7C3AED" },
-  pointsTextHL: { color: "#fff" },
-  pointsValHL: { color: "#FCD34D" },
+  pointsRowHighlight: { backgroundColor: "#EDE9FE" },
+  pointsClue: { fontFamily: F.medium, fontSize: 14, color: "#6B7280" },
+  pointsTextHL: { color: "#5B21B6", fontFamily: F.bold },
+  pointsVal: { fontFamily: F.bold, fontSize: 16, color: "#374151" },
+  pointsValHL: { color: "#7C3AED", fontSize: 18 },
   cta: {
-    backgroundColor: "#E8692A", borderRadius: 16,
-    paddingVertical: 18, alignItems: "center",
-    shadowColor: "#E8692A", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
-    elevation: 6, marginTop: 4,
+    backgroundColor: "#E8692A", borderRadius: 16, paddingVertical: 18,
+    alignItems: "center", marginTop: 4,
   },
-  ctaText: { fontFamily: F.bold, fontSize: 17, color: "#fff" },
+  ctaText: { fontFamily: F.bold, fontSize: 18, color: "#FFFFFF" },
 });
 
-// ── PLAYING STYLES ────────────────────────────────────────────────────────────
 const pl = StyleSheet.create({
   topBar: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingBottom: 16,
+    paddingHorizontal: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  quitBtn: {
-    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
-  },
-  quitText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.7)" },
+  quitBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  quitText: { fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.6)" },
   dotsRow: { flexDirection: "row", gap: 6, alignItems: "center" },
-  dot: { borderRadius: 4 },
-  dotDone: { width: 18, height: 7, backgroundColor: "#7C3AED" },
-  dotActive: { width: 22, height: 9, backgroundColor: "#fff" },
-  dotNext: { width: 7, height: 7, backgroundColor: "rgba(255,255,255,0.25)" },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  dotDone: { backgroundColor: "#16A34A" },
+  dotActive: { backgroundColor: "#E8692A", width: 14, height: 14, borderRadius: 7 },
+  dotNext: { backgroundColor: "rgba(255,255,255,0.2)" },
   scoreBadge: {
-    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: "rgba(232,105,42,0.22)", borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 4,
   },
-  scoreText: { fontFamily: F.bold, fontSize: 13, color: "#FCD34D" },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 4,
-  },
-  historyWrap: { marginBottom: 8, gap: 8 },
-  historyRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  scoreText: { fontFamily: F.bold, fontSize: 15, color: "#F97316" },
+  historyWrap: { gap: 6, marginBottom: 4 },
+  historyRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   historyNum: {
     width: 20, height: 20, borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignItems: "center", justifyContent: "center",
-    marginTop: 1, flexShrink: 0,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center", alignItems: "center", marginTop: 1, flexShrink: 0,
   },
   historyNumText: { fontFamily: F.bold, fontSize: 10, color: "rgba(255,255,255,0.5)" },
-  historyText: { fontFamily: F.medium, fontSize: 12, color: "rgba(255,255,255,0.4)", flex: 1, lineHeight: 18 },
-  bubbleWrap: { marginBottom: 8, position: "relative" },
+  historyText: {
+    fontFamily: F.medium, fontSize: 13,
+    color: "rgba(255,255,255,0.35)", flex: 1, lineHeight: 18,
+    textDecorationLine: "line-through",
+  },
+  bubbleWrap: { position: "relative", marginTop: 4 },
   bubbleTail: {
-    width: 0, height: 0, marginLeft: 28,
-    borderLeftWidth: 8, borderRightWidth: 8, borderBottomWidth: 10,
+    position: "absolute", top: -7, left: 24,
+    width: 0, height: 0,
+    borderLeftWidth: 8, borderRightWidth: 8, borderBottomWidth: 8,
     borderLeftColor: "transparent", borderRightColor: "transparent",
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomColor: "#4C1D95",
   },
   bubble: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 16, padding: 20, minHeight: 100,
-    justifyContent: "center",
+    backgroundColor: "#4C1D95", borderRadius: 18, padding: 20,
+    borderWidth: 1, borderColor: "rgba(139,92,246,0.3)",
   },
-  clueNum: {
-    fontFamily: F.bold, fontSize: 10,
-    color: "rgba(255,255,255,0.45)", letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  clueText: {
-    fontFamily: "Fraunces_900Black",
-    fontSize: 18, color: "#fff", lineHeight: 26, fontStyle: "italic",
-  },
-  optionsWrap: { gap: 10, marginBottom: 10 },
+  clueNum: { fontFamily: F.bold, fontSize: 11, color: "#A78BFA", letterSpacing: 1.5, marginBottom: 8 },
+  clueText: { fontFamily: F.medium, fontSize: 17, color: "#FFFFFF", lineHeight: 26 },
+  optionsWrap: { gap: 10 },
   optBtn: {
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 14,
+    paddingVertical: 16, paddingHorizontal: 20,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
   },
-  optBtnElim: {
-    opacity: 0.25,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: "rgba(255,255,255,0.06)",
-  },
+  optBtnElim: { backgroundColor: "rgba(220,38,38,0.15)", borderColor: "rgba(220,38,38,0.3)", opacity: 0.5 },
   optBtnPressed: { backgroundColor: "rgba(255,255,255,0.22)" },
-  optText: {
-    fontSize: 17,
-    fontFamily: F.bold,
-    color: "#fff",
-    letterSpacing: 1,
-  },
-  optTextElim: {
-    textDecorationLine: "line-through",
-    color: "rgba(255,255,255,0.4)",
-  },
-  inputWrap: { gap: 10, marginBottom: 10 },
+  optText: { fontFamily: F.bold, fontSize: 16, color: "#FFFFFF" },
+  optTextElim: { color: "rgba(255,255,255,0.35)", textDecorationLine: "line-through" },
+  inputWrap: { gap: 10 },
   textInput: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 14, paddingVertical: 16, paddingHorizontal: 20,
-    fontFamily: F.bold, fontSize: 16, color: "#fff",
-    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 14,
+    paddingHorizontal: 18, paddingVertical: 16,
+    fontFamily: F.medium, fontSize: 17, color: "#FFFFFF",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.2)",
   },
   submitBtn: {
     backgroundColor: "#E8692A", borderRadius: 14,
     paddingVertical: 16, alignItems: "center",
   },
-  submitText: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
-  skipBtn: {
-    borderRadius: 12,
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.18)",
-    borderStyle: "dashed",
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 0,
-  },
-  skipText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.5)" },
+  submitText: { fontFamily: F.bold, fontSize: 17, color: "#FFFFFF" },
+  skipBtn: { alignItems: "center", paddingVertical: 6 },
+  skipText: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.45)" },
 });
 
-// ── CORRECT STYLES ────────────────────────────────────────────────────────────
 const cr = StyleSheet.create({
-  container: { paddingHorizontal: 20 },
-  closeRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 },
+  container: { paddingHorizontal: 24, alignItems: "stretch" },
+  closeRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 8 },
   closeBtn: {
-    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 8,
   },
-  closeTxt: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.8)" },
-  hero: { alignItems: "center", marginBottom: 24 },
-  emoji: { fontSize: 56, marginBottom: 12 },
-  headline: { fontFamily: F.bold, fontSize: 40, color: "#fff", marginBottom: 8 },
-  answer: {
-    fontSize: 28, fontFamily: F.bold,
-    color: "#6EE7B7", letterSpacing: 6, marginBottom: 4,
-  },
-  clueLabel: {
-    fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.55)",
-    marginBottom: 14,
-  },
+  closeTxt: { fontFamily: F.bold, fontSize: 14, color: "#FFFFFF" },
+  hero: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  emoji: { fontSize: 72 },
+  headline: { fontFamily: "Fraunces_900Black", fontSize: 40, color: "#FFFFFF", textAlign: "center" },
+  answer: { fontFamily: F.bold, fontSize: 28, color: "#6EE7B7", textAlign: "center" },
+  clueLabel: { fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.7)", textAlign: "center" },
   scoreBadge: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 20, paddingHorizontal: 20, paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24,
+    paddingHorizontal: 20, paddingVertical: 10, marginTop: 4,
   },
-  scoreText: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.8)" },
-  scoreVal: { color: "#FCD34D" },
-  factCard: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 20, padding: 20, marginBottom: 12,
-  },
-  factLabel: {
-    fontFamily: F.bold, fontSize: 10,
-    color: "rgba(255,255,255,0.45)", letterSpacing: 1.2, marginBottom: 8,
-  },
-  factText: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 21 },
+  scoreText: { fontFamily: F.medium, fontSize: 15, color: "#FFFFFF" },
+  scoreVal: { fontFamily: F.bold, fontSize: 18, color: "#6EE7B7" },
+  factCard: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 16, padding: 20, marginBottom: 16 },
+  factLabel: { fontFamily: F.bold, fontSize: 11, color: "rgba(110,231,183,0.8)", letterSpacing: 2, marginBottom: 8 },
+  factText: { fontFamily: F.medium, fontSize: 15, color: "rgba(255,255,255,0.85)", lineHeight: 22 },
   xpNote: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16,
-    alignItems: "center", marginBottom: 16,
+    backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12,
+    padding: 14, alignItems: "center", marginBottom: 24,
   },
-  xpText: { fontFamily: F.medium, fontSize: 12, color: "rgba(255,255,255,0.4)" },
-  actions: { gap: 10 },
+  xpText: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.5)" },
+  actions: { gap: 12 },
   btnPrimary: {
-    backgroundColor: "#E8692A", borderRadius: 14,
-    paddingVertical: 16, alignItems: "center",
-    shadowColor: "#E8692A", shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
+    backgroundColor: "#FFFFFF", borderRadius: 16,
+    paddingVertical: 18, alignItems: "center",
   },
-  btnPrimaryTxt: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
+  btnPrimaryTxt: { fontFamily: F.bold, fontSize: 17, color: "#064E3B" },
   btnGhost: {
-    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 14,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)", borderRadius: 16,
     paddingVertical: 16, alignItems: "center",
   },
-  btnGhostTxt: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
+  btnGhostTxt: { fontFamily: F.bold, fontSize: 16, color: "rgba(255,255,255,0.7)" },
 });
 
-// ── REVEALED STYLES ───────────────────────────────────────────────────────────
 const rv = StyleSheet.create({
-  container: { paddingHorizontal: 20 },
-  closeRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 16 },
+  container: { paddingHorizontal: 24, alignItems: "stretch" },
+  closeRow: { flexDirection: "row", justifyContent: "flex-end", marginBottom: 8 },
   closeBtn: {
-    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 8,
   },
-  closeTxt: { fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.7)" },
-  hero: { alignItems: "center", marginBottom: 20 },
-  oh: {
-    fontFamily: F.bold, fontSize: 13, color: "rgba(255,255,255,0.4)",
-    letterSpacing: 1.2, marginBottom: 12,
-  },
-  answer: {
-    fontSize: 30, fontFamily: F.bold,
-    color: "#fff", letterSpacing: 6, marginBottom: 4,
-  },
-  answerLabel: {
-    fontFamily: F.medium, fontSize: 13,
-    color: "rgba(255,255,255,0.45)",
-  },
-  cluesCard: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20, padding: 16, marginBottom: 12, gap: 12,
-  },
-  cluesLabel: {
-    fontFamily: F.bold, fontSize: 10,
-    color: "rgba(255,255,255,0.35)", letterSpacing: 1.2, marginBottom: 4,
-  },
-  clueRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  closeTxt: { fontFamily: F.bold, fontSize: 14, color: "rgba(255,255,255,0.7)" },
+  hero: { alignItems: "center", paddingVertical: 20, gap: 4 },
+  oh: { fontFamily: F.bold, fontSize: 12, letterSpacing: 2, color: "#F87171", marginBottom: 4 },
+  answer: { fontFamily: "Fraunces_900Black", fontSize: 36, color: "#FFFFFF", textAlign: "center" },
+  answerLabel: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.5)" },
+  cluesCard: { backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, gap: 12 },
+  cluesLabel: { fontFamily: F.bold, fontSize: 11, letterSpacing: 2, color: "rgba(248,113,113,0.8)", marginBottom: 4 },
+  clueRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   clueNum: {
-    width: 24, height: 24, borderRadius: 12,
+    width: 22, height: 22, borderRadius: 11,
     backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
+    justifyContent: "center", alignItems: "center", flexShrink: 0, marginTop: 1,
   },
   clueNumText: { fontFamily: F.bold, fontSize: 11, color: "rgba(255,255,255,0.6)" },
-  clueText: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.7)", flex: 1, lineHeight: 19 },
-  factCard: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20, padding: 20, marginBottom: 16,
-  },
-  factLabel: {
-    fontFamily: F.bold, fontSize: 10,
-    color: "rgba(255,255,255,0.35)", letterSpacing: 1.2, marginBottom: 8,
-  },
-  factText: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.75)", lineHeight: 21 },
-  actions: { gap: 10 },
+  clueText: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.75)", flex: 1, lineHeight: 20 },
+  factCard: { backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 24 },
+  factLabel: { fontFamily: F.bold, fontSize: 11, color: "rgba(248,113,113,0.7)", letterSpacing: 2, marginBottom: 8 },
+  factText: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.7)", lineHeight: 21 },
+  actions: { gap: 12 },
   btnPrimary: {
-    backgroundColor: "#E8692A", borderRadius: 14,
-    paddingVertical: 16, alignItems: "center",
+    backgroundColor: "#FFFFFF", borderRadius: 16,
+    paddingVertical: 18, alignItems: "center",
   },
-  btnPrimaryTxt: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
+  btnPrimaryTxt: { fontFamily: F.bold, fontSize: 17, color: "#3D1A1A" },
   btnGhost: {
-    backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 14,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.2)", borderRadius: 16,
     paddingVertical: 16, alignItems: "center",
   },
-  btnGhostTxt: { fontFamily: F.bold, fontSize: 15, color: "#fff" },
+  btnGhostTxt: { fontFamily: F.bold, fontSize: 16, color: "rgba(255,255,255,0.5)" },
 });
