@@ -2892,6 +2892,10 @@ export function selectStopsFromPool(
   let museumsInCurrentDay = 0;
   let anchorsInCurrentDay = 0;
   let immersivesInCurrentDay = 0;
+  // Global per-trip museum ceiling: 1 museum per 3 trip-days (min 1).
+  // Prevents visitor-center padding when the pool has many high-scoring museums.
+  const maxMuseumsPerTrip = Math.max(1, Math.ceil(input.tripDays / 3));
+  let museumsTotal = 0;
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
@@ -3005,6 +3009,8 @@ export function selectStopsFromPool(
       if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
       // Museum hard cap: exactly 1 museum per day regardless of pool size
       if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
+      // Global per-trip museum ceiling (e.g. 2 for a 6-day trip)
+      if (c.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
       // Immersive cap: max 1 immersive stop per day (zoo, aquarium, activity, palace, museum)
       const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
       if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
@@ -3124,7 +3130,7 @@ export function selectStopsFromPool(
       zonesInCurrentDay.add(bestCandidate.neighborhoodZone);
     }
     typesInCurrentDay.add(bestCandidate.type);
-    if (bestCandidate.type === 'museum') museumsInCurrentDay++;
+    if (bestCandidate.type === 'museum') { museumsInCurrentDay++; museumsTotal++; }
     if (IMMERSIVE_TYPES.has(bestCandidate.type ?? '') && (bestCandidate.durationMinutes ?? 0) >= 90) immersivesInCurrentDay++;
     if (bestCandidate.familyAnchorType === 'anchor') anchorsInCurrentDay++;
     dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
