@@ -216,13 +216,14 @@ export default function HangmanGame() {
 
   const startGame = useCallback(async () => {
     const storageKey = `hangman_seen_${tripId || "default"}`;
-    let seen: string[] = [];
+    let seenMap: Record<string, string[]> = {};
     try {
       const raw = await AsyncStorage.getItem(storageKey);
-      seen = raw ? JSON.parse(raw) : [];
+      seenMap = raw ? JSON.parse(raw) : {};
     } catch {
-      seen = [];
+      seenMap = {};
     }
+    let seen: string[] = seenMap[difficulty] ?? [];
 
     const staticPool = HANGMAN_WORDS.filter(
       (w) =>
@@ -238,18 +239,15 @@ export default function HangmanGame() {
     let unseen = pool.filter((w) => !seen.includes(w.word));
     if (unseen.length === 0) {
       seen = [];
-      try {
-        await AsyncStorage.setItem(storageKey, JSON.stringify([]));
-      } catch {}
       unseen = pool;
     }
 
     if (unseen.length === 0) return;
 
     const pick = unseen[Math.floor(Math.random() * unseen.length)];
-    const newSeen = [...seen, pick.word];
+    const newSeenMap = { ...seenMap, [difficulty]: [...seen, pick.word] };
     try {
-      await AsyncStorage.setItem(storageKey, JSON.stringify(newSeen));
+      await AsyncStorage.setItem(storageKey, JSON.stringify(newSeenMap));
     } catch {}
 
     setCurrentWord(pick);
@@ -413,7 +411,7 @@ export default function HangmanGame() {
               style={ws.closeBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetToMenu();
+                router.push("/kids/games" as never);
               }}
             >
               <Text style={ws.closeTxt}>Done</Text>
@@ -469,7 +467,7 @@ export default function HangmanGame() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetToMenu();
+                router.push("/kids/games" as never);
               }}
             >
               <Text style={ws.btnSecondaryTxt}>Back to Games</Text>
@@ -498,7 +496,7 @@ export default function HangmanGame() {
               style={ls.closeBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetToMenu();
+                router.push("/kids/games" as never);
               }}
             >
               <Text style={ls.closeTxt}>Done</Text>
@@ -548,7 +546,7 @@ export default function HangmanGame() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetToMenu();
+                router.push("/kids/games" as never);
               }}
             >
               <Text style={ls.btnSecondaryTxt}>Back to Games</Text>
