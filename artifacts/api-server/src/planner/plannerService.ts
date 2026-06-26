@@ -2933,12 +2933,17 @@ export function selectStopsFromPool(
   let anchorDayIndex = 0;
   for (const anchor of anchorCandidates) {
     if (preSelectedAnchors.length >= totalAnchorsNeeded) break;
+    // Museum cap at the source: Pass 1 must not seat more museum-anchors than the trip
+    // allows. Skipped museums stay in `remaining` for the greedy pass (where the same cap
+    // blocks them). museumsTotal is 0 here, so this counter also keeps greedy/fill-up honest.
+    if (anchor.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
     const dayAnchors = anchorsByDay.get(anchorDayIndex % input.tripDays)!;
     if (dayAnchors.length < anchorsPerDay) {
       dayAnchors.push(anchor);
       preSelectedAnchors.push(anchor);
       usedNormNames.add(normStopName(anchor.name));
       remaining.delete(anchor);
+      if (anchor.type === 'museum') museumsTotal++;
     }
     anchorDayIndex++;
     if (anchorDayIndex >= totalAnchorsNeeded * 2) break;
