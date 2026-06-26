@@ -66,7 +66,7 @@ function HangmanScaffold({
   const show = (n: number) => wrongCount >= n;
 
   return (
-    <Svg width={160} height={190} viewBox="0 0 160 190">
+    <Svg width={280} height={240} viewBox="0 0 160 190">
       <Rect x={10} y={178} width={140} height={6} rx={3} fill={structColor} />
       <Rect x={38} y={20} width={6} height={160} rx={3} fill={structColor} />
       <Rect x={38} y={20} width={80} height={6} rx={3} fill={structColor} />
@@ -142,6 +142,8 @@ export default function HangmanGame() {
     "Geography \u2014 World",
   ]);
   const [destWords, setDestWords] = useState<HangmanWord[]>([]);
+  const [hintUsed, setHintUsed] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const bounceRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -252,6 +254,8 @@ export default function HangmanGame() {
 
     setCurrentWord(pick);
     setGuessedLetters(new Set());
+    setHintUsed(false);
+    setShowHint(false);
     setGameState("playing");
   }, [difficulty, categories, destWords, tripId]);
 
@@ -352,6 +356,41 @@ export default function HangmanGame() {
             </View>
           ))}
         </View>
+
+        {showHint && currentWord.hint ? (
+          <View style={ps.hintCard}>
+            <Text style={ps.hintCardText}>{"\uD83D\uDCA1"} {currentWord.hint}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={[
+            ps.hintBtn,
+            wrongGuesses.length >= 3 && !hintUsed && ps.hintBtnActive,
+            hintUsed && ps.hintBtnUsed,
+          ]}
+          onPress={() => {
+            if (hintUsed) return;
+            if (wrongGuesses.length < 3) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              return;
+            }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setHintUsed(true);
+            setShowHint(true);
+          }}
+        >
+          <Text style={[
+            ps.hintBtnText,
+            wrongGuesses.length >= 3 && !hintUsed && ps.hintBtnTextActive,
+          ]}>
+            {hintUsed
+              ? "\uD83D\uDCA1 Hint shown"
+              : wrongGuesses.length >= 3
+              ? "\uD83D\uDCA1 Show hint"
+              : "\uD83D\uDCA1 Hint unlocks after 3 wrong"}
+          </Text>
+        </Pressable>
 
         <View style={ps.keyboard}>
           {KEYBOARD_ROWS.map((row, ri) => (
@@ -715,9 +754,9 @@ const ps = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 14,
     paddingHorizontal: 24,
-    paddingBottom: 12,
+    paddingVertical: 20,
   },
   blank: { alignItems: "center", gap: 6, minWidth: 26 },
   blankLetter: {
@@ -728,9 +767,9 @@ const ps = StyleSheet.create({
     textAlign: "center",
   },
   blankLine: {
-    width: 24,
-    height: 3,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    width: 32,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.5)",
     borderRadius: 2,
   },
   blankLineFilled: { backgroundColor: "#E8692A" },
@@ -752,7 +791,7 @@ const ps = StyleSheet.create({
     justifyContent: "center",
   },
   wrongChipText: { fontFamily: F.bold, fontSize: 13, color: "#DC2626" },
-  keyboard: { paddingHorizontal: 10, paddingBottom: 12, gap: 5 },
+  keyboard: { paddingHorizontal: 10, paddingBottom: 32, gap: 5, marginTop: "auto" },
   keyRow: { flexDirection: "row", gap: 4, justifyContent: "center" },
   key: {
     flex: 1,
@@ -770,6 +809,50 @@ const ps = StyleSheet.create({
   keyText: { fontFamily: F.bold, fontSize: 13, color: "white" },
   keyTextCorrect: { color: "white" },
   keyTextWrong: { color: "rgba(255,255,255,0.4)" },
+  hintBtn: {
+    alignSelf: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginBottom: 10,
+  },
+  hintBtnActive: {
+    borderColor: "#F97316",
+    backgroundColor: "rgba(249,115,22,0.1)",
+  },
+  hintBtnUsed: {
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "transparent",
+    opacity: 0.5,
+  },
+  hintBtnText: {
+    fontFamily: F.medium,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.35)",
+  },
+  hintBtnTextActive: {
+    color: "#F97316",
+  },
+  hintCard: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    backgroundColor: "rgba(251,191,36,0.12)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.3)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  hintCardText: {
+    fontFamily: F.medium,
+    fontSize: 14,
+    color: "#FCD34D",
+    textAlign: "center",
+    lineHeight: 20,
+  },
 });
 
 // ─── Win styles ───────────────────────────────────────────────────────────────
