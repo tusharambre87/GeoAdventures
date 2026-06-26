@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { API_BASE } from "@/lib/apiClient";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useKids } from "@/lib/kidsContext";
@@ -81,6 +80,19 @@ const GRID_GAMES = [
     border: "#BFDBFE",
     titleColor: "#1E40AF",
     route: "kids/games/what-am-i" as string | undefined,
+  },
+  {
+    type: "think-fast",
+    icon: "\u26A1",
+    name: "Think Fast!",
+    desc: "Name 10 things in 30 seconds",
+    tag: "FAST",
+    tagBg: "#FFEDD5",
+    tagColor: "#C2410C",
+    cardBg: "#FFF7ED",
+    border: "#FED7AA",
+    titleColor: "#C2410C",
+    route: undefined as string | undefined,
   },
 ];
 
@@ -153,31 +165,6 @@ export default function GameHub() {
             <Text style={s.hangmanDesc}>Guess travel words before the figure appears</Text>
             <View style={s.hangmanPill}>
               <Text style={s.hangmanPillText}>Play now {'\u2192'}</Text>
-            </View>
-          </Pressable>
-
-          {/* Hero — Think Fast */}
-          <Pressable
-            style={({ pressed }) => [s.heroCard, pressed && { transform: [{ scale: 0.98 }] }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: "/kids/game-play", params: { type: "think-fast", stopId, stopName: kids.stopName, gameContentJson: JSON.stringify(gameContent ?? {}) } } as never);
-            }}
-          >
-            <LinearGradient
-              colors={["#FF6B2B", "#FF8C00"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Text style={s.heroBigEmoji}>{'\u26A1'}</Text>
-            <View style={s.heroBadge}>
-              <Text style={s.heroBadgeText}>MOST PLAYED</Text>
-            </View>
-            <Text style={s.heroTitle}>Think Fast!</Text>
-            <Text style={s.heroDesc}>Name 10 things in 30 seconds</Text>
-            <View style={s.heroPlayPill}>
-              <Text style={s.heroPlayText}>Play now →</Text>
             </View>
           </Pressable>
 
@@ -268,31 +255,6 @@ const s = StyleSheet.create({
   hdrSub: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)" },
   // Body
   body: { padding: 16 },
-  // Hero card
-  heroCard: {
-    borderRadius: 20, overflow: "hidden", padding: 24,
-    marginBottom: 12, position: "relative", minHeight: 190,
-  },
-  heroBigEmoji: {
-    position: "absolute", right: 16, top: "50%",
-    fontSize: 80, opacity: 0.15,
-  },
-  heroBadge: {
-    backgroundColor: "rgba(0,0,0,0.2)", borderRadius: 6,
-    paddingHorizontal: 10, paddingVertical: 4,
-    alignSelf: "flex-start", marginBottom: 10,
-  },
-  heroBadgeText: {
-    fontFamily: F.bold, fontSize: 10,
-    color: "rgba(255,255,255,0.9)", letterSpacing: 0.8,
-  },
-  heroTitle: { fontFamily: F.bold, fontSize: 32, color: "#fff", marginBottom: 4 },
-  heroDesc: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.8)", marginBottom: 16 },
-  heroPlayPill: {
-    backgroundColor: "#fff", borderRadius: 12,
-    paddingHorizontal: 20, paddingVertical: 12, alignSelf: "flex-start",
-  },
-  heroPlayText: { fontFamily: F.bold, fontSize: 14, color: "#FF6B2B" },
   // Grid
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   gridCard: {
