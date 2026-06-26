@@ -3309,6 +3309,75 @@ export function selectStopsFromPool(
     return ordered;
   }
 
+  // ── Geographic sequencing helper ─────────────────────────────────────────
+  // Nearest-neighbor reorder for dispersed destinations (national parks, large
+  // rural areas). Activates only when the widest intra-day stop pair exceeds
+  // GEO_SEQUENCE_THRESHOLD_KM — city trips (pairs ≤ 15 km) are left untouched.
+  // The first stop (morning anchor from slot sequencing) is always kept fixed so
+  // time-of-day logic still governs what starts the day.
+  const GEO_SEQUENCE_THRESHOLD_KM = 15;
+
+  function geoSequenceDay(dayStops: CachedStopCandidate[]): CachedStopCandidate[] {
+    if (dayStops.length <= 2) return dayStops;
+
+    const withCoords = dayStops.filter(
+      s => s.latitude && s.longitude &&
+           !isNaN(parseFloat(String(s.latitude))) &&
+           !isNaN(parseFloat(String(s.longitude))),
+    );
+    if (withCoords.length < 2) return dayStops;
+
+    let maxDist = 0;
+    for (let i = 0; i < withCoords.length; i++) {
+      for (let j = i + 1; j < withCoords.length; j++) {
+        const d = haversineKm(
+          parseFloat(String(withCoords[i].latitude)), parseFloat(String(withCoords[i].longitude)),
+          parseFloat(String(withCoords[j].latitude)), parseFloat(String(withCoords[j].longitude)),
+        );
+        if (d > maxDist) maxDist = d;
+      }
+    }
+
+    if (maxDist <= GEO_SEQUENCE_THRESHOLD_KM) return dayStops;
+
+    // Nearest-neighbor TSP: fix first stop, greedily pick nearest remaining
+    const ordered: CachedStopCandidate[] = [dayStops[0]];
+    const rem = new Set(dayStops.slice(1));
+
+    while (rem.size > 0) {
+      const last = ordered[ordered.length - 1];
+      const lLat = last.latitude ? parseFloat(String(last.latitude)) : null;
+      const lLon = last.longitude ? parseFloat(String(last.longitude)) : null;
+
+      if (!lLat || !lLon) {
+        for (const s of rem) ordered.push(s);
+        break;
+      }
+
+      let nearest: CachedStopCandidate | null = null;
+      let nearestDist = Infinity;
+
+      for (const s of rem) {
+        const sLat = s.latitude ? parseFloat(String(s.latitude)) : null;
+        const sLon = s.longitude ? parseFloat(String(s.longitude)) : null;
+        if (!sLat || !sLon) continue;
+        const d = haversineKm(lLat, lLon, sLat, sLon);
+        if (d < nearestDist) { nearestDist = d; nearest = s; }
+      }
+
+      if (nearest) {
+        ordered.push(nearest);
+        rem.delete(nearest);
+      } else {
+        for (const s of rem) ordered.push(s);
+        break;
+      }
+    }
+
+    console.log(`[GeoSequence] Day reordered (max spread: ${maxDist.toFixed(0)} km): ${ordered.map(s => s.name).join(' → ')}`);
+    return ordered;
+  }
+
   const result: GeneratedStop[] = [];
   let stopIdx = 0;
 
@@ -3359,6 +3428,13 @@ export function selectStopsFromPool(
             orderedSlice[swapIdx] = tmp;
           }
         }
+      }
+
+      // Geographic sequencing: for dispersed destinations (national parks, wide
+      // rural areas) nearest-neighbor reorder eliminates backtracking within the
+      // day. Skipped for city trips where max inter-stop distance ≤ 15 km.
+      if ((input.transportMode ?? 'driving') === 'driving') {
+        orderedSlice = geoSequenceDay(orderedSlice);
       }
     }
 
