@@ -68,6 +68,7 @@ async function findPlace(name: string, city: string, country: string): Promise<s
 type PlaceDetails = {
   gpHours: Record<string, unknown> | null;
   gpRating: string | null;
+  gpRatingsTotal: number | null;
   gpPhotoRefs: string[];
   gpPriceLevel: number | null;
   gpAddressVerified: string | null;
@@ -85,6 +86,7 @@ async function getPlaceDetails(placeId: string): Promise<PlaceDetails> {
   const fields = [
     "opening_hours",
     "rating",
+    "user_ratings_total",
     "photos",
     "price_level",
     "formatted_address",
@@ -109,6 +111,7 @@ async function getPlaceDetails(placeId: string): Promise<PlaceDetails> {
     result?: {
       opening_hours?: Record<string, unknown>;
       rating?: number;
+      user_ratings_total?: number;
       photos?: Array<{ photo_reference: string }>;
       price_level?: number;
       formatted_address?: string;
@@ -138,6 +141,7 @@ async function getPlaceDetails(placeId: string): Promise<PlaceDetails> {
   return {
     gpHours: r.opening_hours ?? null,
     gpRating: r.rating != null ? String(r.rating) : null,
+    gpRatingsTotal: r.user_ratings_total ?? null,
     gpPhotoRefs,
     gpPriceLevel: r.price_level ?? null,
     gpAddressVerified: r.formatted_address ?? null,
@@ -217,6 +221,7 @@ async function run(): Promise<void> {
               gpPlaceId: placeId,
               gpHours: details.gpHours,
               gpRating: details.gpRating,
+              gpRatingsTotal: details.gpRatingsTotal,
               gpPhotoRefs: details.gpPhotoRefs,
               gpPriceLevel: details.gpPriceLevel,
               gpAddressVerified: details.gpAddressVerified,
