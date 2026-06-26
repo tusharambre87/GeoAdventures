@@ -27,6 +27,7 @@ const GRID_GAMES = [
     cardBg: "#EFF6FF",
     border: "#BFDBFE",
     titleColor: "#1E40AF",
+    badge: "MOST PLAYED" as string | undefined,
     route: "kids/games/what-am-i" as string | undefined,
   },
   {
@@ -187,6 +188,11 @@ export default function GameHub() {
                   }
                 }}
               >
+                {game.badge && (
+                  <View style={s.gridBadge}>
+                    <Text style={s.gridBadgeText}>{game.badge}</Text>
+                  </View>
+                )}
                 <Text style={s.gridIcon}>{game.icon}</Text>
                 <Text style={[s.gridName, { color: game.titleColor }]}>{game.name}</Text>
                 <Text style={s.gridDesc} numberOfLines={2}>{game.desc}</Text>
@@ -207,7 +213,7 @@ const s = StyleSheet.create({
   // Hangman hero card
   hangmanCard: {
     borderRadius: 20, overflow: "hidden", padding: 24,
-    marginBottom: 12, backgroundColor: "#7C3AED",
+    marginBottom: 12, backgroundColor: "#9333EA",
     minHeight: 170, position: "relative",
   },
   hangmanBg: {
@@ -260,6 +266,12 @@ const s = StyleSheet.create({
   gridCard: {
     width: "47.5%", borderRadius: 18, padding: 16, borderWidth: 2,
   },
+  gridBadge: {
+    position: "absolute", top: 10, left: 10,
+    backgroundColor: "#E8692A", borderRadius: 5,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  gridBadgeText: { fontFamily: F.bold, fontSize: 8, color: "#fff", letterSpacing: 0.6 },
   gridIcon: { fontSize: 32, marginBottom: 10 },
   gridName: { fontFamily: F.bold, fontSize: 15, marginBottom: 3 },
   gridDesc: {
