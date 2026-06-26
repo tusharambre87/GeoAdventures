@@ -24,3 +24,4 @@
 - [interests-trip-tailoring storage](interests-trip-tailoring.md) — top-level `interests` in POST /api/travel/trips was never stored; must destructure + merge into tailoring JSONB so planner reads them
 - [anchor-first pipeline](anchor-first-pipeline.md) — Pass 1 pre-selects anchors round-robin; AnchorConstraint must cap at anchorsPerDay not 1; familyAnchorType must be written to metadata JSONB explicitly
 - [pool path skips distributeStopsToDays](pool-distribute-bypass.md) — Pool path must NOT call distributeStopsToDays; it re-assigns dayNumbers using arrivalDayCap (stopsPerDayByPace=4) which steals stops from later days when effectivePerDay=3
+- [booking-link-bug](booking-link-bug.md) — "Book now" Text in tripId.tsx ~1846 has no onPress; needs Pressable → sheet of ticket stops + Linking.openURL per stop

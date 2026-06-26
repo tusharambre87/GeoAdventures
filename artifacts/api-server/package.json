@@ -21,6 +21,7 @@
     "backfill:landmarks": "tsx src/planner/seedLandmarkPhotos.ts",
     "backfill:landmarks:dc": "LANDMARK_CITY=\"Washington DC\" tsx src/planner/seedLandmarkPhotos.ts",
     "backfill:library-psi": "tsx src/planner/backfillLibraryPsi.ts",
+    "backfill:pmal": "tsx src/planner/backfillPmal.ts",
     "backfill:google-places": "tsx src/scripts/backfill-google-places.ts",
     "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts",
     "script:tag-metro": "tsx src/scripts/tagMetroStops.ts"
