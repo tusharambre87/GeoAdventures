@@ -24,6 +24,24 @@ import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 
 const SCOPE_CITY = process.env.DEDUP_CITY ?? null;
 
+const COLLISION_THRESHOLD_MILES = 0.5;
+
+function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 3958.8; // Earth radius, miles
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function parseCoord(v: string | null): number | null {
+  if (v === null) return null;
+  const n = parseFloat(v);           // coords are varchar — string parse, same gotcha as gpRating
+  return Number.isFinite(n) ? n : null;
+}
+
 async function run(): Promise<void> {
   console.log(
     SCOPE_CITY
@@ -59,6 +77,7 @@ async function run(): Promise<void> {
 
   let totalDeleted = 0;
   let totalKept = 0;
+  let flaggedCollisions = 0;
 
   for (const group of groups) {
     const { gp_place_id, city, cnt } = group;
@@ -69,7 +88,8 @@ async function run(): Promise<void> {
         id: stopLibrary.id,
         name: stopLibrary.name,
         createdAt: stopLibrary.createdAt,
-        manuallyOverridden: stopLibrary.manuallyOverridden,
+        latitude: stopLibrary.latitude,
+        longitude: stopLibrary.longitude,
       })
       .from(stopLibrary)
       .where(
@@ -78,12 +98,7 @@ async function run(): Promise<void> {
           sql`LOWER(TRIM(${stopLibrary.city})) = LOWER(TRIM(${city}))`
         )
       )
-      .orderBy(
-        // Keep manually_overridden rows first (they carry curated scores),
-        // then fall back to oldest created_at.
-        sql`CASE WHEN manually_overridden = true THEN 0 ELSE 1 END`,
-        stopLibrary.createdAt
-      );
+      .orderBy(stopLibrary.createdAt);
 
     if (rows.length < 2) continue;
 
@@ -93,18 +108,41 @@ async function run(): Promise<void> {
     console.log(
       `[DedupGpPlaceId] ${city} | gp_place_id=${gp_place_id} | ${cnt} rows`
     );
-    console.log(`  KEEP  : ${keeper.id} — "${keeper.name}" (${keeper.manuallyOverridden ? "overridden" : "normal"})`);
+    console.log(`  KEEP  : ${keeper.id} — "${keeper.name}"`);
+
+    const kLat = parseCoord(keeper.latitude);
+    const kLon = parseCoord(keeper.longitude);
 
     for (const dupe of dupes) {
-      console.log(`  DELETE: ${dupe.id} — "${dupe.name}"`);
+      const dLat = parseCoord(dupe.latitude);
+      const dLon = parseCoord(dupe.longitude);
+
+      // Coordinate guard. A shared gp_place_id is only a TRUE duplicate if the two rows
+      // sit at (nearly) the same spot. Far apart = GP matched one row to the WRONG listing;
+      // deleting it would destroy a real, distinct stop. Flag for GP re-fetch, never delete.
+      // Also refuse to delete when either side has no usable coords (can't verify → don't risk).
+      if (kLat === null || kLon === null || dLat === null || dLon === null) {
+        console.warn(`  ⚠️  FLAG (missing coords, NOT deleting): ${dupe.id} — "${dupe.name}"`);
+        flaggedCollisions++;
+        continue;
+      }
+
+      const miles = haversineMiles(kLat, kLon, dLat, dLon);
+      if (miles > COLLISION_THRESHOLD_MILES) {
+        console.warn(
+          `  ⚠️  COLLISION (NOT deleting): ${dupe.id} "${dupe.name}" is ${miles.toFixed(1)}mi from ` +
+          `keeper ${keeper.id} "${keeper.name}" — same gp_place_id=${gp_place_id}, different locations. ` +
+          `One row has a mismatched Place ID; re-fetch GP for both.`
+        );
+        flaggedCollisions++;
+        continue;
+      }
 
       // Hard-delete the duplicate. FK references in planner_stop_intelligence
       // go through planner_places (joined by name+city), not stop_library.id,
       // so there are no FK cascade concerns here.
-      await db
-        .delete(stopLibrary)
-        .where(eq(stopLibrary.id, dupe.id));
-
+      console.log(`  DELETE: ${dupe.id} — "${dupe.name}" (${miles.toFixed(2)}mi from keeper — true dupe)`);
+      await db.delete(stopLibrary).where(eq(stopLibrary.id, dupe.id));
       totalDeleted++;
     }
 
@@ -115,6 +153,10 @@ async function run(): Promise<void> {
   console.log(`  Duplicate groups : ${groups.length}`);
   console.log(`  Rows kept        : ${totalKept} (one per group)`);
   console.log(`  Rows deleted     : ${totalDeleted}`);
+  console.log(`  Collisions flagged (NOT deleted) : ${flaggedCollisions}`);
+  if (flaggedCollisions > 0) {
+    console.log(`\n[DedupGpPlaceId] ⚠️  ${flaggedCollisions} collision(s) flagged — shared gp_place_id, distinct locations. These need GP re-fetch, NOT deletion. Review the COLLISION lines above before scaling to other cities.`);
+  }
   console.log(`[DedupGpPlaceId] Next step: run Library PSI Backfill on remaining stops, then floor recompute.`);
 }
 
