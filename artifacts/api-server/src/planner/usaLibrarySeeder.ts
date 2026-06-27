@@ -10,7 +10,9 @@
  * CITY_TARGET_OVERRIDES — one config change raises pool depth for the whole
  * category without manual inserts.
  *
- * Fully idempotent — cities already at their target are skipped.
+ * Fully idempotent — cities already at their target are skipped, and cities in
+ * CURATED_CITIES are skipped unconditionally regardless of count (regenerating
+ * AI stops would undo GP-fetch, dedup, and PSI-scoring already applied).
  * Processes cities sequentially with a 500 ms delay to respect rate limits.
  *
  * After seeding completes, kicks off startEnrichmentQueue("USA") to enrich all
@@ -47,6 +49,13 @@ const CITY_TARGET_OVERRIDES: Record<string, number> = {
   "Sedona":        30,
   "Park City":     30,
 };
+
+// Cities whose library has been fully curated (GP-fetched, deduped, PSI-scored).
+// The seeder must NOT regenerate stops for these — doing so re-injects un-scored
+// AI stops and undoes the curation. Add a city here the moment its pipeline completes.
+const CURATED_CITIES = new Set<string>([
+  "Yellowstone",
+]);
 
 const USA_CITIES = [
   "Orlando",
@@ -138,6 +147,11 @@ export async function seedUSACityLibrary(): Promise<void> {
     const { generateCityStops } = await import("../travelContent.js");
 
     for (const city of USA_CITIES) {
+      if (CURATED_CITIES.has(city)) {
+        console.log(`[USALibrarySeeder] ✦ ${city} — curated, seeder will not regenerate (skipping)`);
+        citiesSkipped++;
+        continue;
+      }
       const target = targetForCity(city);
       try {
         const existing = await storage.getStopLibraryByCity(city, "USA");
