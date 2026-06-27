@@ -26,6 +26,18 @@ const SCOPE_CITY = process.env.DEDUP_CITY ?? null;
 
 const COLLISION_THRESHOLD_MILES = 0.5;
 
+// gp_place_ids that legitimately back MORE THAN ONE distinct real stop (one Google
+// listing, multiple family stops). Value = expected number of distinct rows. The dedup
+// skips these — but only while the count matches. If a new row joins the listing, the
+// count changes and it falls through to the guard (could be a hallucinated stop matching
+// the same listing — exactly how 309487d7 latched onto Canyon's id).
+const KNOWN_DISTINCT_SHARED_LISTINGS: Record<string, number> = {
+  // Mammoth Hot Springs Terraces + Mammoth Hot Springs — one listing, 2 stops, 1.3mi apart.
+  // NOTE: the second row's coords share an identical latitude with the first (suspected
+  // AI-generated); flagged for coordinate cleanup, kept for beta.
+  "ChIJ75ypF2vUT1MRPsN_pTVGfs8": 2,
+};
+
 function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const R = 3958.8; // Earth radius, miles
@@ -81,6 +93,15 @@ async function run(): Promise<void> {
 
   for (const group of groups) {
     const { gp_place_id, city, cnt } = group;
+
+    const allowedCount = KNOWN_DISTINCT_SHARED_LISTINGS[gp_place_id];
+    if (allowedCount !== undefined) {
+      if (Number(cnt) === allowedCount) {
+        console.log(`[DedupGpPlaceId] ${city} | gp_place_id=${gp_place_id} | ${cnt} rows — known shared listing (${allowedCount} distinct stops), skipping`);
+        continue;
+      }
+      console.warn(`[DedupGpPlaceId] ⚠️  ${city} | gp_place_id=${gp_place_id} | expected ${allowedCount} rows, found ${cnt} — composition changed, inspecting`);
+    }
 
     // Fetch all rows for this place_id + city, ordered oldest first.
     const rows = await db
@@ -155,7 +176,7 @@ async function run(): Promise<void> {
   console.log(`  Rows deleted     : ${totalDeleted}`);
   console.log(`  Collisions flagged (NOT deleted) : ${flaggedCollisions}`);
   if (flaggedCollisions > 0) {
-    console.log(`\n[DedupGpPlaceId] ⚠️  ${flaggedCollisions} collision(s) flagged — shared gp_place_id, distinct locations. These need GP re-fetch, NOT deletion. Review the COLLISION lines above before scaling to other cities.`);
+    console.log(`\n[DedupGpPlaceId] ⚠️  ${flaggedCollisions} collision(s) flagged. Re-fetch does NOT fix these (matching is name-based, deterministic). Each needs triage: rename+refetch (real mismatched place), allowlist (distinct stops sharing one listing), or delete (hallucinated stop with no real referent). Use Place Details + findplacefromtext to tell them apart before acting.`);
   }
   console.log(`[DedupGpPlaceId] Next step: run Library PSI Backfill on remaining stops, then floor recompute.`);
 }
