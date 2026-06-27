@@ -2483,6 +2483,23 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function filterGeoOutliers<T extends { latitude: string | null; longitude: string | null; name: string }>(
+  stops: T[],
+): { kept: T[]; dropped: { stop: T; km: number }[] } {
+  const pts = stops
+    .map(s => ({ s, lat: parseFloat(s.latitude ?? ""), lon: parseFloat(s.longitude ?? "") }))
+    .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  if (pts.length < 8) return { kept: stops, dropped: [] };            // too few to judge a cluster
+  const med = (a: number[]) => { const s=[...a].sort((x,y)=>x-y); const m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; };
+  const cLat = med(pts.map(p=>p.lat)), cLon = med(pts.map(p=>p.lon));
+  const withD = pts.map(p => ({ ...p, d: haversineKm(cLat, cLon, p.lat, p.lon) }));
+  const thresholdKm = Math.max(64, med(withD.map(p=>p.d)) * 5);        // 64km≈40mi floor; scales to the city's spread
+  const kept: T[] = [], dropped: { stop: T; km: number }[] = [];
+  for (const p of withD) (p.d > thresholdKm ? dropped.push({ stop: p.s, km: p.d }) : kept.push(p.s));
+  const noCoord = stops.filter(s => !pts.some(p => p.s === s));        // can't judge → keep
+  return { kept: [...kept, ...noCoord], dropped };
+}
+
 function estimateTravelMins(km: number, mode: string): number {
   const speeds: Record<string, number> = { driving: 35, walking: 5, transit: 20, cycling: 15 };
   return Math.round((km / (speeds[mode] ?? 35)) * 60);
@@ -2553,6 +2570,20 @@ export function selectStopsFromPool(
   const totalStopsNeeded = input.tripDays * effectiveStopsPerDay;
 
   let candidates = [...pool];
+
+  // Geographic outlier guard (systemic, every city). Pool = all stops tagged to this
+  // city with NO distance check, so a far stop (Grand Canyon Skywalk, West Rim, ~250mi
+  // from the South Rim cluster) enters and creates multi-hour same-day drives. Self-
+  // calibrating via median spread, so large parks keep their internal layout.
+  {
+    const { kept, dropped } = filterGeoOutliers(candidates);
+    if (dropped.length && kept.length >= totalStopsNeeded) {
+      for (const d of dropped) console.log(`[Planner] Geo-outlier dropped: "${d.stop.name}" (${Math.round(d.km * 0.621)}mi from ${targetCity ?? input.destination} cluster)`);
+      candidates = kept;
+    } else if (dropped.length) {
+      console.warn(`[Planner] Geo-outlier filter skipped — only ${kept.length} would remain (<${totalStopsNeeded})`);
+    }
+  }
 
   // ── Hard quality gate: primary score floor ────────────────────────────────
   // Only apply the ≥40 floor when the pool has enough scored stops to make
