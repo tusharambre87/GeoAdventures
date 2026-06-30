@@ -24,8 +24,11 @@ import { enrichStop } from "./stopEnrichmentService.js";
 import { computeScores, type FamilyProfile } from "./scoringEngine.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
-// Set to false to run against the full library after DC test passes.
+// Set BACKFILL_CITY env var to scope to a single city (e.g. BACKFILL_CITY=Yosemite).
+// Set DC_ONLY=true to scope to Washington DC only (legacy test mode).
+// Neither set → full library run.
 const DC_ONLY = false;
+const SCOPE_CITY = process.env.BACKFILL_CITY ?? null;
 
 const BATCH_SIZE = 5;
 const BATCH_PAUSE_MS = 2000;
@@ -117,16 +120,20 @@ function fmtCost(calls: number): string {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function run(): Promise<void> {
-  const cityFilter = DC_ONLY
-    ? sql`${stopLibrary.city} = 'Washington DC'`
-    : sql`1=1`;
+  const cityFilter = SCOPE_CITY
+    ? sql`${stopLibrary.city} = ${SCOPE_CITY}`
+    : DC_ONLY
+      ? sql`${stopLibrary.city} = 'Washington DC'`
+      : sql`1=1`;
+
+  const mode = SCOPE_CITY ? `CITY: ${SCOPE_CITY}` : DC_ONLY ? "DC ONLY (test run)" : "FULL LIBRARY";
 
   const [{ total }] = await db
     .select({ total: count() })
     .from(stopLibrary)
     .where(cityFilter);
 
-  console.log(`${LOG} Mode: ${DC_ONLY ? "DC ONLY (test run)" : "FULL LIBRARY"}`);
+  console.log(`${LOG} Mode: ${mode}`);
   console.log(`${LOG} ${total} stop(s) to process.`);
   console.log(`${LOG} Estimated cost if all are new: ${fmtCost(total)}`);
 
