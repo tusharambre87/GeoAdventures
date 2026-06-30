@@ -2817,6 +2817,7 @@ function RunDaySheet({
   selectedDay,
   dayStops,
   tripId,
+  trip,
   runMode,
   onModeChange,
   onClose,
@@ -2827,6 +2828,7 @@ function RunDaySheet({
   selectedDay: number;
   dayStops: Stop[];
   tripId: string;
+  trip?: any;
   runMode: RunMode;
   onModeChange: (m: RunMode) => void;
   onClose: () => void;
@@ -2835,6 +2837,7 @@ function RunDaySheet({
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const [applying, setApplying] = useState(false);
+  const [showHotelSheet, setShowHotelSheet] = useState(false);
   const insets  = useSafeAreaInsets();
   const anchor  = getAnchorStop(dayStops);
   const dropSt  = getDropStop(dayStops);
@@ -2888,8 +2891,47 @@ function RunDaySheet({
         });
       } catch { /* non-critical */ }
     }
+    // Day 1 only: prompt for hotel/start point if none set yet
+    if (selectedDay === 1) {
+      const hasStayLoc = trip?.stayLocations?.length > 0 &&
+        (trip.stayLocations[0]?.name || trip.stayLocations[0]?.address);
+      const storedHotel = await AsyncStorage.getItem(`hotel_${tripId}_day0`).catch(() => null);
+      if (!hasStayLoc && !storedHotel) {
+        setShowHotelSheet(true);
+        return;
+      }
+    }
     onClose();
     router.replace('/(tabs)/today' as any);
+  }
+
+  function handleHotelSaved(hotelName: string, combined: string) {
+    setShowHotelSheet(false);
+    const resolvedAddr = combined || hotelName;
+    const totalDays = trip?.tripDays ?? trip?.plannerTripDays ?? 1;
+
+    const saveForDay = async () => {
+      await AsyncStorage.setItem(`hotel_${tripId}_day0`, resolvedAddr).catch(() => {});
+      onClose();
+      router.replace('/(tabs)/today' as any);
+    };
+
+    const saveForAllDays = async () => {
+      for (let d = 0; d < totalDays; d++) {
+        await AsyncStorage.setItem(`hotel_${tripId}_day${d}`, resolvedAddr).catch(() => {});
+      }
+      onClose();
+      router.replace('/(tabs)/today' as any);
+    };
+
+    Alert.alert(
+      'Use for all days?',
+      `Use "${hotelName || combined}" as the starting point for every day of your trip?`,
+      [
+        { text: 'This day only', style: 'cancel', onPress: () => { void saveForDay(); } },
+        { text: 'All days', onPress: () => { void saveForAllDays(); } },
+      ]
+    );
   }
 
   return (
@@ -2904,6 +2946,13 @@ function RunDaySheet({
           <IconX size={14} />
         </Pressable>
       </View>
+      <AddHotelSheet
+        visible={showHotelSheet}
+        tripId={tripId}
+        destination={trip?.destination ?? trip?.city ?? ''}
+        onClose={() => setShowHotelSheet(false)}
+        onSaved={handleHotelSaved}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={rds.body}>
         {/* Mode cards */}
@@ -4914,6 +4963,7 @@ export default function TripPlanScreen() {
             selectedDay={selectedDay}
             dayStops={dayStopsForSheet}
             tripId={tripId ?? ''}
+            trip={trip}
             runMode={runMode}
             onModeChange={setRunMode}
             onClose={closeSheet}
