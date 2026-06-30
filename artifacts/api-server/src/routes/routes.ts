@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, type PlannerInput, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -5753,7 +5753,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let usedPool = false;
         try {
           // Pass full city name — getCityStopPool normalizes commas and country variants
-          const cachedPool = await storage.getCityStopPool(cityName, country);
+          let cachedPool = await storage.getCityStopPool(cityName, country);
+
+          // Cache miss: try building the pool from stop_library before falling back to AI.
+          // This is the path for library-seeded cities (e.g. Yosemite, DC) on their first trip.
+          if (!cachedPool || !Array.isArray(cachedPool.stopPool) || cachedPool.stopPool.length === 0) {
+            try {
+              const libraryStops = await generateCityStopPool(cityName, country);
+              if (libraryStops.length > 0) {
+                await storage.saveCityStopPool({
+                  city: cityName,
+                  country,
+                  stopPool: libraryStops as any[],
+                  normalizedKey: buildCityPoolKey(cityName, country),
+                });
+                console.log(`[bg] Built pool for ${cityName} from stop_library: ${libraryStops.length} stops — saved to cache`);
+                cachedPool = await storage.getCityStopPool(cityName, country);
+              }
+            } catch (libErr) {
+              console.warn(`[bg] stop_library pool build failed for ${cityName} (non-fatal, will use AI):`, libErr);
+            }
+          }
+
           if (cachedPool && Array.isArray(cachedPool.stopPool) && cachedPool.stopPool.length > 0) {
             console.log(`🎯 [Travel] [bg] Pool hit for ${cityName}`);
             const firstWithCoords = (cachedPool.stopPool as any[]).find(s => s.latitude && s.longitude);
