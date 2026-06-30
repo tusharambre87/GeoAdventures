@@ -7824,6 +7824,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  async function driveSecondsCached(oLat:number,oLng:number,dLat:number,dLng:number):Promise<number|null>{
+    const k=(la:number,lo:number)=>`${la.toFixed(5)},${lo.toFixed(5)}`;
+    const oKey=k(oLat,oLng), dKey=k(dLat,dLng);
+    const hit=await pool.query(
+      `SELECT duration_seconds FROM travel_legs WHERE (origin_key=$1 AND dest_key=$2) OR (origin_key=$2 AND dest_key=$1) LIMIT 1`,[oKey,dKey]);
+    if(hit.rows[0]) return hit.rows[0].duration_seconds;
+    try{
+      const key=process.env.GOOGLE_PLACES_API_KEY;
+      const url=`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${oLat},${oLng}&destinations=${dLat},${dLng}&mode=driving&key=${key}`;
+      const data=await (await fetch(url)).json() as any;
+      const el=data?.rows?.[0]?.elements?.[0];
+      if(el?.status==='OK' && el.duration?.value!=null){
+        const secs=el.duration.value as number;
+        await pool.query(`INSERT INTO travel_legs (origin_key,dest_key,duration_seconds) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,[oKey,dKey,secs]);
+        return secs;
+      }
+    }catch{}
+    return null;
+  }
+
   app.get('/api/travel/trips/:tripId', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {
       const { tripId } = req.params;
@@ -7861,36 +7881,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         journeyPackCompleted: packsByStopId.get(stop.id)?.isCompleted || false,
       }));
 
-      // Compute travelMinsFromPrevious for each stop at read time using haversine
-      (() => {
-        function hKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-          const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-        const sorted = [...stopsWithPackStatus].sort((a, b) => {
-          const dd = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
-          return dd !== 0 ? dd : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
-        });
-        sorted.forEach((stop, i) => {
-          if (i === 0 || (sorted[i - 1].dayIndex ?? 0) !== (stop.dayIndex ?? 0)) {
-            (stop as any).travelMinsFromPrevious = null;
-          } else {
-            const prev = sorted[i - 1];
-            const pLat = prev.latitude ? parseFloat(String(prev.latitude)) : null;
-            const pLon = prev.longitude ? parseFloat(String(prev.longitude)) : null;
-            const sLat = stop.latitude ? parseFloat(String(stop.latitude)) : null;
-            const sLon = stop.longitude ? parseFloat(String(stop.longitude)) : null;
-            if (pLat && pLon && sLat && sLon) {
-              // 12 km/h accounts for city driving + road factor vs crow-flies + parking.
-              // The front-end then adds a 15-min family overhead buffer on top.
-              const rawMins = Math.round((hKm(pLat, pLon, sLat, sLon) / 40) * 60);
-              (stop as any).travelMinsFromPrevious = Math.max(10, rawMins);
-            } else {
-              (stop as any).travelMinsFromPrevious = null;
-            }
-          }
-        });
+      // Compute travelMinsFromPrevious using Google Distance Matrix (cached); haversine fallback
+      await (async () => {
+        function hKm(lat1:number,lon1:number,lat2:number,lon2:number){const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+        const sorted=[...stopsWithPackStatus].sort((a,b)=>{const dd=(a.dayIndex??0)-(b.dayIndex??0);return dd!==0?dd:(a.displayOrder??0)-(b.displayOrder??0);});
+        await Promise.all(sorted.map(async (stop,i)=>{
+          if(i===0||(sorted[i-1].dayIndex??0)!==(stop.dayIndex??0)){(stop as any).travelMinsFromPrevious=null;return;}
+          const prev=sorted[i-1];
+          const pLat=prev.latitude?parseFloat(String(prev.latitude)):null, pLon=prev.longitude?parseFloat(String(prev.longitude)):null;
+          const sLat=stop.latitude?parseFloat(String(stop.latitude)):null, sLon=stop.longitude?parseFloat(String(stop.longitude)):null;
+          if(pLat&&pLon&&sLat&&sLon){
+            const secs=await driveSecondsCached(pLat,pLon,sLat,sLon);
+            (stop as any).travelMinsFromPrevious = secs!=null ? Math.max(1,Math.round(secs/60)) : Math.max(10,Math.round((hKm(pLat,pLon,sLat,sLon)/40)*60));
+          } else {(stop as any).travelMinsFromPrevious=null;}
+        }));
       })();
 
       // Batch-enrich stops from stop_library: merge storyPack, audioUrl, keepsake, enrichment
