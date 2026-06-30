@@ -11331,7 +11331,29 @@ Return ONLY valid JSON in this exact format:
       const destination = trip?.destination || '';
 
       const { generateStopHeroImage } = await import('../exploreContentService');
-      const url = await generateStopHeroImage(stop.name, stop.stopType || 'landmark', destination);
+      let url = await generateStopHeroImage(stop.name, stop.stopType || 'landmark', destination);
+
+      // If Wikipedia found nothing, fall back to a Google Places photo ref already stored in stop_library
+      if (!url) {
+        try {
+          const city = (stop as any).cityGroup ?? trip?.destination ?? '';
+          const libRows = await db.execute(drizzleSql`
+            SELECT gp_photo_refs FROM stop_library
+            WHERE city = ${city}
+              AND LOWER(TRIM(name)) = LOWER(TRIM(${stop.name}))
+              AND gp_photo_refs IS NOT NULL
+              AND array_length(gp_photo_refs, 1) > 0
+            LIMIT 1
+          `);
+          const ref = (libRows.rows[0] as any)?.gp_photo_refs?.[0];
+          if (ref) {
+            const baseUrl = process.env.REPLIT_DOMAINS
+              ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+              : `${req.protocol}://${req.get('host')}`;
+            url = `${baseUrl}/api/travel/place-photo?ref=${encodeURIComponent(ref)}`;
+          }
+        } catch { /* fall through to gradient */ }
+      }
 
       if (url) {
         heroImageCache[stopId] = url;
