@@ -3223,44 +3223,39 @@ export function selectStopsFromPool(
     }
   }
 
-  // ── Cross-day geographic clustering (dispersed trips only) ──────────────────
-  // The day assignment below is a positional slice of selected[]. Without this,
-  // nearby stops scatter across days (Mammoth split) and far stops collide on one
-  // day (72-min legs). Reorder selected[] into a nearest-neighbor chain so the
-  // slice produces geographically-compact days. Gate matches GeoSequence@geoSequenceDay:
-  // maxDist > GEO_SEQUENCE_THRESHOLD_KM (15 km) — city trips skip this entirely.
-  // Meals aren't in selected[] yet (added later), so only activity stops are reordered.
-  if (selected.length > effectiveStopsPerDay) {
-    const co = (s: CachedStopCandidate) => ({
-      lat: parseFloat(String(s.latitude ?? "")),
-      lon: parseFloat(String(s.longitude ?? "")),
-    });
-    const pts = selected.filter(s => { const c = co(s); return Number.isFinite(c.lat) && Number.isFinite(c.lon); });
-    const noCo = selected.filter(s => !pts.includes(s));
-    let maxGlobalDist = 0;
-    for (let i = 0; i < pts.length; i++) {
-      for (let j = i + 1; j < pts.length; j++) {
-        const d = haversineKm(co(pts[i]).lat, co(pts[i]).lon, co(pts[j]).lat, co(pts[j]).lon);
-        if (d > maxGlobalDist) maxGlobalDist = d;
-      }
-    }
-    if (maxGlobalDist > GEO_SEQUENCE_THRESHOLD_KM && pts.length >= 2) {
-      const cLat = pts.reduce((a, s) => a + co(s).lat, 0) / pts.length;
-      const cLon = pts.reduce((a, s) => a + co(s).lon, 0) / pts.length;
-      let seed = 0, sb = Infinity;
-      pts.forEach((s, i) => { const d = haversineKm(cLat, cLon, co(s).lat, co(s).lon); if (d < sb) { sb = d; seed = i; } });
-      const rest = [...pts];
-      const chain = [rest.splice(seed, 1)[0]];
-      while (rest.length) {
-        const l = co(chain[chain.length - 1]);
-        let bi = 0, bd = Infinity;
-        rest.forEach((s, i) => { const d = haversineKm(l.lat, l.lon, co(s).lat, co(s).lon); if (d < bd) { bd = d; bi = i; } });
-        chain.push(rest.splice(bi, 1)[0]);
-      }
-      selected = [...chain, ...noCo];
-      console.log(`[GeoCluster] Reordered ${chain.length} stops into nearest-neighbor chain before day-slice (max spread: ${maxGlobalDist.toFixed(0)} km)`);
-    }
-  }
+  // ── Cross-day geographic clustering (dispersed trips only) ── DISABLED ──────
+  // Commented out for investigation — uncomment to re-enable.
+  // if (selected.length > effectiveStopsPerDay) {
+  //   const co = (s: CachedStopCandidate) => ({
+  //     lat: parseFloat(String(s.latitude ?? "")),
+  //     lon: parseFloat(String(s.longitude ?? "")),
+  //   });
+  //   const pts = selected.filter(s => { const c = co(s); return Number.isFinite(c.lat) && Number.isFinite(c.lon); });
+  //   const noCo = selected.filter(s => !pts.includes(s));
+  //   let maxGlobalDist = 0;
+  //   for (let i = 0; i < pts.length; i++) {
+  //     for (let j = i + 1; j < pts.length; j++) {
+  //       const d = haversineKm(co(pts[i]).lat, co(pts[i]).lon, co(pts[j]).lat, co(pts[j]).lon);
+  //       if (d > maxGlobalDist) maxGlobalDist = d;
+  //     }
+  //   }
+  //   if (maxGlobalDist > GEO_SEQUENCE_THRESHOLD_KM && pts.length >= 2) {
+  //     const cLat = pts.reduce((a, s) => a + co(s).lat, 0) / pts.length;
+  //     const cLon = pts.reduce((a, s) => a + co(s).lon, 0) / pts.length;
+  //     let seed = 0, sb = Infinity;
+  //     pts.forEach((s, i) => { const d = haversineKm(cLat, cLon, co(s).lat, co(s).lon); if (d < sb) { sb = d; seed = i; } });
+  //     const rest = [...pts];
+  //     const chain = [rest.splice(seed, 1)[0]];
+  //     while (rest.length) {
+  //       const l = co(chain[chain.length - 1]);
+  //       let bi = 0, bd = Infinity;
+  //       rest.forEach((s, i) => { const d = haversineKm(l.lat, l.lon, co(s).lat, co(s).lon); if (d < bd) { bd = d; bi = i; } });
+  //       chain.push(rest.splice(bi, 1)[0]);
+  //     }
+  //     selected = [...chain, ...noCo];
+  //     console.log(`[GeoCluster] Reordered ${chain.length} stops into nearest-neighbor chain before day-slice (max spread: ${maxGlobalDist.toFixed(0)} km)`);
+  //   }
+  // }
 
   // ── Anchor constraint enforcement ─────────────────────────────────────────
   // Each day must have between 1 and anchorsPerDay stops with familyAnchorType === 'anchor'.
