@@ -56,6 +56,7 @@ const CITY_TARGET_OVERRIDES: Record<string, number> = {
 // AI stops and undoes the curation. Add a city here the moment its pipeline completes.
 const CURATED_CITIES = new Set<string>([
   "Yellowstone",
+  "Yosemite",
 ]);
 
 const USA_CITIES = [
