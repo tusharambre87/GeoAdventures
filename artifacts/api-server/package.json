@@ -28,6 +28,7 @@
     "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts",
     "script:tag-metro": "tsx src/scripts/tagMetroStops.ts",
     "seed:yellowstone": "tsx src/scripts/seed-yellowstone.ts",
+    "seed:yosemite": "tsx src/scripts/seed-yosemite.ts",
     "dedup:gp-place-id": "tsx src/scripts/dedup-gp-place-id.ts",
     "dedup:gp-place-id:yellowstone": "DEDUP_CITY=Yellowstone tsx src/scripts/dedup-gp-place-id.ts"
   },

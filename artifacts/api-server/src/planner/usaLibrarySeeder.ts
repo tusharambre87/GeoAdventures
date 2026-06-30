@@ -41,6 +41,7 @@ const DELAY_BETWEEN_CITIES_MS = 500;
 const CITY_TARGET_OVERRIDES: Record<string, number> = {
   "Yellowstone":   40,
   "Grand Canyon":  40,
+  "Yosemite":      40,
   "Bar Harbor":    35,   // Acadia National Park gateway
   "Gatlinburg":    35,   // Great Smoky Mountains
   "Jackson Hole":  35,
@@ -102,6 +103,7 @@ const USA_CITIES = [
   "Williamsburg",
   "Yellowstone",
   "Grand Canyon",
+  "Yosemite",
   "Sedona",
   "Monterey",
   "Santa Barbara",
