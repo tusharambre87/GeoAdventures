@@ -154,11 +154,21 @@ async function getPlaceDetails(placeId: string): Promise<PlaceDetails> {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+const SCOPE_CITY = process.env.BACKFILL_CITY ?? null;
+
 async function run(): Promise<void> {
+  const baseWhere = SCOPE_CITY
+    ? and(isNull(stopLibrary.gpVerifiedAt), eq(stopLibrary.city, SCOPE_CITY))
+    : isNull(stopLibrary.gpVerifiedAt);
+
+  if (SCOPE_CITY) {
+    console.log(`[BackfillGooglePlaces] Scoped to city: ${SCOPE_CITY}`);
+  }
+
   const [{ total }] = await db
     .select({ total: count() })
     .from(stopLibrary)
-    .where(isNull(stopLibrary.gpVerifiedAt));
+    .where(baseWhere);
 
   if (total === 0) {
     console.log("[BackfillGooglePlaces] 0 stops to process — already complete.");
@@ -184,8 +194,8 @@ async function run(): Promise<void> {
       .from(stopLibrary)
       .where(
         failedIds.length === 0
-          ? isNull(stopLibrary.gpVerifiedAt)
-          : and(isNull(stopLibrary.gpVerifiedAt), notInArray(stopLibrary.id, failedIds)),
+          ? baseWhere
+          : and(baseWhere, notInArray(stopLibrary.id, failedIds)),
       )
       .orderBy(
         sql`CASE
