@@ -1022,7 +1022,7 @@ function MealSuggestionCard({
           '/api/travel/rescue/food-options',
           {
             method: 'POST',
-            body: JSON.stringify({ tripId, cityGroup, city: destination }),
+            body: JSON.stringify({ tripId, cityGroup, city: destination, dayIndex }),
           },
         ),
         timeout,

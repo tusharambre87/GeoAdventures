@@ -9291,7 +9291,7 @@ Return valid JSON only. No markdown.`;
       // Suppress unused-variable warnings — lat/lng accepted for future proximity ranking
       void lat; void lng;
 
-      const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food', 'market'];
+      const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food'];
 
       // Exclude names the caller already has (e.g. stops on the current day)
       const excludeNames: string[] = Array.isArray(req.body.excludeNames) ? req.body.excludeNames : [];
@@ -9319,13 +9319,15 @@ Return valid JSON only. No markdown.`;
         .orderBy(desc(stopLibrary.serveCount))
         .limit(30);
 
-      // Filter out already-used stops, then shuffle for day-to-day variety
       const candidates = pool.filter((r: any) => !usedNames.has((r.name ?? '').toLowerCase()));
-      for (let i = candidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-      }
-      let rows: typeof candidates = candidates.slice(0, 5);
+      // Deterministic per-day rotation: day N starts at the Nth most-popular pick.
+      // Stable across refreshes, distinct per day, wraps gracefully when pool < days.
+      const dayIdx = Number.isInteger(req.body.dayIndex) ? req.body.dayIndex : 0;
+      const offset = candidates.length
+        ? (((dayIdx % candidates.length) + candidates.length) % candidates.length)
+        : 0;
+      const rotated = [...candidates.slice(offset), ...candidates.slice(0, offset)];
+      let rows: typeof candidates = rotated.slice(0, 5);
 
       // AI fallback when library has no food stops for this city
       if (rows.length === 0) {
