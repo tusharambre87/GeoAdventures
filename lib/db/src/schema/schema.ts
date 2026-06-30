@@ -156,6 +156,7 @@ export const players = pgTable("players", {
   streakFreezes: integer("streak_freezes").default(0),
   hasSeenDailyQuestOnboarding: boolean("has_seen_daily_quest_onboarding").default(false),
   totalXp: integer("total_xp").default(0),
+  starsXpV2Done: boolean("stars_xp_v2_done").default(false),
   avatar: varchar("avatar"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
