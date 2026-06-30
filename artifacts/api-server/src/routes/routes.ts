@@ -7827,17 +7827,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function driveSecondsCached(oLat:number,oLng:number,dLat:number,dLng:number):Promise<number|null>{
     const k=(la:number,lo:number)=>`${la.toFixed(5)},${lo.toFixed(5)}`;
     const oKey=k(oLat,oLng), dKey=k(dLat,dLng);
-    const hit=await pool.query(
-      `SELECT duration_seconds FROM travel_legs WHERE (origin_key=$1 AND dest_key=$2) OR (origin_key=$2 AND dest_key=$1) LIMIT 1`,[oKey,dKey]);
-    if(hit.rows[0]) return hit.rows[0].duration_seconds;
     try{
-      const key=process.env.GOOGLE_PLACES_API_KEY;
-      const url=`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${oLat},${oLng}&destinations=${dLat},${dLng}&mode=driving&key=${key}`;
+      const hit=await db.execute(drizzleSql`SELECT duration_seconds FROM travel_legs WHERE (origin_key=${oKey} AND dest_key=${dKey}) OR (origin_key=${dKey} AND dest_key=${oKey}) LIMIT 1`);
+      if(hit.rows[0]) return (hit.rows[0] as any).duration_seconds as number;
+      const apiKey=process.env.GOOGLE_PLACES_API_KEY;
+      const url=`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${oLat},${oLng}&destinations=${dLat},${dLng}&mode=driving&key=${apiKey}`;
       const data=await (await fetch(url)).json() as any;
       const el=data?.rows?.[0]?.elements?.[0];
       if(el?.status==='OK' && el.duration?.value!=null){
         const secs=el.duration.value as number;
-        await pool.query(`INSERT INTO travel_legs (origin_key,dest_key,duration_seconds) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,[oKey,dKey,secs]);
+        await db.execute(drizzleSql`INSERT INTO travel_legs (origin_key,dest_key,duration_seconds) VALUES (${oKey},${dKey},${secs}) ON CONFLICT DO NOTHING`);
         return secs;
       }
     }catch{}
