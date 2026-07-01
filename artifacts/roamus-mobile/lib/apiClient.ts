@@ -218,7 +218,8 @@ export type TripStory = {
 
 export const memoriesAPI = {
   getMoments: (tripId: string) =>
-    apiFetch<Moment[]>(`/api/travel/trips/${tripId}/moments`),
+    apiFetch<{ moments: Moment[] }>(`/api/travel/trips/${tripId}/moments`)
+      .then(r => (Array.isArray(r) ? r : r.moments ?? [])),
   createMoment: (data: {
     tripId: string;
     stopId?: string | null;
