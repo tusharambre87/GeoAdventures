@@ -2272,9 +2272,47 @@ export async function generateCityStopPool(
     return true;
   });
 
-  console.log(`[CityPoolSeeder] Building pool for ${city} from stop_library — ${uniqueRows.length} stops`);
+  // ── Pass 2: collapse rows sharing the same Google Place ID ────────────────
+  // Catches name-different duplicates (e.g. "San Diego Zoo" vs
+  // "San Diego Zoo (Balboa Park)") that slipped past the name-variant dedup.
+  // Runs on uniqueRows (Pass 1 output), never on raw rows.
+  type PoolRow = typeof uniqueRows[number];
+  const SPECIFIC_STOP_TYPES = new Set(['zoo', 'aquarium', 'museum', 'garden', 'park']);
+  const pickKeeper = (a: PoolRow, b: PoolRow): PoolRow => {
+    // 1. Higher PSI classic score wins
+    const sa = a.scoreClassicFinal ?? 0, sb = b.scoreClassicFinal ?? 0;
+    if (sa !== sb) return sa > sb ? a : b;
+    // 2. More specific stop type wins (zoo/aquarium/museum > landmark)
+    const aSpec = SPECIFIC_STOP_TYPES.has(a.stopType ?? '') ? 1 : 0;
+    const bSpec = SPECIFIC_STOP_TYPES.has(b.stopType ?? '') ? 1 : 0;
+    if (aSpec !== bSpec) return aSpec > bSpec ? a : b;
+    // 3. Shorter/cleaner name wins (drops "(Balboa Park)" parentheticals)
+    return (a.name?.length ?? 0) <= (b.name?.length ?? 0) ? a : b;
+  };
 
-  return uniqueRows.map((row): CachedStopCandidate => {
+  const byGpPlace = new Map<string, PoolRow>();
+  const passThrough: PoolRow[] = [];
+  for (const row of uniqueRows) {
+    const gid = row.gpPlaceId;
+    if (!gid || gid === 'NOT_FOUND') { passThrough.push(row); continue; }
+    const existing = byGpPlace.get(gid);
+    if (!existing) { byGpPlace.set(gid, row); continue; }
+    // Coordinate guard: same gp_place_id but >500m apart = place_id collision
+    // (two genuinely different stops sharing one Google ID). Keep BOTH.
+    const dLat = Math.abs(parseFloat(existing.latitude ?? '0') - parseFloat(row.latitude ?? '0'));
+    const dLng = Math.abs(parseFloat(existing.longitude ?? '0') - parseFloat(row.longitude ?? '0'));
+    if (dLat > 0.005 || dLng > 0.005) {
+      console.warn(`[Dedup] gp_place_id ${gid} spans >500m — keeping both (collision): "${existing.name}" / "${row.name}"`);
+      passThrough.push(row);
+      continue;
+    }
+    byGpPlace.set(gid, pickKeeper(existing, row));
+  }
+  const finalDeduped = [...byGpPlace.values(), ...passThrough];
+
+  console.log(`[CityPoolSeeder] Building pool for ${city} from stop_library — ${uniqueRows.length} stops after name-dedup, ${finalDeduped.length} after gp_place_id dedup`);
+
+  return finalDeduped.map((row): CachedStopCandidate => {
     const enrichment = row.enrichment as Record<string, string> | null;
     const stopType = row.stopType ?? "landmark";
 
