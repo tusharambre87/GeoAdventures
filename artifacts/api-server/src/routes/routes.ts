@@ -5472,7 +5472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const fpMinChildAge = fpChildAges.length > 0 ? Math.min(...fpChildAges) : 99;
             const fpPlannerPace: "relaxed" | "moderate" | "busy" = fpEffectivePace === "chill" ? "relaxed" : fpEffectivePace === "packed" ? "busy" : "moderate";
             const stopsPerDay = getStopsPerDay(fpPlannerPace, fpMinChildAge).total;
-            const FAST_MEAL = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+            const FAST_MEAL = new Set(['restaurant','food','cafe','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const activityStops = ordered.filter(sl => !FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const mealStops    = ordered.filter(sl =>  FAST_MEAL.has((sl.stopType ?? '').toLowerCase()));
             const plannerTripDays = tripDays ?? 2;
@@ -5684,7 +5684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise(r => setTimeout(r, 2500));
 
         // Shared meal-type filter used by all three stop-insertion paths (template / pool / AI)
-        const AUTO_MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery', 'dining', 'bakery', 'dessert', 'lunch']);
+        const AUTO_MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'meal', 'street_food', 'diner', 'eatery', 'dining', 'bakery', 'dessert', 'lunch']);
 
         // ── Fetch trip data + tailoring for stop planning ─────────────────────
         const fullTrip = await storage.getTripById(tripId);
@@ -5818,7 +5818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             // Separate meals from activity stops BEFORE slicing so meal stops from all
             // days are captured regardless of effectiveStopCount.
-            const POOL_MEAL_TYPES = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+            const POOL_MEAL_TYPES = new Set(['restaurant','food','cafe','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
             const poolMealsByDay = new Map<number, GeneratedStop>();
             const activityOnlyStops = selectedStops.filter(s => {
               if (POOL_MEAL_TYPES.has((s.type ?? '').toLowerCase())) {
@@ -10156,7 +10156,7 @@ Return ONLY valid JSON in this exact format:
       const allStops = await storage.getStopsByTripId(tripId);
       const sorted = [...allStops].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-      const MEAL_STOP_TYPES = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
+      const MEAL_STOP_TYPES = new Set(['restaurant','food','cafe','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
       const isMealStop = MEAL_STOP_TYPES.has((stopType || '').toLowerCase());
 
       let insertAt: number;
