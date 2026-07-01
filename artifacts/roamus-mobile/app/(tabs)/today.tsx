@@ -2903,7 +2903,7 @@ export default function TodayScreen() {
           onPreviewStop={handlePreviewStop}
         />
         <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
-          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 }}>{"Changed your mind?"}</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginTop: 20, marginBottom: 4 }}>{"Changed your mind?"}</Text>
           <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 18, lineHeight: 20 }}>{"That's fine — tell us why so we can adjust your day."}</Text>
           {([
             { icon: '\u23F0', bg: '#FFF3E0', name: 'Ran out of time',       desc: "We'll skip it and keep the rest of your day",  signal: 'time' },
@@ -3408,7 +3408,7 @@ export default function TodayScreen() {
           onPreviewStop={handlePreviewStop}
         />
         <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
-          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 }}>{"Changed your mind?"}</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginTop: 20, marginBottom: 4 }}>{"Changed your mind?"}</Text>
           <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 18, lineHeight: 20 }}>{"That's fine — tell us why so we can adjust your day."}</Text>
           {([
             { icon: '\u23F0', bg: '#FFF3E0', name: 'Ran out of time',       desc: "We'll skip it and keep the rest of your day",  signal: 'time' },
