@@ -29,6 +29,7 @@ export interface UpgradeSheetProps {
   onClose: () => void;
   context: UpgradeContext;
   tripId?: string;
+  onSuccess?: () => void;
 }
 
 const HEADLINES: Record<UpgradeContext, string> = {
@@ -86,7 +87,7 @@ const BUNDLE_PLAN = {
   cta: 'Unlock 3 Trips for $22.99 →',
 };
 
-export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheetProps) {
+export default function UpgradeSheet({ visible, onClose, context, onSuccess }: UpgradeSheetProps) {
   const insets = useSafeAreaInsets();
   const { token, refreshUser } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -188,6 +189,7 @@ export default function UpgradeSheet({ visible, onClose, context }: UpgradeSheet
               } catch {}
             }
             onClose();
+            if (onSuccess) setTimeout(onSuccess, 150);
           },
         },
       ],

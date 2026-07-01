@@ -2530,6 +2530,7 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        onSuccess={() => { void handleStartDay(); }}
         />
         <RescueSheet
           visible={showRescue}
@@ -2888,6 +2889,7 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        onSuccess={() => { void handleStartDay(); }}
         />
         <RescueSheet
           visible={showRescue}
@@ -3393,6 +3395,7 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        onSuccess={() => { void handleStartDay(); }}
         />
         <RescueSheet
           visible={showRescue}
@@ -3594,6 +3597,7 @@ export default function TodayScreen() {
           visible={upgradeVisible}
           onClose={() => setUpgradeVisible(false)}
           context="run_day"
+        onSuccess={() => { void handleStartDay(); }}
         />
         <RescueSheet
           visible={showRescue}
