@@ -1530,6 +1530,8 @@ function DayDetail({
   isFree,
   onShowUpgrade,
   onPmalAddRequest,
+  fromDayWrap,
+  prevDayIndex,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1551,6 +1553,8 @@ function DayDetail({
   isFree?: boolean;
   onShowUpgrade?: () => void;
   onPmalAddRequest?: (suggestion: ParentSuggestion, dayStops: PmalStop[], dayIndex: number, onAdded: () => void) => void;
+  fromDayWrap?: boolean;
+  prevDayIndex?: number;
 }) {
   const insets   = useSafeAreaInsets();
   const status   = getDayStatus(selectedDay);
@@ -1563,6 +1567,16 @@ function DayDetail({
     selectedDayStops.every(s => s.isVisited || s.visited);
   const isViewingPast    = selectedDay - 1 < activeDayIndex;
   const runBtnDisabled   = isViewingPast || isDayComplete;
+
+  // Calendar check — is this day still in the future?
+  const isDayCalendarFuture = (() => {
+    if (!trip.startDate) return false;
+    const base = new Date(trip.startDate);
+    base.setHours(0, 0, 0, 0);
+    const dayDate = new Date(base.getTime() + (selectedDay - 1) * 86400000);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return dayDate > today;
+  })();
   const dayStops = getStopsForDay(selectedDay);
   const anchor   = getAnchorStopForDay(selectedDay);
   const theme    = dayTheme(dayStops, selectedDay === totalDays);
@@ -2145,14 +2159,47 @@ function DayDetail({
           );
         })()}
 
+        {/* Recap buttons shown after wrapping previous day */}
+        {fromDayWrap && prevDayIndex != null && (
+          <View style={{ marginHorizontal: 16, marginTop: 8, gap: 8 }}>
+            <Pressable
+              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F0FF', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, gap: 10 }}
+              onPress={() => {
+                const prevDayStops = getStopsForDay(prevDayIndex + 1);
+                const firstStop = prevDayStops[0];
+                if (firstStop) {
+                  router.push({ pathname: '/kids' as never, params: { stopId: firstStop.id, stopName: encodeURIComponent(firstStop.name ?? ''), tripId } });
+                }
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>{'\uD83E\uDDF8'}</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 14, color: '#3D2A6E', flex: 1 }}>Revisit Kids Zone — Day {prevDayIndex + 1}</Text>
+              <Text style={{ fontSize: 16, color: '#8A8FA8' }}>{'\u203A'}</Text>
+            </Pressable>
+            <Pressable
+              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF8F0', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, gap: 10 }}
+              onPress={() => router.push({ pathname: '/memories/[tripId]' as never, params: { tripId, dayIndex: String(prevDayIndex) } } as never)}
+            >
+              <Text style={{ fontSize: 18 }}>{'\uD83D\uDCF8'}</Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 14, color: '#E8692A', flex: 1 }}>Revisit Memories — Day {prevDayIndex + 1}</Text>
+              <Text style={{ fontSize: 16, color: '#8A8FA8' }}>{'\u203A'}</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Inline Start Day / Day Complete button */}
-        {dayStops.length > 0 && !isDayComplete && !isViewingPast && (
+        {dayStops.length > 0 && !isDayComplete && !isViewingPast && !isDayCalendarFuture && (
           <Pressable
             style={[dd.runBtn, { marginHorizontal: 16, marginTop: 10, marginBottom: 4 }]}
             onPress={onRunDay}
           >
             <IconPlay /><Text style={dd.runBtnText}>{'  '}Start Day {selectedDay}</Text>
           </Pressable>
+        )}
+        {dayStops.length > 0 && !isDayComplete && !isViewingPast && isDayCalendarFuture && (
+          <View style={[dd.runBtn, { marginHorizontal: 16, marginTop: 10, marginBottom: 4, backgroundColor: '#D1D5E0', opacity: 0.7 }]}>
+            <Text style={[dd.runBtnText, { color: '#6B7280' }]}>{'\uD83D\uDD50'} Start Day {selectedDay} — available on day of</Text>
+          </View>
         )}
         {dayStops.length > 0 && (isDayComplete || isViewingPast) && (
           <View style={[dd.runBtn, dd.runBtnDone, { marginHorizontal: 16, marginTop: 10, marginBottom: 4 }]}>
@@ -4575,7 +4622,7 @@ const pps = StyleSheet.create({
 // ─── Root screen ──────────────────────────────────────────────────────────────
 
 export default function TripPlanScreen() {
-  const { tripId, openAddStop, addStopDefaultFilter } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string }>();
+  const { tripId, openAddStop, addStopDefaultFilter, initialDay, fromDayWrap } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string; initialDay?: string; fromDayWrap?: string }>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   useFrauncesFonts({ Fraunces_900Black });
@@ -4631,6 +4678,14 @@ export default function TripPlanScreen() {
       setActiveSheet('addStop');
     }
   }, []);
+
+  // When opened from "See Tomorrow's Plan" after a day wrap, jump to the right day
+  useEffect(() => {
+    if (initialDay && Number(initialDay) > 0) {
+      setSelectedDay(Number(initialDay));
+      setActiveScreen('detail');
+    }
+  }, [initialDay]);
   const [showCommunityShare, setShowCommunityShare] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
@@ -4922,6 +4977,8 @@ export default function TripPlanScreen() {
           onPmalAddRequest={(suggestion, dayStops, dayIndex, onAdded) => {
             setPmalTarget({ suggestion, dayStops, dayIndex, onAdded });
           }}
+          fromDayWrap={fromDayWrap === 'true'}
+          prevDayIndex={fromDayWrap === 'true' && initialDay ? Number(initialDay) - 2 : undefined}
         />
       )}
 

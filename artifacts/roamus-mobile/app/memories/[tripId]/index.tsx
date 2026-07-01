@@ -5,11 +5,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   Dimensions,
 } from 'react-native';
@@ -17,6 +20,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as FileSystem from 'expo-file-system/legacy';
 import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
@@ -57,6 +61,8 @@ export default function TripMemoryIndex() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const [instagramSharing, setInstagramSharing] = useState(false);
 
   // When opened from "Wrap Day", dayIndex is set — show day-level "Today's Story" view
   const focusDayIndex = dayIndexParam != null && dayIndexParam !== '' ? Number(dayIndexParam) : null;
@@ -129,26 +135,89 @@ export default function TripMemoryIndex() {
 
   function openPhotoSheet() { setShowPhotoSheet(true); }
 
-  async function shareDay() {
-    const dayNum = (focusDayIndex ?? 0) + 1;
-    const name = trip?.name ?? 'our family trip';
-    const stopNames = dayStops.map((s: any) => s.name).join(', ');
-    const quotePart = kidQuotes.length > 0
-      ? '\n\nKid highlights:\n' + kidQuotes.map(q => q.name ? `${q.name}: "${q.quote}"` : `"${q.quote}"`).join('\n')
-      : '';
-    const url = `https://roamus.app/s/${tripId}`;
-    const message = `Day ${dayNum} of ${name}!\nWe visited: ${stopNames}${quotePart}\n\n${url}`;
+  function openAddPhotoForStop(stop: any) {
+    router.push({
+      pathname: `/memories/${tripId}/add-photo` as never,
+      params: {
+        stopId: stop.id ?? '',
+        stopName: stop.name ?? 'Stop',
+        stopIcon: stopEmoji(stop.stopType),
+      },
+    });
+  }
+
+  async function openInstagramSharing(destination: 'story' | 'post') {
+    setInstagramSharing(true);
     try {
-      await Share.share({ message, url });
-    } catch (_) {}
+      // Collect all day photos as absolute URLs
+      const allDayPhotos: string[] = dayStops.flatMap((stop: any) => {
+        const stopMoments = momentsByStop[stop.id] ?? [];
+        return stopMoments.flatMap((m: Moment) =>
+          m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
+        );
+      });
+
+      if (allDayPhotos.length === 0) {
+        // No photos — just open Instagram
+        const igUrl = destination === 'story' ? 'instagram-stories://share' : 'instagram://app';
+        const canOpen = await Linking.canOpenURL(igUrl);
+        if (canOpen) {
+          await Linking.openURL(igUrl);
+        } else {
+          await Linking.openURL('https://instagram.com');
+        }
+        setShowInstagramModal(false);
+        return;
+      }
+
+      // Download photos to temp files
+      const tempDir = FileSystem.cacheDirectory + 'ig_share/';
+      await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true }).catch(() => {});
+
+      const localPaths: string[] = [];
+      for (let i = 0; i < Math.min(allDayPhotos.length, 10); i++) {
+        const url = absPhotoUrl(allDayPhotos[i]);
+        if (!url) continue;
+        try {
+          const dest = `${tempDir}photo_${i}.jpg`;
+          const res = await FileSystem.downloadAsync(url, dest);
+          if (res.status === 200) localPaths.push(res.uri);
+        } catch (_) {}
+      }
+
+      setShowInstagramModal(false);
+
+      // Try Instagram deep link
+      const igStoryUrl = 'instagram-stories://share';
+      const igAppUrl = destination === 'story' ? igStoryUrl : 'instagram://library';
+      const canOpen = await Linking.canOpenURL(igAppUrl);
+
+      if (canOpen) {
+        await Linking.openURL(igAppUrl);
+        Alert.alert(
+          'Photos ready!',
+          `${localPaths.length} photo${localPaths.length !== 1 ? 's' : ''} downloaded. Tap + in Instagram to select them from your recent photos.`,
+          [{ text: 'Got it' }]
+        );
+      } else {
+        await Linking.openURL('https://instagram.com');
+      }
+    } catch (err) {
+      setShowInstagramModal(false);
+      Alert.alert('Could not open Instagram', 'Make sure Instagram is installed.');
+    } finally {
+      setInstagramSharing(false);
+    }
   }
 
   async function shareTrip() {
     const url = `https://roamus.app/s/${tripId}`;
     const name = trip?.name ?? 'our family trip';
     try {
-      await Share.share({ message: `Check out ${name}! ${url}`, url });
-    } catch (_) {}
+      await Linking.openURL(`https://wa.me/?text=${encodeURIComponent('Check out ' + name + '! ' + url)}`);
+    } catch (_) {
+      await Linking.openURL(url);
+    }
   }
 
   function handleStopSelect(stopId: string | null, stopName: string, stopIcon: string) {
@@ -252,14 +321,14 @@ export default function TripMemoryIndex() {
                           <ExpoImage source={{ uri: absPhotoUrl(uri) }} style={StyleSheet.absoluteFill} contentFit="cover" />
                         </View>
                       ))}
-                      <Pressable style={styles.addSlot} onPress={openPhotoSheet}>
+                      <Pressable style={styles.addSlot} onPress={() => openAddPhotoForStop(stop)}>
                         <Text style={styles.addSlotPlus}>+</Text>
                       </Pressable>
                     </View>
                   )}
 
                   {photos.length === 0 && (
-                    <Pressable style={dayStyles.addPhotoRow} onPress={openPhotoSheet}>
+                    <Pressable style={dayStyles.addPhotoRow} onPress={() => openAddPhotoForStop(stop)}>
                       <Text style={dayStyles.addPhotoText}>{'\uD83D\uDCF7'} Add photos from {stop.name}</Text>
                     </Pressable>
                   )}
@@ -280,14 +349,84 @@ export default function TripMemoryIndex() {
             })
           )}
 
-          {/* Share button */}
-          <View style={[styles.shareSection, { marginTop: 16 }]}>
-            <Pressable style={styles.shareBtn} onPress={shareDay}>
+          {/* Kids Zone button */}
+          {dayStops.length > 0 && (
+            <TouchableOpacity
+              style={dayStyles.kidsZoneBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                const firstStop = dayStops[0];
+                if (firstStop) {
+                  router.push({
+                    pathname: '/kids' as never,
+                    params: { stopId: firstStop.id, stopName: encodeURIComponent(firstStop.name ?? ''), tripId: tripId ?? '' },
+                  });
+                }
+              }}
+            >
+              <Text style={dayStyles.kidsZoneBtnText}>{'\uD83E\uDDF8'} Revisit Kids Zone</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Share to Instagram button */}
+          <View style={[styles.shareSection, { marginTop: 8 }]}>
+            <TouchableOpacity style={styles.shareBtn} onPress={() => setShowInstagramModal(true)}>
               <Text style={styles.shareBtnText}>Share Day {dayNum}</Text>
-            </Pressable>
-            <Text style={dayStyles.shareHint}>Shareable on Instagram, WhatsApp, and more</Text>
+            </TouchableOpacity>
+            <Text style={dayStyles.shareHint}>Share to Instagram Story or Post</Text>
           </View>
         </ScrollView>
+
+        {/* Instagram sharing modal */}
+        <Modal
+          visible={showInstagramModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowInstagramModal(false)}
+        >
+          <Pressable style={dayStyles.modalOverlay} onPress={() => setShowInstagramModal(false)}>
+            <Pressable style={dayStyles.modalSheet} onPress={e => e.stopPropagation()}>
+              <View style={dayStyles.modalGrip} />
+              <Text style={dayStyles.modalTitle}>Share Day {dayNum}</Text>
+              <Text style={dayStyles.modalSub}>Choose how to share to Instagram</Text>
+
+              <TouchableOpacity
+                style={[dayStyles.igBtn, dayStyles.igBtnStory]}
+                activeOpacity={0.85}
+                disabled={instagramSharing}
+                onPress={() => openInstagramSharing('story')}
+              >
+                <Text style={dayStyles.igBtnIcon}>{'\uD83C\uDF9E'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={dayStyles.igBtnTitle}>Instagram Story</Text>
+                  <Text style={dayStyles.igBtnSub}>Share as a full-screen story</Text>
+                </View>
+                <Text style={dayStyles.igBtnArrow}>{instagramSharing ? '...' : '\u203A'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[dayStyles.igBtn, dayStyles.igBtnPost]}
+                activeOpacity={0.85}
+                disabled={instagramSharing}
+                onPress={() => openInstagramSharing('post')}
+              >
+                <Text style={dayStyles.igBtnIcon}>{'\uD83D\uDDBC'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={dayStyles.igBtnTitle}>Instagram Post</Text>
+                  <Text style={dayStyles.igBtnSub}>Share as a grid post</Text>
+                </View>
+                <Text style={dayStyles.igBtnArrow}>{instagramSharing ? '...' : '\u203A'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={dayStyles.modalCancel}
+                onPress={() => setShowInstagramModal(false)}
+              >
+                <Text style={dayStyles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {showPhotoSheet && (
           <StopPickerSheet
@@ -572,4 +711,45 @@ const dayStyles = StyleSheet.create({
   quoteText: { fontFamily: F.regular, fontSize: 14, color: '#1A1F2E', lineHeight: 20, fontStyle: 'italic' },
 
   shareHint: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 8, textAlign: 'center' },
+
+  kidsZoneBtn: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: '#3D2A6E',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 12,
+  },
+  modalGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#D1D5E0', alignSelf: 'center', marginBottom: 16 },
+  modalTitle: { fontFamily: F.bold, fontSize: 20, color: '#1A1F2E', textAlign: 'center', marginBottom: 4 },
+  modalSub: { fontFamily: F.regular, fontSize: 13, color: '#8A8FA8', textAlign: 'center', marginBottom: 20 },
+
+  igBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    gap: 12,
+  },
+  igBtnStory: { backgroundColor: '#F5F0FF', borderWidth: 1.5, borderColor: '#C084FC' },
+  igBtnPost: { backgroundColor: '#FFF0F8', borderWidth: 1.5, borderColor: '#F472B6' },
+  igBtnIcon: { fontSize: 28 },
+  igBtnTitle: { fontFamily: F.semibold, fontSize: 15, color: '#1A1F2E' },
+  igBtnSub: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 2 },
+  igBtnArrow: { fontFamily: F.bold, fontSize: 22, color: '#8A8FA8' },
+  modalCancel: { marginTop: 6, paddingVertical: 12, alignItems: 'center' },
+  modalCancelText: { fontFamily: F.semibold, fontSize: 15, color: '#8A8FA8' },
 });

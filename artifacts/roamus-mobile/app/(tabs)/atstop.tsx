@@ -985,11 +985,20 @@ export default function AtStopScreen() {
                 ))}
               </View>
               <TouchableOpacity
-                onPress={() => router.push('/(tabs)/today')}
+                onPress={() => {
+                  if (trip?.id) {
+                    router.push({
+                      pathname: '/trip/[tripId]' as never,
+                      params: { tripId: trip.id, initialDay: String(dayIndex + 2), fromDayWrap: 'true' },
+                    } as never);
+                  } else {
+                    router.push('/(tabs)/today');
+                  }
+                }}
                 style={{ backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' }}
               >
                 <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>
-                  Go to Today {'→'}
+                  See Tomorrow's Plan {'→'}
                 </Text>
               </TouchableOpacity>
             </View>
