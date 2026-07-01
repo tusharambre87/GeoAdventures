@@ -931,7 +931,11 @@ export default function TodayScreen() {
       }
 
 
-      if (!devState && override !== 'stop_complete' && (!LOCKED_STATES.includes(todayState) || forceReset) && !executionStartedRef.current) {
+      if (forceReset && !devState) {
+        // "Start Day N" was tapped explicitly — always land on morning regardless of DB visited state
+        setTodayState('morning');
+        await AsyncStorage.multiRemove(['atStopFrozen', 'atStopFrozenTripId']).catch(() => {});
+      } else if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const days = daysUntilDate(t.startDate);
         if (days > 7) {
           setTodayState('pre_trip_far');
@@ -960,7 +964,7 @@ export default function TodayScreen() {
       }
 
       // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
-      if (!devState && override !== 'stop_complete' && (!LOCKED_STATES.includes(todayState) || forceReset) && !executionStartedRef.current) {
+      if (!forceReset && !devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
         const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
         if (frozenFlag === 'true' && frozenTripId === tid) {
