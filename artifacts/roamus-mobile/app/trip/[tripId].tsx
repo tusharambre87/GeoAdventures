@@ -269,6 +269,11 @@ function needsTicket(stop: Stop): boolean {
 }
 
 function getStopDuration(stop: Stop): number {
+  // metadata.durationMinutes is where the server stores the value (travel_stops has no
+  // top-level duration_minutes column). Check it first so Zoo/aquarium etc. get their
+  // real stored duration rather than the type-based constant fallbacks below.
+  const metaDur = (stop as any).metadata?.durationMinutes;
+  if (typeof metaDur === 'number' && metaDur > 0) return metaDur;
   if (stop.durationMinutes) return stop.durationMinutes;
   const t = stop.stopType?.toLowerCase() ?? '';
   if (t.includes('zoo') || t.includes('aquarium') || t.includes('beach')) return 120;
@@ -1662,20 +1667,17 @@ function DayDetail({
       const DAY_START = 9 * 60, TRANSIT = 15, NOON = 12 * 60, LUNCH_END = 14 * 60;
       // Fast-path: if stop[0] has a real duration that already ends at or after 10:30 am,
       // lock the meal after the first stop and skip the noon search loop entirely.
-      const _rawDur0 = localContentStops.length > 0
-        ? (localContentStops[0] as any).durationMinutes
-        : undefined;
-      const fastPath =
-        typeof _rawDur0 === 'number' &&
-        _rawDur0 >= 60 &&
-        DAY_START + _rawDur0 >= 630;
+      // Use getStopDuration() so metadata.durationMinutes is read (the Zoo's 180-min
+      // value lives there — travel_stops has no top-level duration_minutes column).
+      const _dur0 = localContentStops.length > 0 ? getStopDuration(localContentStops[0]) : 0;
+      const fastPath = localContentStops.length > 0 && _dur0 >= 60 && DAY_START + _dur0 >= 630;
       if (fastPath) {
         mealInsertAfterIdx = 0;
       } else {
         let cursor = DAY_START;
         let bestDist = Infinity;
         for (let i = 0; i < localContentStops.length; i++) {
-          const dur = (localContentStops[i] as any).durationMinutes ?? 60;
+          const dur = getStopDuration(localContentStops[i]);
           const slotAfter = cursor + dur + TRANSIT;
           if (slotAfter <= LUNCH_END) {
             const dist = Math.abs(slotAfter - NOON);
@@ -1702,23 +1704,16 @@ function DayDetail({
   // ── Debug log: mealInsertAfterIdx placement (remove before ship) ──────────
   if (__DEV__ && localContentStops.length > 0) {
     const _dbgS0 = localContentStops[0] as any;
-    const _dbgDur: number = typeof _dbgS0.durationMinutes === 'number' ? _dbgS0.durationMinutes : 60;
-    const _dbgProp = typeof _dbgS0.durationMinutes === 'number' ? 'durationMinutes' : '(missing → defaulted 60)';
-    const _dbgEndMin = 9 * 60 + _dbgDur;
+    const _dbgMetaDur = _dbgS0.metadata?.durationMinutes;
+    const _dbgResolved = getStopDuration(localContentStops[0]);
+    const _dbgEndMin = 9 * 60 + _dbgResolved;
     console.log(
-      '[mealInsert] dayStartHr=9 |',
-      'stops[0]:', _dbgS0.name,
-      '| dur:', _dbgDur, 'from', _dbgProp,
-      '| endMin:', _dbgEndMin, '(', Math.floor(_dbgEndMin/60) + ':' + String(_dbgEndMin%60).padStart(2,'0'), ')',
+      '[mealInsert:fixed] stops[0]:', _dbgS0.name,
+      '| metadata.durationMinutes:', _dbgMetaDur,
+      '| getStopDuration():', _dbgResolved,
+      '| endMin:', _dbgEndMin, '(' + Math.floor(_dbgEndMin/60) + ':' + String(_dbgEndMin%60).padStart(2,'0') + ')',
+      '| fastPath:', localContentStops.length > 0 && _dbgResolved >= 60 && _dbgEndMin >= 630,
       '| mealInsertAfterIdx:', mealInsertAfterIdx
-    );
-    console.log(
-      '[stopShape] keys:', Object.keys(_dbgS0).join(', '),
-      '| durationMinutes:', _dbgS0.durationMinutes,
-      '| duration:', _dbgS0.duration,
-      '| estimatedDurationMinutes:', _dbgS0.estimatedDurationMinutes,
-      '| visitDuration:', _dbgS0.visitDuration,
-      '| getStopDuration result:', _dbgS0.stopType
     );
   }
 
