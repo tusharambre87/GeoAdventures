@@ -1712,6 +1712,14 @@ function DayDetail({
       '| endMin:', _dbgEndMin, '(', Math.floor(_dbgEndMin/60) + ':' + String(_dbgEndMin%60).padStart(2,'0'), ')',
       '| mealInsertAfterIdx:', mealInsertAfterIdx
     );
+    console.log(
+      '[stopShape] keys:', Object.keys(_dbgS0).join(', '),
+      '| durationMinutes:', _dbgS0.durationMinutes,
+      '| duration:', _dbgS0.duration,
+      '| estimatedDurationMinutes:', _dbgS0.estimatedDurationMinutes,
+      '| visitDuration:', _dbgS0.visitDuration,
+      '| getStopDuration result:', _dbgS0.stopType
+    );
   }
 
   const [weatherWarning, setWeatherWarning] = useState<{
