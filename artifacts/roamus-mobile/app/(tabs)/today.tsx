@@ -439,6 +439,7 @@ function SheetModal({
   visible: boolean; onClose: () => void; children: React.ReactNode;
 }) {
   const translateY = useRef(new Animated.Value(800)).current;
+  const shInsets = useSafeAreaInsets();
   useEffect(() => {
     Animated.spring(translateY, {
       toValue: visible ? 0 : 800,
@@ -454,7 +455,7 @@ function SheetModal({
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,30,0.48)' }]}
         onPress={onClose}
       />
-      <Animated.View style={[sm.sheet, { transform: [{ translateY }] }]}>
+      <Animated.View style={[sm.sheet, { transform: [{ translateY }], paddingBottom: TAB_BAR_H + shInsets.bottom + 20 }]}>
         {children}
       </Animated.View>
     </View>
@@ -2832,54 +2833,43 @@ export default function TodayScreen() {
           )}
           {/* Dual action buttons: outline Directions + dark I'm here */}
           <View style={er.dualBtnRow}>
-            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
-              <TouchableOpacity
-                style={er.dirBtn}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const addr = (stop as { address?: string }).address ?? stop.name;
-                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-                }}
-              >
-                <Text style={er.dirBtnText}>Directions</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={{ alignSelf: 'center', paddingVertical: 4 }}
-                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
-              >
-                <Text style={{ color: C.orange, fontSize: 12, fontFamily: F.semibold }}>{'+ Add Stop'}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
-              <TouchableOpacity
-                style={er.hereBtn}
-                activeOpacity={0.85}
-                onPress={() => {
-                  if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setTodayState('at_stop_frozen');
-                  AsyncStorage.setItem('atStopFrozen', 'true');
-                  AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
-                  AsyncStorage.setItem('atStopStartTime', String(Date.now()));
-                  router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
-                }}
-              >
-              <Text style={er.hereBtnText}>I’m here {'\u2713'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={{ alignSelf: 'center', paddingVertical: 4 }}
-                onPress={() => setShowChangedMind(true)}
-              >
-                <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={er.dirBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const addr = (stop as { address?: string }).address ?? stop.name;
+                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+              }}
+            >
+              <Text style={er.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={er.hereBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setTodayState('at_stop_frozen');
+                AsyncStorage.setItem('atStopFrozen', 'true');
+                AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
+                AsyncStorage.setItem('atStopStartTime', String(Date.now()));
+                router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
+              }}
+            >
+              <Text style={er.hereBtnText}>{"I'm here ✓"}</Text>
+            </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={{ alignSelf: 'center', marginTop: 10, paddingVertical: 6, paddingHorizontal: 16 }}
+            onPress={() => setShowChangedMind(true)}
+          >
+            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setShowRescue(true)}
-            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+            style={{ alignSelf: 'center', marginTop: 12, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
           >
             <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
           </TouchableOpacity>
@@ -3356,47 +3346,35 @@ export default function TodayScreen() {
 
           {/* Directions + Go to stop */}
           <View style={er.dualBtnRow}>
-            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
-              <TouchableOpacity
-                style={er.dirBtn}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const addr = (stop as { address?: string }).address ?? stop.name;
-                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-                }}
-              >
-                <Text style={er.dirBtnText}>Directions</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={{ alignSelf: 'center', paddingVertical: 4 }}
-                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
-              >
-                <Text style={{ color: C.orange, fontSize: 12, fontFamily: F.semibold }}>{'+ Add Stop'}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
-              <TouchableOpacity
-                style={er.hereBtn}
-                activeOpacity={0.85}
-                onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
-              >
-                <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={{ alignSelf: 'center', paddingVertical: 4 }}
-                onPress={() => setShowChangedMind(true)}
-              >
-                <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={er.dirBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                const addr = (stop as { address?: string }).address ?? stop.name;
+                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+              }}
+            >
+              <Text style={er.dirBtnText}>Directions</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={er.hereBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
+            >
+              <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
+            </TouchableOpacity>
           </View>
-
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={{ alignSelf: 'center', marginTop: 10, paddingVertical: 6, paddingHorizontal: 16 }}
+            onPress={() => setShowChangedMind(true)}
+          >
+            <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setShowRescue(true)}
-            style={{ alignSelf: 'center', marginTop: 20, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
+            style={{ alignSelf: 'center', marginTop: 12, marginBottom: TAB_BAR_H + insets.bottom + 16, paddingVertical: 8, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: C.orange, backgroundColor: 'transparent' }}
           >
             <Text style={{ color: C.orange, fontSize: 13, fontFamily: F.semibold }}>{'Day not going to plan? \u2192'}</Text>
           </TouchableOpacity>
