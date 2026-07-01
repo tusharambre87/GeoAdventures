@@ -1699,6 +1699,20 @@ function DayDetail({
       }
     }
   }
+  // ── Debug log: mealInsertAfterIdx placement (remove before ship) ──────────
+  if (__DEV__ && localContentStops.length > 0) {
+    const _dbgS0 = localContentStops[0] as any;
+    const _dbgDur: number = typeof _dbgS0.durationMinutes === 'number' ? _dbgS0.durationMinutes : 60;
+    const _dbgProp = typeof _dbgS0.durationMinutes === 'number' ? 'durationMinutes' : '(missing → defaulted 60)';
+    const _dbgEndMin = 9 * 60 + _dbgDur;
+    console.log(
+      '[mealInsert] dayStartHr=9 |',
+      'stops[0]:', _dbgS0.name,
+      '| dur:', _dbgDur, 'from', _dbgProp,
+      '| endMin:', _dbgEndMin, '(', Math.floor(_dbgEndMin/60) + ':' + String(_dbgEndMin%60).padStart(2,'0'), ')',
+      '| mealInsertAfterIdx:', mealInsertAfterIdx
+    );
+  }
 
   const [weatherWarning, setWeatherWarning] = useState<{
     precipProb: number;
