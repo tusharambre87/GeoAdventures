@@ -746,9 +746,23 @@ export default function AtStopScreen() {
     } catch { /* best effort */ }
     setSubmittingFeedback(false);
     setActiveSheet('none');
-    // Always signal today tab STOP_COMPLETE and navigate back
+    // Signal today tab that a stop was completed
     await AsyncStorage.setItem('today_state_override', 'stop_complete');
-    router.push('/(tabs)/today');
+    // Advance to the next unvisited stop if one exists; otherwise go to picker
+    // (which will show the "all done" summary). Do NOT reload from network — use
+    // the locally-updated dayStops state so the user never sees a stale stop.
+    setDayStops(prev => {
+      const updated = prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s);
+      const nextUnvisited = updated.find(s => !isStopVisited(s));
+      if (nextUnvisited) {
+        setCurrentStop(nextUnvisited);
+        setMode('detail');
+      } else {
+        setCurrentStop(null);
+        setMode('picker');
+      }
+      return updated;
+    });
   }
 
   async function handleMealComplete() {
@@ -947,6 +961,38 @@ export default function AtStopScreen() {
                 );
               })}
             </>
+          )}
+          {/* All stops done for today */}
+          {dayStops.length > 0 && unvisited.length === 0 && (
+            <View style={{ alignItems: 'center', padding: 32 }}>
+              <Text style={{ fontSize: 40, marginBottom: 12 }}>{'\uD83C\uDF89'}</Text>
+              <Text style={{ fontFamily: F.bold, fontSize: 22, color: '#1A1F2E', textAlign: 'center', marginBottom: 8 }}>
+                All stops done for today!
+              </Text>
+              <Text style={{ fontFamily: F.regular, fontSize: 14, color: '#8A8FA8', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
+                You visited {visited.length} stop{visited.length !== 1 ? 's' : ''} today. Head to Today to wrap up your day and save your memories.
+              </Text>
+              {/* Mini recap of today's stops */}
+              <View style={{ width: '100%', backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                <Text style={{ fontFamily: F.semibold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.8, marginBottom: 10 }}>TODAY'S ADVENTURE</Text>
+                {visited.map((stop, i) => (
+                  <View key={stop.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: 'rgba(26,31,46,0.07)' }}>
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#E8F7EF', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                      <Text style={{ fontSize: 10, fontFamily: F.bold, color: '#3DAA6E' }}>{'\u2713'}</Text>
+                    </View>
+                    <Text style={{ fontFamily: F.medium, fontSize: 14, color: '#1A1F2E', flex: 1 }} numberOfLines={1}>{stop.name}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/today')}
+                style={{ backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' }}
+              >
+                <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>
+                  Go to Today {'→'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
           {dayStops.length === 0 && (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 }}>

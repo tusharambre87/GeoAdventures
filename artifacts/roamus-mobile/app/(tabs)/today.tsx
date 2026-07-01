@@ -3715,7 +3715,10 @@ export default function TodayScreen() {
                   await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
                 } catch { /* best-effort */ }
 
-                router.push('/(tabs)/memories' as never);
+                router.push({
+                  pathname: '/memories/[tripId]' as never,
+                  params: { tripId: trip!.id, dayIndex: String(resolvedDayIndex) },
+                } as never);
               } finally {
                 setIsWrapping(false);
               }

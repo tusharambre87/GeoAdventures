@@ -53,10 +53,14 @@ function formatTime(d?: string | null): string {
 }
 
 export default function TripMemoryIndex() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, dayIndex: dayIndexParam } = useLocalSearchParams<{ tripId: string; dayIndex?: string }>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+
+  // When opened from "Wrap Day", dayIndex is set — show day-level "Today's Story" view
+  const focusDayIndex = dayIndexParam != null && dayIndexParam !== '' ? Number(dayIndexParam) : null;
+  const isDayView = focusDayIndex != null && !isNaN(focusDayIndex);
 
   const { data: trip, isLoading: tripLoading, isError: tripError } = useQuery({
     queryKey: ['trip', tripId],
@@ -75,10 +79,12 @@ export default function TripMemoryIndex() {
     ? momentsRaw
     : ((momentsRaw as any)?.moments ?? []);
 
-  const { visitedStops, momentsByStop, allPhotos } = useMemo(() => {
-    const visitedStops = ((trip?.stops ?? []) as any[])
+  const { visitedStops, momentsByStop, allPhotos, dayStops, dayMoments, dayPhotos, kidQuotes } = useMemo(() => {
+    const allStops = ((trip?.stops ?? []) as any[])
       .filter((s: any) => s.isVisited || s.visited)
       .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
+    const visitedStops = allStops;
 
     const momentsByStop: Record<string, Moment[]> = {};
     for (const m of moments) {
@@ -91,10 +97,51 @@ export default function TripMemoryIndex() {
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
 
-    return { visitedStops, momentsByStop, allPhotos };
-  }, [trip, moments]);
+    // Day-level filter
+    const dayStops = isDayView
+      ? allStops.filter((s: any) => (s.dayIndex ?? 0) === focusDayIndex)
+      : [];
+
+    const dayStopIds = new Set(dayStops.map((s: any) => s.id));
+    const dayMoments = isDayView
+      ? moments.filter(m => m.stopId ? dayStopIds.has(m.stopId) : false)
+      : [];
+
+    const dayPhotos = dayMoments.flatMap(m =>
+      m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
+    );
+
+    // Parse kid quotes: stored as "name|quote" or plain quote
+    const kidQuotes = (isDayView ? dayMoments : moments)
+      .filter(m => m.kidPromptResponse)
+      .map(m => {
+        const raw = m.kidPromptResponse ?? '';
+        const pipeIdx = raw.indexOf('|');
+        if (pipeIdx > 0) {
+          return { name: raw.slice(0, pipeIdx).trim(), quote: raw.slice(pipeIdx + 1).trim() };
+        }
+        return { name: null, quote: raw.trim() };
+      })
+      .filter(q => q.quote.length > 0);
+
+    return { visitedStops, momentsByStop, allPhotos, dayStops, dayMoments, dayPhotos, kidQuotes };
+  }, [trip, moments, isDayView, focusDayIndex]);
 
   function openPhotoSheet() { setShowPhotoSheet(true); }
+
+  async function shareDay() {
+    const dayNum = (focusDayIndex ?? 0) + 1;
+    const name = trip?.name ?? 'our family trip';
+    const stopNames = dayStops.map((s: any) => s.name).join(', ');
+    const quotePart = kidQuotes.length > 0
+      ? '\n\nKid highlights:\n' + kidQuotes.map(q => q.name ? `${q.name}: "${q.quote}"` : `"${q.quote}"`).join('\n')
+      : '';
+    const url = `https://roamus.app/s/${tripId}`;
+    const message = `Day ${dayNum} of ${name}!\nWe visited: ${stopNames}${quotePart}\n\n${url}`;
+    try {
+      await Share.share({ message, url });
+    } catch (_) {}
+  }
 
   async function shareTrip() {
     const url = `https://roamus.app/s/${tripId}`;
@@ -142,7 +189,118 @@ export default function TripMemoryIndex() {
   }
 
   const tripName = trip?.name ?? 'Trip';
+  const dayNum = (focusDayIndex ?? 0) + 1;
 
+  // ── Day-level "Today's Story" view ─────────────────────────────────────────
+  if (isDayView) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.header}>
+          <Pressable style={styles.backBtn} onPress={() => router.replace('/(tabs)/memories' as never)} hitSlop={12}>
+            <Text style={styles.backBtnText}>←</Text>
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>Day {dayNum} Story</Text>
+          <Pressable style={styles.addBtn} onPress={openPhotoSheet} hitSlop={8}>
+            <Text style={styles.addBtnText}>{'\uD83D\uDCF7'} Add</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+          {/* Day header */}
+          <View style={dayStyles.heroCard}>
+            <Text style={dayStyles.heroEmoji}>{'\uD83C\uDF89'}</Text>
+            <Text style={dayStyles.heroTitle}>Day {dayNum} Complete!</Text>
+            <Text style={dayStyles.heroSub}>{dayStops.length} stop{dayStops.length !== 1 ? 's' : ''} visited</Text>
+          </View>
+
+          {/* Stops with photos and quotes */}
+          {dayStops.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>No stops recorded for Day {dayNum}</Text>
+              <Text style={styles.emptyBody}>Mark stops as visited to see them here.</Text>
+            </View>
+          ) : (
+            dayStops.map((stop: any, idx: number) => {
+              const stopMoments = momentsByStop[stop.id] ?? [];
+              const photos = stopMoments.flatMap((m: Moment) =>
+                m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
+              );
+              const stopQuotes = stopMoments
+                .filter(m => m.kidPromptResponse)
+                .map(m => {
+                  const raw = m.kidPromptResponse ?? '';
+                  const pipeIdx = raw.indexOf('|');
+                  if (pipeIdx > 0) return { name: raw.slice(0, pipeIdx).trim(), quote: raw.slice(pipeIdx + 1).trim() };
+                  return { name: null, quote: raw.trim() };
+                })
+                .filter(q => q.quote.length > 0);
+
+              return (
+                <View key={stop.id} style={{ marginBottom: 4 }}>
+                  <View style={styles.stopRow}>
+                    <View style={styles.stopIconWrap}>
+                      <Text style={{ fontSize: 18 }}>{stopEmoji(stop.stopType)}</Text>
+                    </View>
+                    <Text style={styles.stopName} numberOfLines={1}>{stop.name}</Text>
+                  </View>
+
+                  {photos.length > 0 && (
+                    <View style={styles.photoGrid}>
+                      {photos.map((uri: string, i: number) => (
+                        <View key={i} style={styles.photoCell}>
+                          <ExpoImage source={{ uri: absPhotoUrl(uri) }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                        </View>
+                      ))}
+                      <Pressable style={styles.addSlot} onPress={openPhotoSheet}>
+                        <Text style={styles.addSlotPlus}>+</Text>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {photos.length === 0 && (
+                    <Pressable style={dayStyles.addPhotoRow} onPress={openPhotoSheet}>
+                      <Text style={dayStyles.addPhotoText}>{'\uD83D\uDCF7'} Add photos from {stop.name}</Text>
+                    </Pressable>
+                  )}
+
+                  {stopQuotes.map((q, qi) => (
+                    <View key={qi} style={dayStyles.quoteRow}>
+                      <View style={dayStyles.quoteBar} />
+                      <View style={{ flex: 1 }}>
+                        {q.name && <Text style={dayStyles.quoteName}>{q.name}</Text>}
+                        <Text style={dayStyles.quoteText}>{'\u201C'}{q.quote}{'\u201D'}</Text>
+                      </View>
+                    </View>
+                  ))}
+
+                  {idx < dayStops.length - 1 && <View style={styles.divider} />}
+                </View>
+              );
+            })
+          )}
+
+          {/* Share button */}
+          <View style={[styles.shareSection, { marginTop: 16 }]}>
+            <Pressable style={styles.shareBtn} onPress={shareDay}>
+              <Text style={styles.shareBtnText}>Share Day {dayNum}</Text>
+            </Pressable>
+            <Text style={dayStyles.shareHint}>Shareable on Instagram, WhatsApp, and more</Text>
+          </View>
+        </ScrollView>
+
+        {showPhotoSheet && (
+          <StopPickerSheet
+            trip={trip ?? null}
+            onDismiss={() => setShowPhotoSheet(false)}
+            onSelect={handleStopSelect}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // ── Full trip view (default) ────────────────────────────────────────────────
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -372,4 +530,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: 0.2,
   },
+});
+
+const dayStyles = StyleSheet.create({
+  heroCard: {
+    margin: 20,
+    backgroundColor: '#1D4A42',
+    borderRadius: 20,
+    paddingVertical: 28,
+    alignItems: 'center',
+  },
+  heroEmoji: { fontSize: 36, marginBottom: 8 },
+  heroTitle: { fontFamily: F.bold, fontSize: 22, color: '#fff', marginBottom: 4 },
+  heroSub: { fontFamily: F.regular, fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+
+  addPhotoRow: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+    backgroundColor: '#F5F2EE',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5E0',
+    alignItems: 'center',
+  },
+  addPhotoText: { fontFamily: F.medium, fontSize: 13, color: '#8A8FA8' },
+
+  quoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 10,
+  },
+  quoteBar: { width: 3, borderRadius: 2, backgroundColor: '#E8692A', marginTop: 2, alignSelf: 'stretch' },
+  quoteName: { fontFamily: F.semibold, fontSize: 11, color: '#8A8FA8', letterSpacing: 0.5, marginBottom: 2, textTransform: 'uppercase' },
+  quoteText: { fontFamily: F.regular, fontSize: 14, color: '#1A1F2E', lineHeight: 20, fontStyle: 'italic' },
+
+  shareHint: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 8, textAlign: 'center' },
 });
