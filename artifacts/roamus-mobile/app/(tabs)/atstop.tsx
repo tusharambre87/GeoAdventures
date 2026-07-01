@@ -450,6 +450,7 @@ function mapsDirectionsUrl(stop: Stop): string {
 function SheetModal({ visible, onClose, children }: {
   visible: boolean; onClose: () => void; children: React.ReactNode;
 }) {
+  const sheetInsets = useSafeAreaInsets();
   const anim    = useRef(new Animated.Value(0)).current;
   const mounted = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -471,6 +472,7 @@ function SheetModal({ visible, onClose, children }: {
       pointerEvents={visible ? 'auto' : 'none'}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       <Animated.View style={[sh.sheet, {
+        paddingBottom: TAB_BAR_H + sheetInsets.bottom + 20,
         transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }],
       }]}>
         <View {...pan.panHandlers} style={sh.handle} />

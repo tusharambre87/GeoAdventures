@@ -559,6 +559,7 @@ export default function TodayScreen() {
 
   const [viewingDay, setViewingDay]             = useState<number>(0);
   const [activeSheet, setActiveSheet]           = useState<'none' | 'rescue' | 'stopsOnTheWay'>('none');
+  const [showChangedMind, setShowChangedMind]   = useState(false);
   const [rescueType, setRescueType]             = useState<'behind' | 'tired' | 'skip' | 'fun'>('behind');
   const [atStopStartTime, setAtStopStartTime]   = useState<number | null>(null);
   const [markingVisited, setMarkingVisited]     = useState(false);
@@ -1100,6 +1101,25 @@ export default function TodayScreen() {
     Analytics.track('stop_skipped', { trip_id: resolvedTripId ?? '', stop_id: stop.id, reason: 'manual_skip' });
     setDayStops(prev => prev.filter(s => s.id !== stop.id));
     setActiveSheet('none');
+    executionStartedRef.current = true;
+    setTodayState('en_route');
+  }
+
+  // ── Changed My Mind: skip current stop from en_route + send quality signal ──
+  async function handleChangedMindSkip(signal: string) {
+    const s = dayStops[currentStopIndex] ?? null;
+    if (!s) return;
+    try {
+      await apiFetch(`/api/travel/stops/${s.id}/quality-signal`, {
+        method: 'POST',
+        headers: { 'x-adventure-parent': '1' },
+        body: JSON.stringify({ signal }),
+      });
+    } catch { /* best-effort */ }
+    try { await apiFetch(`/api/travel/stops/${s.id}`, { method: 'DELETE' }); } catch {}
+    Analytics.track('stop_skipped', { trip_id: resolvedTripId ?? '', stop_id: s.id, reason: signal });
+    setDayStops(prev => prev.filter(st => st.id !== s.id));
+    setShowChangedMind(false);
     executionStartedRef.current = true;
     setTodayState('en_route');
   }
@@ -2812,31 +2832,49 @@ export default function TodayScreen() {
           )}
           {/* Dual action buttons: outline Directions + dark I'm here */}
           <View style={er.dualBtnRow}>
-            <TouchableOpacity
-              style={er.dirBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                const addr = (stop as { address?: string }).address ?? stop.name;
-                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-              }}
-            >
-              <Text style={er.dirBtnText}>Directions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={er.hereBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setTodayState('at_stop_frozen');
-                AsyncStorage.setItem('atStopFrozen', 'true');
-                AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
-                AsyncStorage.setItem('atStopStartTime', String(Date.now()));
-                router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
-              }}
-            >
+            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
+              <TouchableOpacity
+                style={er.dirBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const addr = (stop as { address?: string }).address ?? stop.name;
+                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+                }}
+              >
+                <Text style={er.dirBtnText}>Directions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={{ alignSelf: 'center', paddingVertical: 4 }}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
+              >
+                <Text style={{ color: C.orange, fontSize: 12, fontFamily: F.semibold }}>{'+ Add Stop'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
+              <TouchableOpacity
+                style={er.hereBtn}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (isFree && resolvedDayIndex > 0) { setUpgradeVisible(true); return; }
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setTodayState('at_stop_frozen');
+                  AsyncStorage.setItem('atStopFrozen', 'true');
+                  AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
+                  AsyncStorage.setItem('atStopStartTime', String(Date.now()));
+                  router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
+                }}
+              >
               <Text style={er.hereBtnText}>I’m here {'\u2713'}</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={{ alignSelf: 'center', paddingVertical: 4 }}
+                onPress={() => setShowChangedMind(true)}
+              >
+                <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -2874,6 +2912,33 @@ export default function TodayScreen() {
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
         />
+        <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
+          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 }}>{"Changed your mind?"}</Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 18, lineHeight: 20 }}>{"That's fine — tell us why so we can adjust your day."}</Text>
+          {([
+            { icon: '\u23F0', bg: '#FFF3E0', name: 'Ran out of time',       desc: "We'll skip it and keep the rest of your day",  signal: 'time' },
+            { icon: '\uD83D\uDE24', bg: C.redLt, name: "Kids didn't want to go", desc: "Noted — won't suggest similar stops next time", signal: 'kids_rejected' },
+            { icon: '\uD83D\uDD12', bg: C.bg, name: 'It was closed', desc: "We'll flag this for future families", signal: 'closed' },
+            { icon: '\u270C\uFE0F', bg: C.bg, name: 'Just skipping it', desc: 'No reason needed — moving on', signal: 'skipped' },
+          ] as Array<{ icon: string; bg: string; name: string; desc: string; signal: string }>).map(row => (
+            <TouchableOpacity key={row.signal}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 13, borderRadius: 13, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, marginBottom: 8 }}
+              activeOpacity={0.8}
+              onPress={() => { void handleChangedMindSkip(row.signal); }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: row.bg }}>
+                <Text style={{ fontSize: 18 }}>{row.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: F.bold, fontSize: 14, color: C.deep, marginBottom: 2 }}>{row.name}</Text>
+                <Text style={{ fontFamily: F.medium, fontSize: 12, color: C.muted, lineHeight: 17 }}>{row.desc}</Text>
+              </View>
+              <Text style={{ fontSize: 16, color: C.muted }}>{"\u203A"}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={{ paddingVertical: 14, alignItems: 'center' }} onPress={() => setShowChangedMind(false)}>
+            <Text style={{ fontFamily: F.semibold, fontSize: 14, color: C.muted }}>{"Cancel"}</Text>
+          </TouchableOpacity>
+        </SheetModal>
         {menuOverlay}
       </View>
       {previewStop && (
@@ -3291,23 +3356,41 @@ export default function TodayScreen() {
 
           {/* Directions + Go to stop */}
           <View style={er.dualBtnRow}>
-            <TouchableOpacity
-              style={er.dirBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                const addr = (stop as { address?: string }).address ?? stop.name;
-                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
-              }}
-            >
-              <Text style={er.dirBtnText}>Directions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={er.hereBtn}
-              activeOpacity={0.85}
-              onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
-            >
-              <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
-            </TouchableOpacity>
+            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
+              <TouchableOpacity
+                style={er.dirBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const addr = (stop as { address?: string }).address ?? stop.name;
+                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(addr)}`);
+                }}
+              >
+                <Text style={er.dirBtnText}>Directions</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={{ alignSelf: 'center', paddingVertical: 4 }}
+                onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, openAddStop: 'true', addStopDefaultFilter: 'landmarks' } })}
+              >
+                <Text style={{ color: C.orange, fontSize: 12, fontFamily: F.semibold }}>{'+ Add Stop'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, alignItems: 'stretch', gap: 6 }}>
+              <TouchableOpacity
+                style={er.hereBtn}
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
+              >
+                <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={{ alignSelf: 'center', paddingVertical: 4 }}
+                onPress={() => setShowChangedMind(true)}
+              >
+                <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.semibold }}>{'Changed My Mind'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -3346,6 +3429,33 @@ export default function TodayScreen() {
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
         />
+        <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
+          <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginBottom: 4 }}>{"Changed your mind?"}</Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.muted, marginBottom: 18, lineHeight: 20 }}>{"That's fine — tell us why so we can adjust your day."}</Text>
+          {([
+            { icon: '\u23F0', bg: '#FFF3E0', name: 'Ran out of time',       desc: "We'll skip it and keep the rest of your day",  signal: 'time' },
+            { icon: '\uD83D\uDE24', bg: C.redLt, name: "Kids didn't want to go", desc: "Noted — won't suggest similar stops next time", signal: 'kids_rejected' },
+            { icon: '\uD83D\uDD12', bg: C.bg, name: 'It was closed', desc: "We'll flag this for future families", signal: 'closed' },
+            { icon: '\u270C\uFE0F', bg: C.bg, name: 'Just skipping it', desc: 'No reason needed — moving on', signal: 'skipped' },
+          ] as Array<{ icon: string; bg: string; name: string; desc: string; signal: string }>).map(row => (
+            <TouchableOpacity key={row.signal}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 13, borderRadius: 13, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card, marginBottom: 8 }}
+              activeOpacity={0.8}
+              onPress={() => { void handleChangedMindSkip(row.signal); }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: row.bg }}>
+                <Text style={{ fontSize: 18 }}>{row.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: F.bold, fontSize: 14, color: C.deep, marginBottom: 2 }}>{row.name}</Text>
+                <Text style={{ fontFamily: F.medium, fontSize: 12, color: C.muted, lineHeight: 17 }}>{row.desc}</Text>
+              </View>
+              <Text style={{ fontSize: 16, color: C.muted }}>{"\u203A"}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={{ paddingVertical: 14, alignItems: 'center' }} onPress={() => setShowChangedMind(false)}>
+            <Text style={{ fontFamily: F.semibold, fontSize: 14, color: C.muted }}>{"Cancel"}</Text>
+          </TouchableOpacity>
+        </SheetModal>
         {menuOverlay}
       </View>
       {previewStop && (
