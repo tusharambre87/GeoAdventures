@@ -1646,19 +1646,32 @@ function DayDetail({
     if (mealIsAppendedLast) {
       // Time-based: insert after the content stop whose end+transit is closest to noon
       const DAY_START = 9 * 60, TRANSIT = 15, NOON = 12 * 60, LUNCH_END = 14 * 60;
-      let cursor = DAY_START;
-      let bestDist = Infinity;
-      for (let i = 0; i < localContentStops.length; i++) {
-        const dur = (localContentStops[i] as any).durationMinutes ?? 60;
-        const slotAfter = cursor + dur + TRANSIT;
-        if (slotAfter <= LUNCH_END) {
-          const dist = Math.abs(slotAfter - NOON);
-          if (dist < bestDist) { bestDist = dist; mealInsertAfterIdx = i; }
+      // Fast-path: if stop[0] has a real duration that already ends at or after 10:30 am,
+      // lock the meal after the first stop and skip the noon search loop entirely.
+      const _rawDur0 = localContentStops.length > 0
+        ? (localContentStops[0] as any).durationMinutes
+        : undefined;
+      const fastPath =
+        typeof _rawDur0 === 'number' &&
+        _rawDur0 >= 60 &&
+        DAY_START + _rawDur0 >= 630;
+      if (fastPath) {
+        mealInsertAfterIdx = 0;
+      } else {
+        let cursor = DAY_START;
+        let bestDist = Infinity;
+        for (let i = 0; i < localContentStops.length; i++) {
+          const dur = (localContentStops[i] as any).durationMinutes ?? 60;
+          const slotAfter = cursor + dur + TRANSIT;
+          if (slotAfter <= LUNCH_END) {
+            const dist = Math.abs(slotAfter - NOON);
+            if (dist < bestDist) { bestDist = dist; mealInsertAfterIdx = i; }
+          }
+          cursor += dur + TRANSIT;
         }
-        cursor += dur + TRANSIT;
-      }
-      if (bestDist === Infinity && localContentStops.length > 0) {
-        mealInsertAfterIdx = localContentStops.length - 1;
+        if (bestDist === Infinity && localContentStops.length > 0) {
+          mealInsertAfterIdx = localContentStops.length - 1;
+        }
       }
     } else if (mealStops[0]) {
       // Meal has been explicitly positioned — reflect its actual DB order
