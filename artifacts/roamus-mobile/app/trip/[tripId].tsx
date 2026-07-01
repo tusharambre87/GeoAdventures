@@ -1701,22 +1701,6 @@ function DayDetail({
       }
     }
   }
-  // ── Debug log: mealInsertAfterIdx placement (remove before ship) ──────────
-  if (__DEV__ && localContentStops.length > 0) {
-    const _dbgS0 = localContentStops[0] as any;
-    const _dbgMetaDur = _dbgS0.metadata?.durationMinutes;
-    const _dbgResolved = getStopDuration(localContentStops[0]);
-    const _dbgEndMin = 9 * 60 + _dbgResolved;
-    console.log(
-      '[mealInsert:fixed] stops[0]:', _dbgS0.name,
-      '| metadata.durationMinutes:', _dbgMetaDur,
-      '| getStopDuration():', _dbgResolved,
-      '| endMin:', _dbgEndMin, '(' + Math.floor(_dbgEndMin/60) + ':' + String(_dbgEndMin%60).padStart(2,'0') + ')',
-      '| fastPath:', localContentStops.length > 0 && _dbgResolved >= 60 && _dbgEndMin >= 630,
-      '| mealInsertAfterIdx:', mealInsertAfterIdx
-    );
-  }
-
   const [weatherWarning, setWeatherWarning] = useState<{
     precipProb: number;
     impactedStops: string[];
