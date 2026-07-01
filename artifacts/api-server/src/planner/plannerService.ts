@@ -116,6 +116,22 @@ const CITY_MUST_DO_STOPS: Record<string, {
   },
 };
 
+// ── Auto-must-do config ────────────────────────────────────────────────────
+// Stops whose gpRatingsTotal meets or exceeds this threshold are treated as
+// mandatory icons for any city without a hand-configured CITY_MUST_DO_STOPS entry.
+// Tune this number off the real review distribution before launch.
+// Current data: SD Zoo 66k, Balboa 79k, SeaWorld 54k, USS Midway 53k clear it;
+// LEGOLAND 39k misses. Chicago: Millennium 92k, Navy Pier 88k clear; Bean/Lincoln Zoo ~39k miss.
+const AUTO_MUST_DO_REVIEW_THRESHOLD = 40000;
+const AUTO_MUST_DO_MAX = 3; // cap forced icons so short trips aren't overstuffed
+
+// Module-level name normalizer — used by both generateCityStopPool (dedup) and
+// selectStopsFromPool / generateDayStops (must-do enforcement).
+const normalizePoolKey = (s: string) =>
+  s.toLowerCase().trim()
+    .replace(/[\u2018\u2019\u201a\u201b\u02bc]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f]/g, '"');
+
 function getCityMustDoBlock(destination: string, localDayNumber: number, usedStopNames: string[]): string {
   const key = destination.toLowerCase().trim();
   // Strip country suffix if present (e.g. "New York City, USA" → "new york city")
@@ -834,6 +850,34 @@ ${sessionAnalysis}`;
     usedStopNames,
   );
 
+  // Auto-must-do: extend the mandate with high-review-count pool stops for any city
+  let fullMustDoBlock = mustDoBlock;
+  try {
+    const _amCity = targetCity ?? input.destination.split(",")[0]?.trim();
+    const _amCountry = input.destination.split(",").pop()?.trim() ?? "USA";
+    const _amCityKey = (_amCity ?? "").toLowerCase().trim().replace(/,\s*\w+$/, "");
+    const _amPool = await storage.getCityStopPool(_amCity ?? _amCityKey, _amCountry);
+    if (_amPool?.stopPool?.length) {
+      const _handConfigured = new Set(
+        (CITY_MUST_DO_STOPS[_amCityKey]?.stops ?? []).map(s => normalizePoolKey(s.name))
+      );
+      const autoMustDos = _amPool.stopPool
+        .filter(r => (r.gpRatingsTotal ?? 0) >= AUTO_MUST_DO_REVIEW_THRESHOLD)
+        .sort((a, b) => (b.gpRatingsTotal ?? 0) - (a.gpRatingsTotal ?? 0))
+        .filter(r => !_handConfigured.has(normalizePoolKey(r.name)))
+        .filter(r => !usedStopNames.some(u => normalizePoolKey(u) === normalizePoolKey(r.name)))
+        .slice(0, AUTO_MUST_DO_MAX)
+        .map(r => r.name);
+      if (autoMustDos.length) {
+        fullMustDoBlock += `\n\nMANDATORY ICONIC STOPS for ${_amCity} — these are the most-visited family attractions in this city and MUST be included across the trip. Do NOT substitute a lesser stop or a containing park for these:\n`
+          + autoMustDos.map(n => `- ${n}`).join('\n');
+        console.log(`[AutoMustDo] ${_amCity} day ${dayNumber} autoMustDos:`, autoMustDos);
+      }
+    }
+  } catch (_amErr) {
+    console.warn('[AutoMustDo] Could not compute auto-must-dos for AI path:', _amErr);
+  }
+
   // Build quality-signal context block if the family has historical feedback
   let qualityContextBlock = "";
   if (qualityProfile) {
@@ -878,7 +922,7 @@ Children: ${ageContext}
 Pace: ${cfg.label}
 Transport: ${input.transportMode ?? "walking"}
 Budget: ${input.budgetSensitivity ?? "moderate"}
-${familyContext}${qualityContextBlock}${mustDoBlock}${canonicalBlock}${webIntelligenceBlock}${fixedAnchorBlock}${excludeBlock}
+${familyContext}${qualityContextBlock}${fullMustDoBlock}${canonicalBlock}${webIntelligenceBlock}${fixedAnchorBlock}${excludeBlock}
 HARD CONSTRAINTS (these are firm rules, not suggestions):
 
 1. SESSION-BASED DAY PLANNING: Plan using 3 natural family sessions, not by counting stops
@@ -2260,13 +2304,9 @@ export async function generateCityStopPool(
   // Deduplicate: multiple planner_stop_intelligence rows can share the same stop_library_id,
   // and stop_library itself may have Unicode apostrophe variants of the same name.
   // Keep the first hit per normalized name (sort order already puts intelligence-rich rows first).
-  const normalizeKey = (s: string) =>
-    s.toLowerCase().trim()
-      .replace(/[\u2018\u2019\u201a\u201b\u02bc]/g, "'")  // smart/curly single quotes → straight
-      .replace(/[\u201c\u201d\u201e\u201f]/g, '"');        // smart double quotes → straight
   const seen = new Set<string>();
   const uniqueRows = rows.filter(row => {
-    const key = normalizeKey(row.name);
+    const key = normalizePoolKey(row.name);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -2388,6 +2428,7 @@ export async function generateCityStopPool(
       scoreClassicFinal: row.scoreClassicFinal ?? undefined,
       scoreUrbanFinal: row.scoreUrbanFinal ?? undefined,
       scoreAdventureFinal: row.scoreAdventureFinal ?? undefined,
+      gpRatingsTotal: row.gpRatingsTotal ?? undefined,
       parentSupportData: {
         breakSuggestion: "Find a nearby bench or café for a quick rest.",
         foodSuggestion: "Check the venue's café or look for options nearby.",
@@ -3232,8 +3273,7 @@ export function selectStopsFromPool(
   }
 
   // ── Must-do iconic stop enforcement ──────────────────────────────────────
-  // Guarantee at least one city-defining iconic stop is always selected,
-  // regardless of pace, age scoring, or museum balance rules.
+  // Pass 1: hand-configured cities (existing logic — unchanged)
   if (targetCity) {
     const cityKey = targetCity.toLowerCase().trim().replace(/,\s*\w+$/, "");
     const mustDoEntry = CITY_MUST_DO_STOPS[cityKey];
@@ -3243,12 +3283,10 @@ export function selectStopsFromPool(
         mustDoNames.some(n => s.name.toLowerCase().includes(n))
       );
       if (!alreadyHasMustDo) {
-        // Find the best must-do candidate from the full pool (unscored)
         const mustDoCandidate = pool.find(c =>
           mustDoNames.some(n => c.name.toLowerCase().includes(n))
         );
         if (mustDoCandidate) {
-          // Swap it in for the lowest-priority non-anchor stop, or append
           const swapIdx = selected.findIndex(s => s.familyAnchorType === "filler" || s.familyAnchorType === "reset");
           if (swapIdx !== -1) {
             selected[swapIdx] = mustDoCandidate;
@@ -3260,6 +3298,33 @@ export function selectStopsFromPool(
           console.log(`[MustDo] Forced iconic stop into plan: "${mustDoCandidate.name}" (city: ${targetCity})`);
         }
       }
+    }
+
+    // Pass 2: auto-must-do by review count — fires for ALL cities
+    // Stops with gpRatingsTotal >= threshold that aren't already in the plan
+    // get forced in, just like hand-configured must-dos above.
+    const cityKey2 = targetCity.toLowerCase().trim().replace(/,\s*\w+$/, "");
+    const handConfiguredNames = new Set(
+      (CITY_MUST_DO_STOPS[cityKey2]?.stops ?? []).map(s => normalizePoolKey(s.name))
+    );
+    const autoMustDoCandidates = pool
+      .filter(r => (r.gpRatingsTotal ?? 0) >= AUTO_MUST_DO_REVIEW_THRESHOLD)
+      .sort((a, b) => (b.gpRatingsTotal ?? 0) - (a.gpRatingsTotal ?? 0))
+      .filter(r => !handConfiguredNames.has(normalizePoolKey(r.name)))
+      .slice(0, AUTO_MUST_DO_MAX);
+
+    for (const candidate of autoMustDoCandidates) {
+      const alreadyIn = selected.some(s => normalizePoolKey(s.name) === normalizePoolKey(candidate.name));
+      if (alreadyIn) continue;
+      const swapIdx = selected.findIndex(s => s.familyAnchorType === "filler" || s.familyAnchorType === "reset");
+      if (swapIdx !== -1) {
+        selected[swapIdx] = candidate;
+      } else if (selected.length >= totalStopsNeeded) {
+        selected[selected.length - 1] = candidate;
+      } else {
+        selected.push(candidate);
+      }
+      console.log(`[AutoMustDo] Forced "${candidate.name}" into plan (gpRatingsTotal: ${candidate.gpRatingsTotal}, city: ${targetCity})`);
     }
   }
 

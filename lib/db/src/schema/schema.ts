@@ -3393,6 +3393,8 @@ export interface CachedStopCandidate {
   scoreClassicFinal?: number;
   scoreUrbanFinal?: number;
   scoreAdventureFinal?: number;
+  // Google Places review count — used for auto-must-do threshold detection
+  gpRatingsTotal?: number;
   // Journey content — pre-generated so stop content is available without extra AI calls
   facts?: string[];
   parentTip?: string;
