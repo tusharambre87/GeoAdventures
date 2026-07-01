@@ -328,6 +328,7 @@ export default function MemoriesScreen() {
     queryKey: ['moments', heroTrip?.id],
     queryFn: () => memoriesAPI.getMoments(heroTrip!.id),
     enabled: !!heroTrip?.id,
+    select: (d: unknown) => Array.isArray(d) ? d as Moment[] : ((d as { moments?: Moment[] })?.moments ?? []),
   });
 
   if (isLoading) {

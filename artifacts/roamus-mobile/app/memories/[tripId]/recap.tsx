@@ -60,6 +60,7 @@ export default function RecapScreen() {
     queryKey: ['moments', tripId],
     queryFn: () => memoriesAPI.getMoments(tripId),
     enabled: !!tripId,
+    select: (d: unknown) => Array.isArray(d) ? d as Moment[] : ((d as { moments?: Moment[] })?.moments ?? []),
   });
 
   const { data: story } = useQuery({
