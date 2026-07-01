@@ -2217,6 +2217,8 @@ export async function generateCityStopPool(
       scoreUrbanFinal: plannerStopIntelligence.scoreUrbanFinal,
       scoreAdventureFinal: plannerStopIntelligence.scoreAdventureFinal,
       metroArea: stopLibrary.metroArea,
+      gpPlaceId: stopLibrary.gpPlaceId,
+      gpRatingsTotal: stopLibrary.gpRatingsTotal,
     })
     .from(stopLibrary)
     .leftJoin(

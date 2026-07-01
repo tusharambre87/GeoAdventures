@@ -1669,13 +1669,6 @@ function DayDetail({
         typeof _rawDur0 === 'number' &&
         _rawDur0 >= 60 &&
         DAY_START + _rawDur0 >= 630;
-      // TEMP DEBUG — remove after screenshot
-      console.log('[mealIdx DEBUG] stop[0].durationMinutes=', _rawDur0,
-        '| badgeField=(durationMinutes)', (localContentStops[0] as any)?.durationMinutes,
-        '| DAY_START_hr=', DAY_START / 60,
-        '| computedEndMin=', _rawDur0 != null ? DAY_START + _rawDur0 : 'n/a',
-        '| fastPath=', fastPath,
-        '| mealInsertAfterIdx(before)=', mealInsertAfterIdx);
       if (fastPath) {
         mealInsertAfterIdx = 0;
       } else {
