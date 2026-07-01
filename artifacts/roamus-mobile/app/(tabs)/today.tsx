@@ -939,7 +939,7 @@ export default function TodayScreen() {
         await AsyncStorage.multiRemove(['atStopFrozen', 'atStopFrozenTripId']).catch(() => {});
       } else if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const days = daysUntilDate(t.startDate);
-        if (days > 7) {
+        if (days > 1) {
           setTodayState('pre_trip_far');
         } else if (days === 1) {
           setTodayState('pre_trip_tomorrow');
@@ -1504,28 +1504,6 @@ export default function TodayScreen() {
         >
           <Text style={nt.ctaText}>Plan a trip →</Text>
         </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // GATE: UPCOMING — trip start date is in the future
-  // ─────────────────────────────────────────────────────────────────────────────
-  const daysUntil = trip?.startDate
-    ? Math.ceil(
-        (parseLocalDate(trip.startDate)!.getTime() - new Date().setHours(0, 0, 0, 0))
-        / (1000 * 60 * 60 * 24)
-      )
-    : 0;
-  if (trip && tripIsUpcoming && daysUntil > 1) {
-    return (
-      <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32, paddingTop: insets.top + 32 }}>
-        <Text style={{ fontFamily: 'Fraunces_900Black', fontSize: 30, color: C.deep, textAlign: 'center', marginBottom: 12 }}>
-          {trip.destination} in {daysUntil} day{daysUntil !== 1 ? 's' : ''}
-        </Text>
-        <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22 }}>
-          {daysUntil === 1 ? 'Your adventure starts tomorrow.' : `Check back in ${daysUntil} days to start Day 1.`}
-        </Text>
       </View>
     );
   }
