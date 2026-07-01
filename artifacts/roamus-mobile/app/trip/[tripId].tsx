@@ -976,6 +976,8 @@ function MealSuggestionCard({
   beforeStopName,
   dayIndex,
   cityGroup,
+  anchorLat,
+  anchorLng,
   confirmedStop,
   onAdded,
   onOtherOptions,
@@ -989,6 +991,8 @@ function MealSuggestionCard({
   beforeStopName: string;
   dayIndex: number;
   cityGroup: string | null;
+  anchorLat?: number | null;
+  anchorLng?: number | null;
   confirmedStop?: Stop;
   onAdded: () => void;
   onOtherOptions: () => void;
@@ -1022,7 +1026,7 @@ function MealSuggestionCard({
           '/api/travel/rescue/food-options',
           {
             method: 'POST',
-            body: JSON.stringify({ tripId, cityGroup, city: destination, dayIndex }),
+            body: JSON.stringify({ tripId, cityGroup, city: destination, dayIndex, anchorLat, anchorLng }),
           },
         ),
         timeout,
@@ -1955,6 +1959,8 @@ function DayDetail({
                     beforeStopName={localContentStops[mealInsertAfterIdx]?.name ?? ''}
                     dayIndex={selectedDay - 1}
                     cityGroup={localContentStops[mealInsertAfterIdx]?.cityGroup ?? null}
+                    anchorLat={localContentStops[mealInsertAfterIdx]?.latitude != null ? parseFloat(String(localContentStops[mealInsertAfterIdx]?.latitude)) : null}
+                    anchorLng={localContentStops[mealInsertAfterIdx]?.longitude != null ? parseFloat(String(localContentStops[mealInsertAfterIdx]?.longitude)) : null}
                     confirmedStop={mealStops[0]}
                     onAdded={() => queryClient.invalidateQueries({ queryKey: ['trip', tripId] })}
                     onOtherOptions={() => { if (mealStops[0]) void onDelete(mealStops[0].id); onAddStop('food'); }}

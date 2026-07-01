@@ -9288,8 +9288,10 @@ Return valid JSON only. No markdown.`;
       }
       if (!cityRaw) return res.status(400).json({ message: 'Trip has no destination' });
 
-      // Suppress unused-variable warnings — lat/lng accepted for future proximity ranking
-      void lat; void lng;
+      void lat; void lng; // legacy fields still ignored
+      const aLat = req.body.anchorLat != null ? Number(req.body.anchorLat) : null;
+      const aLng = req.body.anchorLng != null ? Number(req.body.anchorLng) : null;
+      function _hKm(la1:number,lo1:number,la2:number,lo2:number){const R=6371,dLa=(la2-la1)*Math.PI/180,dLo=(lo2-lo1)*Math.PI/180;const a=Math.sin(dLa/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
 
       const foodTypes = ['restaurant', 'food', 'cafe', 'lunch', 'dining', 'street_food'];
 
@@ -9311,23 +9313,37 @@ Return valid JSON only. No markdown.`;
         address: stopLibrary.address,
         description: stopLibrary.description,
         city: stopLibrary.city,
+        latitude: stopLibrary.latitude,
+        longitude: stopLibrary.longitude,
       }).from(stopLibrary)
         .where(and(
           ilike(stopLibrary.city, `%${cityRaw}%`),
           inArray(stopLibrary.stopType, foodTypes),
         ))
         .orderBy(desc(stopLibrary.serveCount))
-        .limit(30);
+        .limit(80);
 
       const candidates = pool.filter((r: any) => !usedNames.has((r.name ?? '').toLowerCase()));
+      // Option A: proximity gate around the lunch-time stop, popularity order preserved, variety within.
+      let geoPool = candidates;
+      if (aLat != null && aLng != null && Number.isFinite(aLat) && Number.isFinite(aLng)) {
+        const RADIUS_KM = 8;
+        const near = candidates.filter((r: any) => {
+          const rLat = r.latitude ? parseFloat(String(r.latitude)) : null;
+          const rLng = r.longitude ? parseFloat(String(r.longitude)) : null;
+          if (rLat == null || rLng == null || !Number.isFinite(rLat) || !Number.isFinite(rLng)) return false;
+          return _hKm(aLat, aLng, rLat, rLng) <= RADIUS_KM;
+        });
+        geoPool = near.length >= 3 ? near : candidates; // graceful fallback if too few nearby
+      }
       // Deterministic per-day rotation: day N starts at the Nth most-popular pick.
       // Stable across refreshes, distinct per day, wraps gracefully when pool < days.
       const dayIdx = Number.isInteger(req.body.dayIndex) ? req.body.dayIndex : 0;
-      const offset = candidates.length
-        ? (((dayIdx % candidates.length) + candidates.length) % candidates.length)
+      const offset = geoPool.length
+        ? (((dayIdx % geoPool.length) + geoPool.length) % geoPool.length)
         : 0;
-      const rotated = [...candidates.slice(offset), ...candidates.slice(0, offset)];
-      let rows: typeof candidates = rotated.slice(0, 5);
+      const rotated = [...geoPool.slice(offset), ...geoPool.slice(0, offset)];
+      let rows: typeof geoPool = rotated.slice(0, 5);
 
       // AI fallback when library has no food stops for this city
       if (rows.length === 0) {
