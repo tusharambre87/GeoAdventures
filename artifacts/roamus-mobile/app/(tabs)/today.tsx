@@ -848,9 +848,15 @@ export default function TodayScreen() {
     try {
       // Check for state override from atstop.tsx feedback
       const override = await AsyncStorage.getItem('today_state_override');
+      // force_morning: "Start Day N" was tapped — break out of any locked state
+      // so the new day's stops are evaluated fresh (fixes day_complete lock across days)
+      let forceReset = false;
       if (override) {
         await AsyncStorage.removeItem('today_state_override');
-        if (override === 'stop_complete') {
+        if (override === 'force_morning') {
+          forceReset = true;
+          executionStartedRef.current = false;
+        } else if (override === 'stop_complete') {
           const elapsed = await AsyncStorage.getItem('atStopElapsed');
           if (elapsed) {
             setVisitedElapsed(parseInt(elapsed, 10) || null);
@@ -925,7 +931,7 @@ export default function TodayScreen() {
       }
 
 
-      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
+      if (!devState && override !== 'stop_complete' && (!LOCKED_STATES.includes(todayState) || forceReset) && !executionStartedRef.current) {
         const days = daysUntilDate(t.startDate);
         if (days > 7) {
           setTodayState('pre_trip_far');
@@ -954,7 +960,7 @@ export default function TodayScreen() {
       }
 
       // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
-      if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
+      if (!devState && override !== 'stop_complete' && (!LOCKED_STATES.includes(todayState) || forceReset) && !executionStartedRef.current) {
         const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
         const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
         if (frozenFlag === 'true' && frozenTripId === tid) {

@@ -2967,6 +2967,7 @@ function RunDaySheet({
         return;
       }
     }
+    await AsyncStorage.setItem('today_state_override', 'force_morning').catch(() => {});
     onClose();
     router.replace('/(tabs)/today' as any);
   }
@@ -2978,6 +2979,7 @@ function RunDaySheet({
 
     const saveForDay = async () => {
       await AsyncStorage.setItem(`hotel_${tripId}_day0`, resolvedAddr).catch(() => {});
+      await AsyncStorage.setItem('today_state_override', 'force_morning').catch(() => {});
       onClose();
       router.replace('/(tabs)/today' as any);
     };
@@ -2986,6 +2988,7 @@ function RunDaySheet({
       for (let d = 0; d < totalDays; d++) {
         await AsyncStorage.setItem(`hotel_${tripId}_day${d}`, resolvedAddr).catch(() => {});
       }
+      await AsyncStorage.setItem('today_state_override', 'force_morning').catch(() => {});
       onClose();
       router.replace('/(tabs)/today' as any);
     };
