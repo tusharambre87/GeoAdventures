@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -63,6 +64,9 @@ export default function TripMemoryIndex() {
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [instagramSharing, setInstagramSharing] = useState(false);
+  const [showKidsStopPicker, setShowKidsStopPicker] = useState(false);
+  const [igDestination, setIgDestination] = useState<'story' | 'post'>('story');
+  const [selectedSharePhotos, setSelectedSharePhotos] = useState<Set<string>>(new Set());
 
   // When opened from "Wrap Day", dayIndex is set — show day-level "Today's Story" view
   const focusDayIndex = dayIndexParam != null && dayIndexParam !== '' ? Number(dayIndexParam) : null;
@@ -109,8 +113,9 @@ export default function TripMemoryIndex() {
       : [];
 
     const dayStopIds = new Set(dayStops.map((s: any) => s.id));
+    // Include stop-linked moments AND unassigned moments (stopId=null, e.g. wrap photos)
     const dayMoments = isDayView
-      ? moments.filter(m => m.stopId ? dayStopIds.has(m.stopId) : false)
+      ? moments.filter(m => m.stopId ? dayStopIds.has(m.stopId) : true)
       : [];
 
     const dayPhotos = dayMoments.flatMap(m =>
@@ -146,63 +151,53 @@ export default function TripMemoryIndex() {
     });
   }
 
-  async function openInstagramSharing(destination: 'story' | 'post') {
+  function openIgModal(destination: 'story' | 'post') {
+    setIgDestination(destination);
+    // Pre-select all day photos
+    const allUrls = dayPhotos.map(u => absPhotoUrl(u)).filter(Boolean) as string[];
+    setSelectedSharePhotos(new Set(allUrls));
+    setShowInstagramModal(true);
+  }
+
+  async function openInstagramSharing() {
+    const photosToShare = Array.from(selectedSharePhotos);
     setInstagramSharing(true);
     try {
-      // Collect all day photos as absolute URLs
-      const allDayPhotos: string[] = dayStops.flatMap((stop: any) => {
-        const stopMoments = momentsByStop[stop.id] ?? [];
-        return stopMoments.flatMap((m: Moment) =>
-          m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
-        );
-      });
-
-      if (allDayPhotos.length === 0) {
-        // No photos — just open Instagram
-        const igUrl = destination === 'story' ? 'instagram-stories://share' : 'instagram://app';
+      if (photosToShare.length === 0) {
+        const igUrl = igDestination === 'story' ? 'instagram-stories://share' : 'instagram://app';
         const canOpen = await Linking.canOpenURL(igUrl);
-        if (canOpen) {
-          await Linking.openURL(igUrl);
-        } else {
-          await Linking.openURL('https://instagram.com');
-        }
+        await Linking.openURL(canOpen ? igUrl : 'https://instagram.com');
         setShowInstagramModal(false);
         return;
       }
 
-      // Download photos to temp files
       const tempDir = FileSystem.cacheDirectory + 'ig_share/';
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true }).catch(() => {});
 
       const localPaths: string[] = [];
-      for (let i = 0; i < Math.min(allDayPhotos.length, 10); i++) {
-        const url = absPhotoUrl(allDayPhotos[i]);
-        if (!url) continue;
+      for (let i = 0; i < Math.min(photosToShare.length, 10); i++) {
         try {
           const dest = `${tempDir}photo_${i}.jpg`;
-          const res = await FileSystem.downloadAsync(url, dest);
+          const res = await FileSystem.downloadAsync(photosToShare[i], dest);
           if (res.status === 200) localPaths.push(res.uri);
         } catch (_) {}
       }
 
       setShowInstagramModal(false);
 
-      // Try Instagram deep link
-      const igStoryUrl = 'instagram-stories://share';
-      const igAppUrl = destination === 'story' ? igStoryUrl : 'instagram://library';
+      const igAppUrl = igDestination === 'story' ? 'instagram-stories://share' : 'instagram://library';
       const canOpen = await Linking.canOpenURL(igAppUrl);
-
       if (canOpen) {
         await Linking.openURL(igAppUrl);
         Alert.alert(
-          'Photos ready!',
-          `${localPaths.length} photo${localPaths.length !== 1 ? 's' : ''} downloaded. Tap + in Instagram to select them from your recent photos.`,
+          'Open your camera roll in Instagram',
+          `${localPaths.length} photo${localPaths.length !== 1 ? 's' : ''} saved — tap the photo library icon in Instagram to find them.`,
           [{ text: 'Got it' }]
         );
       } else {
         await Linking.openURL('https://instagram.com');
       }
-    } catch (err) {
+    } catch {
       setShowInstagramModal(false);
       Alert.alert('Could not open Instagram', 'Make sure Instagram is installed.');
     } finally {
@@ -210,11 +205,23 @@ export default function TripMemoryIndex() {
     }
   }
 
+  async function shareDayNative() {
+    const dayNum = (focusDayIndex ?? 0) + 1;
+    const name = trip?.name ?? 'our family trip';
+    try {
+      await Share.share({
+        message: `Day ${dayNum} of ${name} — making memories! #RoamUs`,
+        url: `https://roamus.app/s/${tripId}`,
+        title: `Day ${dayNum} Story`,
+      });
+    } catch (_) {}
+  }
+
   async function shareTrip() {
     const url = `https://roamus.app/s/${tripId}`;
     const name = trip?.name ?? 'our family trip';
     try {
-      await Linking.openURL(`https://wa.me/?text=${encodeURIComponent('Check out ' + name + '! ' + url)}`);
+      await Share.share({ message: `Check out ${name}! ${url}`, url, title: name });
     } catch (_) {
       await Linking.openURL(url);
     }
@@ -349,35 +356,56 @@ export default function TripMemoryIndex() {
             })
           )}
 
-          {/* Kids Zone button */}
+          {/* Unassigned day photos (wrap photos with no stopId) */}
+          {(() => {
+            const unassigned = (momentsByStop['__none__'] ?? []).flatMap((m: Moment) =>
+              m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
+            );
+            if (unassigned.length === 0) return null;
+            return (
+              <View style={{ marginTop: 12 }}>
+                <Text style={dayStyles.unassignedTitle}>Day Photos</Text>
+                <View style={styles.photoGrid}>
+                  {unassigned.map((uri: string, i: number) => (
+                    <View key={i} style={styles.photoCell}>
+                      <ExpoImage source={{ uri: absPhotoUrl(uri) }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* Kids Zone button — opens stop picker */}
           {dayStops.length > 0 && (
             <TouchableOpacity
               style={dayStyles.kidsZoneBtn}
               activeOpacity={0.85}
-              onPress={() => {
-                const firstStop = dayStops[0];
-                if (firstStop) {
-                  router.push({
-                    pathname: '/kids' as never,
-                    params: { stopId: firstStop.id, stopName: encodeURIComponent(firstStop.name ?? ''), tripId: tripId ?? '' },
-                  });
-                }
-              }}
+              onPress={() => setShowKidsStopPicker(true)}
             >
               <Text style={dayStyles.kidsZoneBtnText}>{'\uD83E\uDDF8'} Revisit Kids Zone</Text>
             </TouchableOpacity>
           )}
 
-          {/* Share to Instagram button */}
+          {/* Share section */}
           <View style={[styles.shareSection, { marginTop: 8 }]}>
-            <TouchableOpacity style={styles.shareBtn} onPress={() => setShowInstagramModal(true)}>
+            {/* Native share */}
+            <TouchableOpacity style={styles.shareBtn} onPress={shareDayNative}>
               <Text style={styles.shareBtnText}>Share Day {dayNum}</Text>
             </TouchableOpacity>
-            <Text style={dayStyles.shareHint}>Share to Instagram Story or Post</Text>
+            {/* Instagram-specific */}
+            <View style={dayStyles.igRow}>
+              <TouchableOpacity style={dayStyles.igSmallBtn} onPress={() => openIgModal('story')}>
+                <Text style={dayStyles.igSmallBtnText}>{'\uD83C\uDF9E'} Instagram Story</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dayStyles.igSmallBtn} onPress={() => openIgModal('post')}>
+                <Text style={dayStyles.igSmallBtnText}>{'\uD83D\uDDBC'} Instagram Post</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
 
-        {/* Instagram sharing modal */}
+        {/* Instagram photo picker + share modal */}
         <Modal
           visible={showInstagramModal}
           transparent
@@ -387,41 +415,110 @@ export default function TripMemoryIndex() {
           <Pressable style={dayStyles.modalOverlay} onPress={() => setShowInstagramModal(false)}>
             <Pressable style={dayStyles.modalSheet} onPress={e => e.stopPropagation()}>
               <View style={dayStyles.modalGrip} />
-              <Text style={dayStyles.modalTitle}>Share Day {dayNum}</Text>
-              <Text style={dayStyles.modalSub}>Choose how to share to Instagram</Text>
+              <Text style={dayStyles.modalTitle}>
+                {igDestination === 'story' ? 'Instagram Story' : 'Instagram Post'}
+              </Text>
+              <Text style={dayStyles.modalSub}>
+                Select photos to share (tap to toggle)
+              </Text>
+
+              {dayPhotos.length > 0 ? (
+                <View style={dayStyles.pickerGrid}>
+                  {dayPhotos.map((uri: string, i: number) => {
+                    const abs = absPhotoUrl(uri);
+                    const selected = selectedSharePhotos.has(abs);
+                    return (
+                      <Pressable
+                        key={i}
+                        style={[dayStyles.pickerCell, selected && dayStyles.pickerCellSelected]}
+                        onPress={() => {
+                          setSelectedSharePhotos(prev => {
+                            const next = new Set(prev);
+                            if (next.has(abs)) next.delete(abs); else next.add(abs);
+                            return next;
+                          });
+                        }}
+                      >
+                        <ExpoImage source={{ uri: abs }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                        {selected && (
+                          <View style={dayStyles.pickerCheck}>
+                            <Text style={{ color: '#fff', fontSize: 12, fontFamily: F.bold }}>{'\u2713'}</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={[dayStyles.modalSub, { marginBottom: 16 }]}>No photos yet for this day — add some first!</Text>
+              )}
 
               <TouchableOpacity
-                style={[dayStyles.igBtn, dayStyles.igBtnStory]}
+                style={[dayStyles.igBtn, dayStyles.igBtnStory, { marginTop: 8 }]}
                 activeOpacity={0.85}
                 disabled={instagramSharing}
-                onPress={() => openInstagramSharing('story')}
+                onPress={openInstagramSharing}
               >
-                <Text style={dayStyles.igBtnIcon}>{'\uD83C\uDF9E'}</Text>
+                <Text style={dayStyles.igBtnIcon}>{igDestination === 'story' ? '\uD83C\uDF9E' : '\uD83D\uDDBC'}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={dayStyles.igBtnTitle}>Instagram Story</Text>
-                  <Text style={dayStyles.igBtnSub}>Share as a full-screen story</Text>
+                  <Text style={dayStyles.igBtnTitle}>
+                    {instagramSharing ? 'Opening Instagram...' : `Share ${selectedSharePhotos.size} photo${selectedSharePhotos.size !== 1 ? 's' : ''} to Instagram`}
+                  </Text>
+                  <Text style={dayStyles.igBtnSub}>
+                    {igDestination === 'story' ? 'as a full-screen story' : 'as a grid post'}
+                  </Text>
                 </View>
-                <Text style={dayStyles.igBtnArrow}>{instagramSharing ? '...' : '\u203A'}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[dayStyles.igBtn, dayStyles.igBtnPost]}
-                activeOpacity={0.85}
-                disabled={instagramSharing}
-                onPress={() => openInstagramSharing('post')}
-              >
-                <Text style={dayStyles.igBtnIcon}>{'\uD83D\uDDBC'}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={dayStyles.igBtnTitle}>Instagram Post</Text>
-                  <Text style={dayStyles.igBtnSub}>Share as a grid post</Text>
-                </View>
-                <Text style={dayStyles.igBtnArrow}>{instagramSharing ? '...' : '\u203A'}</Text>
+                {instagramSharing
+                  ? <ActivityIndicator size="small" color="#7C3AED" />
+                  : <Text style={dayStyles.igBtnArrow}>{'\u203A'}</Text>}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={dayStyles.modalCancel}
                 onPress={() => setShowInstagramModal(false)}
               >
+                <Text style={dayStyles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Kids zone stop picker modal */}
+        <Modal
+          visible={showKidsStopPicker}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowKidsStopPicker(false)}
+        >
+          <Pressable style={dayStyles.modalOverlay} onPress={() => setShowKidsStopPicker(false)}>
+            <Pressable style={dayStyles.modalSheet} onPress={e => e.stopPropagation()}>
+              <View style={dayStyles.modalGrip} />
+              <Text style={dayStyles.modalTitle}>Which stop?</Text>
+              <Text style={dayStyles.modalSub}>Pick a stop to revisit the story</Text>
+              {dayStops.map((stop: any) => (
+                <TouchableOpacity
+                  key={stop.id}
+                  style={dayStyles.stopPickerRow}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setShowKidsStopPicker(false);
+                    router.push({
+                      pathname: '/kids' as never,
+                      params: {
+                        stopId: stop.id,
+                        stopName: encodeURIComponent(stop.name ?? ''),
+                        tripId: tripId ?? '',
+                        revisit: '1',
+                      },
+                    });
+                  }}
+                >
+                  <Text style={dayStyles.stopPickerEmoji}>{stopEmoji(stop.stopType)}</Text>
+                  <Text style={dayStyles.stopPickerName}>{stop.name}</Text>
+                  <Text style={dayStyles.stopPickerArrow}>{'\u203A'}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={dayStyles.modalCancel} onPress={() => setShowKidsStopPicker(false)}>
                 <Text style={dayStyles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
             </Pressable>
@@ -715,12 +812,78 @@ const dayStyles = StyleSheet.create({
   kidsZoneBtn: {
     marginHorizontal: 20,
     marginTop: 16,
-    backgroundColor: '#3D2A6E',
+    backgroundColor: '#7C3AED',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
   kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+
+  unassignedTitle: {
+    fontFamily: F.semibold,
+    fontSize: 13,
+    color: '#8A8FA8',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
+
+  igRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+    marginHorizontal: 20,
+  },
+  igSmallBtn: {
+    flex: 1,
+    backgroundColor: '#F5F0FF',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#C084FC',
+  },
+  igSmallBtnText: { fontFamily: F.semibold, fontSize: 13, color: '#7C3AED' },
+
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  pickerCell: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  pickerCellSelected: { borderColor: '#7C3AED' },
+  pickerCheck: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#7C3AED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  stopPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0EDE8',
+    gap: 12,
+  },
+  stopPickerEmoji: { fontSize: 22 },
+  stopPickerName: { flex: 1, fontFamily: F.semibold, fontSize: 15, color: '#1A1F2E' },
+  stopPickerArrow: { fontFamily: F.bold, fontSize: 20, color: '#8A8FA8' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   modalSheet: {

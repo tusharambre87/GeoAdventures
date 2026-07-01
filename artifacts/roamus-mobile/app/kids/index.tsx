@@ -118,7 +118,7 @@ const ps = StyleSheet.create({
 
 export default function ExplorerHome() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string; ageBand?: string }>();
+  const params = useLocalSearchParams<{ stopId?: string; stopName?: string; tripId?: string; explorerName?: string; minChildAge?: string; allUnder5?: string; ageBand?: string; revisit?: string }>();
   const kids = useKids();
   // Read ageBand directly from params to avoid a race with _layout.tsx's setAgeBand effect.
   // Both effects run on mount; params is synchronously available, context state is not.
@@ -183,6 +183,19 @@ export default function ExplorerHome() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopId, effectiveAgeBand]);
+
+  // Revisit mode: once explore content is loaded, jump straight to the story (skip missions)
+  const revisitNavigated = useRef(false);
+  useEffect(() => {
+    if (params.revisit !== '1') return;
+    if (revisitNavigated.current) return;
+    if (kids.isLoadingExplore || !kids.exploreContent) return;
+    revisitNavigated.current = true;
+    router.push({
+      pathname: '/kids/story' as any,
+      params: { minChildAge: params.minChildAge ?? '99', allUnder5: params.allUnder5 ?? '0' },
+    });
+  }, [params.revisit, kids.isLoadingExplore, kids.exploreContent]);
 
   // Refresh XP every time this screen comes into focus (including back-nav from missions)
   useFocusEffect(
