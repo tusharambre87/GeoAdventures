@@ -5,6 +5,7 @@ import {
   BackHandler,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -38,31 +39,32 @@ const STEPS = [
     key: 'surprise',
     prompt: 'What surprised you today?',
     sub: 'A hidden gem, an unexpected moment, or something that delighted the whole family.',
-    placeholder: 'Something we didn\u2019t plan for\u2026',
+    placeholder: 'Something we didn’t plan for…',
   },
   {
     key: 'learnMore',
     prompt: 'What do you want to know more about?',
     sub: 'A question the kids asked, a place that sparked curiosity, or a topic worth exploring at home.',
-    placeholder: 'We were curious about\u2026',
+    placeholder: 'We were curious about…',
   },
   {
     key: 'doDifferently',
     prompt: 'What would you do differently tomorrow?',
-    sub: 'Timing, pacing, a stop you\u2019d swap \u2014 or nothing at all.',
-    placeholder: 'Next time we\u2019d\u2026 (or \u201cNot much!\u201d)',
+    sub: 'Timing, pacing, a stop you’d swap — or nothing at all.',
+    placeholder: 'Next time we’d… (or “Not much!”)',
   },
   {
     key: 'kidQuote',
     prompt: 'Capture a kid quote',
     sub: 'Something hilarious, surprisingly wise, or worth remembering forever.',
-    placeholder: '\u201cThe best part was when\u2026\u201d',
+    placeholder: '“The best part was when…”',
   },
 ];
 
 export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids }: Props) {
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(600)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({ surprise: '', learnMore: '', doDifferently: '' });
@@ -77,13 +79,17 @@ export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids
       setAnswers({ surprise: '', learnMore: '', doDifferently: '' });
       setQuoteText('');
       setQuoteKid(kids[0]?.name ?? '');
+      Animated.parallel([
+        Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 26, stiffness: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Keyboard.dismiss();
+      Animated.parallel([
+        Animated.timing(overlayAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 600, damping: 26, stiffness: 200, useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) setMounted(false); });
     }
-    Animated.spring(slideAnim, {
-      toValue: visible ? 1 : 0,
-      tension: 65, friction: 12, useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished && !visible) setMounted(false);
-    });
   }, [visible, kids]);
 
   useEffect(() => {
@@ -114,11 +120,6 @@ export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids
     onClose();
   }, [step, answers, quoteText, quoteKid, tripId, dayIndex, onClose]);
 
-  const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [800, 0] });
-  const backdropOpacity = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
-  if (!mounted) return null;
-
   const cur = STEPS[step];
   const isKidStep = step === 3;
   const isLastStep = step === STEPS.length - 1;
@@ -126,108 +127,118 @@ export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids
   const value = isKidStep ? quoteText : (answers[key] ?? '');
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(26,31,46,0.55)', opacity: backdropOpacity }]}
-        pointerEvents={visible ? 'auto' : 'none'}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
-
-      <Animated.View
-        style={[sh.sheet, { transform: [{ translateY }], paddingBottom: insets.bottom + 16 }]}
-        pointerEvents="box-none"
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={sh.handle} />
-
-          <View style={sh.headerRow}>
-            <TouchableOpacity
-              onPress={() => (step > 0 ? setStep(s => s - 1) : onClose())}
-              hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-            >
-              <Text style={sh.backBtn}>{step === 0 ? 'Cancel' : '\u2190 Back'}</Text>
-            </TouchableOpacity>
-            <View style={sh.dots}>
-              {STEPS.map((_, i) => (
-                <View key={i} style={[sh.dot, i === step && sh.dotActive, i < step && sh.dotDone]} />
-              ))}
-            </View>
-            <Text style={sh.stepLabel}>{step + 1} / {STEPS.length}</Text>
-          </View>
-
-          <ScrollView
-            contentContainerStyle={sh.body}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
+    <Modal
+      visible={mounted}
+      transparent
+      statusBarTranslucent
+      animationType="none"
+      onRequestClose={() => (step > 0 ? setStep(s => s - 1) : onClose())}
+    >
+      <Animated.View style={[sh.overlay, { opacity: overlayAnim }]} pointerEvents="box-none">
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={sh.kav}>
+          <Animated.View
+            style={[sh.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}
           >
-            <Text style={sh.prompt}>{cur.prompt}</Text>
-            <Text style={sh.sub}>{cur.sub}</Text>
+            <View style={sh.handle} />
 
-            {isKidStep && kids.length > 1 && (
-              <View style={sh.kidRow}>
-                {kids.map(k => (
-                  <TouchableOpacity
-                    key={k.name}
-                    style={[sh.kidChip, quoteKid === k.name && sh.kidChipSel]}
-                    onPress={() => setQuoteKid(k.name)}
-                  >
-                    <Text style={[sh.kidChipText, quoteKid === k.name && sh.kidChipTextSel]}>
-                      {k.name}
-                    </Text>
-                  </TouchableOpacity>
+            <View style={sh.headerRow}>
+              <TouchableOpacity
+                onPress={() => (step > 0 ? setStep(s => s - 1) : onClose())}
+                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+              >
+                <Text style={sh.backBtn}>{step === 0 ? 'Cancel' : '← Back'}</Text>
+              </TouchableOpacity>
+              <View style={sh.dots}>
+                {STEPS.map((_, i) => (
+                  <View key={i} style={[sh.dot, i === step && sh.dotActive, i < step && sh.dotDone]} />
                 ))}
               </View>
-            )}
+              <Text style={sh.stepLabel}>{step + 1} / {STEPS.length}</Text>
+            </View>
 
-            <TextInput
-              style={sh.input}
-              value={value}
-              onChangeText={v => {
-                if (isKidStep) setQuoteText(v);
-                else setAnswers(prev => ({ ...prev, [key]: v }));
-              }}
-              placeholder={cur.placeholder}
-              placeholderTextColor={C.muted}
-              multiline
-              numberOfLines={4}
-              returnKeyType="default"
-              autoFocus
-            />
-          </ScrollView>
-
-          <View style={sh.footer}>
-            <TouchableOpacity
-              style={[sh.btn, saving && sh.btnDim]}
-              activeOpacity={0.85}
-              disabled={saving}
-              onPress={handleNext}
+            <ScrollView
+              contentContainerStyle={sh.body}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={sh.btnText}>
-                  {isLastStep
-                    ? (value.trim() ? 'Save reflection' : 'Skip \u2014 save reflection')
-                    : 'Next \u2192'}
-                </Text>
+              <Text style={sh.prompt}>{cur.prompt}</Text>
+              <Text style={sh.sub}>{cur.sub}</Text>
+
+              {isKidStep && kids.length > 1 && (
+                <View style={sh.kidRow}>
+                  {kids.map(k => (
+                    <TouchableOpacity
+                      key={k.name}
+                      style={[sh.kidChip, quoteKid === k.name && sh.kidChipSel]}
+                      onPress={() => setQuoteKid(k.name)}
+                    >
+                      <Text style={[sh.kidChipText, quoteKid === k.name && sh.kidChipTextSel]}>
+                        {k.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               )}
-            </TouchableOpacity>
-          </View>
+
+              <TextInput
+                style={sh.input}
+                value={value}
+                onChangeText={v => {
+                  if (isKidStep) setQuoteText(v);
+                  else setAnswers(prev => ({ ...prev, [key]: v }));
+                }}
+                placeholder={cur.placeholder}
+                placeholderTextColor={C.muted}
+                multiline
+                numberOfLines={4}
+                returnKeyType="default"
+                autoFocus
+              />
+            </ScrollView>
+
+            <View style={sh.footer}>
+              <TouchableOpacity
+                style={[sh.btn, saving && sh.btnDim]}
+                activeOpacity={0.85}
+                disabled={saving}
+                onPress={handleNext}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={sh.btnText}>
+                    {isLastStep
+                      ? (value.trim() ? 'Save reflection' : 'Skip — save reflection')
+                      : 'Next →'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Animated.View>
-    </View>
+    </Modal>
   );
 }
 
 const sh = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(26,31,46,0.55)',
+    justifyContent: 'flex-end',
+  },
+  kav: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     minHeight: 520,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.14, shadowRadius: 16, elevation: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 16,
   },
   handle: {
     width: 40, height: 4, borderRadius: 2, backgroundColor: '#D8D4CF',
