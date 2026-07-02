@@ -4,6 +4,7 @@ import * as Speech from "expo-speech";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -146,6 +147,7 @@ export default function StoryPlayer() {
   const storyFetchError = kids.exploreError;
 
   const [callbackLine, setCallbackLine] = useState<string | null>(null);
+  const cbFadeAnim = useRef(new Animated.Value(0)).current;
 
   const transcript =
     kids.exploreContent?.stories?.[storyKey]?.text ?? "";
@@ -241,6 +243,19 @@ export default function StoryPlayer() {
     return () => { clearTimeout(timer); Speech.stop(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minChildAge, transcript]);
+
+  // Fade in the callback banner whenever a non-null line arrives
+  useEffect(() => {
+    if (!callbackLine) {
+      cbFadeAnim.setValue(0);
+      return;
+    }
+    Animated.timing(cbFadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [callbackLine, cbFadeAnim]);
 
   // Background fetch: personalized callback line from an earlier kid quote.
   // Hard 2-second display window — responses arriving after the deadline are ignored.
@@ -414,6 +429,13 @@ export default function StoryPlayer() {
 
       {/* ── Body ── */}
       <View style={s.body}>
+        {/* Personalized callback banner — fades in above the glass panel */}
+        {callbackLine ? (
+          <Animated.View style={[s.cbBanner, s.cbBannerMain, { opacity: cbFadeAnim }]}>
+            <Text style={s.cbText}>{callbackLine}</Text>
+          </Animated.View>
+        ) : null}
+
         {/* Glass panel */}
         <View style={s.glass}>
           {/* Controls */}
@@ -738,6 +760,11 @@ const s = StyleSheet.create({
     marginBottom: 16,
     borderLeftWidth: 3,
     borderLeftColor: "#7C3AED",
+  },
+  cbBannerMain: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    marginTop: 0,
   },
   cbText: {
     fontFamily: "PlusJakartaSans_600SemiBold",
