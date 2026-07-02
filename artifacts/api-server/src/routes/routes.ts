@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -5729,11 +5729,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
         const lastDayType = tripTailoring?.lastDay as string | null;
 
-        // Arrival day cap: late/late_night = 0, evening = pace-2, afternoon = pace-1, morning = full pace
-        const arrivalDayCap = (arrivalTimeSig === "late" || arrivalTimeSig === "late_night") ? 0
-          : arrivalTimeSig === "evening"   ? Math.max(0, effectivePerDay - 2)
+        // Arrival day cap (onboarding emits: morning|afternoon|evening — late/late_night unreachable, deleted)
+        const arrivalDayCap = arrivalTimeSig === "evening"   ? 0
           : arrivalTimeSig === "afternoon" ? Math.max(0, effectivePerDay - 1)
-          : effectivePerDay;
+          : effectivePerDay; // morning or null → full pace
 
         // Last day cap: travel day = 0 (heading home — no stops), leaving late = min(2,pace), full day = normal
         const lastDayCap = lastDayType === "travel" ? 0
@@ -5782,6 +5781,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
             const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (effectivePerDay || 2));
+            // Per-day arrival/departure caps fed into the pool path
+            const _baseSpd = getStopsPerDay(plannerPace, minChildAge);
+            const perDayCapsArr: DayRoleCap[] = [];
+            if (plannerTripDays >= 2) {
+              perDayCapsArr.push(dayRoleCap('arrival', arrivalTimeSig, _baseSpd));
+              for (let _d = 1; _d < plannerTripDays - 1; _d++) {
+                perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd));
+              }
+              perDayCapsArr.push(dayRoleCap('departure', lastDayType, _baseSpd));
+            } else if (plannerTripDays === 1) {
+              perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd));
+            }
             const plannerInput: PlannerInput = {
               destination: cityName,
               tripDays: plannerTripDays,
@@ -5797,6 +5808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               budgetSensitivity: tripTailoring?.budgetSensitivity ?? undefined,
               kidEnergyLevel: tripTailoring?.kidEnergyLevel ?? undefined,
               stopsPerDayOverride: effectivePerDay,
+              perDayCaps: perDayCapsArr,
             };
             try {
               await storage.updateTrip(tripId, {
@@ -5816,6 +5828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error(`[Travel] [bg] plannerInputSnapshot write failed (non-fatal):`, snapshotErr);
             }
             const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
+            console.log(`[Travel] path=POOL city=${cityName}`);
             // Separate meals from activity stops BEFORE slicing so meal stops from all
             // days are captured regardless of effectiveStopCount.
             const POOL_MEAL_TYPES = new Set(['restaurant','food','cafe','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
@@ -6005,6 +6018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (!usedPool) {
+          console.log(`[Travel] path=AI_FALLBACK city=${cityName}`);
           try {
             const openai = getOpenAI();
             const geoResponse = await openai.chat.completions.create({

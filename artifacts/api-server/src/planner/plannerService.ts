@@ -281,6 +281,9 @@ export interface PlannerInput {
   /** When set by the caller, overrides getStopsPerDay(pace) so the
    *  caller is the single source of truth for stop-count per day. */
   stopsPerDayOverride?: number;
+  /** Per-day stop caps — index 0 = arrival day, index n-1 = departure day, middle = base.
+   *  Computed by dayRoleCap() in routes.ts. Pool path only; AI fallback ignores. */
+  perDayCaps?: DayRoleCap[];
 }
 
 export interface GeneratedStop {
@@ -332,6 +335,10 @@ export interface GeneratedStop {
   reviewRequired?: boolean;
   /** Explanation shown to the parent when they tap the reviewRequired badge. */
   reviewNote?: string;
+  /** Day role for arrival/departure banner (Brief 2). */
+  dayRole?: 'arrival' | 'departure' | 'middle';
+  /** Human-readable cap reason for the banner (e.g. "evening arrival"). */
+  capReason?: string;
   /** Why this stop was selected for this family — captured at generation time, stored on travel_stops. */
   selectionReason?: string;
   /** For parent suggestions: recommended insertion position in the day (0-indexed after this stop). */
@@ -598,6 +605,37 @@ export function getStopsPerDay(pace: string, youngestChildAge?: number): StopsPe
   console.log('[getStopsPerDay]', pace, '→', base);
   if (youngestChildAge == null) return base;
   return base; // age adjustment removed — base values already account for family pace
+}
+
+/**
+ * Per-day stop budget for an arrival or departure day.
+ * Onboarding emits: arrivalTime = morning|afternoon|evening
+ *                   lastDay     = full|late|travel
+ * late/late_night are not emitted — do not add dead branches.
+ */
+export interface DayRoleCap {
+  anchors: number;
+  fillers: number;
+  dayRole: 'arrival' | 'departure' | 'middle';
+  capReason: string;
+}
+
+export function dayRoleCap(
+  role: 'arrival' | 'departure' | 'middle',
+  timing: string | null | undefined,
+  base: StopsPerDayConfig,
+): DayRoleCap {
+  if (role === 'arrival') {
+    if (timing === 'evening')   return { anchors: 0, fillers: 0, dayRole: 'arrival', capReason: 'evening arrival' };
+    if (timing === 'afternoon') return { anchors: 1, fillers: 0, dayRole: 'arrival', capReason: 'afternoon arrival' };
+    return { anchors: base.anchors, fillers: base.fillers, dayRole: 'arrival', capReason: 'morning arrival' };
+  }
+  if (role === 'departure') {
+    if (timing === 'travel') return { anchors: 0, fillers: 0, dayRole: 'departure', capReason: 'travel day' };
+    if (timing === 'late')   return { anchors: 2, fillers: 0, dayRole: 'departure', capReason: 'late departure' };
+    return { anchors: base.anchors, fillers: base.fillers, dayRole: 'departure', capReason: 'full departure day' };
+  }
+  return { anchors: base.anchors, fillers: base.fillers, dayRole: 'middle', capReason: 'middle day' };
 }
 
 function getAgeContext(ages: number[]): string {
@@ -2707,7 +2745,23 @@ export function selectStopsFromPool(
   // napActive: under-3 toddler flag — used for per-day last-slot short-stop enforcement only.
   const napActive = minChildAge < 3;
   const effectiveStopsPerDay = stopsPerDay; // age reduction already baked in via getStopsPerDay
-  const totalStopsNeeded = input.tripDays * effectiveStopsPerDay;
+
+  // Per-day budgets: respect arrival/departure caps when supplied, else uniform.
+  const _basePaceConfig = getStopsPerDay(input.pace);
+  const _baseAnchorsPerDay = input.stopsPerDayOverride
+    ? Math.ceil(input.stopsPerDayOverride * 0.5)
+    : _basePaceConfig.anchors;
+  const stopsForDay: number[] = [];
+  const anchorsForDayArr: number[] = [];
+  for (let _d = 0; _d < input.tripDays; _d++) {
+    const _cap = input.perDayCaps?.[_d];
+    stopsForDay.push(_cap ? _cap.anchors + _cap.fillers : effectiveStopsPerDay);
+    anchorsForDayArr.push(_cap ? _cap.anchors : _baseAnchorsPerDay);
+  }
+  const totalStopsNeeded = stopsForDay.reduce((s, n) => s + n, 0);
+  // Cumulative day-start indices for O(1) position lookup in the greedy loop
+  const dayStarts: number[] = [];
+  { let _c = 0; for (let _d = 0; _d < input.tripDays; _d++) { dayStarts.push(_c); _c += stopsForDay[_d]; } }
 
   let candidates = [...pool];
 
@@ -3080,11 +3134,10 @@ export function selectStopsFromPool(
   // This guarantees high-quality anchor stops make the plan before filler selection begins.
   // Anchors are removed from `remaining` here; they are injected into `selected` day-by-day
   // inside the greedy loop (at the day-reset block) so the flat-index slot model stays correct.
-  const anchorPaceConfig = getStopsPerDay(input.pace);
-  const anchorsPerDay = input.stopsPerDayOverride
-    ? Math.ceil(input.stopsPerDayOverride * 0.5)
-    : anchorPaceConfig.anchors;
-  const totalAnchorsNeeded = anchorsPerDay * input.tripDays;
+  // Reuse per-day config computed above — avoids a second getStopsPerDay call
+  const anchorPaceConfig = _basePaceConfig;
+  const anchorsPerDay = _baseAnchorsPerDay;
+  const totalAnchorsNeeded = anchorsForDayArr.reduce((s, n) => s + n, 0);
 
   const anchorCandidates = candidates
     .filter(c =>
@@ -3108,8 +3161,9 @@ export function selectStopsFromPool(
     // allows. Skipped museums stay in `remaining` for the greedy pass (where the same cap
     // blocks them). museumsTotal is 0 here, so this counter also keeps greedy/fill-up honest.
     if (anchor.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
-    const dayAnchors = anchorsByDay.get(anchorDayIndex % input.tripDays)!;
-    if (dayAnchors.length < anchorsPerDay) {
+    const _anchorDay = anchorDayIndex % input.tripDays;
+    const dayAnchors = anchorsByDay.get(_anchorDay)!;
+    if (dayAnchors.length < anchorsForDayArr[_anchorDay]) {
       dayAnchors.push(anchor);
       preSelectedAnchors.push(anchor);
       usedNormNames.add(normStopName(anchor.name));
@@ -3128,8 +3182,14 @@ export function selectStopsFromPool(
   // ── End Pass 1 ───────────────────────────────────────────────────────────────
 
   while (selected.length < totalStopsNeeded && remaining.size > 0) {
-    const dayPosition = selected.length % effectiveStopsPerDay;
-    const currentDayStart = selected.length - dayPosition;
+    // Current day (0-indexed) = highest day whose cumulative start ≤ selected.length.
+    // Backward scan naturally skips 0-stop days (their dayStarts equal the next day's start).
+    let _currDay = 0;
+    for (let _d = input.tripDays - 1; _d >= 0; _d--) {
+      if (selected.length >= dayStarts[_d]) { _currDay = _d; break; }
+    }
+    const dayPosition = selected.length - dayStarts[_currDay];
+    const currentDayStart = dayStarts[_currDay];
     const lastTwo = selected.slice(
       Math.max(currentDayStart, selected.length - 2),
       selected.length,
@@ -3150,7 +3210,7 @@ export function selectStopsFromPool(
       // Inject pre-selected anchors for this day before greedy fills fillers.
       // `continue` forces dayPosition to be recomputed on re-entry so the flat-index
       // slot model stays correct (injected anchors count as real selected slots).
-      const _injDayIdx = Math.floor(selected.length / effectiveStopsPerDay);
+      const _injDayIdx = _currDay;
       const _injAnchors = anchorsByDay.get(_injDayIdx) ?? [];
       let _injected = 0;
       for (const anchor of _injAnchors) {
@@ -3201,7 +3261,7 @@ export function selectStopsFromPool(
       // own per-day caps (museumsInCurrentDay, immersivesInCurrentDay) so they are excluded here.
       const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
       // Anchor slots filled by Pass 1 pre-selection — skip additional anchors once the per-day cap is reached.
-      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorsPerDay) continue;
+      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorsForDayArr[_currDay]) continue;
       if (usedNormNames.has(normStopName(c.name))) continue;
       // Meal stops are additive (not counted against the per-day activity target).
       // They are appended per-day after the main greedy selection finishes.
@@ -3220,7 +3280,7 @@ export function selectStopsFromPool(
         const effDur = effectiveDuration(c.durationMinutes, minChildAge);
         if (dailyDurationMins + effDur > paceConfig.totalStopMinutes.max) continue;
         // Toddler nap rule: last slot of day (for balanced/busy with napActive) must be a short stop (<45 min)
-        if (napActive && input.pace !== "relaxed" && dayPosition === effectiveStopsPerDay - 1) {
+        if (napActive && input.pace !== "relaxed" && dayPosition === stopsForDay[_currDay] - 1) {
           if (effDur >= 45) continue;
         }
       }
@@ -3429,8 +3489,8 @@ export function selectStopsFromPool(
   // Skipped for canonical trips (their template already encodes the right roles).
   if (!isCanonicalTripForSelection) {
     for (let dayIdx = 0; dayIdx < input.tripDays; dayIdx++) {
-      const start = dayIdx * effectiveStopsPerDay;
-      const end = Math.min(start + effectiveStopsPerDay, selected.length);
+      const start = dayStarts[dayIdx];
+      const end = Math.min(start + stopsForDay[dayIdx], selected.length);
       const daySlice = selected.slice(start, end);
       if (daySlice.length === 0) continue;
 
@@ -3449,17 +3509,17 @@ export function selectStopsFromPool(
         // Mutate the candidate in-place (selected array holds object references)
         (daySlice[bestIdx] as any).familyAnchorType = "anchor";
         console.log(`[AnchorConstraint] Day ${dayIdx + 1}: promoted "${daySlice[bestIdx].name}" to anchor (no anchor in pool).`);
-      } else if (anchorIndices.length > anchorsPerDay) {
-        // More anchors than the pace allows — keep the top anchorsPerDay by score, demote the rest
+      } else if (anchorIndices.length > anchorsForDayArr[dayIdx]) {
+        // More anchors than the per-day cap allows — keep top anchorsForDayArr[dayIdx] by score, demote rest
         const sorted = [...anchorIndices].sort((a, b) => (baseScores.get(b.s) ?? 0) - (baseScores.get(a.s) ?? 0));
-        const keepSet = new Set(sorted.slice(0, anchorsPerDay).map(({ i }) => i));
+        const keepSet = new Set(sorted.slice(0, anchorsForDayArr[dayIdx]).map(({ i }) => i));
         for (const { s, i } of anchorIndices) {
           if (!keepSet.has(i)) {
             (s as any).familyAnchorType = "support";
           }
         }
-        const kept = sorted.slice(0, anchorsPerDay).map(({ s }) => `"${s.name}"`).join(", ");
-        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept ${anchorsPerDay} anchor(s) [${kept}], demoted ${anchorIndices.length - anchorsPerDay} extra(s) to support.`);
+        const kept = sorted.slice(0, anchorsForDayArr[dayIdx]).map(({ s }) => `"${s.name}"`).join(", ");
+        console.log(`[AnchorConstraint] Day ${dayIdx + 1}: kept ${anchorsForDayArr[dayIdx]} anchor(s) [${kept}], demoted ${anchorIndices.length - anchorsForDayArr[dayIdx]} extra(s) to support.`);
       }
     }
   }
@@ -3633,8 +3693,9 @@ export function selectStopsFromPool(
   let stopIdx = 0;
 
   for (let day = 1; day <= input.tripDays; day++) {
-    const daySlice = selected.slice(stopIdx, stopIdx + effectiveStopsPerDay);
-    stopIdx += effectiveStopsPerDay;
+    const daySize = stopsForDay[day - 1];
+    const daySlice = selected.slice(stopIdx, stopIdx + daySize);
+    stopIdx += daySize;
     if (daySlice.length === 0) break;
 
     // Meal for this day (additive — appended after activity sequencing)
@@ -3695,8 +3756,11 @@ export function selectStopsFromPool(
     // Append per-day meal at the end (additive: after all activity stops)
     if (dayMeal) orderedSlice = [...orderedSlice, dayMeal];
 
+    const _dayCap = input.perDayCaps?.[day - 1];
     orderedSlice.forEach((stop, idx) => {
-      result.push(candidateToGeneratedStop(stop, day, idx, isCanonicalTrip, selectionReasons.get(stop)));
+      const gs = candidateToGeneratedStop(stop, day, idx, isCanonicalTrip, selectionReasons.get(stop));
+      if (_dayCap) { gs.dayRole = _dayCap.dayRole; gs.capReason = _dayCap.capReason; }
+      result.push(gs);
     });
   }
 
