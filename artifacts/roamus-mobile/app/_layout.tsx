@@ -18,8 +18,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { PostHogProvider } from 'posthog-react-native';
-import { posthog } from '@/services/analytics/analytics';
+import { PostHogProvider } from "posthog-react-native";
+import { posthog } from "@/services/analytics/analytics";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotificationBanner from "@/components/NotificationBanner";
@@ -35,7 +35,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days
-      staleTime: 1000 * 60 * 30,         // 30 min
+      staleTime: 1000 * 60 * 30, // 30 min
       retry: 1,
     },
   },
@@ -84,11 +84,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Drain photo queue when app returns to foreground (paid users only)
   useEffect(() => {
     if (!token || user?.subscriptionTier === "free") return;
-    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (nextState === "active") {
-        drainAllPhotoQueues(token).catch(() => {});
-      }
-    });
+    const sub = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          drainAllPhotoQueues(token).catch(() => {});
+        }
+      },
+    );
     return () => sub.remove();
   }, [token, user?.subscriptionTier]);
 
@@ -97,14 +100,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const inOnboarding = segments[0] === "onboarding";
     const inLegacyLogin = segments[0] === "login";
-    const inAuth      = segments[0] === "auth";
-    const inTabPreview = __DEV__ && (segments[1] === 'today' || segments[1] === 'atstop');
+    const inAuth = segments[0] === "auth";
+    const inTabPreview =
+      __DEV__ && (segments[1] === "today" || segments[1] === "atstop");
     // Shared itinerary is public — no auth required
-    const inSharedItinerary = segments[0] === 'memories' && segments[1] === 'shared';
+    const inSharedItinerary =
+      segments[0] === "memories" && segments[1] === "shared";
     // Join invite link — let the join screen handle auth redirect with token preserved
-    const inJoin = segments[0] === 'join';
+    const inJoin = segments[0] === "join";
 
-    if (!token && !inOnboarding && !inLegacyLogin && !inAuth && !inTabPreview && !inSharedItinerary && !inJoin) {
+    if (
+      !token &&
+      !inOnboarding &&
+      !inLegacyLogin &&
+      !inAuth &&
+      !inTabPreview &&
+      !inSharedItinerary &&
+      !inJoin
+    ) {
       router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
       if (inLegacyLogin || inAuth) router.replace("/(tabs)");
@@ -125,11 +138,11 @@ function RootLayoutNav() {
       case NotifType.AT_STOP_ARRIVAL:
       case NotifType.DAY_COMPLETE:
       case NotifType.WEATHER_ALERT:
-        router.push('/(tabs)/today' as never);
+        router.push("/(tabs)/today" as never);
         break;
       case NotifType.MEMORY_RECAP:
       case NotifType.TRIP_SUMMARY:
-        router.push('/(tabs)/memories' as never);
+        router.push("/(tabs)/memories" as never);
         break;
     }
   }
@@ -143,23 +156,40 @@ function RootLayoutNav() {
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="trip/[tripId]" options={{ headerShown: false }} />
-        <Stack.Screen name="memories/[tripId]" options={{ headerShown: false }} />
-        <Stack.Screen name="memories/shared/[slug]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="memories/[tripId]"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="memories/shared/[slug]"
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="kids"
-          options={{ presentation: "fullScreenModal", headerShown: false, animation: "slide_from_bottom" }}
+          options={{
+            presentation: "fullScreenModal",
+            headerShown: false,
+            animation: "slide_from_bottom",
+          }}
         />
         <Stack.Screen name="atstop" options={{ headerShown: false }} />
         <Stack.Screen name="me" options={{ headerShown: false }} />
         <Stack.Screen name="discover" options={{ headerShown: false }} />
         <Stack.Screen name="join/[token]" options={{ headerShown: false }} />
-        <Stack.Screen name="settings/notifications" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="settings/notifications"
+          options={{ headerShown: false }}
+        />
       </Stack>
     </>
   );
 }
 
 export default function RootLayout() {
+
+  React.useEffect(() => {
+    return () => clearTimeout(timer);
+  }, []);
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -175,7 +205,7 @@ export default function RootLayout() {
 
   // Deep link: cold start (app not running) + warm start (app in background)
   useEffect(() => {
-    Linking.getInitialURL().then(url => {
+    Linking.getInitialURL().then((url) => {
       if (url) handleDeepLink(url);
     });
     const subscription = Linking.addEventListener("url", ({ url }) => {
@@ -188,23 +218,26 @@ export default function RootLayout() {
 
   return (
     <PostHogProvider client={posthog}>
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-          <AuthProvider>
-            <OnboardingProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <AuthGate>
-                    <RootLayoutNav />
-                  </AuthGate>
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </OnboardingProvider>
-          </AuthProvider>
-        </PersistQueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={persistOptions}
+          >
+            <AuthProvider>
+              <OnboardingProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <AuthGate>
+                      <RootLayoutNav />
+                    </AuthGate>
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </OnboardingProvider>
+            </AuthProvider>
+          </PersistQueryClientProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
     </PostHogProvider>
   );
 }

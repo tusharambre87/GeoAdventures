@@ -2247,6 +2247,14 @@ const PARK_ANCHOR_STOPS: Record<string, string[]> = {
     'Lamar Valley',
     'Grand Canyon of the Yellowstone',
   ],
+  'Duluth': [
+    'Canal Park',
+    'Aerial Lift Bridge',
+    'Glensheen Mansion',
+    'Gooseberry Falls State Park',
+    'Enger Tower',
+    'Great Lakes Aquarium',
+  ],
   // Bar Harbor / Acadia, Sedona, etc. — add when each park is scored.
 };
 
