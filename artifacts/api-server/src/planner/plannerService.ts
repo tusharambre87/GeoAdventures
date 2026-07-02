@@ -624,15 +624,21 @@ export function dayRoleCap(
   role: 'arrival' | 'departure' | 'middle',
   timing: string | null | undefined,
   base: StopsPerDayConfig,
+  tripDays?: number,
 ): DayRoleCap {
+  const long = (tripDays ?? 0) >= 4;
   if (role === 'arrival') {
     if (timing === 'evening')   return { anchors: 0, fillers: 0, dayRole: 'arrival', capReason: 'evening arrival' };
-    if (timing === 'afternoon') return { anchors: 1, fillers: 0, dayRole: 'arrival', capReason: 'afternoon arrival' };
+    if (timing === 'afternoon') return long
+      ? { anchors: 0, fillers: 1, dayRole: 'arrival', capReason: 'afternoon arrival' }
+      : { anchors: 1, fillers: 0, dayRole: 'arrival', capReason: 'afternoon arrival' };
     return { anchors: base.anchors, fillers: base.fillers, dayRole: 'arrival', capReason: 'morning arrival' };
   }
   if (role === 'departure') {
     if (timing === 'travel') return { anchors: 0, fillers: 0, dayRole: 'departure', capReason: 'travel day' };
-    if (timing === 'late')   return { anchors: 1, fillers: 0, dayRole: 'departure', capReason: 'late departure' };
+    if (timing === 'late')   return long
+      ? { anchors: 0, fillers: 1, dayRole: 'departure', capReason: 'late departure' }
+      : { anchors: 1, fillers: 0, dayRole: 'departure', capReason: 'late departure' };
     return { anchors: base.anchors, fillers: base.fillers, dayRole: 'departure', capReason: 'full departure day' };
   }
   return { anchors: base.anchors, fillers: base.fillers, dayRole: 'middle', capReason: 'middle day' };

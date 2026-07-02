@@ -5785,13 +5785,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const _baseSpd = getStopsPerDay(plannerPace, minChildAge);
             const perDayCapsArr: DayRoleCap[] = [];
             if (plannerTripDays >= 2) {
-              perDayCapsArr.push(dayRoleCap('arrival', arrivalTimeSig, _baseSpd));
+              perDayCapsArr.push(dayRoleCap('arrival', arrivalTimeSig, _baseSpd, plannerTripDays));
               for (let _d = 1; _d < plannerTripDays - 1; _d++) {
-                perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd));
+                perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd, plannerTripDays));
               }
-              perDayCapsArr.push(dayRoleCap('departure', lastDayType, _baseSpd));
+              perDayCapsArr.push(dayRoleCap('departure', lastDayType, _baseSpd, plannerTripDays));
             } else if (plannerTripDays === 1) {
-              perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd));
+              perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd, plannerTripDays));
             }
             const plannerInput: PlannerInput = {
               destination: cityName,
@@ -6922,11 +6922,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const _prevLastSig = (tailoring?.lastDay as string | null) ?? null;
         const _prevCaps: DayRoleCap[] = [];
         if (tripDays >= 2) {
-          _prevCaps.push(dayRoleCap('arrival', _prevArrSig, _prevBaseSpd));
-          for (let _d = 1; _d < tripDays - 1; _d++) _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
-          _prevCaps.push(dayRoleCap('departure', _prevLastSig, _prevBaseSpd));
+          _prevCaps.push(dayRoleCap('arrival', _prevArrSig, _prevBaseSpd, tripDays));
+          for (let _d = 1; _d < tripDays - 1; _d++) _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd, tripDays));
+          _prevCaps.push(dayRoleCap('departure', _prevLastSig, _prevBaseSpd, tripDays));
         } else {
-          _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
+          _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd, tripDays));
         }
         const plannerInput: PlannerInput = {
           destination: city,
