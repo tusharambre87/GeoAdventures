@@ -273,6 +273,10 @@ export default function BuildingScreen() {
               indoorOutdoor: data.indoorOutdoor,
               budgetSensitivity: data.budgetLevel,
               kidEnergyLevel: data.kidEnergyLevel,
+              arrivalMethod: data.arrivalMethod ?? null,
+              arrivalTime: data.arrivalTime ?? null,
+              lastDay: data.lastDay ?? "full",
+              cityTransitions: data.cityTransitions ?? {},
             },
           }),
         });

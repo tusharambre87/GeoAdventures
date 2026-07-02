@@ -6916,6 +6916,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.log
           ? req.log.info({ city, pace: plannerPace, tripDays }, '[Preview] pool hit — skipping GPT')
           : console.log(`[Preview] pool hit for ${city} (pace=${plannerPace}, days=${tripDays}) — skipping GPT`);
+        const _prevMinAge = childrenAges.length > 0 ? Math.min(...childrenAges) : 8;
+        const _prevBaseSpd = getStopsPerDay(plannerPace, _prevMinAge);
+        const _prevArrSig = (tailoring?.arrivalTime as string | null) ?? null;
+        const _prevLastSig = (tailoring?.lastDay as string | null) ?? null;
+        const _prevCaps: DayRoleCap[] = [];
+        if (tripDays >= 2) {
+          _prevCaps.push(dayRoleCap('arrival', _prevArrSig, _prevBaseSpd));
+          for (let _d = 1; _d < tripDays - 1; _d++) _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
+          _prevCaps.push(dayRoleCap('departure', _prevLastSig, _prevBaseSpd));
+        } else {
+          _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
+        }
         const plannerInput: PlannerInput = {
           destination: city,
           tripDays,
@@ -6930,6 +6942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           indoorLean: tailoring?.indoorOutdoor ?? undefined,
           budgetSensitivity: tailoring?.budgetSensitivity ?? undefined,
           kidEnergyLevel: tailoring?.kidEnergyLevel ?? undefined,
+          perDayCaps: _prevCaps,
         };
         const { stops: poolStops } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, city);
         // Group by dayNumber — selectStopsFromPool now adds meals additively per day,
