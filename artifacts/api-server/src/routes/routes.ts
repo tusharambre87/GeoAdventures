@@ -5503,7 +5503,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   missionKeepsakeReward: false,
                   stopMissions: null,
                   selectionReason: 'preview_parity',
-                  metadata: { durationMinutes: familyDurationFloor(sl.stopType ?? 'landmark', undefined) },
+                  metadata: { durationMinutes: familyDurationFloor(sl.stopType ?? 'landmark', undefined, sl.gpRatingsTotal, cityName, sl.name) },
                 });
                 insertCount++;
               }
