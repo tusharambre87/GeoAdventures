@@ -2216,7 +2216,17 @@ function isParkAnchor(city: string, stopName: string): boolean {
   const list = PARK_ANCHOR_STOPS[city];
   if (!list) return false;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return list.some(a => norm(a) === norm(stopName));
+  const stopNorm = norm(stopName);
+  // Substring match, not exact: "Mammoth Hot Springs Terraces" and
+  // "Grand Prismatic Spring (Midway Geyser Basin Overlook)" both contain a
+  // curated name and should match without hand-adding every variant.
+  // Guard: only match if the curated name is ≥8 normalized chars to avoid
+  // short names accidentally matching unrelated stops.
+  return list.some(a => {
+    const anchorNorm = norm(a);
+    if (anchorNorm.length < 8) return anchorNorm === stopNorm; // exact for short names
+    return stopNorm.includes(anchorNorm) || anchorNorm.includes(stopNorm);
+  });
 }
 
 /**
