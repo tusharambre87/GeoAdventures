@@ -578,6 +578,7 @@ export default function TodayScreen() {
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
   const [showReflectionSheet, setShowReflectionSheet] = useState(false);
+  const [reflectionSaved, setReflectionSaved]         = useState(false);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
   const [currentTemp, setCurrentTemp]           = useState<number | null>(null);
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
@@ -3749,20 +3750,20 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={{
               marginHorizontal: 20, marginBottom: 12,
-              backgroundColor: '#FFFFFF', borderRadius: 16,
+              backgroundColor: reflectionSaved ? '#3DAA6E' : '#E8692A', borderRadius: 16,
               padding: 16, flexDirection: 'row', alignItems: 'center',
-              shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+              shadowColor: '#E8692A', shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
             }}
             activeOpacity={0.85}
             onPress={() => setShowReflectionSheet(true)}
           >
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold, marginBottom: 2 }}>
-                Wrap up today
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: F.bold, marginBottom: 2 }}>
+                {reflectionSaved ? 'Reflection saved!' : 'Wrap up today'}
               </Text>
-              <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.regular }}>
-                Capture what surprised you, what you learned, and a kid quote.
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: F.regular }}>
+                {reflectionSaved ? 'Tap to add more or edit your reflection.' : 'Capture what surprised you, what you learned, and a kid quote.'}
               </Text>
             </View>
             <Text style={{ fontSize: 22, color: '#E8692A', marginLeft: 8 }}>{'\u203A'}</Text>
@@ -3774,8 +3775,8 @@ export default function TodayScreen() {
           </View>
 
           <TouchableOpacity
-            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }]} activeOpacity={0.85}
-            disabled={isWrapping}
+            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }, !reflectionSaved && { opacity: 0.35 }]} activeOpacity={0.85}
+            disabled={isWrapping || !reflectionSaved}
             onPress={async () => {
               setIsWrapping(true);
               try {
@@ -3914,6 +3915,7 @@ export default function TodayScreen() {
         <EndOfDaySheet
           visible={showReflectionSheet}
           onClose={() => setShowReflectionSheet(false)}
+          onSaved={() => setReflectionSaved(true)}
           tripId={resolvedTripId ?? ''}
           dayIndex={resolvedDayIndex}
           kids={(trip?.travelers ?? []).filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age ?? null }))}

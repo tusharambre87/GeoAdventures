@@ -181,6 +181,7 @@ function DayReflectionsSection({ tripId }: { tripId: string }) {
     queryKey: ['day-reflections', tripId],
     queryFn: () => reflectionsAPI.list(tripId),
     enabled: !!tripId,
+    staleTime: 0,
   });
 
   if (!reflections || reflections.length === 0) return null;

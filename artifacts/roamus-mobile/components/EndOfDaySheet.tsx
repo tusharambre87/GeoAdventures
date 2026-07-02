@@ -29,6 +29,7 @@ interface Kid { name: string; age?: number | null; }
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onSaved?: () => void;
   tripId: string;
   dayIndex: number;
   kids: Kid[];
@@ -61,7 +62,7 @@ const STEPS = [
   },
 ];
 
-export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids }: Props) {
+export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIndex, kids }: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(600)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
@@ -117,6 +118,7 @@ export default function EndOfDaySheet({ visible, onClose, tripId, dayIndex, kids
       });
     } catch { /* best-effort */ }
     setSaving(false);
+    onSaved?.();
     onClose();
   }, [step, answers, quoteText, quoteKid, tripId, dayIndex, onClose]);
 
