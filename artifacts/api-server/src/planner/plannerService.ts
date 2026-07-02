@@ -2202,8 +2202,10 @@ const PARK_ANCHOR_STOPS: Record<string, string[]> = {
   'Yellowstone': [
     'Old Faithful',
     'Grand Prismatic Spring',
-    'Midway Geyser Basin',           // Grand Prismatic is split under this name in the data
+    'Grand Prismatic Spring (Midway Geyser Basin Overlook)', // overlook-variant stop name
+    'Midway Geyser Basin',           // Grand Prismatic also split under this name in the data
     'Mammoth Hot Springs',
+    'Mammoth Hot Springs Terraces',  // variant stop name for the terraces area
     'Lamar Valley',
     'Grand Canyon of the Yellowstone',
   ],
@@ -2243,7 +2245,6 @@ export function familyDurationFloor(
       ? ANCHOR_MIN_DURATION_MINUTES
       : 0;
   const floor = Math.max(typeFloor, reviewAnchor, curatedAnchor);
-  console.log('[durFloor]', stopName, '| type:', stopType, '| reviews:', gpRatingsTotal, '| city:', city, '| →', floor);
   if (storedMinutes && storedMinutes > floor) return storedMinutes;
   return floor;
 }
