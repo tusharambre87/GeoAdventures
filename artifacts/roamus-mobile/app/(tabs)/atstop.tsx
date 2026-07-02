@@ -2062,6 +2062,7 @@ function isMealStop(t?: string | null): boolean {
           currentStopIndex={Math.max(0, stopIdx)}
           tripId={trip?.id}
           dayIndex={dayIndex}
+          stopId={currentStop.id}
           stopLat={currentStop.latitude ?? undefined}
           stopLng={currentStop.longitude ?? undefined}
           stopName={currentStop.name}

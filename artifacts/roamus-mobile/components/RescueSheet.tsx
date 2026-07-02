@@ -82,6 +82,7 @@ interface Props {
   stopLng?: string | number | null;
   stopName?: string;
   destination?: string;
+  stopId?: string;
 }
 
 function getFoodLabel(hour: number): string {
@@ -130,6 +131,7 @@ export default function RescueSheet({
   stopLng,
   stopName,
   destination,
+  stopId,
 }: Props) {
   const insets = useSafeAreaInsets();
   const isStopContext = !!(stopLat != null && stopLng != null);
@@ -299,11 +301,15 @@ export default function RescueSheet({
   }, [visible]);
 
   function selectOption(id: RescueOptionId) {
+    // Prefer explicit stopId prop (stop-context) over index lookup to avoid
+    // stale object reference bugs: after isVisited mutations, stops array is
+    // rebuilt with new objects, so indexOf(currentStop) returns -1 and
+    // Math.max(0,-1)=0 silently logs the rescue against the wrong stop.
+    const resolvedStopId = stopId ?? (stops[currentStopIndex] as (typeof stops[0] & { id?: string }))?.id;
     if (id === 'sick') {
       // Silent rescue log — fire-and-forget
-      const currentStop = stops[currentStopIndex] as (typeof stops[0] & { id?: string });
-      if (tripId && currentStop?.id) {
-        apiFetch(`/api/travel/stop-activity-log/${currentStop.id}`, {
+      if (tripId && resolvedStopId) {
+        apiFetch(`/api/travel/stop-activity-log/${resolvedStopId}`, {
           method: 'PATCH',
           body: JSON.stringify({ tripId, rescueTriggered: true, rescueReason: 'sick' }),
         }).catch(() => {});
@@ -313,8 +319,7 @@ export default function RescueSheet({
       return;
     }
     // Silent rescue log — fire-and-forget
-    const currentStop = stops[currentStopIndex] as (typeof stops[0] & { id?: string });
-    if (tripId && currentStop?.id) {
+    if (tripId && resolvedStopId) {
       const rescueReasonMap: Record<RescueOptionId, string> = {
         tired: 'tired',
         late: 'late',
@@ -326,7 +331,7 @@ export default function RescueSheet({
         fun: 'done',
       };
       const rescueReason = rescueReasonMap[id] ?? id;
-      apiFetch(`/api/travel/stop-activity-log/${currentStop.id}`, {
+      apiFetch(`/api/travel/stop-activity-log/${resolvedStopId}`, {
         method: 'PATCH',
         body: JSON.stringify({ tripId, rescueTriggered: true, rescueReason }),
       }).catch(() => {});
