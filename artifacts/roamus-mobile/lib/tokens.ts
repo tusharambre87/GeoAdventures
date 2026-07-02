@@ -48,6 +48,7 @@ export const ALL_CITIES: CityEntry[] = [
   { name: 'Las Vegas', country: 'USA', state: 'Nevada' },
   { name: 'Portland', country: 'USA', state: 'Oregon' },
   { name: 'Minneapolis', country: 'USA', state: 'Minnesota' },
+  { name: 'Duluth', country: 'USA', state: 'Minnesota' },
   { name: 'Philadelphia', country: 'USA', state: 'Pennsylvania' },
   { name: 'Atlanta', country: 'USA', state: 'Georgia' },
   { name: 'Charlotte', country: 'USA', state: 'North Carolina' },
