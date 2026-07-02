@@ -155,9 +155,25 @@ function stopImg(type?: string, idx = 0): string {
 }
 
 // ─── Stop thumbnail: Wikipedia photo of actual stop, type-based Unsplash fallback ─
-function StopThumb({ name, fallback }: { name?: string; fallback: string }) {
-  const src = useWikiPhoto(name ?? "", fallback);
-  return <Image source={{ uri: src }} style={s.stopImg} contentFit="cover" />;
+function StopThumb({ name, fallback, tint, city }: { name?: string; fallback: string; tint?: string; city?: string }) {
+  const src = useWikiPhoto(name ?? "", fallback, city);
+  const [retrySrc, setRetrySrc] = useState<string | null>(null);
+  const finalSrc = retrySrc !== null ? retrySrc : src;
+  return (
+    <View style={[s.stopImg, { backgroundColor: tint ? tint + "2A" : "rgba(255,255,255,0.07)" }]}>
+      {finalSrc ? (
+        <Image
+          source={{ uri: finalSrc }}
+          style={{ width: 80, height: 94 }}
+          contentFit="cover"
+          onError={() => {
+            if (finalSrc !== fallback && fallback) setRetrySrc(fallback);
+            else setRetrySrc("");
+          }}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 // ─── Convert API preview days to display format ──────────────────────────────
@@ -532,6 +548,9 @@ export default function PreviewScreen() {
               <Text style={s.heroBadgeText}>AI-planned</Text>
             </View>
           </View>
+          <Text style={s.previewDisclaimer}>
+            This is just a preview — your personalized trip will be created in the next step.
+          </Text>
         </View>
 
         {/* ── Day tabs ── */}
@@ -567,9 +586,8 @@ export default function PreviewScreen() {
 
         {curDay?.stops.map((stop, i) => (
           <View key={i} style={s.stopCard}>
-            <StopThumb name={stop.name} fallback={stop.img} />
+            <StopThumb name={stop.name} fallback={stop.img} tint={stop.tagColor} city={curDay?.city} />
             <View style={s.stopBody}>
-              <Text style={s.stopTime}>{stop.time}</Text>
               <Text style={s.stopName}>{stop.name}</Text>
               <Text style={s.stopDesc} numberOfLines={2}>{stop.desc}</Text>
               <View style={[s.stopTag, { backgroundColor: stop.tagColor + "22", borderColor: stop.tagColor + "44" }]}>
@@ -659,9 +677,8 @@ const s = StyleSheet.create({
   dayHeader: { fontFamily:F.bold, fontSize:11, fontWeight:"700", color:G.orange, letterSpacing:1, marginBottom:10, paddingHorizontal:20 },
   stopList: { paddingTop:12, paddingBottom:0 },
   stopCard: { flexDirection:"row", backgroundColor:"rgba(255,255,255,0.06)", borderRadius:14, overflow:"hidden", borderWidth:1, borderColor:"rgba(255,255,255,0.08)", marginHorizontal:20, marginBottom:10 },
-  stopImg: { width:80, height:94 },
+  stopImg: { width:80, height:94, overflow:"hidden" },
   stopBody: { flex:1, padding:12, gap:3 },
-  stopTime: { fontFamily:F.regular, fontSize:11, color:"rgba(255,255,255,0.4)", letterSpacing:0.2 },
   stopName: { fontFamily:F.bold, fontSize:15, fontWeight:"700", color:"#fff" },
   stopDesc: { fontFamily:F.regular, fontSize:12, color:"rgba(255,255,255,0.5)", lineHeight:17 },
   stopTag: { alignSelf:"flex-start", borderRadius:8, borderWidth:1, paddingHorizontal:7, paddingVertical:3, marginTop:2 },
@@ -674,4 +691,5 @@ const s = StyleSheet.create({
   ctaBtn: { height:56, borderRadius:28, backgroundColor:G.orange, alignItems:"center", justifyContent:"center", marginBottom:8 },
   ctaBtnText: { fontFamily:F.bold, fontSize:17, fontWeight:"700", color:"#fff" },
   ctaHint: { fontFamily:F.regular, fontSize:13, color:"rgba(255,255,255,0.5)", textAlign:"center" },
+  previewDisclaimer: { fontFamily:F.regular, fontSize:12, color:"rgba(255,255,255,0.4)", marginTop:10, fontStyle:"italic" },
 });
