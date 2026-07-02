@@ -393,15 +393,7 @@ export default function TripMemoryIndex() {
             <TouchableOpacity style={styles.shareBtn} onPress={shareDayNative}>
               <Text style={styles.shareBtnText}>Share Day {dayNum}</Text>
             </TouchableOpacity>
-            {/* Instagram-specific */}
-            <View style={dayStyles.igRow}>
-              <TouchableOpacity style={dayStyles.igSmallBtn} onPress={() => openIgModal('story')}>
-                <Text style={dayStyles.igSmallBtnText}>{'\uD83C\uDF9E'} Instagram Story</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={dayStyles.igSmallBtn} onPress={() => openIgModal('post')}>
-                <Text style={dayStyles.igSmallBtnText}>{'\uD83D\uDDBC'} Instagram Post</Text>
-              </TouchableOpacity>
-            </View>
+
           </View>
         </ScrollView>
 
