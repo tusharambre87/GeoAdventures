@@ -632,7 +632,7 @@ export function dayRoleCap(
   }
   if (role === 'departure') {
     if (timing === 'travel') return { anchors: 0, fillers: 0, dayRole: 'departure', capReason: 'travel day' };
-    if (timing === 'late')   return { anchors: 2, fillers: 0, dayRole: 'departure', capReason: 'late departure' };
+    if (timing === 'late')   return { anchors: 1, fillers: 0, dayRole: 'departure', capReason: 'late departure' };
     return { anchors: base.anchors, fillers: base.fillers, dayRole: 'departure', capReason: 'full departure day' };
   }
   return { anchors: base.anchors, fillers: base.fillers, dayRole: 'middle', capReason: 'middle day' };
