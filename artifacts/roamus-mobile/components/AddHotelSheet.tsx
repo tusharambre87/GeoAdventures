@@ -285,13 +285,18 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
             </View>
 
             {suggestions.length === 0 && (
-              <Pressable
-                style={[s.saveBtn, saved && s.saveBtnDone, !canSave && { opacity: 0.5 }]}
-                onPress={handleSave}
-                disabled={!canSave}
-              >
-                <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  style={[s.saveBtn, saved && s.saveBtnDone, !canSave && { opacity: 0.5 }]}
+                  onPress={handleSave}
+                  disabled={!canSave}
+                >
+                  <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
+                </Pressable>
+                <Pressable style={s.skipBtn} onPress={onClose} hitSlop={12}>
+                  <Text style={s.skipBtnText}>Skip for now</Text>
+                </Pressable>
+              </>
             )}
           </Animated.View>
         </KeyboardAvoidingView>
@@ -394,4 +399,6 @@ const s = StyleSheet.create({
   },
   saveBtnDone: { backgroundColor: '#16A34A' },
   saveBtnText: { fontFamily: F.bold, fontSize: 16, color: '#fff' },
+  skipBtn: { alignItems: 'center', paddingVertical: 14 },
+  skipBtnText: { fontFamily: F.semibold, fontSize: 14, color: C.muted },
 });
