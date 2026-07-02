@@ -2243,6 +2243,7 @@ export function familyDurationFloor(
       ? ANCHOR_MIN_DURATION_MINUTES
       : 0;
   const floor = Math.max(typeFloor, reviewAnchor, curatedAnchor);
+  console.log('[durFloor]', stopName, '| type:', stopType, '| reviews:', gpRatingsTotal, '| city:', city, '| →', floor);
   if (storedMinutes && storedMinutes > floor) return storedMinutes;
   return floor;
 }
