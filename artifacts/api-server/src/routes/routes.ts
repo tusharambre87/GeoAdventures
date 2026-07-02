@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, getExploreCacheByStop, upsertExploreCache } from "../storage";
+import { storage, getExploreCacheByStop, upsertExploreCache, createDayReflection, getDayReflections } from "../storage";
 import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
@@ -13896,6 +13896,47 @@ Return ONLY valid JSON in this exact format:
     } catch (error) {
       console.error("Error regenerating story:", error);
       res.status(500).json({ message: "Failed to regenerate story" });
+    }
+  });
+
+  // ── END OF DAY REFLECTION ─────────────────────────────────────────────────
+  app.post('/api/travel/trips/:tripId/day-reflection', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      const userId = req.user?.claims?.sub;
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      const { dayIndex, surprise, learnMore, doDifferently, kidQuotes } = req.body;
+      const reflection = await createDayReflection({
+        tripId,
+        dayIndex: typeof dayIndex === 'number' ? dayIndex : null,
+        surprise: surprise ?? null,
+        learnMore: learnMore ?? null,
+        doDifferently: doDifferently ?? null,
+        kidQuotes: Array.isArray(kidQuotes) ? kidQuotes : [],
+      });
+      return res.json({ id: reflection.id, created_at: reflection.createdAt });
+    } catch (error) {
+      req.log?.error({ error }, 'Failed to save day reflection');
+      return res.status(500).json({ message: 'Failed to save reflection' });
+    }
+  });
+
+  app.get('/api/travel/trips/:tripId/day-reflections', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      const userId = req.user?.claims?.sub;
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      const reflections = await getDayReflections(tripId);
+      return res.json({ reflections });
+    } catch (error) {
+      req.log?.error({ error }, 'Failed to fetch day reflections');
+      return res.status(500).json({ message: 'Failed to fetch reflections' });
     }
   });
 

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  date,
   index,
   uniqueIndex,
   integer,
@@ -3935,4 +3936,28 @@ export const insertStopActivityLogSchema = createInsertSchema(stopActivityLog).o
   createdAt: true,
 });
 export type InsertStopActivityLog = z.infer<typeof insertStopActivityLogSchema>;
+
+// ── END OF DAY REFLECTIONS ────────────────────────────────────────────────────
+// One row per day per trip; captures surprise, curiosity, improvement notes,
+// and kid quotes so they surface in the Remember story.
+export const tripDayReflections = pgTable('trip_day_reflections', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  tripId: varchar('trip_id').notNull().references(() => travelTrips.id, { onDelete: 'cascade' }),
+  dayIndex: integer('day_index'),
+  reflectionDate: date('reflection_date').notNull().defaultNow(),
+  surprise: text('surprise'),
+  learnMore: text('learn_more'),
+  doDifferently: text('do_differently'),
+  kidQuotes: jsonb('kid_quotes').$type<Array<{ text: string; kid_name: string }>>().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index('IDX_trip_day_reflections_trip').on(table.tripId),
+]);
+
+export const insertTripDayReflectionSchema = createInsertSchema(tripDayReflections).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTripDayReflection = z.infer<typeof insertTripDayReflectionSchema>;
+export type TripDayReflection = typeof tripDayReflections.$inferSelect;
 export type StopActivityLog = typeof stopActivityLog.$inferSelect;

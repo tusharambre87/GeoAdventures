@@ -6,6 +6,7 @@ import { storyEmailSchedules, type StoryEmailSchedule } from "@workspace/db";
 import { stopQualitySignals, type StopQualitySignal, type InsertStopQualitySignal } from "@workspace/db";
 import { guideSubscribers, type GuideSubscriber, guideEmailSchedules, type GuideEmailSchedule } from "@workspace/db";
 import { stopLibrary, type StopLibrary, type InsertStopLibrary, exploreCache, type ExploreCache } from "@workspace/db";
+import { tripDayReflections, type TripDayReflection } from "@workspace/db";
 import { db } from "./db";
 import { buildCityPoolKey } from "./cityPoolUtils.js";
 import { eq, desc, sql, and, gte, lte, isNull, isNotNull, ne, inArray, or, asc } from "drizzle-orm";
@@ -6352,6 +6353,38 @@ export async function upsertExploreCache(
         updatedAt:         new Date(),
       },
     });
+}
+
+// ── Day reflection helpers (standalone, not on DatabaseStorage class) ─────────
+
+export async function createDayReflection(data: {
+  tripId: string;
+  dayIndex?: number | null;
+  surprise?: string | null;
+  learnMore?: string | null;
+  doDifferently?: string | null;
+  kidQuotes?: Array<{ text: string; kid_name: string }>;
+}): Promise<TripDayReflection> {
+  const [row] = await db
+    .insert(tripDayReflections)
+    .values({
+      tripId: data.tripId,
+      dayIndex: data.dayIndex ?? null,
+      surprise: data.surprise ?? null,
+      learnMore: data.learnMore ?? null,
+      doDifferently: data.doDifferently ?? null,
+      kidQuotes: (data.kidQuotes ?? []) as any,
+    })
+    .returning();
+  return row;
+}
+
+export async function getDayReflections(tripId: string): Promise<TripDayReflection[]> {
+  return db
+    .select()
+    .from(tripDayReflections)
+    .where(eq(tripDayReflections.tripId, tripId))
+    .orderBy(asc(tripDayReflections.createdAt));
 }
 
 export const storage = new DatabaseStorage();

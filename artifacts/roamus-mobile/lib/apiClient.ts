@@ -242,6 +242,35 @@ export const memoriesAPI = {
     }),
 };
 
+export type DayReflection = {
+  id: string;
+  tripId: string;
+  dayIndex: number | null;
+  reflectionDate: string;
+  surprise: string | null;
+  learnMore: string | null;
+  doDifferently: string | null;
+  kidQuotes: Array<{ text: string; kid_name: string }>;
+  createdAt: string;
+};
+
+export const reflectionsAPI = {
+  save: (tripId: string, data: {
+    dayIndex?: number;
+    surprise?: string;
+    learnMore?: string;
+    doDifferently?: string;
+    kidQuotes?: Array<{ text: string; kid_name: string }>;
+  }) =>
+    apiFetch<{ id: string; created_at: string }>(`/api/travel/trips/${tripId}/day-reflection`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  list: (tripId: string) =>
+    apiFetch<{ reflections: DayReflection[] }>(`/api/travel/trips/${tripId}/day-reflections`)
+      .then(r => r.reflections ?? []),
+};
+
 export const travelAPI = {
   getTrips: () => apiFetch<TripsResponse>("/api/travel/trips"),
   getTrip: (tripId: string) => apiFetch<Trip>(`/api/travel/trips/${tripId}`),

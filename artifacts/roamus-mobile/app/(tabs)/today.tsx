@@ -58,6 +58,7 @@ import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
 import UpgradeSheet from "@/components/UpgradeSheet";
+import EndOfDaySheet from "@/components/EndOfDaySheet";
 import { isFreePlan } from "@/lib/subscription";
 import { useSpeech } from "@/lib/useSpeech";
 import { SpeakButton } from "@/components/SpeakButton";
@@ -576,6 +577,7 @@ export default function TodayScreen() {
   const [showMenu, setShowMenu]                 = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
+  const [showReflectionSheet, setShowReflectionSheet] = useState(false);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
   const [currentTemp, setCurrentTemp]           = useState<number | null>(null);
   const [indoorSheetVisible, setIndoorSheetVisible] = useState(false);
@@ -3741,6 +3743,29 @@ export default function TodayScreen() {
             </View>
           </View>
 
+          {/* Wrap up today — End of Day Reflection */}
+          <TouchableOpacity
+            style={{
+              marginHorizontal: 20, marginBottom: 12,
+              backgroundColor: '#FFFFFF', borderRadius: 16,
+              padding: 16, flexDirection: 'row', alignItems: 'center',
+              shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+            }}
+            activeOpacity={0.85}
+            onPress={() => setShowReflectionSheet(true)}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1F2E', fontFamily: F.bold, marginBottom: 2 }}>
+                Wrap up today
+              </Text>
+              <Text style={{ fontSize: 13, color: '#8A8FA8', fontFamily: F.regular }}>
+                Capture what surprised you, what you learned, and a kid quote.
+              </Text>
+            </View>
+            <Text style={{ fontSize: 22, color: '#E8692A', marginLeft: 8 }}>{'\u203A'}</Text>
+          </TouchableOpacity>
+
           <View style={dc.storyStrip}>
             <Text style={dc.storyTitle}>Your Day {resolvedDayIndex + 1} story is ready</Text>
             <Text style={dc.storySub}>Auto-written from your stops — tap below to see it</Text>
@@ -3883,6 +3908,13 @@ export default function TodayScreen() {
           kids={kidsForPicker}
           onSelect={handlePickerSelect}
           onClose={() => setKidPickerVisible(false)}
+        />
+        <EndOfDaySheet
+          visible={showReflectionSheet}
+          onClose={() => setShowReflectionSheet(false)}
+          tripId={resolvedTripId ?? ''}
+          dayIndex={resolvedDayIndex}
+          kids={(trip?.travelers ?? []).filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age ?? null }))}
         />
         {menuOverlay}
       </View>

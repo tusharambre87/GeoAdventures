@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { travelAPI, memoriesAPI, Trip, Moment } from '@/lib/apiClient';
+import { travelAPI, memoriesAPI, reflectionsAPI, Trip, Moment, DayReflection } from '@/lib/apiClient';
 import StopPickerSheet from '@/components/StopPickerSheet';
 import { F } from '@/lib/tokens';
 
@@ -157,6 +157,77 @@ function PhotoJournalSection({ trip, moments }: { trip: Trip; moments: Moment[] 
 }
 
 // ─── State A: truly no trips ──────────────────────────────────────────────────
+
+// ─── Day Reflections section ──────────────────────────────────────────────────────────
+
+const dr = StyleSheet.create({
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12,
+    shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  dayChip: {
+    alignSelf: 'flex-start', backgroundColor: '#FDF0E9', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 3, marginBottom: 10,
+  },
+  dayChipText: { fontSize: 11, fontWeight: '700', color: '#E8692A', textTransform: 'uppercase', letterSpacing: 0.5 },
+  row: { marginBottom: 10 },
+  rowLabel: { fontSize: 10, fontWeight: '700', color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
+  rowText: { fontSize: 15, color: '#1A1F2E', lineHeight: 22 },
+});
+
+function DayReflectionsSection({ tripId }: { tripId: string }) {
+  const { data: reflections } = useQuery({
+    queryKey: ['day-reflections', tripId],
+    queryFn: () => reflectionsAPI.list(tripId),
+    enabled: !!tripId,
+  });
+
+  if (!reflections || reflections.length === 0) return null;
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Text style={s.sectionLabel}>Day Reflections</Text>
+      {reflections.map((r: DayReflection, idx: number) => (
+        <View key={r.id ?? idx} style={dr.card}>
+          {r.dayIndex != null && (
+            <View style={dr.dayChip}>
+              <Text style={dr.dayChipText}>Day {r.dayIndex + 1}</Text>
+            </View>
+          )}
+          {!!r.surprise && (
+            <View style={dr.row}>
+              <Text style={dr.rowLabel}>SURPRISED US</Text>
+              <Text style={dr.rowText}>{r.surprise}</Text>
+            </View>
+          )}
+          {!!r.learnMore && (
+            <View style={dr.row}>
+              <Text style={dr.rowLabel}>WANT TO KNOW MORE</Text>
+              <Text style={dr.rowText}>{r.learnMore}</Text>
+            </View>
+          )}
+          {!!r.doDifferently && (
+            <View style={dr.row}>
+              <Text style={dr.rowLabel}>NEXT TIME</Text>
+              <Text style={dr.rowText}>{r.doDifferently}</Text>
+            </View>
+          )}
+          {(r.kidQuotes ?? []).filter((q: { text: string; kid_name: string }) => q.text).map((q: { text: string; kid_name: string }, qi: number) => (
+            <View key={qi} style={pj.quoteRow}>
+              <View style={pj.quoteBar} />
+              <View style={pj.quoteBody}>
+                <Text style={pj.quoteText}>\u201c{q.text}\u201d</Text>
+                {!!q.kid_name && <Text style={pj.quoteName}>\u2014 {q.kid_name}</Text>}
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 
 function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets> }) {
   return (
@@ -440,6 +511,13 @@ export default function MemoriesScreen() {
       {heroTrip && moments && moments.length > 0 && (
         <View style={{ marginHorizontal: 20 }}>
           <PhotoJournalSection trip={heroTrip} moments={moments} />
+        </View>
+      )}
+
+      {/* ── Day Reflections ── */}
+      {heroTrip && (
+        <View style={{ marginHorizontal: 20 }}>
+          <DayReflectionsSection tripId={heroTrip.id} />
         </View>
       )}
 
