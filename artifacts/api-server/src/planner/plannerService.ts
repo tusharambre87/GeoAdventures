@@ -2190,12 +2190,59 @@ function durationByStopType(stopType: string): number {
   return FAMILY_STOP_DURATIONS[stopType.toLowerCase()] ?? FAMILY_STOP_DURATIONS.default;
 }
 
+const ANCHOR_MIN_DURATION_MINUTES = 120;
+// Tuned off real data: Old Faithful 27k clears; next Yellowstone stop 6.7k does not.
+// Deliberately lower than auto-must-do's 40k: deserving 2 hours is a lower bar than forcing inclusion.
+const ANCHOR_DURATION_REVIEW_THRESHOLD = 20000;
+
+// Curated per-park anchors: unmissable stops whose review counts are structurally low
+// (wilderness gets ~10x fewer Google reviews than cities) so the threshold alone misses them.
+// Matched by normalized name. Extend as each park is scored.
+const PARK_ANCHOR_STOPS: Record<string, string[]> = {
+  'Yellowstone': [
+    'Old Faithful',
+    'Grand Prismatic Spring',
+    'Midway Geyser Basin',           // Grand Prismatic is split under this name in the data
+    'Mammoth Hot Springs',
+    'Lamar Valley',
+    'Grand Canyon of the Yellowstone',
+  ],
+  // Bar Harbor / Acadia, Sedona, etc. — add when each park is scored.
+};
+
+function isParkAnchor(city: string, stopName: string): boolean {
+  const list = PARK_ANCHOR_STOPS[city];
+  if (!list) return false;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return list.some(a => norm(a) === norm(stopName));
+}
+
 /**
  * Apply family duration floor: returns the larger of the stored value and the
  * family minimum for this stop type. Use when writing stops to the DB.
+ *
+ * Optional args (backward-compatible):
+ *   gpRatingsTotal — high-review stops get an anchor floor of 120 min (metros)
+ *   city / stopName — curated park anchors get the same floor (parks, where
+ *     review counts are structurally low and the threshold alone under-counts icons)
  */
-export function familyDurationFloor(stopType: string, storedMinutes: number | null | undefined): number {
-  const floor = durationByStopType(stopType);
+export function familyDurationFloor(
+  stopType: string,
+  storedMinutes: number | null | undefined,
+  gpRatingsTotal?: number | null,
+  city?: string,
+  stopName?: string,
+): number {
+  const typeFloor = durationByStopType(stopType);
+  const reviewAnchor =
+    (gpRatingsTotal ?? 0) >= ANCHOR_DURATION_REVIEW_THRESHOLD
+      ? ANCHOR_MIN_DURATION_MINUTES
+      : 0;
+  const curatedAnchor =
+    city && stopName && isParkAnchor(city, stopName)
+      ? ANCHOR_MIN_DURATION_MINUTES
+      : 0;
+  const floor = Math.max(typeFloor, reviewAnchor, curatedAnchor);
   if (storedMinutes && storedMinutes > floor) return storedMinutes;
   return floor;
 }

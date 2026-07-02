@@ -5910,7 +5910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 cityGroup: cityName,
                 selectionReason: stop.selectionReason ?? null,
                 metadata: {
-                  durationMinutes: familyDurationFloor(stop.type ?? stop.stopType ?? 'landmark', stop.durationMinutes),
+                  durationMinutes: familyDurationFloor(stop.type ?? stop.stopType ?? 'landmark', stop.durationMinutes, (stop as any).gpRatingsTotal, cityName, stop.name),
                   sessionFit: null,
                   durationClass: null,
                   anchorScore: null,
@@ -6107,13 +6107,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               cityGroup: cityName,
               metadata: (stop.durationMinutes || stop.sessionFit || stop.durationClass || stop.anchorScore || stop.dropPriority)
                 ? {
-                    durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', stop.durationMinutes ?? null),
+                    durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', stop.durationMinutes ?? null, undefined, cityName, stop.name),
                     sessionFit: stop.sessionFit ?? null,
                     durationClass: stop.durationClass ?? null,
                     anchorScore: stop.anchorScore ?? null,
                     dropPriority: stop.dropPriority ?? null,
                   }
-                : { durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', null) },
+                : { durationMinutes: familyDurationFloor(stop.stopType ?? 'landmark', null, undefined, cityName, stop.name) },
             });
           }
           // Insert AI meal stops last per day — after all activity stops have been written
