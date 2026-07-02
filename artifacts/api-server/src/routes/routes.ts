@@ -5,7 +5,7 @@ import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
-import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, type TripMember } from "@workspace/db";
+import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
@@ -10788,6 +10788,60 @@ Return ONLY valid JSON in this exact format:
     } catch (error) {
       console.error("Error creating quality signal:", error);
       res.status(500).json({ message: "Failed to create quality signal" });
+    }
+  });
+
+  // ── STOP ACTIVITY LOG — silent instrumentation for meltdown-prediction ─────────
+  app.post('/api/travel/stop-activity-log', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tripId, stopId, arrivedAt, plannedDurationMinutes, timeSinceLastStopMinutes, weatherTempF } = req.body;
+      if (!tripId || !stopId) return res.status(400).json({ message: "tripId and stopId are required" });
+      const [ownerTrip] = await db.select({ id: travelTrips.id })
+        .from(travelTrips)
+        .where(and(eq(travelTrips.id, tripId), eq(travelTrips.userId, userId)))
+        .limit(1);
+      if (!ownerTrip) return res.status(403).json({ message: "Not authorized" });
+      const [row] = await db.insert(stopActivityLog).values({
+        tripId,
+        stopId,
+        arrivedAt: arrivedAt ? new Date(arrivedAt) : null,
+        plannedDurationMinutes: plannedDurationMinutes ?? null,
+        timeSinceLastStopMinutes: timeSinceLastStopMinutes ?? null,
+        weatherTempF: weatherTempF ?? null,
+      }).returning();
+      return res.json(row);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to log stop activity" });
+    }
+  });
+
+  app.patch('/api/travel/stop-activity-log/:stopId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { stopId } = req.params;
+      const { tripId, actualDurationMinutes, rescueTriggered, rescueReason } = req.body;
+      if (!tripId) return res.status(400).json({ message: "tripId is required" });
+      const [ownerTrip] = await db.select({ id: travelTrips.id })
+        .from(travelTrips)
+        .where(and(eq(travelTrips.id, tripId), eq(travelTrips.userId, userId)))
+        .limit(1);
+      if (!ownerTrip) return res.status(403).json({ message: "Not authorized" });
+      const updates: Record<string, unknown> = {};
+      if (actualDurationMinutes !== undefined) updates.actualDurationMinutes = actualDurationMinutes;
+      if (rescueTriggered !== undefined) updates.rescueTriggered = rescueTriggered;
+      if (rescueReason !== undefined) updates.rescueReason = rescueReason;
+      if (Object.keys(updates).length === 0) return res.json({ ok: true });
+      const [existing] = await db.select({ id: stopActivityLog.id })
+        .from(stopActivityLog)
+        .where(and(eq(stopActivityLog.stopId, stopId), eq(stopActivityLog.tripId, tripId)))
+        .orderBy(desc(stopActivityLog.createdAt))
+        .limit(1);
+      if (!existing) return res.json({ ok: true });
+      await db.update(stopActivityLog).set(updates).where(eq(stopActivityLog.id, existing.id));
+      return res.json({ ok: true });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update stop activity log" });
     }
   });
 

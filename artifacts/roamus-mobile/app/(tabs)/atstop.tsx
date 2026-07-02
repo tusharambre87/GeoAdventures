@@ -721,6 +721,8 @@ export default function AtStopScreen() {
       const elapsed = Math.round((Date.now() - parseInt(startStr, 10)) / 60000);
       await AsyncStorage.setItem('atStopElapsed', String(elapsed > 0 ? elapsed : 0));
       await AsyncStorage.removeItem('atStopStartTime');
+      // Record completion time so today.tsx can compute time_since_last_stop_minutes
+      await AsyncStorage.setItem('lastStopCompleteTime', String(Date.now())).catch(() => {});
       // Send dwell time signal — fire-and-forget, never blocks the UI
       if (elapsed > 0) {
         const signalType = elapsed >= 15 ? 'long_dwell' : 'short_dwell';
@@ -729,6 +731,13 @@ export default function AtStopScreen() {
           headers: { 'x-adventure-parent': '1' },
           body: JSON.stringify({ signalType, signalValue: elapsed }),
         }).catch(() => {});
+        // Silent activity log update — fire-and-forget
+        if (trip?.id) {
+          apiFetch(`/api/travel/stop-activity-log/${currentStop.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ tripId: trip.id, actualDurationMinutes: elapsed }),
+          }).catch(() => {});
+        }
       }
     }
     await AsyncStorage.removeItem('atStopFrozen');

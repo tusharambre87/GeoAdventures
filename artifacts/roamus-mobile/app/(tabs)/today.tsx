@@ -2832,6 +2832,25 @@ export default function TodayScreen() {
                 AsyncStorage.setItem('atStopFrozen', 'true');
                 AsyncStorage.setItem('atStopFrozenTripId', trip?.id ?? '');
                 AsyncStorage.setItem('atStopStartTime', String(Date.now()));
+                // Silent instrumentation — fire-and-forget, never blocks UI
+                if (trip?.id) {
+                  AsyncStorage.getItem('lastStopCompleteTime').then(lastTs => {
+                    const timeSinceLastStop = lastTs
+                      ? Math.round((Date.now() - parseInt(lastTs, 10)) / 60000)
+                      : null;
+                    apiFetch('/api/travel/stop-activity-log', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        tripId: trip.id,
+                        stopId: stop.id,
+                        arrivedAt: new Date().toISOString(),
+                        plannedDurationMinutes: stop.durationMinutes ?? parseMetadata(stop.metadata).durationMinutes ?? null,
+                        timeSinceLastStopMinutes: timeSinceLastStop,
+                        weatherTempF: currentTemp ?? null,
+                      }),
+                    }).catch(() => {});
+                  }).catch(() => {});
+                }
                 router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
               }}
             >

@@ -300,9 +300,36 @@ export default function RescueSheet({
 
   function selectOption(id: RescueOptionId) {
     if (id === 'sick') {
+      // Silent rescue log — fire-and-forget
+      const currentStop = stops[currentStopIndex] as (typeof stops[0] & { id?: string });
+      if (tripId && currentStop?.id) {
+        apiFetch(`/api/travel/stop-activity-log/${currentStop.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ tripId, rescueTriggered: true, rescueReason: 'sick' }),
+        }).catch(() => {});
+      }
       handleClose();
       setTimeout(() => router.push('/atstop/sos' as never), 300);
       return;
+    }
+    // Silent rescue log — fire-and-forget
+    const currentStop = stops[currentStopIndex] as (typeof stops[0] & { id?: string });
+    if (tripId && currentStop?.id) {
+      const rescueReasonMap: Record<RescueOptionId, string> = {
+        tired: 'tired',
+        late: 'late',
+        food: 'food',
+        weather: 'weather',
+        sick: 'sick',
+        done: 'done',
+        skip: 'done',
+        fun: 'done',
+      };
+      const rescueReason = rescueReasonMap[id] ?? id;
+      apiFetch(`/api/travel/stop-activity-log/${currentStop.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ tripId, rescueTriggered: true, rescueReason }),
+      }).catch(() => {});
     }
     let computed: RescuePlan;
     switch (id) {

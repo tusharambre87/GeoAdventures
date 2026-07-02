@@ -3905,3 +3905,31 @@ export const insertTripMemberSchema = createInsertSchema(tripMembers).omit({
 });
 export type InsertTripMember = z.infer<typeof insertTripMemberSchema>;
 export type TripMember = typeof tripMembers.$inferSelect;
+
+// ── STOP ACTIVITY LOG — meltdown-prediction data pipeline ─────────────────────
+// Silently written on "I'm here", "mark complete", and rescue-sheet taps.
+// No user-visible surface; used to train future meltdown-prediction models.
+export const stopActivityLog = pgTable("stop_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tripId: varchar("trip_id").notNull().references(() => travelTrips.id, { onDelete: "cascade" }),
+  stopId: varchar("stop_id").notNull().references(() => travelStops.id, { onDelete: "cascade" }),
+  arrivedAt: timestamp("arrived_at"),
+  plannedDurationMinutes: integer("planned_duration_minutes"),
+  actualDurationMinutes: integer("actual_duration_minutes"),
+  timeSinceLastStopMinutes: integer("time_since_last_stop_minutes"),
+  timeSinceLastSnackMinutes: integer("time_since_last_snack_minutes"),
+  weatherTempF: integer("weather_temp_f"),
+  rescueTriggered: boolean("rescue_triggered").default(false),
+  rescueReason: varchar("rescue_reason", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_stop_activity_log_trip").on(table.tripId),
+  index("IDX_stop_activity_log_stop").on(table.stopId),
+]);
+
+export const insertStopActivityLogSchema = createInsertSchema(stopActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertStopActivityLog = z.infer<typeof insertStopActivityLogSchema>;
+export type StopActivityLog = typeof stopActivityLog.$inferSelect;
