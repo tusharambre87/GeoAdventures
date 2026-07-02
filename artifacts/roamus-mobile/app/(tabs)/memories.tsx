@@ -384,6 +384,7 @@ export default function MemoriesScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: () => travelAPI.getTrips(),
+    staleTime: 0,
   });
 
   const trips = data?.trips ?? [];

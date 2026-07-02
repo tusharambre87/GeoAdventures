@@ -72,6 +72,7 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
   const [quoteText, setQuoteText] = useState('');
   const [quoteKid, setQuoteKid] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -103,24 +104,33 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
   }, [visible, step, onClose]);
 
   const handleNext = useCallback(async () => {
-    if (step < STEPS.length - 1) { setStep(s => s + 1); return; }
+    if (step < STEPS.length - 1) { setSaveError(null); setStep(s => s + 1); return; }
     Keyboard.dismiss();
     setSaving(true);
+    setSaveError(null);
     try {
       const kidQuotes: Array<{ text: string; kid_name: string }> = [];
       if (quoteText.trim()) kidQuotes.push({ text: quoteText.trim(), kid_name: quoteKid || '' });
-      await reflectionsAPI.save(tripId, {
+      const result = await reflectionsAPI.save(tripId, {
         dayIndex,
         surprise: answers.surprise.trim() || undefined,
         learnMore: answers.learnMore.trim() || undefined,
         doDifferently: answers.doDifferently.trim() || undefined,
         kidQuotes,
       });
-    } catch { /* best-effort */ }
-    setSaving(false);
-    onSaved?.();
-    onClose();
-  }, [step, answers, quoteText, quoteKid, tripId, dayIndex, onClose]);
+      // success — result contains { id, created_at }
+      console.log('[EndOfDaySheet] saved reflection', result);
+      setSaving(false);
+      onSaved?.();
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[EndOfDaySheet] save failed:', msg);
+      setSaving(false);
+      setSaveError(msg || 'Could not save — check your connection and try again.');
+      // do NOT call onSaved or onClose
+    }
+  }, [step, answers, quoteText, quoteKid, tripId, dayIndex, onClose, onSaved]);
 
   const cur = STEPS[step];
   const isKidStep = step === 3;
@@ -187,6 +197,7 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
                 style={sh.input}
                 value={value}
                 onChangeText={v => {
+                  setSaveError(null);
                   if (isKidStep) setQuoteText(v);
                   else setAnswers(prev => ({ ...prev, [key]: v }));
                 }}
@@ -199,6 +210,12 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
               />
             </ScrollView>
 
+            {!!saveError && (
+              <View style={sh.errorBox}>
+                <Text style={sh.errorText}>{'⚠️'} {saveError}</Text>
+                <Text style={sh.errorRetry}>Fix any issues above, then tap the button again.</Text>
+              </View>
+            )}
             <View style={sh.footer}>
               <TouchableOpacity
                 style={[sh.btn, saving && sh.btnDim]}
@@ -278,4 +295,10 @@ const sh = StyleSheet.create({
   btn: { backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   btnDim: { opacity: 0.65 },
   btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', fontFamily: F.bold },
+  errorBox: {
+    marginHorizontal: 24, marginBottom: 8,
+    backgroundColor: '#FEE2E2', borderRadius: 12, padding: 14,
+  },
+  errorText: { fontSize: 14, color: '#B91C1C', fontFamily: F.semibold, marginBottom: 4 },
+  errorRetry: { fontSize: 12, color: '#B91C1C', fontFamily: F.regular },
 });
