@@ -13006,6 +13006,126 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // Story callback — generate a short personalized line bridging a kid's earlier quote to this stop.
+  // Cached forever after first run (callback_checked_at prevents re-running).
+  app.post('/api/travel/trips/:tripId/stops/:stopId/story-callback', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId, stopId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const trip = await storage.getTripById(tripId);
+      if (!trip || trip.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const stop = await storage.getStopById(stopId);
+      if (!stop || stop.tripId !== tripId) {
+        return res.status(404).json({ message: "Stop not found" });
+      }
+
+      // Idempotency: if already checked, return stored result immediately
+      let pack = await storage.getJourneyPackByStopId(stopId);
+      if (pack?.callbackCheckedAt) {
+        return res.json({ callbackLine: pack.callbackLine ?? null });
+      }
+
+      // Find the most recent kid quote from an earlier stop on this trip
+      const allMoments = await storage.getMomentsByTripId(tripId);
+      const priorQuote = allMoments.find(
+        (m) => m.stopId !== stopId && m.kidPromptResponse && m.kidPromptResponse.trim().length > 0
+      );
+
+      const writeResult = async (callbackLine: string | null) => {
+        const now = new Date();
+        const updateData = { callbackLine, callbackCheckedAt: now };
+        try {
+          if (pack) {
+            await storage.updateJourneyPack(pack.id, updateData);
+          } else {
+            const created = await storage.createJourneyPack({ stopId, ...updateData });
+            pack = created;
+          }
+        } catch (_err) {
+          // ignore cache write failures
+        }
+      };
+
+      if (!priorQuote) {
+        await writeResult(null);
+        return res.json({ callbackLine: null });
+      }
+
+      // Two-call GPT-4o-mini pattern: relevance check → generate
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        timeout: 15_000,
+      });
+
+      try {
+        const relevanceResp = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_completion_tokens: 50,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content:
+                'You are a creative travel storyteller for kids. Respond ONLY with valid JSON: {"relevant": true} or {"relevant": false}.',
+            },
+            {
+              role: "user",
+              content: `A child said this at an earlier stop: "${priorQuote.kidPromptResponse}"\n\nThey are now visiting: "${stop.name}" (${stop.stopType || "attraction"}).\n\nIs there any plausible, natural connection between what the child said and this new stop that would feel delightful to reference? Even loose thematic links (animals, food, size, history, color, adventure) count. Only return false if there is truly zero connection.`,
+            },
+          ],
+        });
+
+        let relevant = false;
+        try {
+          const parsed = JSON.parse(relevanceResp.choices[0]?.message?.content ?? "{}");
+          relevant = parsed.relevant === true;
+        } catch (_e) {
+          relevant = false;
+        }
+
+        if (!relevant) {
+          await writeResult(null);
+          return res.json({ callbackLine: null });
+        }
+
+        // Second call: generate the callback sentence
+        const genResp = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          max_completion_tokens: 60,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You write one short, warm, personalized sentence (under 20 words) for a child's travel story app. No emojis. Sound like a friendly narrator who remembers what the child said.",
+            },
+            {
+              role: "user",
+              content: `Earlier, a child said: "${priorQuote.kidPromptResponse}"\n\nNow they're at: "${stop.name}".\n\nWrite one sentence that warmly connects what they said to this new place. Under 20 words. No quotes around the sentence.`,
+            },
+          ],
+        });
+
+        const generated = (genResp.choices[0]?.message?.content ?? "").trim();
+        const wordCount = generated.split(/\s+/).filter(Boolean).length;
+        const callbackLine = generated.length > 0 && wordCount <= 20 ? generated : null;
+        await writeResult(callbackLine);
+        return res.json({ callbackLine });
+      } catch (_aiErr) {
+        await writeResult(null);
+        return res.json({ callbackLine: null });
+      }
+    } catch (error) {
+      req.log?.error({ error }, "Error in story-callback");
+      return res.status(500).json({ message: "Failed to generate story callback" });
+    }
+  });
+
   // Pre-generate Story Packs for all of today's unvisited stops (fire-and-forget background job)
   app.post('/api/travel/trips/:tripId/pregenerate-story-packs', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {

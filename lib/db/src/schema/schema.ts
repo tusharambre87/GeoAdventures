@@ -1126,6 +1126,9 @@ export const journeyPacks = pgTable("journey_packs", {
   whoMadeThis: text("who_made_this"), // "Who Made This & Why" audio section text
   dontMissThis: jsonb("dont_miss_this").default(null), // { highlights: string[], shortOnTime: string }
   curiousQuestion: text("curious_question"), // One curiosity-driving question for the child
+  // Story callback — a personalized line bridging a kid's earlier quote to this stop
+  callbackLine: text("callback_line"), // Generated callback sentence, null if none applicable
+  callbackCheckedAt: timestamp("callback_checked_at", { withTimezone: true }), // Set once check has run; prevents re-running
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_journey_packs_stop").on(table.stopId),

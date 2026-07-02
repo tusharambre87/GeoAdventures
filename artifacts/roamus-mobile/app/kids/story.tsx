@@ -145,6 +145,8 @@ export default function StoryPlayer() {
   const storyLoading = kids.isLoadingExplore;
   const storyFetchError = kids.exploreError;
 
+  const [callbackLine, setCallbackLine] = useState<string | null>(null);
+
   const transcript =
     kids.exploreContent?.stories?.[storyKey]?.text ?? "";
   const rawDuration = kids.exploreContent?.stories?.[storyKey]?.durationSeconds;
@@ -239,6 +241,52 @@ export default function StoryPlayer() {
     return () => { clearTimeout(timer); Speech.stop(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minChildAge, transcript]);
+
+  // Background fetch: personalized callback line from an earlier kid quote.
+  // Hard 2-second display window — responses arriving after the deadline are ignored.
+  // Resets on every stop/trip change so stale text never bleeds across stops.
+  useEffect(() => {
+    const tripId = kids.tripId;
+    // Reset immediately so prior stop's callback never shows for a new stop
+    setCallbackLine(null);
+    if (!stopId || !tripId) return;
+    let cancelled = false;
+    const DISPLAY_DEADLINE_MS = 2000;
+    const startedAt = Date.now();
+    const deadlineTimer = setTimeout(() => { cancelled = true; }, DISPLAY_DEADLINE_MS);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("auth_token");
+        const res = await fetch(
+          `${API_BASE}/api/travel/trips/${tripId}/stops/${stopId}/story-callback`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
+        );
+        if (cancelled || !res.ok) return;
+        // Double-check elapsed time in case the network response arrived just after deadline
+        if (Date.now() - startedAt > DISPLAY_DEADLINE_MS) return;
+        const data = await res.json();
+        if (!cancelled && data.callbackLine && typeof data.callbackLine === "string") {
+          setCallbackLine(data.callbackLine);
+        } else {
+          // Explicitly clear so null responses don't leave stale state
+          setCallbackLine(null);
+        }
+      } catch (_err) {
+        // fail silently — story always shows as-is
+      }
+    })();
+    return () => {
+      cancelled = true;
+      clearTimeout(deadlineTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopId, kids.tripId]);
 
   // ── Controls ─────────────────────────────────────────────────────────────
 
@@ -494,6 +542,11 @@ export default function StoryPlayer() {
               </Pressable>
             </View>
             <ScrollView style={s.tsScroll} contentContainerStyle={{ padding: 20 }}>
+              {callbackLine ? (
+                <View style={s.cbBanner}>
+                  <Text style={s.cbText}>{callbackLine}</Text>
+                </View>
+              ) : null}
               {transcript.split("\n\n").map((para, i) => (
                 <Text key={i} style={s.tsBody}>{para}{"\n"}</Text>
               ))}
@@ -676,6 +729,22 @@ const s = StyleSheet.create({
     fontFamily: F.semibold, fontSize: 12,
     color: "rgba(255,255,255,0.55)",
     textAlign: "center", paddingVertical: 6,
+  },
+  cbBanner: {
+    backgroundColor: "#F0EBFF",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: "#7C3AED",
+  },
+  cbText: {
+    fontFamily: "PlusJakartaSans_600SemiBold",
+    fontSize: 15,
+    color: "#4C1D95",
+    lineHeight: 22,
+    fontStyle: "italic",
   },
   tsOverlay: {
     flex: 1,
