@@ -5793,6 +5793,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } else if (plannerTripDays === 1) {
               perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd, plannerTripDays));
             }
+            // Displaced-anchor safety: when a travel-day filler-swap fires ({anchors:0,fillers:1}),
+            // bump the adjacent middle day's anchor cap +1 so the displaced anchor doesn't drop.
+            if (perDayCapsArr.length >= 2) {
+              const _first = perDayCapsArr[0];
+              if (_first.anchors === 0 && _first.fillers === 1) {
+                perDayCapsArr[1] = { ...perDayCapsArr[1], anchors: perDayCapsArr[1].anchors + 1 };
+              }
+              const _li = perDayCapsArr.length - 1;
+              const _last = perDayCapsArr[_li];
+              if (_last.anchors === 0 && _last.fillers === 1 && _li >= 2) {
+                perDayCapsArr[_li - 1] = { ...perDayCapsArr[_li - 1], anchors: perDayCapsArr[_li - 1].anchors + 1 };
+              }
+            }
             const plannerInput: PlannerInput = {
               destination: cityName,
               tripDays: plannerTripDays,
@@ -6927,6 +6940,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           _prevCaps.push(dayRoleCap('departure', _prevLastSig, _prevBaseSpd, tripDays));
         } else {
           _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd, tripDays));
+        }
+        // Displaced-anchor safety: mirror of trip-create bump
+        if (_prevCaps.length >= 2) {
+          const _pFirst = _prevCaps[0];
+          if (_pFirst.anchors === 0 && _pFirst.fillers === 1) {
+            _prevCaps[1] = { ..._prevCaps[1], anchors: _prevCaps[1].anchors + 1 };
+          }
+          const _pLi = _prevCaps.length - 1;
+          const _pLast = _prevCaps[_pLi];
+          if (_pLast.anchors === 0 && _pLast.fillers === 1 && _pLi >= 2) {
+            _prevCaps[_pLi - 1] = { ..._prevCaps[_pLi - 1], anchors: _prevCaps[_pLi - 1].anchors + 1 };
+          }
         }
         const plannerInput: PlannerInput = {
           destination: city,
