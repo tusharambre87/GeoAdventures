@@ -674,7 +674,11 @@ export default function AtStopScreen() {
         if (dayB !== dayA) return dayB - dayA;
         return new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime();
       });
-      const active = candidates[0] ?? data.trips?.[0];
+      // Fallback: when no trip spans today, pick the soonest future trip by startDate.
+      const upcoming = (data.trips ?? [])
+        .filter(t => t.startDate && parseLocalDate(t.startDate)!.setHours(0,0,0,0) >= todayMs)
+        .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime());
+      const active = candidates[0] ?? upcoming[0] ?? data.trips?.[0];
       if (!active) { setMode('noTrip'); return; }
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);
