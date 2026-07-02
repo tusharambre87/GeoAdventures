@@ -1838,7 +1838,7 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
-          onSkip={() => { setShowHotelSheet(false); void handleStartDay(); }}
+          onSkip={() => setShowHotelSheet(false)}
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
@@ -2459,7 +2459,7 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
-          onSkip={() => { setShowHotelSheet(false); void handleStartDay(); }}
+          onSkip={() => setShowHotelSheet(false)}
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
@@ -3775,8 +3775,8 @@ export default function TodayScreen() {
           </View>
 
           <TouchableOpacity
-            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }, !reflectionSaved && { opacity: 0.35 }]} activeOpacity={0.85}
-            disabled={isWrapping || !reflectionSaved}
+            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }]} activeOpacity={0.85}
+            disabled={isWrapping}
             onPress={async () => {
               setIsWrapping(true);
               try {
