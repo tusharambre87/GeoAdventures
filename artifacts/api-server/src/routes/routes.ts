@@ -6967,6 +6967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })),
           });
         }
+        console.log(`[Preview] path=POOL arrivalTime=${_prevArrSig ?? 'null'} caps=${_prevCaps.map((c, i) => `Day${i + 1}:${c.anchors + c.fillers}(${c.capReason})`).join(',')} actual=${days.map((d, i) => `Day${i + 1}:${d.stops.length}`).join(',')}`);
         // Flat list for previewStopIds — order follows day groups
         stops = days.flatMap(day => day.stops.map(s => ({ name: s.name, description: s.description, stopType: s.stopType })));
         // Resolve stop_library IDs by name so trip creation can reuse the exact same stops (preview parity)
