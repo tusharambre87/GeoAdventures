@@ -84,21 +84,35 @@ async function fetchAndCacheAudio(
   const info = await FileSystem.getInfoAsync(localUri);
   if (info.exists) return localUri;
 
-  // Fetch audio binary from API with auth
+  // Fetch audio binary from API with auth.
+  // Retry up to 3 attempts with increasing delay — cold-start TTS takes
+  // several seconds server-side; the first attempt often lands before
+  // synthesis completes and returns non-200.
   const token = await AsyncStorage.getItem("auth_token");
-  const res = await fetch(
-    `${API_BASE}/api/travel/stops/${stopId}/generate-audio`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ text: storyText, voice: "eva" }),
+  const retryDelays = [0, 2000, 4000];
+  let res: Response | null = null;
+  let lastFetchErr: unknown = null;
+  for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+    if (retryDelays[attempt]) await new Promise(r => setTimeout(r, retryDelays[attempt]));
+    try {
+      const r = await fetch(
+        `${API_BASE}/api/travel/stops/${stopId}/generate-audio`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ text: storyText, voice: "eva" }),
+        }
+      );
+      if (r.ok) { res = r; break; }
+      lastFetchErr = new Error(`Audio fetch failed: ${r.status}`);
+    } catch (e) {
+      lastFetchErr = e;
     }
-  );
-
-  if (!res.ok) throw new Error(`Audio fetch failed: ${res.status}`);
+  }
+  if (!res) throw lastFetchErr ?? new Error("Audio fetch failed");
 
   // Convert blob → base64 via FileReader
   const blob = await res.blob();
@@ -369,7 +383,7 @@ export default function StoryPlayer() {
 
   let statusText = "Tap to listen";
   if (storyLoading) statusText = "Loading story…";
-  else if (storyFetchError) statusText = "Story unavailable — go back and retry";
+  else if (storyFetchError) statusText = "Story’s taking a moment — tap ▶ to try again.";
   else if (audioLoading) statusText = "Loading audio…";
   else if (audioError) statusText = audioError.includes("not loaded") ? "Story loading — please go back and retry" : "Tap ▶ to retry";
   else if (isPlaying) statusText = "Listening…";
