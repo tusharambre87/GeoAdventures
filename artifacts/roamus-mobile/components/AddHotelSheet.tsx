@@ -64,10 +64,11 @@ interface Props {
   initialName?: string;
   initialAddress?: string;
   onClose: () => void;
+  onSkip?: () => void;
   onSaved: (hotelName: string, fullAddress: string) => void;
 }
 
-export default function AddHotelSheet({ visible, tripId, destination, initialName, initialAddress, onClose, onSaved }: Props) {
+export default function AddHotelSheet({ visible, tripId, destination, initialName, initialAddress, onClose, onSkip, onSaved }: Props) {
   const insets      = useSafeAreaInsets();
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const sheetAnim   = useRef(new Animated.Value(500)).current;
@@ -293,7 +294,7 @@ export default function AddHotelSheet({ visible, tripId, destination, initialNam
                 >
                   <Text style={s.saveBtnText}>{saved ? '\u2713 Saved!' : 'Save starting point'}</Text>
                 </Pressable>
-                <Pressable style={s.skipBtn} onPress={onClose} hitSlop={12}>
+                <Pressable style={s.skipBtn} onPress={() => onSkip ? onSkip() : onClose()} hitSlop={12}>
                   <Text style={s.skipBtnText}>Skip for now</Text>
                 </Pressable>
               </>

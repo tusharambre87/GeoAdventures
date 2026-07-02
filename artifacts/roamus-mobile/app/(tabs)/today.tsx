@@ -1837,6 +1837,7 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
+          onSkip={() => { setShowHotelSheet(false); void handleStartDay(); }}
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
@@ -2457,6 +2458,7 @@ export default function TodayScreen() {
           tripId={trip?.id ?? ''}
           destination={trip?.destination ?? (trip as any)?.city ?? ''}
           onClose={() => setShowHotelSheet(false)}
+          onSkip={() => { setShowHotelSheet(false); void handleStartDay(); }}
           onSaved={(name, addr) => {
             const resolvedAddr = addr || name;
             setShowHotelSheet(false);
