@@ -3021,6 +3021,12 @@ function RunDaySheet({
         tripId={tripId}
         destination={trip?.destination ?? trip?.city ?? ''}
         onClose={() => setShowHotelSheet(false)}
+        onSkip={async () => {
+          setShowHotelSheet(false);
+          await AsyncStorage.setItem('today_state_override', 'force_morning').catch(() => {});
+          onClose();
+          router.replace('/(tabs)/today' as any);
+        }}
         onSaved={handleHotelSaved}
       />
 
