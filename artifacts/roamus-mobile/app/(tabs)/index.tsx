@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
 import { travelAPI, type Trip } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
+import { isFreePlan } from "@/lib/subscription";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { preCacheTrip } from "@/lib/tripCache";
 import UpgradeSheet from "@/components/UpgradeSheet";
@@ -46,7 +47,7 @@ function parseLocalDate(s: string | null | undefined): Date | null {
 }
 
 function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePress, onDownloadPress }: { trip: Trip; offlineReady?: boolean; isDownloading?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void; onDownloadPress?: () => void }) {
-  const isFree = !user?.subscriptionTier || user.subscriptionTier === "free";
+  const isFree = isFreePlan(user?.subscriptionTier);
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
   const bg   = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
