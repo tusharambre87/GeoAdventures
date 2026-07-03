@@ -10,6 +10,7 @@ import { BackBtn, Wordmark } from "@/lib/onboardingAtoms";
 import { F, G, CITY_COUNTRY, STYLE_MAP, PACE_MAP, deriveCountry } from "@/lib/tokens";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { BYPASS_PAYWALL } from "@/lib/subscription";
 import { onTripDayStart } from "@/services/notifications/notificationTriggers";
 import { Analytics } from "@/services/analytics/analytics";
 
@@ -67,7 +68,7 @@ export default function AccountScreen() {
     const jwt = token;
     createTripWithJwt(jwt).then(() => {
       setLoading(false);
-      router.replace("/onboarding/upgrade");
+      router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -235,7 +236,7 @@ export default function AccountScreen() {
     if (jwt) await createTripWithJwt(jwt);
 
     setLoading(false);
-    router.replace("/onboarding/upgrade");
+    router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
   }
 
   // ─── Derived ────────────────────────────────────────────────────────────────

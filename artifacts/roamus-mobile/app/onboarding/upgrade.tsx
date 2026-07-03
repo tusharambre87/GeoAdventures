@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { API_BASE, useAuth } from "@/lib/authContext";
 import { F, G } from "@/lib/tokens";
 import { useOnboarding } from "@/lib/onboardingContext";
+import { BYPASS_PAYWALL } from "@/lib/subscription";
 
 type Pricing = { symbol: string; geopass: string; trippack: string; cadence: string };
 
@@ -63,9 +64,9 @@ export default function UpgradeScreen() {
   const [pricing, setPricing] = useState<Pricing | null>(null);
   const [annual, setAnnual] = useState(false);
 
-  // Belt-and-suspenders: returning paid users should never see this screen
+  // Belt-and-suspenders: returning paid users (or bypass mode) should never see this screen
   useEffect(() => {
-    if (data.returningUser && user?.subscriptionTier && user.subscriptionTier !== "free") {
+    if (BYPASS_PAYWALL || (data.returningUser && user?.subscriptionTier && user.subscriptionTier !== "free")) {
       completeOnboarding();
       router.replace("/(tabs)/today");
     }
