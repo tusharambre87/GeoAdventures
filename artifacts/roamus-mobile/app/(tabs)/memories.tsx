@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -6,17 +6,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { travelAPI, memoriesAPI, reflectionsAPI, Trip, Moment, DayReflection } from '@/lib/apiClient';
-import StopPickerSheet from '@/components/StopPickerSheet';
+import { travelAPI, Trip } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -63,172 +61,6 @@ function visitedCount(trip: Trip): number {
   return trip.stops?.filter(s => s.isVisited || s.visited).length ?? (trip as any).visitedStops ?? 0;
 }
 
-// ─── Moment helpers ───────────────────────────────────────────────────────────
-
-function parseKidQuote(response: string | null | undefined): { name: string | null; text: string } {
-  if (!response) return { name: null, text: '' };
-  const sep = response.indexOf('|');
-  if (sep === -1) return { name: null, text: response };
-  return { name: response.slice(0, sep).trim() || null, text: response.slice(sep + 1).trim() };
-}
-
-function getDayForMoment(moment: Moment, trip: Trip): number {
-  if (moment.stopId) {
-    const stop = trip.stops?.find(s => s.id === moment.stopId);
-    if (stop?.dayIndex != null) return stop.dayIndex + 1;
-  }
-  if (trip.startDate && moment.createdAt) {
-    const start = new Date(trip.startDate).setHours(0, 0, 0, 0);
-    const created = new Date(moment.createdAt).setHours(0, 0, 0, 0);
-    const diff = Math.floor((created - start) / (1000 * 60 * 60 * 24));
-    return Math.max(1, diff + 1);
-  }
-  return 1;
-}
-
-type DayGroup = {
-  day: number;
-  photos: string[];
-  quotes: Array<{ name: string | null; text: string }>;
-};
-
-function groupMomentsByDay(moments: Moment[], trip: Trip): DayGroup[] {
-  const map = new Map<number, DayGroup>();
-
-  for (const m of moments) {
-    const day = getDayForMoment(m, trip);
-    if (!map.has(day)) map.set(day, { day, photos: [], quotes: [] });
-    const g = map.get(day)!;
-
-    const urls = m.photoUrls ?? (m.photoUrl ? [m.photoUrl] : []);
-    g.photos.push(...urls);
-
-    if (m.kidPromptResponse) {
-      const parsed = parseKidQuote(m.kidPromptResponse);
-      if (parsed.text) g.quotes.push(parsed);
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => a.day - b.day);
-}
-
-// ─── Photo Journal section ─────────────────────────────────────────────────────
-
-function PhotoJournalSection({ trip, moments }: { trip: Trip; moments: Moment[] }) {
-  const groups = groupMomentsByDay(moments, trip)
-    .filter(g => g.photos.length > 0 || g.quotes.length > 0);
-  if (groups.length === 0) return null;
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <Text style={s.sectionLabel}>Photo Journal</Text>
-      {groups.map(g => (
-        <View key={g.day} style={pj.dayBlock}>
-          {/* Day label */}
-          <View style={pj.dayChip}>
-            <Text style={pj.dayChipText}>Day {g.day}</Text>
-          </View>
-
-          {/* Photo grid */}
-          {g.photos.length > 0 && (
-            <View style={pj.photoGrid}>
-              {g.photos.slice(0, 6).map((uri, idx) => (
-                <View key={idx} style={[pj.photoCell, g.photos.length === 1 && pj.photoCellFull]}>
-                  <ExpoImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Kid quotes */}
-          {g.quotes.map((q, idx) => (
-            <View key={idx} style={pj.quoteRow}>
-              <View style={pj.quoteBar} />
-              <View style={pj.quoteBody}>
-                <Text style={pj.quoteText}>"{q.text}"</Text>
-                {q.name && <Text style={pj.quoteName}>— {q.name}</Text>}
-              </View>
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// ─── State A: truly no trips ──────────────────────────────────────────────────
-
-// ─── Day Reflections section ──────────────────────────────────────────────────────────
-
-const dr = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12,
-    shadowColor: '#1A1F2E', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  dayChip: {
-    alignSelf: 'flex-start', backgroundColor: '#FDF0E9', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 3, marginBottom: 10,
-  },
-  dayChipText: { fontSize: 11, fontWeight: '700', color: '#E8692A', textTransform: 'uppercase', letterSpacing: 0.5 },
-  row: { marginBottom: 10 },
-  rowLabel: { fontSize: 10, fontWeight: '700', color: '#8A8FA8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 },
-  rowText: { fontSize: 15, color: '#1A1F2E', lineHeight: 22 },
-});
-
-function DayReflectionsSection({ tripId }: { tripId: string }) {
-  const { data: reflections } = useQuery({
-    queryKey: ['day-reflections', tripId],
-    queryFn: () => reflectionsAPI.list(tripId),
-    enabled: !!tripId,
-    staleTime: 0,
-  });
-
-  if (!reflections || reflections.length === 0) return null;
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <Text style={s.sectionLabel}>Day Reflections</Text>
-      {reflections.map((r: DayReflection, idx: number) => (
-        <View key={r.id ?? idx} style={dr.card}>
-          {r.dayIndex != null && (
-            <View style={dr.dayChip}>
-              <Text style={dr.dayChipText}>Day {r.dayIndex + 1}</Text>
-            </View>
-          )}
-          {!!r.surprise && (
-            <View style={dr.row}>
-              <Text style={dr.rowLabel}>SURPRISED US</Text>
-              <Text style={dr.rowText}>{r.surprise}</Text>
-            </View>
-          )}
-          {!!r.learnMore && (
-            <View style={dr.row}>
-              <Text style={dr.rowLabel}>WANT TO KNOW MORE</Text>
-              <Text style={dr.rowText}>{r.learnMore}</Text>
-            </View>
-          )}
-          {!!r.doDifferently && (
-            <View style={dr.row}>
-              <Text style={dr.rowLabel}>NEXT TIME</Text>
-              <Text style={dr.rowText}>{r.doDifferently}</Text>
-            </View>
-          )}
-          {(r.kidQuotes ?? []).filter((q: { text: string; kid_name: string }) => q.text).map((q: { text: string; kid_name: string }, qi: number) => (
-            <View key={qi} style={pj.quoteRow}>
-              <View style={pj.quoteBar} />
-              <View style={pj.quoteBody}>
-                <Text style={pj.quoteText}>\u201c{q.text}\u201d</Text>
-                {!!q.kid_name && <Text style={pj.quoteName}>\u2014 {q.kid_name}</Text>}
-              </View>
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
 
 function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets> }) {
   return (
@@ -243,7 +75,7 @@ function NoTripsState({ insets }: { insets: ReturnType<typeof useSafeAreaInsets>
         </View>
         <Text style={s.emptyTitle}>Your stories start here</Text>
         <Text style={s.emptySub}>
-          Every trip you take becomes a permanent chapter — photos, kid quotes, and a shareable story.
+          Every trip you take becomes a permanent chapter {'\u2014'} photos, kid quotes, and a shareable story.
         </Text>
         <Pressable style={s.orangePill} onPress={() => router.push('/onboarding/splash' as any)}>
           <Text style={s.orangePillText}>{'\uD83D\uDDFA'} Plan your first trip</Text>
@@ -378,9 +210,6 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
 
 export default function MemoriesScreen() {
   const insets = useSafeAreaInsets();
-  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
-  const { focusDayIndex } = useLocalSearchParams<{ focusDayIndex?: string }>();
-  const focusDay = focusDayIndex != null ? parseInt(focusDayIndex, 10) : null;
   const { data, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: () => travelAPI.getTrips(),
@@ -397,12 +226,6 @@ export default function MemoriesScreen() {
   const isExplicitlyActive = !!activeTrip;
   const otherCurrentTrips = currentTrips.filter(t => t.id !== heroTrip?.id);
 
-  const { data: moments } = useQuery({
-    queryKey: ['moments', heroTrip?.id],
-    queryFn: () => memoriesAPI.getMoments(heroTrip!.id),
-    enabled: !!heroTrip?.id,
-    select: (d: unknown) => Array.isArray(d) ? d as Moment[] : ((d as { moments?: Moment[] })?.moments ?? []),
-  });
 
   if (isLoading) {
     return (
@@ -422,15 +245,6 @@ export default function MemoriesScreen() {
     return <NoTripsState insets={insets} />;
   }
 
-  const handleStopSelect = (stopId: string | null, stopName: string, stopIcon: string) => {
-    setShowPhotoSheet(false);
-    if (heroTrip) {
-      router.push({
-        pathname: `/memories/${heroTrip.id}/add-photo` as never,
-        params: { stopId: stopId ?? '', stopName, stopIcon },
-      });
-    }
-  };
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
@@ -444,83 +258,12 @@ export default function MemoriesScreen() {
         <Text style={s.pageSub}>Your family travel journal</Text>
       </View>
 
-      {/* ── Hero card (active or first current trip) ── */}
+      {/* ── Current trip ── */}
       {heroTrip && (
-        <View style={{ marginHorizontal: 20, marginBottom: 4 }}>
-          <Text style={[s.sectionLabel, { paddingTop: 0, paddingLeft: 0 }]}>
-            {isExplicitlyActive ? 'In Progress' : 'Current Trip'}
-          </Text>
-          <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} onAddPhoto={() => setShowPhotoSheet(true)} />
-        </View>
-      )}
-
-      {/* ── Focused day recap banner (when navigated from Day Complete screen) ── */}
-      {focusDay !== null && heroTrip && (
-        (() => {
-          const dayNumber = focusDay + 1;
-          const dayMoments = (moments ?? []).filter(m => {
-            if (m.stopId) {
-              const stop = heroTrip.stops?.find(s => s.id === m.stopId);
-              if (stop?.dayIndex != null) return stop.dayIndex === focusDay;
-            }
-            return false;
-          });
-          const hasPhotos = dayMoments.some(m => (m.photoUrls ?? []).length > 0 || m.photoUrl);
-          return (
-            <View style={{
-              marginHorizontal: 20, marginBottom: 16,
-              backgroundColor: '#FFFFFF',
-              borderRadius: 16,
-              overflow: 'hidden',
-              shadowColor: '#1A1F2E',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 8,
-              elevation: 3,
-            }}>
-              <LinearGradient
-                colors={['#1A1F2E', '#163830']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={{ padding: 16, paddingBottom: 14 }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>
-                  Day {dayNumber} Recap
-                </Text>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 }}>
-                  {hasPhotos ? 'Your memories from this day' : 'No photos yet for this day'}
-                </Text>
-              </LinearGradient>
-              {!hasPhotos && (
-                <TouchableWithoutFeedback onPress={() => setShowPhotoSheet(true)}>
-                  <View style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#F5F2EE', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 18 }}>{'\uD83D\uDCF8'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1F2E' }}>Add photos from Day {dayNumber}</Text>
-                      <Text style={{ fontSize: 12, color: '#8A8FA8', marginTop: 2 }}>Tap to upload from your library</Text>
-                    </View>
-                    <Text style={{ fontSize: 18, color: '#E8692A' }}>{'\u203A'}</Text>
-                  </View>
-                </TouchableWithoutFeedback>
-              )}
-            </View>
-          );
-        })()
-      )}
-
-      {/* ── Photo Journal — day-grouped photos & kid quotes ── */}
-      {heroTrip && moments && moments.length > 0 && (
-        <View style={{ marginHorizontal: 20 }}>
-          <PhotoJournalSection trip={heroTrip} moments={moments} />
-        </View>
-      )}
-
-      {/* ── Day Reflections ── */}
-      {heroTrip && (
-        <View style={{ marginHorizontal: 20 }}>
-          <DayReflectionsSection tripId={heroTrip.id} />
-        </View>
+        <>
+          <Text style={s.sectionLabel}>{isExplicitlyActive ? 'In Progress' : 'Current Trip'}</Text>
+          <CompactCard trip={heroTrip} gradIndex={0} variant="current" />
+        </>
       )}
 
       {/* ── Other in-progress / upcoming trips ── */}
@@ -545,91 +288,11 @@ export default function MemoriesScreen() {
         </>
       )}
 
-      {/* ── If only hero, no others ── */}
-      {completedTrips.length === 0 && otherCurrentTrips.length === 0 && heroTrip && !moments?.length && (
-        <Text style={s.hintText}>Complete your trip to see it here as a story</Text>
-      )}
       </ScrollView>
-      {showPhotoSheet && heroTrip && (
-        <StopPickerSheet
-          trip={heroTrip}
-          onDismiss={() => setShowPhotoSheet(false)}
-          onSelect={handleStopSelect}
-        />
-      )}
     </View>
   );
 }
 
-// ─── Photo journal styles ──────────────────────────────────────────────────────
-
-const CELL_GAP = 3;
-
-const pj = StyleSheet.create({
-  dayBlock: {
-    marginBottom: 24,
-  },
-  dayChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: C.deep,
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  dayChipText: {
-    fontSize: 11,
-    fontFamily: F.bold,
-    color: '#fff',
-    letterSpacing: 0.5,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: CELL_GAP,
-    marginBottom: 10,
-  },
-  photoCell: {
-    width: '32.3%',
-    aspectRatio: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: C.muted,
-  },
-  photoCellFull: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
-  quoteRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 8,
-  },
-  quoteBar: {
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: C.orange,
-    minHeight: 36,
-    marginTop: 2,
-  },
-  quoteBody: {
-    flex: 1,
-  },
-  quoteText: {
-    fontSize: 14,
-    fontFamily: F.regular,
-    color: C.deep,
-    fontStyle: 'italic',
-    lineHeight: 21,
-  },
-  quoteName: {
-    fontSize: 12,
-    fontFamily: F.semibold,
-    color: C.orange,
-    marginTop: 3,
-  },
-});
 
 const s = StyleSheet.create({
   root: { flex: 1 },

@@ -26,6 +26,7 @@ import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 import StopPickerSheet from '@/components/StopPickerSheet';
+import DayReflectionsSection from '@/components/DayReflectionsSection';
 
 /** Normalise stored photo URIs — older records may have relative paths */
 function absPhotoUrl(uri: string): string {
@@ -386,6 +387,12 @@ export default function TripMemoryIndex() {
               <Text style={dayStyles.kidsZoneBtnText}>{'\uD83E\uDDF8'} Revisit Kids Zone</Text>
             </TouchableOpacity>
           )}
+
+          {/* Day reflection */}
+          <DayReflectionsSection
+            tripId={tripId}
+            dayIndex={focusDayIndex !== null ? focusDayIndex : undefined}
+          />
 
           {/* Share section */}
           <View style={[styles.shareSection, { marginTop: 8 }]}>
