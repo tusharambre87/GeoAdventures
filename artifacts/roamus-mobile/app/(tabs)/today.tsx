@@ -85,6 +85,11 @@ const TAB_BAR_H = 49; // standard iOS/Android tab bar height (excluding safe are
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
+// ─── Pilot flag — flip to true to re-enable end-of-day reflection card ────────
+// When false: the orange "Wrap up today" card is hidden; EndOfDaySheet and
+// trip_day_reflections remain untouched in the codebase for post-pilot reuse.
+const SHOW_DAY_REFLECTION = false;
+
 const C = {
   orange:       '#E8692A',
   orangeLt:     '#FDF0E9',
@@ -3746,28 +3751,30 @@ export default function TodayScreen() {
             </View>
           </View>
 
-          {/* Wrap up today — End of Day Reflection */}
-          <TouchableOpacity
-            style={{
-              marginHorizontal: 20, marginBottom: 12,
-              backgroundColor: reflectionSaved ? '#3DAA6E' : '#E8692A', borderRadius: 16,
-              padding: 16, flexDirection: 'row', alignItems: 'center',
-              shadowColor: '#E8692A', shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
-            }}
-            activeOpacity={0.85}
-            onPress={() => setShowReflectionSheet(true)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: F.bold, marginBottom: 2 }}>
-                {reflectionSaved ? 'Reflection saved!' : 'Wrap up today'}
-              </Text>
-              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: F.regular }}>
-                {reflectionSaved ? 'Tap to add more or edit your reflection.' : 'Capture what surprised you, what you learned, and a kid quote.'}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 22, color: '#E8692A', marginLeft: 8 }}>{'\u203A'}</Text>
-          </TouchableOpacity>
+          {/* Wrap up today — End of Day Reflection (hidden during pilot; flip SHOW_DAY_REFLECTION to restore) */}
+          {SHOW_DAY_REFLECTION && (
+            <TouchableOpacity
+              style={{
+                marginHorizontal: 20, marginBottom: 12,
+                backgroundColor: reflectionSaved ? '#3DAA6E' : '#E8692A', borderRadius: 16,
+                padding: 16, flexDirection: 'row', alignItems: 'center',
+                shadowColor: '#E8692A', shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
+              }}
+              activeOpacity={0.85}
+              onPress={() => setShowReflectionSheet(true)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: F.bold, marginBottom: 2 }}>
+                  {reflectionSaved ? 'Reflection saved!' : 'Wrap up today'}
+                </Text>
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: F.regular }}>
+                  {reflectionSaved ? 'Tap to add more or edit your reflection.' : 'Capture what surprised you, what you learned, and a kid quote.'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 22, color: '#E8692A', marginLeft: 8 }}>{'\u203A'}</Text>
+            </TouchableOpacity>
+          )}
 
           <View style={dc.storyStrip}>
             <Text style={dc.storyTitle}>Your Day {resolvedDayIndex + 1} story is ready</Text>
