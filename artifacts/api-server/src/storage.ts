@@ -6369,11 +6369,20 @@ export async function createDayReflection(data: {
     .insert(tripDayReflections)
     .values({
       tripId: data.tripId,
-      dayIndex: data.dayIndex ?? null,
+      dayIndex: data.dayIndex ?? 0,
       surprise: data.surprise ?? null,
       learnMore: data.learnMore ?? null,
       doDifferently: data.doDifferently ?? null,
       kidQuotes: (data.kidQuotes ?? []) as any,
+    })
+    .onConflictDoUpdate({
+      target: [tripDayReflections.tripId, tripDayReflections.dayIndex],
+      set: {
+        surprise: data.surprise ?? null,
+        learnMore: data.learnMore ?? null,
+        doDifferently: data.doDifferently ?? null,
+        kidQuotes: (data.kidQuotes ?? []) as any,
+      },
     })
     .returning();
   return row;

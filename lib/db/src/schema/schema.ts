@@ -3943,7 +3943,7 @@ export type InsertStopActivityLog = z.infer<typeof insertStopActivityLogSchema>;
 export const tripDayReflections = pgTable('trip_day_reflections', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   tripId: varchar('trip_id').notNull().references(() => travelTrips.id, { onDelete: 'cascade' }),
-  dayIndex: integer('day_index'),
+  dayIndex: integer('day_index').notNull().default(0),
   reflectionDate: date('reflection_date').notNull().defaultNow(),
   surprise: text('surprise'),
   learnMore: text('learn_more'),
@@ -3952,6 +3952,7 @@ export const tripDayReflections = pgTable('trip_day_reflections', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 }, (table) => [
   index('IDX_trip_day_reflections_trip').on(table.tripId),
+  uniqueIndex('trip_day_reflections_trip_day_uniq').on(table.tripId, table.dayIndex),
 ]);
 
 export const insertTripDayReflectionSchema = createInsertSchema(tripDayReflections).omit({

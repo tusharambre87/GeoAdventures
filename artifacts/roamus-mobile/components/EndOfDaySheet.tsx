@@ -78,9 +78,31 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
     if (visible) {
       setMounted(true);
       setStep(0);
-      setAnswers({ surprise: '', learnMore: '', doDifferently: '' });
-      setQuoteText('');
-      setQuoteKid(kids[0]?.name ?? '');
+      // Prefill from the existing reflection for this day (if any)
+      reflectionsAPI.list(tripId).then(rows => {
+        const existing = rows
+          .filter(r => (r.dayIndex ?? 0) === dayIndex)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        if (existing) {
+          setAnswers({
+            surprise: existing.surprise ?? '',
+            learnMore: existing.learnMore ?? '',
+            doDifferently: existing.doDifferently ?? '',
+          });
+          const firstQuote = existing.kidQuotes?.[0];
+          setQuoteText(firstQuote?.text ?? '');
+          setQuoteKid(firstQuote?.kid_name ?? kids[0]?.name ?? '');
+        } else {
+          setAnswers({ surprise: '', learnMore: '', doDifferently: '' });
+          setQuoteText('');
+          setQuoteKid(kids[0]?.name ?? '');
+        }
+      }).catch(() => {
+        // On fetch failure, fall back to blank (don't block opening)
+        setAnswers({ surprise: '', learnMore: '', doDifferently: '' });
+        setQuoteText('');
+        setQuoteKid(kids[0]?.name ?? '');
+      });
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(slideAnim, { toValue: 0, damping: 26, stiffness: 200, useNativeDriver: true }),
@@ -92,7 +114,7 @@ export default function EndOfDaySheet({ visible, onClose, onSaved, tripId, dayIn
         Animated.spring(slideAnim, { toValue: 600, damping: 26, stiffness: 200, useNativeDriver: true }),
       ]).start(({ finished }) => { if (finished) setMounted(false); });
     }
-  }, [visible, kids]);
+  }, [visible, kids, tripId, dayIndex]);
 
   useEffect(() => {
     if (!visible) return;
