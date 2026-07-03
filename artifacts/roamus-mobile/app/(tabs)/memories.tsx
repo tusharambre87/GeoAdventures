@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -12,6 +12,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import StopPickerSheet from '@/components/StopPickerSheet';
 import { useQuery } from '@tanstack/react-query';
 
 import { travelAPI, Trip } from '@/lib/apiClient';
@@ -226,6 +227,18 @@ export default function MemoriesScreen() {
   const isExplicitlyActive = !!activeTrip;
   const otherCurrentTrips = currentTrips.filter(t => t.id !== heroTrip?.id);
 
+  const [showPhotoSheet, setShowPhotoSheet] = useState(false);
+
+  const handleStopSelect = (stopId: string | null, stopName: string, stopIcon: string) => {
+    setShowPhotoSheet(false);
+    if (heroTrip) {
+      router.push({
+        pathname: `/memories/${heroTrip.id}/add-photo` as never,
+        params: { stopId: stopId ?? '', stopName, stopIcon },
+      });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -258,12 +271,14 @@ export default function MemoriesScreen() {
         <Text style={s.pageSub}>Your family travel journal</Text>
       </View>
 
-      {/* ── Current trip ── */}
+      {/* ── Hero card (active or first current trip) ── */}
       {heroTrip && (
-        <>
-          <Text style={s.sectionLabel}>{isExplicitlyActive ? 'In Progress' : 'Current Trip'}</Text>
-          <CompactCard trip={heroTrip} gradIndex={0} variant="current" />
-        </>
+        <View style={{ marginHorizontal: 20, marginBottom: 4 }}>
+          <Text style={[s.sectionLabel, { paddingTop: 0, paddingLeft: 0 }]}>
+            {isExplicitlyActive ? 'In Progress' : 'Current Trip'}
+          </Text>
+          <HeroCard trip={heroTrip} isExplicitlyActive={isExplicitlyActive} onAddPhoto={() => setShowPhotoSheet(true)} />
+        </View>
       )}
 
       {/* ── Other in-progress / upcoming trips ── */}
@@ -289,6 +304,13 @@ export default function MemoriesScreen() {
       )}
 
       </ScrollView>
+      {showPhotoSheet && heroTrip && (
+        <StopPickerSheet
+          trip={heroTrip}
+          onDismiss={() => setShowPhotoSheet(false)}
+          onSelect={handleStopSelect}
+        />
+      )}
     </View>
   );
 }
