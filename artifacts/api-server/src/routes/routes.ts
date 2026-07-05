@@ -14332,10 +14332,14 @@ Return ONLY the statement, nothing else.`;
 
   // ============================================================================
   // TRAIL TALES - "Who Am I" riddle game for travel memories
+  // Disabled during pilot — flip TRAIL_TALES_ENABLED to true to re-enable.
+  // All code preserved; no AI calls are made while the flag is false.
   // ============================================================================
+  const TRAIL_TALES_ENABLED = false;
 
   // Generate riddles for a trip (creates riddles for all visited stops)
   app.post('/api/travel/trips/:tripId/trail-tales/generate', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId } = req.params;
       console.log(`[Trail Tales] Starting riddle generation for trip: ${tripId}`);
@@ -14441,6 +14445,7 @@ Format your response as JSON:
 
   // Get all riddles for a trip (auto-unlocks if criteria met)
   app.get('/api/travel/trips/:tripId/trail-tales/riddles', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId } = req.params;
       
@@ -14464,6 +14469,7 @@ Format your response as JSON:
 
   // Get unlocked riddles only
   app.get('/api/travel/trips/:tripId/trail-tales/unlocked', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId } = req.params;
       const riddles = await storage.getUnlockedRiddles(tripId);
@@ -14476,6 +14482,7 @@ Format your response as JSON:
 
   // Unlock riddles based on visited stops
   app.post('/api/travel/trips/:tripId/trail-tales/unlock', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId } = req.params;
       const stops = await storage.getStopsByTripId(tripId);
@@ -14491,6 +14498,7 @@ Format your response as JSON:
 
   // Submit an answer for a riddle
   app.post('/api/travel/trail-tales/riddles/:riddleId/answer', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { riddleId } = req.params;
       const { explorerId, selectedAnswer } = req.body;
@@ -14574,6 +14582,7 @@ Format your response as JSON:
 
   // Get explorer's progress for Trail Tales
   app.get('/api/travel/trips/:tripId/trail-tales/progress/:explorerId', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId, explorerId } = req.params;
       const progress = await storage.getOrCreateTrailTalesProgress(tripId, explorerId);
@@ -14588,6 +14597,7 @@ Format your response as JSON:
 
   // Check if Trail Tales button should show (2 days after trip completion)
   app.get('/api/travel/trips/:tripId/trail-tales/availability', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    if (!TRAIL_TALES_ENABLED) return res.status(503).json({ message: 'Trail Tales is not available.', disabled: true });
     try {
       const { tripId } = req.params;
       const trip = await storage.getTripById(tripId);
