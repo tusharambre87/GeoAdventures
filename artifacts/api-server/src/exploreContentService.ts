@@ -403,7 +403,6 @@ async function generateTrackText(prompt: string, minWords: number, trackName: st
         { role: "user", content: prompt },
       ],
       max_completion_tokens: 2500,
-      temperature: 0.72,
     });
     return (completion.choices[0]?.message?.content ?? "").trim();
   };
