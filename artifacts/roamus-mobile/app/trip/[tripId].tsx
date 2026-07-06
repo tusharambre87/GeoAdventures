@@ -3684,6 +3684,7 @@ function AddStopSheet({
           '/api/travel/stops/search',
           { method: 'POST', body: JSON.stringify({ destination: city, query: q }) }
         );
+        console.log('SEARCH', q, result.results?.length);
         setSearchResults(result.results ?? []);
       } catch {
         setSearchResults([]);
