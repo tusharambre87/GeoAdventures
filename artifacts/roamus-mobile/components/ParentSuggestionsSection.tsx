@@ -140,7 +140,7 @@ function SuggestionCard({
           </View>
           {ticket && (
             <View style={sc.tagTicket}>
-              <Text style={sc.tagTicketText}>{'Ticket'}</Text>
+              <Text style={sc.tagTicketText}>{'Need ticket'}</Text>
             </View>
           )}
           {free && (

@@ -925,7 +925,7 @@ function StopCard({
           </View>
           {ticket ? (
             <View style={sc.tagTicket}>
-              <Text style={sc.tagTicketText}>Ticket</Text>
+              <Text style={sc.tagTicketText}>Need ticket</Text>
             </View>
           ) : (
             <View style={sc.tagFree}>
