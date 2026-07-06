@@ -924,9 +924,12 @@ function StopCard({
             <Text style={sc.tagMutedText}>{duration} min</Text>
           </View>
           {ticket ? (
-            <View style={sc.tagTicket}>
+            <Pressable
+              style={sc.tagTicket}
+              onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stop.name + ' tickets')}`).catch(() => {})}
+            >
               <Text style={sc.tagTicketText}>Need ticket</Text>
-            </View>
+            </Pressable>
           ) : (
             <View style={sc.tagFree}>
               <Text style={sc.tagFreeText}>Free entry</Text>
