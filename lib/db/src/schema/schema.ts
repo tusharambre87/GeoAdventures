@@ -3962,3 +3962,14 @@ export const insertTripDayReflectionSchema = createInsertSchema(tripDayReflectio
 export type InsertTripDayReflection = z.infer<typeof insertTripDayReflectionSchema>;
 export type TripDayReflection = typeof tripDayReflections.$inferSelect;
 export type StopActivityLog = typeof stopActivityLog.$inferSelect;
+
+// ── NEARBY LANDMARKS CACHE ────────────────────────────────────────────────────
+// Caches Google Places nearbysearch results keyed by lat/lng grid cell + radius.
+// TTL enforced at query time (48 h). One row per location grid cell eliminates
+// repeated Places API calls when multiple users view the same area.
+export const nearbyLandmarksCache = pgTable("nearby_landmarks_cache", {
+  cacheKey: text("cache_key").primaryKey(),
+  results: jsonb("results").notNull(),
+  cachedAt: timestamp("cached_at").defaultNow().notNull(),
+});
+export type NearbyLandmarksCache = typeof nearbyLandmarksCache.$inferSelect;

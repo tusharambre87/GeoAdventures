@@ -5,7 +5,7 @@ import { checkRateLimit } from "../lib/publicRateLimit";
 import { db } from "../db";
 import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
-import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, type TripMember } from "@workspace/db";
+import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, nearbyLandmarksCache, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
 import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
@@ -6480,19 +6480,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public proxy for Google Places photo references — no auth required
+  // GCS-cached: first request fetches from Google and stores in object storage;
+  // all subsequent requests for the same photo_reference are served from GCS for free.
   app.get('/api/travel/place-photo', async (req: any, res) => {
     const ref = (req.query.ref as string | undefined)?.trim();
     if (!ref) return res.status(400).json({ error: 'ref required' });
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(503).end();
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    // ── GCS cache hit ──────────────────────────────────────────────────────────
+    if (bucketId) {
+      try {
+        const key = crypto.createHash('sha256').update(ref).digest('hex');
+        const file = objectStorageClient.bucket(bucketId).file(`place-photos/${key}`);
+        const [exists] = await file.exists();
+        if (exists) {
+          const [metadata] = await file.getMetadata();
+          res.set('Content-Type', (metadata.contentType as string) || 'image/jpeg');
+          res.set('Cache-Control', 'public, max-age=31536000');
+          file.createReadStream().pipe(res);
+          return;
+        }
+      } catch (_cacheErr) {
+        // GCS unavailable — fall through to direct proxy
+      }
+    }
+    // ── Cache miss: fetch from Google Places ───────────────────────────────────
     const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
     try {
       const upstream = await fetch(url);
       if (!upstream.ok) return res.status(404).end();
-      res.set('Content-Type', upstream.headers.get('content-type') ?? 'image/jpeg');
-      res.set('Cache-Control', 'public, max-age=86400');
-      const buf = await upstream.arrayBuffer();
-      res.end(Buffer.from(buf));
+      const contentType = upstream.headers.get('content-type') ?? 'image/jpeg';
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      // Persist to GCS in the background so next request is free
+      if (bucketId) {
+        const key = crypto.createHash('sha256').update(ref).digest('hex');
+        objectStorageClient.bucket(bucketId).file(`place-photos/${key}`)
+          .save(buf, { contentType, public: true })
+          .catch(() => {});
+      }
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=31536000');
+      res.end(buf);
     } catch (err) {
       req.log?.error({ err }, '[PlacePhoto] proxy error');
       res.status(500).end();
@@ -6545,6 +6574,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Nearby landmarks — tourist attractions, museums, parks for PMAL "Also in this area"
+  // DB-cached per ~1km grid cell (lat/lng rounded to 2dp) + radius for 48 hours.
+  // One Places API burst per location per 48h regardless of how many users load that area.
   app.get('/api/travel/nearby-landmarks', async (req: any, res) => {
     let { lat, lng, city, radius = '16000' } = req.query as Record<string, string>;
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -6564,7 +6595,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const lat_n = parseFloat(lat);
     const lng_n = parseFloat(lng);
+    // Round to 2dp (~1km grid) so nearby stops share a cache entry
+    const latR = Math.round(lat_n * 100) / 100;
+    const lngR = Math.round(lng_n * 100) / 100;
+    const cacheKey = `${latR}|${lngR}|${radius}`;
 
+    // ── DB cache hit (48h TTL) ─────────────────────────────────────────────────
+    try {
+      const cached = await db.select().from(nearbyLandmarksCache)
+        .where(and(
+          eq(nearbyLandmarksCache.cacheKey, cacheKey),
+          gt(nearbyLandmarksCache.cachedAt, drizzleSql`NOW() - INTERVAL '48 hours'`)
+        ))
+        .limit(1);
+      if (cached.length > 0) {
+        return res.json({ results: cached[0].results });
+      }
+    } catch {}
+
+    // ── Cache miss: call Google Places (3 Nearby Search requests) ─────────────
     const types = ['tourist_attraction', 'museum', 'park'];
     const seen = new Set<string>();
     const results: any[] = [];
@@ -6593,7 +6642,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     results.sort((a, b) => b.rating - a.rating);
-    res.json({ results: results.slice(0, 6) });
+    const finalResults = results.slice(0, 6);
+
+    // Persist to DB cache (fire-and-forget)
+    if (finalResults.length > 0) {
+      db.insert(nearbyLandmarksCache)
+        .values({ cacheKey, results: finalResults, cachedAt: new Date() })
+        .onConflictDoUpdate({
+          target: nearbyLandmarksCache.cacheKey,
+          set: { results: finalResults, cachedAt: new Date() },
+        })
+        .catch(() => {});
+    }
+
+    res.json({ results: finalResults });
   });
 
   // Static map image proxy — keeps GOOGLE_PLACES_API_KEY server-side
