@@ -9149,7 +9149,7 @@ Example structure:
         messages: [
           {
             role: 'system',
-            content: `You are a family travel expert. Return a JSON object with a "results" array of up to 5 real places in the given city that match the search query. Each item must have: name (real place name), stopType (landmark/museum/park/zoo/aquarium/restaurant/food/other), description (1 sentence on kid appeal). Return ONLY real places. Return valid JSON only.`,
+            content: `You are a family travel expert. Return a JSON object with a "results" array of 3-5 real, currently-operating places that match the search query in the given city. Each item must have: name (real place name), stopType (landmark/museum/park/zoo/aquarium/restaurant/food/other), description (1 sentence on kid appeal). Do not return an empty array unless the query is nonsensical. Return valid JSON only.`,
           },
           {
             role: 'user',
@@ -9157,7 +9157,7 @@ Example structure:
           },
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 600,
+        max_completion_tokens: 900,
       });
       const data = JSON.parse(response.choices[0].message.content || '{}');
       const results: any[] = Array.isArray(data.results) ? data.results : [];
