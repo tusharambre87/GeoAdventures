@@ -269,7 +269,7 @@ export default function TripPlanStopSheet({
                 style={s.ticketPill}
                 onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(stop.name + ' tickets')}`).catch(() => {})}
               >
-                <Text style={s.ticketPillText}>Ticket</Text>
+                <Text style={s.ticketPillText}>Click to book</Text>
               </Pressable>
               <Text style={s.ticketNote}>Book in advance recommended</Text>
             </View>
