@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 import { F } from '@/lib/tokens';
 import { apiFetch } from '@/lib/apiClient';
@@ -27,6 +28,7 @@ import {
   computeTiredDay,
   computeWeatherDay,
   getOptions,
+  OFFLINE_TIPS,
   type RescueOptionId,
   type RescuePlan,
   type StopLike,
@@ -183,6 +185,14 @@ export default function RescueSheet({
   const [previewItem, setPreviewItem] = useState<{ stop: LibraryStop | OtherDayStop; swapFn: () => void } | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageLoading, setPreviewImageLoading] = useState(false);
+  // Flips true when any rescue fetch .catch() fires (network down or server error)
+  const [offlineFallback, setOfflineFallback] = useState(false);
+
+  // NetInfo: instant offline detection. isConnected===false = definitely offline.
+  // isConnected===null = unknown (first load) — don't show tips yet.
+  const netInfo = useNetInfo();
+  const isOffline = netInfo.isConnected === false;
+  const showOfflineTips = isOffline || offlineFallback;
 
   useEffect(() => {
     if (visible) {
@@ -209,6 +219,7 @@ export default function RescueSheet({
       setApplyingRec(null);
       setPreviewItem(null);
       setPreviewImageUrl(null);
+      setOfflineFallback(false);
       Animated.parallel([
         Animated.timing(overlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
         Animated.spring(sheetAnim,   { toValue: 0, damping: 26, stiffness: 220, useNativeDriver: true }),
@@ -250,6 +261,7 @@ export default function RescueSheet({
       setNewOptions(r.options ?? []);
       setOtherDayStops(r.otherDayStops ?? []);
     }).catch(() => {
+      setOfflineFallback(true);
       setSwapError('Could not load options. Check your connection.');
     }).finally(() => setSwapLoading(false));
   }, [view]);
@@ -266,6 +278,7 @@ export default function RescueSheet({
       setFoodOptions(r.options ?? []);
       setFoodCity(r.city ?? '');
     }).catch(() => {
+      setOfflineFallback(true);
       setFoodError('Could not load food options. Check your connection.');
     }).finally(() => setFoodLoading(false));
   }, [view]);
@@ -280,6 +293,7 @@ export default function RescueSheet({
     }).then(r => {
       setWeatherOptions(r.options ?? []);
     }).catch(() => {
+      setOfflineFallback(true);
       setWeatherOptions([]);
     }).finally(() => setWeatherLoading(false));
   }, [view]);
@@ -455,6 +469,7 @@ export default function RescueSheet({
     }).then(r => {
       setNeedRecsResults(r.suggestions ?? []);
     }).catch(() => {
+      setOfflineFallback(true);
       setNeedRecsError("We couldn't find options right now.");
     }).finally(() => setNeedRecsLoading(false));
   }, [view, isStopContext]);
@@ -656,7 +671,9 @@ export default function RescueSheet({
               </Text>
             </View>
             <ScrollView style={s.scroll} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
-              {needRecsLoading ? (
+              {showOfflineTips ? (
+                <OfflineTipsBanner category={view as RescueOptionId} />
+              ) : needRecsLoading ? (
                 <View style={s.centeredNote}>
                   <ActivityIndicator color="#E8692A" />
                   <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding options nearby…</Text>
@@ -804,7 +821,9 @@ export default function RescueSheet({
                     </>
                   )}
 
-                  {swapLoading ? (
+                  {showOfflineTips ? (
+                    <OfflineTipsBanner category="fun" />
+                  ) : swapLoading ? (
                     <View style={s.centeredNote}>
                       <ActivityIndicator color="#E8692A" />
                       <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding alternatives{'\u2026'}</Text>
@@ -872,7 +891,9 @@ export default function RescueSheet({
             ctaColor={selectedFoodId ? '#E8692A' : '#C4C8D8'}
             ctaDisabled={!selectedFoodId}
           >
-            {foodLoading ? (
+            {showOfflineTips ? (
+              <OfflineTipsBanner category="food" />
+            ) : foodLoading ? (
               <View style={s.centeredNote}>
                 <ActivityIndicator color="#E8692A" />
                 <Text style={[s.centeredNoteText, { marginTop: 10 }]}>Finding food options…</Text>
@@ -970,7 +991,9 @@ export default function RescueSheet({
             ctaLabel={applyingPlan ? 'Moving indoors…' : plan.swaps && plan.swaps.length > 0 ? 'Move indoors' : 'Got it'}
             ctaColor={plan.swaps && plan.swaps.length > 0 && !applyingPlan ? '#1A1F2E' : '#8A8FA8'}
           >
-            {plan.swaps && plan.swaps.length > 0 ? (
+            {showOfflineTips ? (
+              <OfflineTipsBanner category="weather" />
+            ) : plan.swaps && plan.swaps.length > 0 ? (
               <>
                 <Text style={s.sectionLabel}>OUTDOOR STOPS TO MOVE INDOORS</Text>
                 {plan.swaps.map((swap, idx) => {
@@ -1130,6 +1153,27 @@ export default function RescueSheet({
 }
 
 // ─── Shared result-view wrapper ───────────────────────────────────────────────
+
+// ─── Offline tips banner ─────────────────────────────────────────────────────
+
+function OfflineTipsBanner({ category }: { category: RescueOptionId }) {
+  const tips = OFFLINE_TIPS[category] ?? [];
+  return (
+    <View>
+      <View style={s.offlineBanner}>
+        <Text style={s.offlineBannerText}>
+          {'No signal \u2014 here are ideas that work without it'}
+        </Text>
+      </View>
+      {tips.map((tip, i) => (
+        <View key={i} style={s.offlineTipRow}>
+          <Text style={s.offlineTipBullet}>{'\u2022'}</Text>
+          <Text style={s.offlineTipText}>{tip}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 // ─── Stop Preview Panel ───────────────────────────────────────────────────────
 
@@ -1624,4 +1668,38 @@ const s = StyleSheet.create({
     backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 15, alignItems: 'center',
   },
   previewSwapBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', fontFamily: F.bold },
+
+  // ── Offline tips banner ──
+  offlineBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+  },
+  offlineBannerText: {
+    fontSize: 13,
+    fontFamily: F.semibold,
+    color: '#92400E',
+  },
+  offlineTipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  offlineTipBullet: {
+    fontSize: 14,
+    color: '#E8692A',
+    marginTop: 1,
+    fontFamily: F.bold,
+    lineHeight: 20,
+  },
+  offlineTipText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1F2E',
+    fontFamily: F.regular,
+    lineHeight: 20,
+  },
 });

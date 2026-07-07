@@ -262,3 +262,45 @@ export function computeFoodStop(): RescuePlan {
     body: "Loading family-friendly options in your area…",
   };
 }
+
+// ─── Offline static tips ─────────────────────────────────────────────────────
+// Shown when a rescue fetch fails or NetInfo reports no connection.
+// Zero network required. Family voice — short, actionable, honest.
+export const OFFLINE_TIPS: Partial<Record<RescueOptionId, string[]>> = {
+  food: [
+    "Check the snacks you packed — granola bars, fruit, or crackers can hold everyone over.",
+    "Most visitor centers and park lodges have vending machines or a small deli counter.",
+    "Water and shade first — kids often feel much better once they're cooled down and hydrated.",
+    "Gas stations near park entrances usually stock sandwiches, hot food, and drinks.",
+  ],
+  tired: [
+    "10-minute quiet reset in the car — windows down, no screens, just rest.",
+    "Let the kids stretch out flat in the back seat with their eyes closed.",
+    "Trade a screen for window-watching: who can spot the most wildlife or license plates?",
+    "Trim the next stop to 20 minutes — a shorter version beats skipping it entirely.",
+  ],
+  fun: [
+    "Let the kids pick the next stop from the list — ownership changes everything.",
+    "I-spy the landscape: colors, shapes, animals, weird road signs.",
+    "Count animals or state license plates out the window — winner picks the music.",
+    "Ask each kid to be the tour guide for the next 10 minutes.",
+  ],
+  late: [
+    "Pick the one stop everyone most wants and give it your full energy.",
+    "Trim each remaining stop to 20 minutes — quick highlights only.",
+    "Drive first, eat at the destination — combine the meal stop and activity into one.",
+    "Let the kids vote on what to cut — they handle it better when they chose.",
+  ],
+  weather: [
+    "Most visitor centers are free, indoors, and have ranger talks kids love.",
+    "Look for a local bowling alley, movie theater, or arcade nearby.",
+    "Museum gift shops are free to browse — surprisingly entertaining for 20 minutes.",
+    "A hotel lobby or covered pavilion can be a great low-pressure rainy-day reset.",
+  ],
+  sick: [
+    "Find a shaded bench or grassy area and sit quietly for 10-15 minutes.",
+    "Hydrate first — most kid sick feelings ease with water and a light snack.",
+    "Visitor centers have first aid kits and quiet seating areas.",
+    "For anything serious, search for urgent care nearby once you have signal again.",
+  ],
+};
