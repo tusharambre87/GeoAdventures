@@ -6,6 +6,7 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import {
   Alert,
   Animated,
+  Linking,
   PanResponder,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import {
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -407,19 +409,52 @@ export default function StoryScreen() {
   async function handleShareImage() {
     const uri = await captureSlide();
     if (!uri) {
-      // Fall back to URL share if capture fails
       try { await Share.share({ url: `https://roamus.app/s/${tripId}`, message: `Our ${trip?.name ?? ''} trip on RoamUs` }); } catch {}
       return;
     }
     try {
-      if (Platform.OS === 'ios') {
-        // iOS: Share.share with url works for local file URIs
-        await Share.share({ url: uri, message: `Our ${trip?.name ?? ''} trip on RoamUs` });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        // expo-sharing works on both iOS and Android with local file URIs
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your story slide' });
       } else {
-        // Android: share the roamus link (local file URIs need content:// which requires extra native setup)
-        await Share.share({ message: `Check out our ${trip?.name ?? ''} trip on RoamUs!\nhttps://roamus.app/s/${tripId}` });
+        // Fallback: iOS Share.share with url, or message-only on Android
+        await Share.share({ url: uri, message: `Our ${trip?.name ?? ''} trip on RoamUs` });
       }
     } catch {}
+  }
+
+  async function handleShareInstagram() {
+    const uri = await captureSlide();
+    if (!uri) { Alert.alert('Could not prepare image', 'Please try again.'); return; }
+    // Save to camera roll first (Instagram reads from library)
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo access so we can share your story slide to Instagram.');
+      return;
+    }
+    try {
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      // iOS deep link: opens Instagram and pre-selects the photo from library
+      const iosDeepLink = `instagram://library?LocalIdentifier=${asset.id}`;
+      // Android: Instagram Play Store intent fallback
+      const androidDeepLink = 'instagram://app';
+      const deepLink = Platform.OS === 'ios' ? iosDeepLink : androidDeepLink;
+      const canOpen = await Linking.canOpenURL(deepLink).catch(() => false);
+      if (canOpen) {
+        await Linking.openURL(deepLink);
+      } else {
+        // Instagram not installed — fall through to native share with the image
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share to Instagram' });
+        } else {
+          Alert.alert('Instagram not installed', 'Your photo has been saved to your camera roll — you can share it from there.');
+        }
+      }
+    } catch {
+      Alert.alert('Could not open Instagram', 'Your slide has been saved to your camera roll.');
+    }
   }
 
   async function handleShareLink() {
@@ -475,9 +510,14 @@ export default function StoryScreen() {
 
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable style={styles.shareMain} onPress={handleShareImage}>
-          <Text style={styles.shareMainText}>{'\u2197'} Share as image</Text>
-        </Pressable>
+        <View style={styles.sharePrimaryRow}>
+          <Pressable style={[styles.shareMain, { flex: 1 }]} onPress={handleShareImage}>
+            <Text style={styles.shareMainText}>{'\u2197'} Share as image</Text>
+          </Pressable>
+          <Pressable style={styles.instaBtn} onPress={handleShareInstagram}>
+            <Text style={styles.instaBtnText}>{'\uD83D\uDCF7'}</Text>
+          </Pressable>
+        </View>
         <View style={styles.shareRow}>
           <Pressable style={styles.shareSmall} onPress={handleShareLink}>
             <Text style={styles.shareSmallText}>{'\uD83D\uDD17'} Share link</Text>
@@ -543,13 +583,19 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: 16, paddingTop: 12,
   },
+  sharePrimaryRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   shareMain: {
     backgroundColor: '#E8692A',
     borderRadius: 14, paddingVertical: 15,
-    alignItems: 'center', marginBottom: 10,
+    alignItems: 'center',
     flexDirection: 'row', justifyContent: 'center', gap: 8,
   },
   shareMainText: { fontSize: 15, fontFamily: F.bold, color: '#fff' },
+  instaBtn: {
+    width: 52, backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+  },
+  instaBtnText: { fontSize: 22 },
   shareRow: { flexDirection: 'row', gap: 8 },
   shareSmall: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   shareSmallText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },

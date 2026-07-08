@@ -68,6 +68,7 @@
     "expo-file-system": "^19.0.23",
     "expo-media-library": "^18.2.1",
     "expo-notifications": "~0.32.17",
+    "expo-sharing": "~14.0.8",
     "expo-speech": "^56.0.3",
     "expo-store-review": "~9.0.9",
     "lottie-react-native": "~7.3.8",
