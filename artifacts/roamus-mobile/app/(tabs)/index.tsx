@@ -206,6 +206,8 @@ export default function TripsScreen() {
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [overrideHeroId, setOverrideHeroId] = useState<string | null>(null);
+  const [cachedTrips, setCachedTrips] = useState<Trip[] | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('heroTripOverride').then(id => {
@@ -234,7 +236,7 @@ export default function TripsScreen() {
     retry: 1,
   });
 
-  const trips = data?.trips ?? [];
+  const trips = (isError && fromCache && cachedTrips) ? cachedTrips : (data?.trips ?? []);
 
   // Date-aware trip status helper
   function isTripDateActive(t: Trip): boolean {
@@ -246,6 +248,25 @@ export default function TripsScreen() {
   }
 
   const activeTrip = trips.find(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
+
+  // Write last-good trips list to cache on every successful load
+  useEffect(() => {
+    if (data?.trips?.length) {
+      AsyncStorage.setItem('cache_trips', JSON.stringify(data)).catch(() => {});
+    }
+  }, [data]);
+
+  // Fall back to cached trips list when the query fails
+  useEffect(() => {
+    if (!isError) { setFromCache(false); return; }
+    AsyncStorage.getItem('cache_trips').then(raw => {
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as { trips: Trip[] };
+        if (parsed.trips?.length) { setCachedTrips(parsed.trips); setFromCache(true); }
+      } catch {}
+    }).catch(() => {});
+  }, [isError]);
 
   // On mount — restore cacheStatus only if an active/upcoming trip is actually cached
   useEffect(() => {
@@ -346,7 +367,7 @@ export default function TripsScreen() {
             <ActivityIndicator size="large" color={G.orange} />
             <Text style={s.loadingText}>Fetching your trips…</Text>
           </View>
-        ) : isError ? (
+        ) : isError && !fromCache ? (
           <View style={s.errorCard}>
             <Ionicons name="wifi-outline" size={28} color="#DC2626" />
             <Text style={s.errorTitle}>Couldn't load trips</Text>
@@ -357,6 +378,13 @@ export default function TripsScreen() {
           </View>
         ) : heroTrip ? (
           <>
+            {fromCache && (
+              <View style={{ backgroundColor: '#1F2937', paddingVertical: 7, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Text style={{ color: '#D1FAE5', fontSize: 12, fontFamily: F.medium, letterSpacing: 0.2 }}>
+                  {'Offline \u2014 showing your saved plan'}
+                </Text>
+              </View>
+            )}
             <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} isDownloading={downloading} user={user} onUpgradePress={() => setUpgradeVisible(true)} onDownloadPress={handleDownloadOffline} />
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow} onPress={() => setShowSwitcher(true)}>

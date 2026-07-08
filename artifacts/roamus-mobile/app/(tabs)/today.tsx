@@ -425,13 +425,13 @@ function openTicketSearch(stopName: string) {
   ).catch(() => {});
 }
 
-function daysUntilDate(dateStr?: string | null): number {
+function daysUntilDate(dateStr?: string | null, simNow?: Date | null): number {
   if (!dateStr) return 0;
   try {
     const target = parseLocalDate(dateStr);
     if (!target) return 0;
     target.setHours(0, 0, 0, 0);
-    const now = new Date();
+    const now = simNow ? new Date(simNow) : new Date();
     now.setHours(0, 0, 0, 0);
     return Math.round((target.getTime() - now.getTime()) / 86_400_000);
   } catch { return 0; }
@@ -521,12 +521,26 @@ export default function TodayScreen() {
       ? (rawDevState as TodayState)
       : undefined;
 
+  // Dev-only date override: set AsyncStorage 'dev_date_override' = 'YYYY-MM-DD' to force
+  // today's date for testing date-gated flows (e.g. airplane-mode Today-tab verification).
+  // Clear it by tapping the purple banner, or: AsyncStorage.removeItem('dev_date_override')
+  const [devDate, setDevDate] = useState<Date | null>(null);
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem('dev_date_override').then(raw => {
+      if (!raw) return;
+      const d = new Date(raw + 'T12:00:00');
+      if (!isNaN(d.getTime())) setDevDate(d);
+    }).catch(() => {});
+  }, []);
+
   const [todayState, setTodayState]             = useState<TodayState>(devState ?? 'no_trip');
   const [trip, setTrip]                         = useState<TripData | null>(null);
   const [dayStops, setDayStops]                 = useState<Stop[]>([]);
   const [currentStopIndex, setCurrentStopIndex] = useState(0);
   const [selectedPace, setSelectedPace]         = useState<Pace>('balanced');
   const [loading, setLoading]                   = useState(true);
+  const [fromCache, setFromCache]               = useState(false);
   const [starting, setStarting]                 = useState(false);
   const [checklistOpen, setChecklistOpen]       = useState(false);
   const [error, setError]                       = useState<string | null>(null);
@@ -535,14 +549,14 @@ export default function TodayScreen() {
   const todayDayIndex = useMemo(() => {
     if (!trip?.startDate) return 0;
     const start = parseLocalDate(trip.startDate)!;
-    const today = new Date();
+    const today = devDate ? new Date(devDate) : new Date();
     start.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
     const diff = Math.floor(
       (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     );
     return Math.max(0, Math.min(diff, (trip.tripDays ?? 1) - 1));
-  }, [trip?.startDate, trip?.tripDays]);
+  }, [trip?.startDate, trip?.tripDays, devDate]);
   const resolvedDayIndex = todayDayIndex;
 
   // Day-gating flags — derived from trip state, recalculated on every render
@@ -552,7 +566,7 @@ export default function TodayScreen() {
     if (!trip?.startDate) return false;
     const start = parseLocalDate(trip.startDate)!;
     start.setHours(0, 0, 0, 0);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = devDate ? new Date(devDate) : new Date(); today.setHours(0, 0, 0, 0);
     return today.getTime() >= start.getTime();
   })();
 
@@ -560,7 +574,7 @@ export default function TodayScreen() {
     if (!trip?.startDate) return false;
     const start = parseLocalDate(trip.startDate)!;
     start.setHours(0, 0, 0, 0);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = devDate ? new Date(devDate) : new Date(); today.setHours(0, 0, 0, 0);
     return start.getTime() > today.getTime();
   })();
 
@@ -855,6 +869,8 @@ export default function TodayScreen() {
     const wasAlreadyResolved = !!resolvedTripId;
     if (!wasAlreadyResolved) setLoading(true);
     setError(null);
+    setFromCache(false);
+    let localFromCache = false;
     try {
       // Check for state override from atstop.tsx feedback
       const override = await AsyncStorage.getItem('today_state_override');
@@ -883,12 +899,18 @@ export default function TodayScreen() {
         let data: { trips: TripData[] };
         try {
           data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
+          AsyncStorage.setItem('cache_trips', JSON.stringify(data)).catch(() => {});
         } catch {
           if (__DEV__) {
             data = { trips: [MOCK_TRIP] };
           } else {
-            setError('Could not connect to server.');
-            return;
+            const cachedRaw = await AsyncStorage.getItem('cache_trips').catch(() => null);
+            if (cachedRaw) {
+              try { data = JSON.parse(cachedRaw); localFromCache = true; } catch { data = { trips: [] }; }
+            } else {
+              setError('Could not connect to server.');
+              return;
+            }
           }
         }
         const sortedTrips = [...(data.trips ?? [])].sort((a, b) => {
@@ -896,7 +918,7 @@ export default function TodayScreen() {
           if (!b.startDate) return -1;
           return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
         });
-        const todayMs = new Date().setHours(0,0,0,0);
+        const todayMs = (devDate ? new Date(devDate) : new Date()).setHours(0,0,0,0);
         const active = sortedTrips.find(t => {
           if (t.status === 'active' || t.status === 'in_progress') return true;
           if (!t.startDate || !t.endDate) return false;
@@ -919,6 +941,7 @@ export default function TodayScreen() {
         const cached = await getCachedTrip(tid);
         if (cached) {
           t = cached as TripData;
+          localFromCache = true;
         } else if (__DEV__) {
           t = MOCK_TRIP;
         } else {
@@ -927,6 +950,10 @@ export default function TodayScreen() {
         }
       }
       setTrip(t);
+      setFromCache(localFromCache);
+      if (!localFromCache && tid) {
+        AsyncStorage.setItem(`roamus_trip_cache_${tid}`, JSON.stringify({ data: t, cachedAt: Date.now() })).catch(() => {});
+      }
 
       const stops = (t.stops ?? [])
         .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
@@ -946,7 +973,7 @@ export default function TodayScreen() {
         setTodayState('morning');
         await AsyncStorage.multiRemove(['atStopFrozen', 'atStopFrozenTripId']).catch(() => {});
       } else if (!devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
-        const days = daysUntilDate(t.startDate);
+        const days = daysUntilDate(t.startDate, devDate);
         if (days > 1) {
           setTodayState('pre_trip_far');
         } else if (days === 1) {
@@ -1428,13 +1455,27 @@ export default function TodayScreen() {
   const currentDayIndex = resolvedDayIndex;
 
   const isPaidUser = user?.subscriptionTier !== 'free';
-  const offlineBannerEl = (isOffline && isPaidUser) ? (
-    <View style={{ backgroundColor: '#1F2937', paddingVertical: 7, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Text style={{ color: '#D1FAE5', fontSize: 12, fontFamily: F.medium, letterSpacing: 0.2 }}>
-        {'No connection — showing cached data'}
-      </Text>
-    </View>
-  ) : null;
+  const offlineBannerEl = (
+    <>
+      {((isOffline && isPaidUser) || fromCache) && (
+        <View style={{ backgroundColor: '#1F2937', paddingVertical: 7, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: '#D1FAE5', fontSize: 12, fontFamily: F.medium, letterSpacing: 0.2 }}>
+            {fromCache ? 'Offline \u2014 showing your saved plan' : 'No connection \u2014 showing cached data'}
+          </Text>
+        </View>
+      )}
+      {__DEV__ && devDate && (
+        <View style={{ backgroundColor: '#7C3AED', paddingVertical: 5, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: F.bold }}>
+            {'DEV DATE: ' + devDate.toISOString().slice(0, 10)}
+          </Text>
+          <Pressable onPress={() => { AsyncStorage.removeItem('dev_date_override').catch(() => {}); setDevDate(null); }}>
+            <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Clear</Text>
+          </Pressable>
+        </View>
+      )}
+    </>
+  );
 
   // ── ⋯ Menu overlay (shared by all states except no_trip) ──
   const menuOverlay = todayState === 'no_trip' ? null : (
@@ -1552,7 +1593,7 @@ export default function TodayScreen() {
   // STATE: PRE_TRIP_FAR  (trip starts >7 days from now)
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'pre_trip_far') {
-    const daysLeft = daysUntilDate(trip?.startDate);
+    const daysLeft = daysUntilDate(trip?.startDate, devDate);
     const startLabel = formatDayDate(trip?.startDate, 0);
     const previewStops = (trip?.stops ?? [])
       .filter(s => (s.dayIndex ?? 0) === 0)
