@@ -4015,7 +4015,7 @@ export default function TodayScreen() {
             </Text>
             <TouchableOpacity
               style={tc.storyBtn} activeOpacity={0.85}
-              onPress={() => router.push('/(tabs)/memories' as never)}
+              onPress={() => router.push({ pathname: '/memories/[tripId]/story', params: { tripId: resolvedTripId ?? '', fromComplete: '1' } } as never)}
             >
               <Text style={tc.storyBtnText}>View your trip story →</Text>
             </TouchableOpacity>

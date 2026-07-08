@@ -2,10 +2,12 @@
  * Story Slides Carousel — 5 slides, swipeable
  * Brief: memories-replit-brief.md — Screen 4
  */
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import {
+  Alert,
   Animated,
   PanResponder,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -14,6 +16,8 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import * as MediaLibrary from 'expo-media-library';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,7 +70,7 @@ function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null
         <Text style={styles.slide1Title}>This is what they'll remember</Text>
         <Text style={styles.slide1Meta}>
           {stopTotal > 0 ? `${stopTotal} stops` : ''}
-          {trip?.destination ? `  ·  ${trip.destination}` : ''}
+          {trip?.destination ? `  \u00B7  ${trip.destination}` : ''}
         </Text>
       </View>
       <Wordmark right opacity={0.4} />
@@ -93,7 +97,7 @@ function Slide2Map({ trip }: { trip: any }) {
         <Text style={styles.mapTripName}>{trip?.name ?? 'Our Trip'}</Text>
         <Text style={styles.mapSubline}>
           {[city, visitedCount > 0 ? `${visitedCount} stops` : null, numDays > 0 ? `${numDays} days` : null]
-            .filter(Boolean).join(' · ')}
+            .filter(Boolean).join(' \u00B7 ')}
         </Text>
       </View>
 
@@ -120,6 +124,9 @@ function Slide2Map({ trip }: { trip: any }) {
             </View>
           );
         })}
+        {visitedCount === 0 && (
+          <Text style={styles.mapEmptyHint}>Stops you visit will appear here</Text>
+        )}
       </View>
 
       {/* Attribution pill */}
@@ -135,6 +142,7 @@ function Slide2Map({ trip }: { trip: any }) {
 function Slide3Collage({ collagePhotos }: { collagePhotos: (string | null)[] }) {
   const cells = [0, 1, 2, 3];
   const placeholderBg = ['#2a4a3a', '#1a3a5f', '#3a2a1a', '#2a1a3a'];
+  const placeholderLabels = ['A favourite moment', 'Pure adventure', 'Family fun', 'Exploring together'];
   return (
     <View style={styles.slide}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: C.deep }]} />
@@ -147,7 +155,12 @@ function Slide3Collage({ collagePhotos }: { collagePhotos: (string | null)[] }) 
           <View key={i} style={[styles.collageCell, { backgroundColor: placeholderBg[i] }]}>
             {collagePhotos[i]
               ? <ExpoImage source={{ uri: collagePhotos[i]! }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              : null
+              : (
+                <View style={styles.collagePlaceholder}>
+                  <Text style={styles.collagePlaceholderIcon}>{'\uD83D\uDCF8'}</Text>
+                  <Text style={styles.collagePlaceholderText}>{placeholderLabels[i]}</Text>
+                </View>
+              )
             }
           </View>
         ))}
@@ -196,7 +209,7 @@ function Slide4Quotes({
             >
               {generating
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.generateBtnText}>Generate story →</Text>
+                : <Text style={styles.generateBtnText}>Generate story {'\u2192'}</Text>
               }
             </Pressable>
           </View>
@@ -237,9 +250,22 @@ function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: strin
 // ─── Main carousel ────────────────────────────────────────────────────────────
 
 export default function StoryScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, fromComplete } = useLocalSearchParams<{ tripId: string; fromComplete?: string }>();
   const insets = useSafeAreaInsets();
+
+  // Slide state + cross-fade animation
   const [slide, setSlide] = useState(0);
+  const [displaySlide, setDisplaySlide] = useState(0);
+  const slideOpacity = useRef(new Animated.Value(1)).current;
+  // Mutable ref so panResponder always reads the latest slide index (avoids stale closure)
+  const slideIndexRef = useRef(0);
+
+  // Toast opacity refs
+  const savedToastOpacity = useRef(new Animated.Value(0)).current;
+  const photoToastOpacity = useRef(new Animated.Value(0)).current;
+
+  // ViewShot capture ref (on the slide area only, not chrome)
+  const slideRef = useRef<View>(null);
 
   const { data: trip } = useQuery({
     queryKey: ['trip', tripId],
@@ -263,6 +289,41 @@ export default function StoryScreen() {
   const { user, isLoading: authLoading } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = React.useState(false);
+
+  // Show "Saved to Memories" toast when arriving from trip complete
+  useEffect(() => {
+    if (fromComplete === '1') {
+      showSavedToast();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromComplete]);
+
+  function showSavedToast() {
+    savedToastOpacity.setValue(1);
+    Animated.sequence([
+      Animated.delay(2800),
+      Animated.timing(savedToastOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start();
+  }
+
+  function showPhotoToast() {
+    photoToastOpacity.setValue(1);
+    Animated.sequence([
+      Animated.delay(2200),
+      Animated.timing(photoToastOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start();
+  }
+
+  // Cross-fade to new slide index — reads slideIndexRef so panResponder never goes stale
+  function changeSlide(newIdx: number) {
+    if (newIdx === slideIndexRef.current) return;
+    slideIndexRef.current = newIdx;
+    Animated.timing(slideOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+      setSlide(newIdx);
+      setDisplaySlide(newIdx);
+      Animated.timing(slideOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    });
+  }
 
   async function handleGenerate() {
     if (!tripId) return;
@@ -291,26 +352,81 @@ export default function StoryScreen() {
   }, [moments, story]);
 
   function nextSlide() {
-    if (slide >= TOTAL_SLIDES - 1) { router.back(); return; }
-    setSlide(s => Math.min(s + 1, TOTAL_SLIDES - 1));
+    const cur = slideIndexRef.current;
+    if (cur >= TOTAL_SLIDES - 1) { router.back(); return; }
+    changeSlide(cur + 1);
   }
-  function prevSlide() { setSlide(s => Math.max(s - 1, 0)); }
+  function prevSlide() {
+    const cur = slideIndexRef.current;
+    if (cur <= 0) return;
+    changeSlide(cur - 1);
+  }
+
+  // panResponder uses a stable ref-based wrapper so it never closes over stale state
+  const nextSlideRef = useRef(nextSlide);
+  const prevSlideRef = useRef(prevSlide);
+  nextSlideRef.current = nextSlide;
+  prevSlideRef.current = prevSlide;
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10,
       onPanResponderRelease: (_, g) => {
-        if (g.dx < -50) nextSlide();
-        if (g.dx > 50) prevSlide();
+        if (g.dx < -50) nextSlideRef.current();
+        if (g.dx > 50) prevSlideRef.current();
       },
     })
   ).current;
 
-  async function handleShare() {
+  // Capture the slide view as a PNG and return the local URI
+  async function captureSlide(): Promise<string | null> {
+    if (!slideRef.current) return null;
+    try {
+      return await captureRef(slideRef, { format: 'png', quality: 0.92 });
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleSave() {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to save story slides to your camera roll.');
+      return;
+    }
+    const uri = await captureSlide();
+    if (!uri) { Alert.alert('Could not save', 'Please try again.'); return; }
+    try {
+      await MediaLibrary.saveToLibraryAsync(uri);
+      showPhotoToast();
+    } catch {
+      Alert.alert('Could not save', 'Please try again.');
+    }
+  }
+
+  async function handleShareImage() {
+    const uri = await captureSlide();
+    if (!uri) {
+      // Fall back to URL share if capture fails
+      try { await Share.share({ url: `https://roamus.app/s/${tripId}`, message: `Our ${trip?.name ?? ''} trip on RoamUs` }); } catch {}
+      return;
+    }
+    try {
+      if (Platform.OS === 'ios') {
+        // iOS: Share.share with url works for local file URIs
+        await Share.share({ url: uri, message: `Our ${trip?.name ?? ''} trip on RoamUs` });
+      } else {
+        // Android: share the roamus link (local file URIs need content:// which requires extra native setup)
+        await Share.share({ message: `Check out our ${trip?.name ?? ''} trip on RoamUs!\nhttps://roamus.app/s/${tripId}` });
+      }
+    } catch {}
+  }
+
+  async function handleShareLink() {
     try {
       await Share.share({
         url: `https://roamus.app/s/${tripId}`,
-        message: `Check out our ${trip?.name ?? ''} on RoamUs! \uD83D\uDDFA`,
+        message: `Check out our ${trip?.name ?? ''} on RoamUs!`,
       });
     } catch {}
   }
@@ -326,51 +442,65 @@ export default function StoryScreen() {
   return (
     <View style={[styles.root, { backgroundColor: '#000' }]} {...panResponder.panHandlers}>
       <Stack.Screen options={{ headerShown: false }} />
-      {/* Slide content */}
-      {slideContent[slide]}
+
+      {/* Slide content — wrapped in a capturable ref + animated fade */}
+      <View ref={slideRef} style={StyleSheet.absoluteFill} collapsable={false}>
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: slideOpacity }]}>
+          {slideContent[displaySlide]}
+        </Animated.View>
+      </View>
 
       {/* Top bar — close + progress */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topBarRow}>
           <Pressable style={styles.closeBtn} onPress={() => router.back()}>
-            <Text style={styles.closeBtnText}>×</Text>
+            <Text style={styles.closeBtnText}>{'\u00D7'}</Text>
           </Pressable>
           <Text style={styles.slideCounter}>{slide + 1}/{TOTAL_SLIDES}</Text>
         </View>
         <View style={styles.progressRow}>
           {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.progressBar,
-                i < slide && styles.progressDone,
-                i === slide && styles.progressCurrent,
-              ]}
-            />
+            <Pressable key={i} onPress={() => changeSlide(i)} style={{ flex: 1 }}>
+              <View
+                style={[
+                  styles.progressBar,
+                  i < slide && styles.progressDone,
+                  i === slide && styles.progressCurrent,
+                ]}
+              />
+            </Pressable>
           ))}
         </View>
       </View>
 
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable style={styles.shareMain} onPress={handleShare}>
-          <Text style={styles.shareMainText}>↗ Post on Social Media</Text>
+        <Pressable style={styles.shareMain} onPress={handleShareImage}>
+          <Text style={styles.shareMainText}>{'\u2197'} Share as image</Text>
         </Pressable>
         <View style={styles.shareRow}>
-          <Pressable style={styles.shareSmall} onPress={handleShare}>
+          <Pressable style={styles.shareSmall} onPress={handleShareLink}>
             <Text style={styles.shareSmallText}>{'\uD83D\uDD17'} Share link</Text>
           </Pressable>
           <Pressable style={styles.shareSmall} onPress={nextSlide}>
-            <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next →' : 'Done \u2713'}</Text>
+            <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next \u2192' : 'Done \u2713'}</Text>
           </Pressable>
-          <Pressable
-            style={styles.shareSmall}
-            onPress={() => {}} // save functionality placeholder
-          >
+          <Pressable style={styles.shareSmall} onPress={handleSave}>
             <Text style={styles.shareSmallText}>{'\u2B07'} Save</Text>
           </Pressable>
         </View>
       </View>
+
+      {/* "Saved to Memories" toast — shown when coming from trip complete */}
+      <Animated.View style={[styles.toast, styles.toastBottom, { opacity: savedToastOpacity, bottom: insets.bottom + 110 }]} pointerEvents="none">
+        <Text style={styles.toastText}>{'\u2728'} Story saved to your Memories tab</Text>
+      </Animated.View>
+
+      {/* "Photo saved!" toast */}
+      <Animated.View style={[styles.toast, styles.toastBottom, { opacity: photoToastOpacity, bottom: insets.bottom + 110 }]} pointerEvents="none">
+        <Text style={styles.toastText}>{'\uD83D\uDCF7'} Photo saved to camera roll</Text>
+      </Animated.View>
+
       {isFree && (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.82)', alignItems: 'center', justifyContent: 'center' }]}>
           <Text style={{ fontSize: 44, marginBottom: 16 }}>{'\uD83D\uDD12'}</Text>
@@ -380,7 +510,7 @@ export default function StoryScreen() {
             style={{ backgroundColor: '#E8692A', borderRadius: 24, paddingHorizontal: 32, paddingVertical: 14 }}
             onPress={() => setUpgradeVisible(true)}
           >
-            <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Unlock story {'→'}</Text>
+            <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Unlock story {'\u2192'}</Text>
           </Pressable>
         </View>
       )}
@@ -404,7 +534,7 @@ const styles = StyleSheet.create({
   closeBtnText: { fontSize: 20, color: '#fff' },
   slideCounter: { fontSize: 13, fontFamily: F.bold, color: 'rgba(255,255,255,0.7)' },
   progressRow: { flexDirection: 'row', gap: 4, marginTop: 14 },
-  progressBar: { flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 },
+  progressBar: { height: 3, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 },
   progressDone: { backgroundColor: '#fff' },
   progressCurrent: { backgroundColor: '#E8692A' },
 
@@ -423,6 +553,19 @@ const styles = StyleSheet.create({
   shareRow: { flexDirection: 'row', gap: 8 },
   shareSmall: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   shareSmallText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
+
+  // Toast
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(26,31,46,0.92)',
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    zIndex: 99,
+  },
+  toastBottom: {},
+  toastText: { fontSize: 13, fontFamily: F.bold, color: '#fff', textAlign: 'center' },
 
   // Wordmark
   wordmark: { position: 'absolute', bottom: 115, left: 24, fontSize: 11, fontFamily: F.bold, letterSpacing: 2, textTransform: 'uppercase' },
@@ -450,12 +593,16 @@ const styles = StyleSheet.create({
   mapStopTime: { fontSize: 12, fontFamily: F.regular, color: 'rgba(255,255,255,0.45)', marginLeft: 8 },
   mapPill: { position: 'absolute', bottom: 140, left: 28, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 },
   mapPillText: { fontSize: 13, fontFamily: F.medium, color: 'rgba(255,255,255,0.75)' },
+  mapEmptyHint: { fontSize: 13, fontFamily: F.regular, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic', marginTop: 8 },
 
   // Slide 3 Collage
   collageHeader: { paddingTop: 100, paddingHorizontal: 24, paddingBottom: 20, position: 'relative', zIndex: 2 },
   collageTitle: { fontFamily: 'Georgia', fontSize: 26, fontWeight: '800', color: '#fff', lineHeight: 32 },
   collageGrid: { marginHorizontal: 20, borderRadius: 16, overflow: 'hidden', flexDirection: 'row', flexWrap: 'wrap', gap: 3, position: 'relative', zIndex: 2 },
   collageCell: { width: (SW - 40 - 3) / 2, aspectRatio: 1, overflow: 'hidden' },
+  collagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16 },
+  collagePlaceholderIcon: { fontSize: 28, opacity: 0.5 },
+  collagePlaceholderText: { fontSize: 11, fontFamily: F.medium, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 15 },
 
   // Slide 4 Quotes
   quotesContent: { position: 'absolute', inset: 0, paddingHorizontal: 24, paddingTop: 100, paddingBottom: 180, justifyContent: 'center', gap: 16 },
