@@ -716,6 +716,12 @@ export default function TodayScreen() {
     }).catch(() => {});
   }, []);
 
+  // ── Mark trip completed server-side when trip_complete is reached (fire-and-forget) ──
+  useEffect(() => {
+    if (todayState !== 'trip_complete' || !resolvedTripId) return;
+    apiFetch(`/api/travel/trips/${resolvedTripId}/complete`, { method: 'POST' }).catch(() => {});
+  }, [todayState, resolvedTripId]);
+
   // ── Fetch real kid quotes when trip is complete ──
   useEffect(() => {
     if (todayState !== 'trip_complete' || !resolvedTripId) return;
@@ -979,23 +985,36 @@ export default function TodayScreen() {
         } else if (days === 1) {
           setTodayState('pre_trip_tomorrow');
         } else {
-          const allVisited = stops.length > 0 && stops.every(s => s.isVisited || s.visited);
-          const lastVisited = stops.reduce(
-            (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
-          );
-          if (allVisited) {
-            const tripDays = t.plannerTripDays ?? t.tripDays ?? 1;
-            if (resolvedDayIndex >= tripDays - 1) {
-              setTodayState('trip_complete');
-            } else {
-              setTodayState('day_complete');
-            }
-          } else if (lastVisited >= 0 && lastVisited < stops.length - 1) {
-            setCurrentStopIndex(lastVisited + 1);
-            executionStartedRef.current = true;
-            setTodayState('en_route');
+          // Lapsed-trip: if end_date is in the past and trip not yet completed,
+          // show the completion screen regardless of visited state.
+          const _tripEnd = t.endDate ? parseLocalDate(t.endDate) : null;
+          if (_tripEnd) _tripEnd.setHours(23, 59, 59, 999);
+          if (_tripEnd != null && _tripEnd.getTime() < Date.now() && t.status !== 'completed') {
+            setTodayState('trip_complete');
           } else {
-            setTodayState('morning');
+            const allVisited = stops.length > 0 && stops.every(s => s.isVisited || s.visited);
+            const lastVisited = stops.reduce(
+              (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
+            );
+            if (allVisited) {
+              // Key on last day that has real (non-meal) stops, not last calendar day.
+              // Guard: if no stops loaded yet, fall back to tripDays-1 to avoid Day-1 false fire.
+              const nonMealStops = (t.stops ?? []).filter(s => !isMealStop(s.stopType));
+              const lastPopulatedDay = nonMealStops.length > 0
+                ? Math.max(...nonMealStops.map(s => s.dayIndex ?? 0))
+                : (t.plannerTripDays ?? t.tripDays ?? 1) - 1;
+              if (resolvedDayIndex >= lastPopulatedDay) {
+                setTodayState('trip_complete');
+              } else {
+                setTodayState('day_complete');
+              }
+            } else if (lastVisited >= 0 && lastVisited < stops.length - 1) {
+              setCurrentStopIndex(lastVisited + 1);
+              executionStartedRef.current = true;
+              setTodayState('en_route');
+            } else {
+              setTodayState('morning');
+            }
           }
         }
       }

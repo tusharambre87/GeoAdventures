@@ -77,8 +77,13 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
 
   function handleContinue() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isActiveNow) router.push({ pathname: "/(tabs)/today", params: { tripId: trip.id } } as any);
-    else router.push(`/trip/${trip.id}` as any);
+    if (trip.status === 'completed') {
+      router.push(`/memories/${trip.id}/story` as any);
+    } else if (isActiveNow) {
+      router.push({ pathname: "/(tabs)/today", params: { tripId: trip.id } } as any);
+    } else {
+      router.push(`/trip/${trip.id}` as any);
+    }
   }
 
   function handleViewPlan() {
