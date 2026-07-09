@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useExplorer } from "@/lib/explorerContext";
-import { formatTime } from "@/lib/compassQuestData";
+import { formatTime } from "@workspace/compass-quest";
 
 interface ChallengeData {
   challengeId: string;

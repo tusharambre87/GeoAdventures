@@ -25,7 +25,7 @@ import {
   type QuestStep,
   type CompassDirection,
   type AdventureProgress,
-} from "@/constants/compassQuestData";
+} from "@workspace/compass-quest";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,10 +179,56 @@ export default function CompassQuestGame() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  // Backend persistence refs (fire-and-forget; progress is authoritative in AsyncStorage)
+  const attemptIdRef = useRef<string | null>(null);
+  const questIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     loadAllProgress(effectiveExplorerId).then(setAllProgress);
     return () => { if (resultTimer.current) clearTimeout(resultTimer.current); };
   }, [effectiveExplorerId]);
+
+  // ── Backend persistence: upsert quest, create attempt ─────────────────────
+  const startQuestAttempt = useCallback(async (adv: Adventure) => {
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // 1. Upsert the quest record
+      const questRes = await fetch(`${API_BASE}/api/quests`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          questKey: adv.id,
+          title: adv.title,
+          subtitle: adv.subtitle ?? null,
+          icon: adv.icon ?? null,
+          description: adv.description ?? null,
+          startCity: adv.startCity,
+          cities: adv.steps.map((s) => s.correctCity),
+          stepsJson: JSON.stringify(adv.steps),
+          isCustom: adv.isCustom ?? false,
+        }),
+      });
+      if (!questRes.ok) return;
+      const quest = await questRes.json() as { id: string };
+      questIdRef.current = quest.id;
+
+      // 2. Create an attempt for this player
+      const playerName = kidName || explorerId || "Explorer";
+      const attemptRes = await fetch(`${API_BASE}/api/attempts`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ questId: quest.id, playerName }),
+      });
+      if (!attemptRes.ok) return;
+      const attempt = await attemptRes.json() as { id: string };
+      attemptIdRef.current = attempt.id;
+    } catch {
+      // Non-critical — progress is already saved in AsyncStorage
+    }
+  }, [kidName, explorerId]);
 
   // Connect needleAnim → needleDisplayDeg so CompassRose renders animated needle
   useEffect(() => {
@@ -256,11 +302,18 @@ export default function CompassQuestGame() {
       wrong = existing.wrongGuesses ?? 0;
     }
 
+    // Reset backend attempt refs for new adventure session
+    attemptIdRef.current = null;
+    questIdRef.current = null;
+
     setAdventure(adv);
     setStepIdx(currentStep);
     setFragmentsCollected(fragments);
     setWrongGuesses(wrong);
     setStartTime(Date.now());
+
+    // Kick off backend quest + attempt creation (non-blocking)
+    startQuestAttempt(adv);
 
     const step = steps[currentStep];
     if (step && step.storyBeat && currentStep === 0) {
@@ -356,17 +409,34 @@ export default function CompassQuestGame() {
     setAllProgress((prev) => ({ ...prev, [adventure.id]: progress }));
 
     if (isLast) {
-      // Award XP on backend via existing player rewards endpoint
+      const xp = calculateXP(wrongGuesses, adventure.steps.length);
+      const timeMs = Date.now() - startTime;
+      const totalAnswers = adventure.steps.length * 2; // city + compass per step
+      const accuracy = Math.round(((totalAnswers - wrongGuesses) / totalAnswers) * 100);
+
+      // 1. Complete the backend attempt (if one was created)
+      if (attemptIdRef.current) {
+        const token = await AsyncStorage.getItem("authToken");
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        fetch(`${API_BASE}/api/attempts/${attemptIdRef.current}/complete`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ xp, timeMs, wrongGuesses, accuracy }),
+        }).catch(() => {});
+      }
+
+      // 2. Award XP stars to the player (legacy rewards endpoint)
       if (explorerId) {
         const token = await AsyncStorage.getItem("authToken");
-        const xp = calculateXP(wrongGuesses, adventure.steps.length);
         const stars = Math.max(1, Math.floor(xp / 50));
         fetch(`${API_BASE}/api/players/${explorerId}/add-game-rewards`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ stars, gamesPlayed: true }),
-        }).catch(() => {}); // fire-and-forget; progress already in AsyncStorage
+        }).catch(() => {});
       }
+
       setPhase("adventure_complete");
       return;
     }

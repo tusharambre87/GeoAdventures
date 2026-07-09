@@ -45,7 +45,7 @@ import {
   type CompassStats,
   type AchievementDef,
   type AchievementsRecord,
-} from "@/lib/compassQuestData";
+} from "@workspace/compass-quest";
 import { getDistanceMiles, getBearing } from "@/lib/compassQuestMaps";
 
 declare const L: typeof import("leaflet");

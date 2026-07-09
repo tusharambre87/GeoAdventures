@@ -53,7 +53,8 @@
     "react-native-worklets": "0.5.1",
     "typescript": "~5.9.2",
     "zod": "catalog:",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "@workspace/compass-quest": "workspace:*"
   },
   "dependencies": {
     "@expo-google-fonts/fraunces": "^0.4.1",

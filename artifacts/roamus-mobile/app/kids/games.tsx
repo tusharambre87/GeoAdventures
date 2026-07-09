@@ -42,6 +42,7 @@ const GRID_GAMES = [
     border: "#1E3A5F",
     titleColor: "#93C5FD",
     badge: "NEW" as string | undefined,
+    ageBadge: "AGES 8+" as string | undefined,
     route: "kids/games/compass-quest" as string | undefined,
   },
   {
@@ -208,6 +209,11 @@ export default function GameHub() {
                 {game.badge && (
                   <View style={s.gridBadge}>
                     <Text style={s.gridBadgeText}>{game.badge}</Text>
+                  </View>
+                )}
+                {"ageBadge" in game && game.ageBadge && (
+                  <View style={[s.gridBadge, { top: 30, backgroundColor: "#1E3A5F" }]}>
+                    <Text style={[s.gridBadgeText, { color: "#93C5FD" }]}>{game.ageBadge}</Text>
                   </View>
                 )}
                 <Text style={s.gridIcon}>{game.icon}</Text>

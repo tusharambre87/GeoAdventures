@@ -8,12 +8,14 @@ import confetti from "canvas-confetti";
 import { toast } from "sonner";
 import {
   formatTime,
+  checkAndUnlockAchievements,
+  type AchievementDef,
+} from "@workspace/compass-quest";
+import {
   loadCompassStats,
   saveCompassStats,
   loadCompassAchievements,
   saveCompassAchievements,
-  checkAndUnlockAchievements,
-  type AchievementDef,
 } from "@/lib/compassQuestData";
 import { useExplorer } from "@/lib/explorerContext";
 import { UserPlus } from "lucide-react";

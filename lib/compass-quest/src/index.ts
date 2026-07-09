@@ -59,6 +59,7 @@ export interface Adventure {
   startCityEmoji: string;
   startCityCoords: CityCoords;
   locked?: boolean;
+  isCustom?: boolean;
   nextAdventure?: {
     country: string;
     city: string;
@@ -1003,4 +1004,94 @@ export function formatTime(ms: number): string {
     return `${minutes}m ${remainingSeconds}s`;
   }
   return `${remainingSeconds}s`;
+}
+
+// ─── Web-compatible types (shared across platforms) ───────────────────────────
+
+export interface CompassStats {
+  totalQuestsCompleted: number;
+  totalXp: number;
+  totalCorrectAnswers: number;
+  totalWrongAnswers: number;
+  continentsVisited: string[];
+  challengesWon: number;
+  challengesPlayed: number;
+  currentStreak: number;
+  bestTimeMs?: number;
+  perfectQuestsCompleted: number;
+  customQuestsCompleted: number;
+}
+
+export type AchievementCategory =
+  | "Explorer Progress"
+  | "Skills"
+  | "World Exploration"
+  | "Challenges"
+  | "Special";
+
+export interface AchievementDef {
+  key: string;
+  label: string;
+  description: string;
+  category: AchievementCategory;
+  icon: string;
+  check: (stats: CompassStats) => boolean;
+  progress?: (stats: CompassStats) => { value: number; max: number };
+}
+
+export interface AchievementUnlock {
+  unlockedAt: string;
+}
+
+export type AchievementsRecord = Record<string, AchievementUnlock>;
+
+export const ACHIEVEMENTS: AchievementDef[] = [
+  { key: "first_quest", label: "First Steps", description: "Complete your first quest", category: "Explorer Progress", icon: "\u{1F9ED}", check: s => s.totalQuestsCompleted >= 1, progress: s => ({ value: Math.min(s.totalQuestsCompleted, 1), max: 1 }) },
+  { key: "quest_5", label: "Trail Blazer", description: "Complete 5 quests", category: "Explorer Progress", icon: "\u{1F97E}", check: s => s.totalQuestsCompleted >= 5, progress: s => ({ value: Math.min(s.totalQuestsCompleted, 5), max: 5 }) },
+  { key: "quest_10", label: "Quest Veteran", description: "Complete 10 quests", category: "Explorer Progress", icon: "\u{1F5FA}\uFE0F", check: s => s.totalQuestsCompleted >= 10, progress: s => ({ value: Math.min(s.totalQuestsCompleted, 10), max: 10 }) },
+  { key: "quest_25", label: "Quest Legend", description: "Complete 25 quests", category: "Explorer Progress", icon: "\u{1F3C6}", check: s => s.totalQuestsCompleted >= 25, progress: s => ({ value: Math.min(s.totalQuestsCompleted, 25), max: 25 }) },
+  { key: "xp_100", label: "XP Collector", description: "Earn 100 total XP", category: "Skills", icon: "\u2B50", check: s => s.totalXp >= 100, progress: s => ({ value: Math.min(s.totalXp, 100), max: 100 }) },
+  { key: "xp_500", label: "XP Hunter", description: "Earn 500 total XP", category: "Skills", icon: "\u{1F4AB}", check: s => s.totalXp >= 500, progress: s => ({ value: Math.min(s.totalXp, 500), max: 500 }) },
+  { key: "xp_1000", label: "XP Master", description: "Earn 1000 total XP", category: "Skills", icon: "\u{1F31F}", check: s => s.totalXp >= 1000, progress: s => ({ value: Math.min(s.totalXp, 1000), max: 1000 }) },
+  { key: "perfect_quest", label: "Sharpshooter", description: "Complete a quest with no wrong answers", category: "Skills", icon: "\u{1F3AF}", check: s => s.perfectQuestsCompleted >= 1 },
+  { key: "answers_50", label: "Answer Machine", description: "Give 50 correct answers in total", category: "Skills", icon: "\u2705", check: s => s.totalCorrectAnswers >= 50, progress: s => ({ value: Math.min(s.totalCorrectAnswers, 50), max: 50 }) },
+  { key: "continent_1", label: "World Wanderer", description: "Visit cities on 1 continent", category: "World Exploration", icon: "\u{1F30D}", check: s => s.continentsVisited.length >= 1, progress: s => ({ value: Math.min(s.continentsVisited.length, 1), max: 1 }) },
+  { key: "continent_3", label: "Continental Drifter", description: "Visit cities on 3 continents", category: "World Exploration", icon: "\u{1F30E}", check: s => s.continentsVisited.length >= 3, progress: s => ({ value: Math.min(s.continentsVisited.length, 3), max: 3 }) },
+  { key: "continent_5", label: "Globe Trotter", description: "Visit cities on 5 continents", category: "World Exploration", icon: "\u{1F30F}", check: s => s.continentsVisited.length >= 5, progress: s => ({ value: Math.min(s.continentsVisited.length, 5), max: 5 }) },
+  { key: "continent_7", label: "World Conqueror", description: "Visit cities on all 7 continents", category: "World Exploration", icon: "\u{1F5FA}\uFE0F", check: s => s.continentsVisited.length >= 7, progress: s => ({ value: Math.min(s.continentsVisited.length, 7), max: 7 }) },
+  { key: "quests_3_continents", label: "Cross-Continental", description: "Complete quests on 3 different continents", category: "World Exploration", icon: "\u2708\uFE0F", check: s => s.continentsVisited.length >= 3, progress: s => ({ value: Math.min(s.continentsVisited.length, 3), max: 3 }) },
+  { key: "first_challenge", label: "Challenger", description: "Play your first challenge", category: "Challenges", icon: "\u2694\uFE0F", check: s => s.challengesPlayed >= 1, progress: s => ({ value: Math.min(s.challengesPlayed, 1), max: 1 }) },
+  { key: "challenge_win", label: "Champion", description: "Win a challenge against a friend", category: "Challenges", icon: "\u{1F947}", check: s => s.challengesWon >= 1, progress: s => ({ value: Math.min(s.challengesWon, 1), max: 1 }) },
+  { key: "challenge_wins_5", label: "Undefeated", description: "Win 5 challenges", category: "Challenges", icon: "\u{1F3C5}", check: s => s.challengesWon >= 5, progress: s => ({ value: Math.min(s.challengesWon, 5), max: 5 }) },
+  { key: "streak_3", label: "On a Roll", description: "Complete 3 quests in a row without quitting", category: "Special", icon: "\u{1F525}", check: s => s.currentStreak >= 3, progress: s => ({ value: Math.min(s.currentStreak, 3), max: 3 }) },
+  { key: "custom_quest", label: "Quest Creator", description: "Create and complete your own custom quest", category: "Special", icon: "\u2728", check: s => s.customQuestsCompleted >= 1 },
+  { key: "speed_runner", label: "Speed Runner", description: "Complete a quest in under 3 minutes", category: "Special", icon: "\u26A1", check: s => s.bestTimeMs !== undefined && s.bestTimeMs > 0 && s.bestTimeMs < 3 * 60 * 1000 },
+];
+
+export function checkAndUnlockAchievements(
+  stats: CompassStats,
+  existing: AchievementsRecord,
+): AchievementDef[] {
+  return ACHIEVEMENTS.filter(ach => !existing[ach.key] && ach.check(stats));
+}
+
+// Map city to continent for cross-platform tracking
+const CITY_CONTINENT_MAP: Record<string, string> = {
+  "San Francisco": "North America", "Las Vegas": "North America", "Denver": "North America",
+  "New York": "North America", "Seattle": "North America", "Vancouver": "North America",
+  "Chicago": "North America", "Washington D.C.": "North America", "Honolulu": "North America",
+  "Mexico City": "North America",
+  "Rio de Janeiro": "South America", "Buenos Aires": "South America", "Lima": "South America", "Bogota": "South America",
+  "London": "Europe", "Paris": "Europe", "Madrid": "Europe", "Berlin": "Europe", "Rome": "Europe",
+  "Amsterdam": "Europe", "Reykjavik": "Europe", "Istanbul": "Europe", "Moscow": "Europe",
+  "Athens": "Europe", "Lisbon": "Europe",
+  "Cairo": "Africa", "Nairobi": "Africa", "Cape Town": "Africa", "Casablanca": "Africa", "Lagos": "Africa",
+  "Riyadh": "Asia", "Dubai": "Asia", "Delhi": "Asia", "Mumbai": "Asia", "Bangkok": "Asia",
+  "Tokyo": "Asia", "Beijing": "Asia", "Seoul": "Asia", "Singapore": "Asia", "Lahore": "Asia",
+  "Tashkent": "Asia", "Amman": "Asia", "Doha": "Asia", "Muscat": "Asia",
+  "Sydney": "Oceania", "Melbourne": "Oceania", "Auckland": "Oceania", "Wellington": "Oceania",
+};
+
+export function getContinentForCity(city: string): string | null {
+  return CITY_CONTINENT_MAP[city] || null;
 }
