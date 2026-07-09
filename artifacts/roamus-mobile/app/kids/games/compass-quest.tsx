@@ -495,37 +495,6 @@ export default function CompassQuestGame() {
     }
   }, [startAdventure]);
 
-if (ageBand === "young") return null;
-
-  // ── Middle band gate — coming soon for younger explorers ─────────────────────
-  if (ageBand === "middle") {
-    return (
-      <View style={[s.root, { backgroundColor: "#0F172A" }]}>
-        <View style={[s.header, { paddingTop: insets.top + 16, paddingBottom: 24 }]}>
-          <Pressable style={s.backRow} onPress={() => router.back()}>
-            <Text style={s.backText}>{"\u2190"} Back</Text>
-          </Pressable>
-          <Text style={s.hdrEye}>COMPASS QUEST</Text>
-          <Text style={s.hdrTitle}>For Older Explorers</Text>
-        </View>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
-          <Text style={{ fontSize: 56, marginBottom: 20 }}>{"\uD83E\uDDED"}</Text>
-          <Text style={{ fontFamily: F.bold, fontSize: 22, color: "#E2E8F0", textAlign: "center", marginBottom: 12 }}>
-            Coming Soon for Junior Explorers
-          </Text>
-          <Text style={{ fontFamily: F.medium, fontSize: 15, color: "#94A3B8", textAlign: "center", lineHeight: 24, marginBottom: 32 }}>
-            Compass Quest opens at age 8+. Keep discovering the other games and check back soon!
-          </Text>
-          <Pressable
-            style={{ backgroundColor: "#F97316", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 }}
-            onPress={() => router.back()}
-          >
-            <Text style={{ fontFamily: F.bold, fontSize: 15, color: "#fff" }}>Back to Games</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
 
 
   // ── ADVENTURE SELECT ─────────────────────────────────────────────────────────
