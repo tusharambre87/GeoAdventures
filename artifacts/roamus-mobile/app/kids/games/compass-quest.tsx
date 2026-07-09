@@ -112,6 +112,10 @@ const CITY_COUNTRY_CODES: Record<string, string> = {
   "beirut": "lb", "amman": "jo",
 };
 
+function normalizeCity(city: string): string {
+  return city.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+}
+
 // ─── City → landmark image key mapping ───────────────────────────────────────
 const CITY_LANDMARK_MAP: Record<string, string> = {
   "new york": "statue-of-liberty",
@@ -161,15 +165,42 @@ const LANDMARK_IMAGES: Record<string, number> = {
 
 // ─── Ring fragment images (local PNGs) ───────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const RING_FRAGMENTS: number[] = [
-  require("../../../assets/fragments/ring_1.png"),
-  require("../../../assets/fragments/ring_2.png"),
-  require("../../../assets/fragments/ring_3.png"),
-  require("../../../assets/fragments/ring_4.png"),
-  require("../../../assets/fragments/ring_5.png"),
-  require("../../../assets/fragments/ring_6.png"),
-  require("../../../assets/fragments/ring_final.png"),
-];
+const ADVENTURE_FRAGMENTS: Record<string, { pieces: number[]; final: number }> = {
+  "lost-crown": {
+    pieces: [
+      require("../../../assets/fragments/crown_1.png"),
+      require("../../../assets/fragments/crown_2.png"),
+      require("../../../assets/fragments/crown_3.png"),
+      require("../../../assets/fragments/crown_4.png"),
+      require("../../../assets/fragments/crown_5.png"),
+      require("../../../assets/fragments/crown_6.png"),
+      require("../../../assets/fragments/crown_7.png"),
+    ],
+    final: require("../../../assets/fragments/crown_final.png"),
+  },
+  "broken-trail": {
+    pieces: [
+      require("../../../assets/fragments/ring_1.png"),
+      require("../../../assets/fragments/ring_2.png"),
+      require("../../../assets/fragments/ring_3.png"),
+      require("../../../assets/fragments/ring_4.png"),
+      require("../../../assets/fragments/ring_5.png"),
+      require("../../../assets/fragments/ring_6.png"),
+    ],
+    final: require("../../../assets/fragments/ring_final.png"),
+  },
+};
+const DEFAULT_FRAG_SET = {
+  pieces: [
+    require("../../../assets/fragments/ring_1.png"),
+    require("../../../assets/fragments/ring_2.png"),
+    require("../../../assets/fragments/ring_3.png"),
+    require("../../../assets/fragments/ring_4.png"),
+    require("../../../assets/fragments/ring_5.png"),
+    require("../../../assets/fragments/ring_6.png"),
+  ],
+  final: require("../../../assets/fragments/ring_final.png"),
+};
 
 
 // ─── Compass Rose ─────────────────────────────────────────────────────────────
@@ -368,19 +399,31 @@ export default function CompassQuestGame() {
     return () => needleAnim.current.removeListener(id);
   }, []);
 
-  // Drive travel fade-in + animated plane along the arc
+  // Drive travel fade-in + animated transport icon along world map arc
   useEffect(() => {
-    if (phase === "travel") {
-      const svgW = 280; const svgH = 90;
-      const x1 = 32; const y1 = svgH / 2;
-      const x2 = svgW - 32; const y2 = svgH / 2;
-      const cpX = svgW / 2; const cpY = 14;
+    if (phase === "travel" && adventure) {
+      const mapW = 320; const mapH = 160;
+      const fromCoords = stepIdx > 0
+        ? adventure.steps[stepIdx - 1].cityCoords
+        : adventure.startCityCoords;
+      const toCoords = adventure.steps[stepIdx]?.cityCoords ?? { lat: 0, lng: 0 };
+      const project = (lat: number, lng: number) => ({
+        x: ((lng + 180) / 360) * mapW,
+        y: ((90 - lat) / 180) * mapH,
+      });
+      const fromPt = project(fromCoords.lat, fromCoords.lng);
+      const toPt = project(toCoords.lat, toCoords.lng);
+      const dist = Math.sqrt(Math.pow(toPt.x - fromPt.x, 2) + Math.pow(toPt.y - fromPt.y, 2));
+      const cpX = (fromPt.x + toPt.x) / 2;
+      const cpY = (fromPt.y + toPt.y) / 2 - Math.min(dist * 0.45, 65);
+
       travelAnimRef.current.setValue(0);
       planePosAnim.current.setValue(0);
-      setPlanePx(x1); setPlanePy(y1);
+      setPlanePx(fromPt.x); setPlanePy(fromPt.y);
+
       const listenerId = planePosAnim.current.addListener(({ value: t }) => {
-        const px = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cpX + t * t * x2;
-        const py = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cpY + t * t * y2;
+        const px = (1 - t) * (1 - t) * fromPt.x + 2 * (1 - t) * t * cpX + t * t * toPt.x;
+        const py = (1 - t) * (1 - t) * fromPt.y + 2 * (1 - t) * t * cpY + t * t * toPt.y;
         setPlanePx(px);
         setPlanePy(py);
       });
@@ -394,7 +437,7 @@ export default function CompassQuestGame() {
       });
       return () => planePosAnim.current.removeListener(listenerId);
     }
-  }, [phase]);
+  }, [phase, stepIdx, adventure]);
 
   const prepareStep = useCallback((adv: Adventure, idx: number) => {
     const step = adv.steps[idx];
@@ -855,9 +898,12 @@ export default function CompassQuestGame() {
           <View style={bs.divider} />
           {adventure.storyIntro ? (
             <Text style={bs.proseText}>{adventure.storyIntro}</Text>
-          ) : (
+          ) : null}
+          {adventure.steps[0]?.storyBeat ? (
+            <Text style={bs.proseText}>{adventure.steps[0].storyBeat}</Text>
+          ) : !adventure.storyIntro ? (
             <Text style={bs.proseText}>{adventure.description}</Text>
-          )}
+          ) : null}
           <Text style={bs.startCity}>
             {"\uD83D\uDCCD"} Starting in {adventure.startCity} {adventure.startCityEmoji}
           </Text>
@@ -949,7 +995,7 @@ export default function CompassQuestGame() {
             {clue.clueType === "landmark" && clue.landmarkClue ? (
               <>
                 {(() => {
-                  const lKey = CITY_LANDMARK_MAP[step.correctCity.toLowerCase()];
+                  const lKey = CITY_LANDMARK_MAP[normalizeCity(step.correctCity)];
                   const lImg = lKey ? LANDMARK_IMAGES[lKey] : null;
                   return lImg ? (
                     <Image source={lImg} style={{ width: "100%", height: 160, borderRadius: 10, marginBottom: 10, resizeMode: "cover" }} />
@@ -962,11 +1008,11 @@ export default function CompassQuestGame() {
             ) : clue.clueType === "flag" && clue.flagClue ? (
               <>
                 {(() => {
-                  const cc = CITY_COUNTRY_CODES[step.correctCity.toLowerCase()];
+                  const cc = CITY_COUNTRY_CODES[normalizeCity(step.correctCity)];
                   return cc ? (
                     <Image
                       source={{ uri: `https://flagcdn.com/w320/${cc}.png` }}
-                      style={{ width: "100%", height: 100, borderRadius: 10, marginBottom: 10, resizeMode: "cover" }}
+                      style={{ width: "100%", height: 140, borderRadius: 10, marginBottom: 10, resizeMode: "contain", backgroundColor: "#1E3A5F" }}
                     />
                   ) : null;
                 })()}
@@ -1030,13 +1076,20 @@ export default function CompassQuestGame() {
     const fromCity = stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).correctCity : adventure.startCity;
     const toCity = step.correctCity;
 
-    // SVG arc route: two city dots connected by a curved dashed path
-    const svgW = 280;
-    const svgH = 90;
-    const x1 = 32; const y1 = svgH / 2;
-    const x2 = svgW - 32; const y2 = svgH / 2;
-    const cpX = svgW / 2; const cpY = 14; // control point arcs upward
-    const arcPath = `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`;
+    // World map projection (equirectangular)
+    const mapW = 320; const mapH = 160;
+    const fromCoords = stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).cityCoords : adventure.startCityCoords;
+    const toCoords = step.cityCoords;
+    const project = (lat: number, lng: number) => ({
+      x: ((lng + 180) / 360) * mapW,
+      y: ((90 - lat) / 180) * mapH,
+    });
+    const fromPt = project(fromCoords.lat, fromCoords.lng);
+    const toPt = project(toCoords.lat, toCoords.lng);
+    const dist = Math.sqrt(Math.pow(toPt.x - fromPt.x, 2) + Math.pow(toPt.y - fromPt.y, 2));
+    const cpX = (fromPt.x + toPt.x) / 2;
+    const cpY = (fromPt.y + toPt.y) / 2 - Math.min(dist * 0.45, 65);
+    const arcPath = `M ${fromPt.x} ${fromPt.y} Q ${cpX} ${cpY} ${toPt.x} ${toPt.y}`;
 
     return (
       <View style={[s.root, { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" }]}>
@@ -1054,27 +1107,33 @@ export default function CompassQuestGame() {
           </View>
         </View>
         <Animated.View style={{ alignItems: "center", opacity: travelAnimRef.current }}>
-          {/* Transport icon */}
           <Text style={tv.transportIcon}>{icon}</Text>
-          <Text style={tv.travelLabel}>{label} to</Text>
+          <Text style={tv.travelLabel}>{label.toUpperCase()} TO</Text>
           <Text style={tv.cityName}>{toCity}</Text>
 
-          {/* SVG route arc with animated transport icon */}
-          <View style={{ marginVertical: 16 }}>
-            <View style={{ position: "relative", width: svgW, height: svgH }}>
-              <Svg width={svgW} height={svgH} style={{ position: "absolute", top: 0, left: 0 }}>
-                <Path d={arcPath} stroke="#F97316" strokeWidth={2} strokeDasharray="6 4" fill="none" opacity={0.7} />
-                <Circle cx={x1} cy={y1} r={5} fill="#F97316" />
-                <Circle cx={x2} cy={y2} r={7} fill="#F97316" />
-              </Svg>
-              <Text style={{ position: "absolute", left: planePx - 14, top: planePy - 16, fontSize: 24 }}>
-                {icon}
-              </Text>
-            </View>
-            <View style={tv.routeRow}>
-              <Text style={tv.routeFrom}>{fromCity}</Text>
-              <Text style={tv.routeTo}>{toCity}</Text>
-            </View>
+          {/* Real world map with route overlay */}
+          <View style={{ marginVertical: 14, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "rgba(249,115,22,0.4)" }}>
+            <Image
+              source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/800px-World_map_-_low_resolution.svg.png" }}
+              style={{ width: mapW, height: mapH }}
+              resizeMode="stretch"
+            />
+            <Svg width={mapW} height={mapH} style={{ position: "absolute", top: 0, left: 0 }}>
+              <Path d={arcPath} stroke="#F97316" strokeWidth={2} strokeDasharray="5 3" fill="none" opacity={0.9} />
+              <Circle cx={fromPt.x} cy={fromPt.y} r={5} fill="#F97316" opacity={0.9} />
+              <Circle cx={fromPt.x} cy={fromPt.y} r={9} fill="none" stroke="#F97316" strokeWidth={1.5} opacity={0.4} />
+              <Circle cx={toPt.x} cy={toPt.y} r={6} fill="#F97316" opacity={0.9} />
+              <Circle cx={toPt.x} cy={toPt.y} r={11} fill="none" stroke="#F97316" strokeWidth={1.5} opacity={0.4} />
+            </Svg>
+            <Text style={{ position: "absolute", left: planePx - 12, top: planePy - 14, fontSize: 18 }}>
+              {icon}
+            </Text>
+          </View>
+
+          <View style={tv.routeRow}>
+            <Text style={tv.routeFrom}>{fromCity}</Text>
+            <Text style={tv.routeArrow}>{"\u2192"}</Text>
+            <Text style={tv.routeTo}>{toCity}</Text>
           </View>
 
           <Pressable style={tv.skipBtn} onPress={() => setPhase("compass_guess")}>
@@ -1197,26 +1256,27 @@ export default function CompassQuestGame() {
             <Text style={sf.factText}>{step.travelFact}</Text>
           </View>
 
-          {/* Fragment collection progress with ring PNG images */}
-          <View style={sf.fragmentsRow}>
-            {collected.map((_, i) => {
-              const fragImg = RING_FRAGMENTS[i];
-              return fragImg ? (
-                <View key={i} style={[sf.fragmentDot, { backgroundColor: "rgba(249,115,22,0.15)", borderColor: "#F97316" }]}>
-                  <Image source={fragImg} style={{ width: 32, height: 32, resizeMode: "contain" }} />
-                </View>
-              ) : (
-                <View key={i} style={sf.fragmentDot}>
-                  <Text style={sf.fragmentDotEmoji}>{collected[i]}</Text>
-                </View>
-              );
-            })}
-            {Array.from({ length: totalSteps - collected.length }).map((_, i) => (
-              <View key={`empty-${i}`} style={[sf.fragmentDot, sf.fragmentDotEmpty]}>
-                <Text style={sf.fragmentDotEmptyText}>?</Text>
+          {/* Fragment collection progress with adventure-specific PNG images */}
+          {(() => {
+            const fragSet = ADVENTURE_FRAGMENTS[adventure.id] ?? DEFAULT_FRAG_SET;
+            return (
+              <View style={sf.fragmentsRow}>
+                {collected.map((_, i) => {
+                  const fragImg = i >= fragSet.pieces.length ? fragSet.final : fragSet.pieces[i];
+                  return (
+                    <View key={i} style={[sf.fragmentDot, { backgroundColor: "rgba(249,115,22,0.15)", borderColor: "#F97316" }]}>
+                      <Image source={fragImg} style={{ width: 32, height: 32, resizeMode: "contain" }} />
+                    </View>
+                  );
+                })}
+                {Array.from({ length: totalSteps - collected.length }).map((_, i) => (
+                  <View key={`empty-${i}`} style={[sf.fragmentDot, sf.fragmentDotEmpty]}>
+                    <Text style={sf.fragmentDotEmptyText}>?</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            );
+          })()}
 
           <Pressable
             style={({ pressed }) => [bs.continueBtn, pressed && { opacity: 0.85 }]}
@@ -1234,6 +1294,10 @@ export default function CompassQuestGame() {
   // ── ADVENTURE COMPLETE ────────────────────────────────────────────────────────
   if (phase === "adventure_complete") {
     const xp = calculateXP(wrongGuesses, totalSteps);
+    const playable = ADVENTURES.filter((a) => (a.steps ?? []).length > 0);
+    const advIdx = playable.findIndex((a) => a.id === adventure.id);
+    const nextAdv = advIdx >= 0 && advIdx < playable.length - 1 ? playable[advIdx + 1] : null;
+    const fragSet = ADVENTURE_FRAGMENTS[adventure.id] ?? DEFAULT_FRAG_SET;
     return (
       <LinearGradient colors={["#064E3B", "#065F46", "#047857"]} style={{ flex: 1 }}>
         <ScrollView
@@ -1241,12 +1305,10 @@ export default function CompassQuestGame() {
           showsVerticalScrollIndicator={false}
         >
           <View style={ac.heroBlock}>
-            {RING_FRAGMENTS.length > 0 && (
-              <Image
-                source={RING_FRAGMENTS[RING_FRAGMENTS.length - 1]}
-                style={{ width: 100, height: 100, resizeMode: "contain", marginBottom: 8 }}
-              />
-            )}
+            <Image
+              source={fragSet.final}
+              style={{ width: 110, height: 110, resizeMode: "contain", marginBottom: 8 }}
+            />
             <Text style={ac.headline}>Quest Complete!</Text>
             <Text style={ac.rewardTitle}>{adventure.reward.title}</Text>
             <Text style={ac.rewardDesc}>{adventure.reward.description}</Text>
@@ -1267,39 +1329,51 @@ export default function CompassQuestGame() {
             </View>
           </View>
 
-          {/* Fragments assembled with PNG images */}
+          {/* Fragments assembled with adventure-specific PNG images */}
           <View style={ac.fragmentsWrap}>
             <Text style={ac.fragmentsLabel}>Fragments Collected</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 8 }}>
               {fragmentsCollected.map((_, i) => {
-                const fragImg = RING_FRAGMENTS[i];
-                return fragImg ? (
+                const fragImg = i >= fragSet.pieces.length ? fragSet.final : fragSet.pieces[i];
+                return (
                   <View key={i} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" }}>
                     <Image source={fragImg} style={{ width: 36, height: 36, resizeMode: "contain" }} />
-                  </View>
-                ) : (
-                  <View key={i} style={sf.fragmentDot}>
-                    <Text style={sf.fragmentDotEmoji}>{fragmentsCollected[i]}</Text>
                   </View>
                 );
               })}
             </View>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [ac.btnPrimary, pressed && { opacity: 0.85 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setPhase("adventure_select");
-              setAdventure(null);
-              setStepIdx(0);
-              setFragmentsCollected([]);
-              setWrongGuesses(0);
-              needleAnim.current.setValue(0);
-            }}
-          >
-            <Text style={ac.btnPrimaryText}>Back to Adventures</Text>
-          </Pressable>
+          {nextAdv ? (
+            <Pressable
+              style={({ pressed }) => [ac.btnPrimary, pressed && { opacity: 0.85 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setFragmentsCollected([]);
+                setWrongGuesses(0);
+                setStepIdx(0);
+                needleAnim.current.setValue(0);
+                startAdventure(nextAdv);
+              }}
+            >
+              <Text style={ac.btnPrimaryText}>Start Next Adventure {"→"}</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [ac.btnPrimary, pressed && { opacity: 0.85 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setPhase("adventure_select");
+                setAdventure(null);
+                setStepIdx(0);
+                setFragmentsCollected([]);
+                setWrongGuesses(0);
+                needleAnim.current.setValue(0);
+              }}
+            >
+              <Text style={ac.btnPrimaryText}>Back to Adventures</Text>
+            </Pressable>
+          )}
 
           <Pressable
             style={({ pressed }) => [ac.btnGhost, pressed && { opacity: 0.75 }]}
@@ -1564,14 +1638,15 @@ const ac = StyleSheet.create({
 
 const tv = StyleSheet.create({
   transportIcon: { fontSize: 52, marginBottom: 16 },
-  travelLabel: { fontFamily: F.medium, fontSize: 13, color: "#64748B", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 },
+  travelLabel: { fontFamily: F.medium, fontSize: 11, color: "#64748B", marginBottom: 4, letterSpacing: 1.2 },
   cityName: { fontFamily: F.bold, fontSize: 28, color: "#E2E8F0", marginBottom: 4 },
   routeRow: {
-    flexDirection: "row", justifyContent: "space-between",
-    width: 280, paddingHorizontal: 8, marginTop: 4,
+    flexDirection: "row", justifyContent: "center", alignItems: "center",
+    width: 320, paddingHorizontal: 8, marginTop: 10, gap: 8,
   },
-  routeFrom: { fontFamily: F.medium, fontSize: 12, color: "#64748B" },
-  routeTo: { fontFamily: F.bold, fontSize: 12, color: "#F97316" },
+  routeFrom: { fontFamily: F.medium, fontSize: 13, color: "#94A3B8" },
+  routeArrow: { fontFamily: F.bold, fontSize: 14, color: "#F97316", marginHorizontal: 4 },
+  routeTo: { fontFamily: F.bold, fontSize: 13, color: "#F97316" },
   skipBtn: {
     backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14,
     paddingHorizontal: 28, paddingVertical: 12,
