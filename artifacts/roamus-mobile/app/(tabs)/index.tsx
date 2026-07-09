@@ -59,7 +59,12 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
     ?? (trip.startDate && trip.endDate
       ? Math.round((parseLocalDate(trip.endDate)!.getTime() - parseLocalDate(trip.startDate!)!.getTime()) / 86_400_000) + 1
       : 0);
-  const isActiveNow   = tripStart ? tripStart <= today : false;
+  const tripEnd       = trip.endDate ? parseLocalDate(trip.endDate) : null;
+  if (tripEnd) tripEnd.setHours(23, 59, 59, 999);
+  const isActiveNow   = tripStart
+    ? (tripEnd ? tripStart <= today && tripEnd >= today : tripStart <= today)
+    : false;
+  const isTripPast    = !isActiveNow && !!tripStart && tripStart <= today;
   const daysSince     = tripStart ? Math.floor((today.getTime() - tripStart.getTime()) / 86_400_000) : 0;
   const activeDayIdx  = Math.max(0, Math.min(daysSince, Math.max(totalDays - 1, 0)));
   const activeDay     = activeDayIdx + 1;
@@ -94,8 +99,8 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
 
       {/* Badge */}
       <View style={s.heroBadge}>
-        <View style={s.activeDot} />
-        <Text style={s.activeBadgeText}>ACTIVE TRIP</Text>
+        <View style={[s.activeDot, isTripPast && { backgroundColor: '#F59E0B' }]} />
+        <Text style={s.activeBadgeText}>{isTripPast ? 'PAST TRIP' : 'ACTIVE TRIP'}</Text>
       </View>
 
       {/* Trip name */}
@@ -249,6 +254,7 @@ export default function TripsScreen() {
 
   const activeTrip = trips.find(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
 
+
   // Write last-good trips list to cache on every successful load
   useEffect(() => {
     if (data?.trips?.length) {
@@ -312,6 +318,16 @@ export default function TripsScreen() {
   const heroTrip = overrideHeroId
     ? (currentTrips.find(t => t.id === overrideHeroId) ?? activeTrip ?? currentTrips[0] ?? null)
     : (activeTrip ?? currentTrips[0] ?? null);
+
+  // Detect trips whose dates are fully in the past but not yet completed
+  const isPastUnfinished = (() => {
+    if (!heroTrip || !heroTrip.endDate) return false;
+    if (heroTrip.status === "completed" || heroTrip.status === "archived") return false;
+    const end = parseLocalDate(heroTrip.endDate);
+    if (!end) return false;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return end < now;
+  })();
 
   async function handleDownloadOffline() {
     if (!heroTrip || !token || downloading) return;
@@ -386,6 +402,15 @@ export default function TripsScreen() {
               </View>
             )}
             <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} isDownloading={downloading} user={user} onUpgradePress={() => setUpgradeVisible(true)} onDownloadPress={handleDownloadOffline} />
+            {isPastUnfinished && (
+              <Pressable
+                style={s.pastBanner}
+                onPress={() => router.push({ pathname: "/(tabs)/today", params: { tripId: heroTrip.id } } as any)}
+              >
+                <Text style={s.pastBannerTitle}>{'⏰'} Your trip has ended</Text>
+                <Text style={s.pastBannerSub}>Tap to wrap it up and save your story {'→'}</Text>
+              </Pressable>
+            )}
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow} onPress={() => setShowSwitcher(true)}>
                 <Text style={s.switchText}>Switch trip →</Text>
@@ -639,6 +664,27 @@ const s = StyleSheet.create({
   heroMeta: { fontFamily: F.regular, fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 14 },
   continueBtn: { backgroundColor: G.orange, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, alignItems: "center" },
   continueBtnText: { fontFamily: F.bold, fontSize: 15, fontWeight: "700", color: "#fff" },
+  pastBanner: {
+    marginTop: 8,
+    marginHorizontal: 0,
+    backgroundColor: '#2D1F0A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#F59E0B44',
+  },
+  pastBannerTitle: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: '#FCD34D',
+    marginBottom: 2,
+  },
+  pastBannerSub: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 12,
+    color: '#D97706',
+  },
   viewPlanLink: { alignItems: "center", paddingTop: 10 },
   viewPlanLinkText: { fontFamily: F.semibold, fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.55)" },
 
