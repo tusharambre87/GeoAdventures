@@ -18,21 +18,9 @@ import { useUser } from "@/lib/userContext";
 import confetti from "canvas-confetti";
 import {
   ADVENTURES,
-  loadProgress,
-  saveProgress,
-  saveCustomAdventure,
-  loadCustomAdventure,
-  loadAllCustomAdventures,
-  clearProgress,
-  loadRecords,
-  saveRecord,
   calculateXP,
   formatTime,
   makeCompassOptions,
-  loadCompassStats,
-  saveCompassStats,
-  loadCompassAchievements,
-  saveCompassAchievements,
   checkAndUnlockAchievements,
   ACHIEVEMENTS,
   getContinentForCity,
@@ -46,7 +34,21 @@ import {
   type AchievementDef,
   type AchievementsRecord,
 } from "@workspace/compass-quest";
-import { getDistanceMiles, getBearing } from "@/lib/compassQuestMaps";
+import {
+  loadProgress,
+  saveProgress,
+  saveCustomAdventure,
+  loadCustomAdventure,
+  loadAllCustomAdventures,
+  clearProgress,
+  loadRecords,
+  saveRecord,
+  loadCompassStats,
+  saveCompassStats,
+  loadCompassAchievements,
+  saveCompassAchievements,
+} from "@/lib/compassQuestData";
+import { getDistanceMiles, getBearing } from "@workspace/compass-quest";
 
 declare const L: typeof import("leaflet");
 import turkeyPiece1 from "@assets/1_1773756593418.png";
