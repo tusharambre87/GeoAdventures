@@ -38,9 +38,9 @@ const GRID_GAMES = [
     tag: "GEO",
     tagBg: "#DBEAFE",
     tagColor: "#1E3A8A",
-    cardBg: "#0F172A",
-    border: "#1E3A5F",
-    titleColor: "#93C5FD",
+    cardBg: "#EEF2FF",
+    border: "#C7D2FE",
+    titleColor: "#3730A3",
     badge: "NEW" as string | undefined,
     ageBadge: "AGES 8+" as string | undefined,
     route: "kids/games/compass-quest" as string | undefined,
@@ -195,11 +195,9 @@ export default function GameHub() {
                 style={({ pressed }) => [
                   s.gridCard,
                   { backgroundColor: game.cardBg, borderColor: game.border },
-                  pressed && game.type !== "compass-quest" && { opacity: 0.82 },
-                  game.type === "compass-quest" && ageBand === "middle" && { opacity: 0.6 },
+                  pressed && { opacity: 0.82 },
                 ]}
                 onPress={() => {
-                  if (game.type === "compass-quest" && ageBand === "middle") return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   if (game.route) {
                     router.push(`/${game.route}` as never);
@@ -210,14 +208,12 @@ export default function GameHub() {
               >
                 {game.badge && (
                   <View style={s.gridBadge}>
-                    <Text style={s.gridBadgeText}>
-                      {game.type === "compass-quest" && ageBand === "middle" ? "COMING SOON" : game.badge}
-                    </Text>
+                    <Text style={s.gridBadgeText}>{game.badge}</Text>
                   </View>
                 )}
-                {"ageBadge" in game && game.ageBadge && ageBand !== "middle" && (
-                  <View style={[s.gridBadge, { top: 30, backgroundColor: "#1E3A5F" }]}>
-                    <Text style={[s.gridBadgeText, { color: "#93C5FD" }]}>{game.ageBadge}</Text>
+                {"ageBadge" in game && game.ageBadge && (
+                  <View style={[s.gridBadge, { top: 30, backgroundColor: "#4338CA" }]}>
+                    <Text style={[s.gridBadgeText, { color: "#E0E7FF" }]}>{game.ageBadge}</Text>
                   </View>
                 )}
                 <Text style={s.gridIcon}>{game.icon}</Text>
