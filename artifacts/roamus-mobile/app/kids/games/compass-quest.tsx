@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -40,7 +41,8 @@ type GamePhase =
   | "compass_result"
   | "step_fact"
   | "adventure_complete"
-  | "custom_quest";
+  | "custom_quest"
+  | "how_to_play";
 
 const TRANSPORT_ICONS: Record<string, string> = {
   plane: "\u2708\uFE0F",
@@ -54,6 +56,121 @@ const TRANSPORT_LABELS: Record<string, string> = {
   train: "Taking the train",
   car: "Driving",
 };
+// ─── Country codes for flag images ───────────────────────────────────────────
+const CITY_COUNTRY_CODES: Record<string, string> = {
+  "paris": "fr", "lyon": "fr", "nice": "fr",
+  "rome": "it", "milan": "it", "venice": "it", "florence": "it", "naples": "it",
+  "london": "gb", "edinburgh": "gb", "manchester": "gb",
+  "berlin": "de", "munich": "de", "hamburg": "de", "frankfurt": "de",
+  "madrid": "es", "barcelona": "es", "seville": "es", "valencia": "es",
+  "amsterdam": "nl", "rotterdam": "nl",
+  "athens": "gr", "thessaloniki": "gr",
+  "istanbul": "tr", "ankara": "tr",
+  "moscow": "ru", "st. petersburg": "ru", "saint petersburg": "ru",
+  "tokyo": "jp", "osaka": "jp", "kyoto": "jp", "hiroshima": "jp",
+  "beijing": "cn", "shanghai": "cn", "hong kong": "hk", "guangzhou": "cn",
+  "bangkok": "th", "chiang mai": "th",
+  "mumbai": "in", "delhi": "in", "new delhi": "in", "bangalore": "in", "kolkata": "in", "chennai": "in", "agra": "in",
+  "seoul": "kr", "busan": "kr",
+  "singapore": "sg",
+  "dubai": "ae", "abu dhabi": "ae",
+  "sydney": "au", "melbourne": "au", "brisbane": "au", "perth": "au", "cairns": "au",
+  "auckland": "nz", "wellington": "nz", "queenstown": "nz",
+  "cairo": "eg", "alexandria": "eg", "giza": "eg",
+  "nairobi": "ke", "mombasa": "ke",
+  "cape town": "za", "johannesburg": "za", "durban": "za",
+  "casablanca": "ma", "marrakech": "ma",
+  "lagos": "ng", "abuja": "ng",
+  "accra": "gh",
+  "addis ababa": "et",
+  "rio de janeiro": "br", "sao paulo": "br", "brasilia": "br",
+  "buenos aires": "ar",
+  "lima": "pe",
+  "santiago": "cl",
+  "bogota": "co",
+  "havana": "cu",
+  "mexico city": "mx",
+  "toronto": "ca", "vancouver": "ca", "montreal": "ca", "ottawa": "ca",
+  "new york": "us", "new york city": "us", "los angeles": "us", "chicago": "us",
+  "san francisco": "us", "seattle": "us", "washington dc": "us", "honolulu": "us",
+  "miami": "us", "las vegas": "us", "denver": "us",
+  "reykjavik": "is",
+  "oslo": "no", "stockholm": "se", "copenhagen": "dk", "helsinki": "fi",
+  "vienna": "at", "prague": "cz", "budapest": "hu",
+  "warsaw": "pl", "krakow": "pl",
+  "lisbon": "pt", "porto": "pt",
+  "brussels": "be", "zurich": "ch", "geneva": "ch", "dublin": "ie",
+  "riyadh": "sa", "tehran": "ir", "karachi": "pk", "dhaka": "bd",
+  "colombo": "lk", "kathmandu": "np", "yangon": "mm",
+  "hanoi": "vn", "ho chi minh city": "vn",
+  "manila": "ph",
+  "jakarta": "id", "bali": "id",
+  "kuala lumpur": "my",
+  "taipei": "tw",
+  "fiji": "fj", "suva": "fj",
+  "tbilisi": "ge", "baku": "az", "yerevan": "am",
+  "beirut": "lb", "amman": "jo",
+};
+
+// ─── City → landmark image key mapping ───────────────────────────────────────
+const CITY_LANDMARK_MAP: Record<string, string> = {
+  "new york": "statue-of-liberty",
+  "new york city": "statue-of-liberty",
+  "paris": "eiffel-tower",
+  "moscow": "st-basils",
+  "delhi": "red-fort",
+  "new delhi": "red-fort",
+  "agra": "red-fort",
+  "cape town": "table-mountain",
+  "rio de janeiro": "christ-redeemer",
+  "vancouver": "vancouver-skyline",
+  "seattle": "space-needle",
+  "chicago": "chicago-skyline",
+  "washington dc": "white-house",
+  "honolulu": "honolulu-landscape",
+  "sydney": "kangaroo-outback",
+  "auckland": "sky-tower-auckland",
+  "bangkok": "grand-palace-bangkok",
+  "beijing": "great-wall-china",
+  "hanoi": "hanoi-flag-tower",
+};
+
+// ─── Landmark images (local PNGs) ─────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const LANDMARK_IMAGES: Record<string, number> = {
+  "mountains":            require("../../../assets/landmarks/landmark_rocky_mountains.png"),
+  "statue-of-liberty":    require("../../../assets/landmarks/landmark_statue_of_liberty.png"),
+  "eiffel-tower":         require("../../../assets/landmarks/landmark_eiffel_tower.png"),
+  "st-basils":            require("../../../assets/landmarks/landmark_st_basils.png"),
+  "red-fort":             require("../../../assets/landmarks/landmark_red_fort.png"),
+  "table-mountain":       require("../../../assets/landmarks/landmark_table_mountain.png"),
+  "christ-redeemer":      require("../../../assets/landmarks/landmark_christ_redeemer.png"),
+  "vancouver-skyline":    require("../../../assets/landmarks/landmark_vancouver.png"),
+  "space-needle":         require("../../../assets/landmarks/landmark_space_needle.png"),
+  "niagara-falls":        require("../../../assets/landmarks/landmark_niagara_falls.png"),
+  "chicago-skyline":      require("../../../assets/landmarks/landmark_chicago_skyline.png"),
+  "white-house":          require("../../../assets/landmarks/landmark_white_house.png"),
+  "honolulu-landscape":   require("../../../assets/landmarks/landmark_honolulu.png"),
+  "kangaroo-outback":     require("../../../assets/landmarks/landmark_kangaroo_outback.png"),
+  "hobbiton-shire":       require("../../../assets/landmarks/landmark_hobbiton_shire.png"),
+  "hanoi-flag-tower":     require("../../../assets/landmarks/landmark_hanoi_flag_tower.png"),
+  "sky-tower-auckland":   require("../../../assets/landmarks/landmark_sky_tower_auckland.png"),
+  "grand-palace-bangkok": require("../../../assets/landmarks/landmark_grand_palace_bangkok.png"),
+  "great-wall-china":     require("../../../assets/landmarks/landmark_great_wall_china.png"),
+};
+
+// ─── Ring fragment images (local PNGs) ───────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const RING_FRAGMENTS: number[] = [
+  require("../../../assets/fragments/ring_1.png"),
+  require("../../../assets/fragments/ring_2.png"),
+  require("../../../assets/fragments/ring_3.png"),
+  require("../../../assets/fragments/ring_4.png"),
+  require("../../../assets/fragments/ring_5.png"),
+  require("../../../assets/fragments/ring_6.png"),
+  require("../../../assets/fragments/ring_final.png"),
+];
+
 
 // ─── Compass Rose ─────────────────────────────────────────────────────────────
 
@@ -174,6 +291,9 @@ export default function CompassQuestGame() {
   const needleAnim = useRef(new Animated.Value(0));
   const [needleDisplayDeg, setNeedleDisplayDeg] = useState(0);
   const travelAnimRef = useRef(new Animated.Value(0));
+  const planePosAnim = useRef(new Animated.Value(0));
+  const [planePx, setPlanePx] = useState(32);
+  const [planePy, setPlanePy] = useState(45);
   const resultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [customAdventure, setCustomAdventure] = useState<Adventure | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -248,24 +368,33 @@ export default function CompassQuestGame() {
     return () => needleAnim.current.removeListener(id);
   }, []);
 
-  // Drive travel fade-in from a ref (not inside render) to avoid anti-pattern
+  // Drive travel fade-in + animated plane along the arc
   useEffect(() => {
     if (phase === "travel") {
+      const svgW = 280; const svgH = 90;
+      const x1 = 32; const y1 = svgH / 2;
+      const x2 = svgW - 32; const y2 = svgH / 2;
+      const cpX = svgW / 2; const cpY = 14;
       travelAnimRef.current.setValue(0);
+      planePosAnim.current.setValue(0);
+      setPlanePx(x1); setPlanePy(y1);
+      const listenerId = planePosAnim.current.addListener(({ value: t }) => {
+        const px = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cpX + t * t * x2;
+        const py = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cpY + t * t * y2;
+        setPlanePx(px);
+        setPlanePy(py);
+      });
       Animated.timing(travelAnimRef.current, {
-        toValue: 1, duration: 1200, useNativeDriver: true,
+        toValue: 1, duration: 600, useNativeDriver: true,
+      }).start();
+      Animated.timing(planePosAnim.current, {
+        toValue: 1, duration: 2400, useNativeDriver: false,
       }).start(({ finished }) => {
         if (finished) setPhase("compass_guess");
       });
+      return () => planePosAnim.current.removeListener(listenerId);
     }
   }, [phase]);
-
-  // ── Age gate — redirect 'young' kids back to games ───────────────────────────
-  useEffect(() => {
-    if (ageBand === "young") {
-      router.replace("/kids/games" as never);
-    }
-  }, [ageBand]);
 
   const prepareStep = useCallback((adv: Adventure, idx: number) => {
     const step = adv.steps[idx];
@@ -501,8 +630,15 @@ export default function CompassQuestGame() {
   if (phase === "adventure_select") {
     const playable = ADVENTURES.filter((a) => (a.steps ?? []).length > 0);
     const comingSoon = ADVENTURES.filter((a) => (a.steps ?? []).length === 0);
-    const featured = playable.find((a) => !a.locked) ?? playable[0];
-    const rest = playable.filter((a) => a !== featured);
+    // Sequential locking: first is always unlocked; each next requires previous completed
+    const isAdvLocked = (adv: Adventure): boolean => {
+      const idx = playable.findIndex((a) => a.id === adv.id);
+      if (idx <= 0) return false;
+      const prev = playable[idx - 1];
+      return !allProgress[prev?.id]?.completed;
+    };
+    const featured = playable[0];
+    const rest = playable.slice(1);
 
     return (
       <View style={s.root}>
@@ -517,9 +653,17 @@ export default function CompassQuestGame() {
           >
             <View style={s.circle1} />
             <View style={s.circle2} />
-            <Pressable style={s.backRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}>
-              <Text style={s.backText}>{"\u2190"} Back</Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Pressable style={s.backRow} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}>
+                <Text style={s.backText}>{"\u2190"} Back</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setPhase("how_to_play")}
+                style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 }}
+              >
+                <Text style={{ fontFamily: F.bold, fontSize: 13, color: "#E2E8F0" }}>How to Play</Text>
+              </Pressable>
+            </View>
             <Text style={s.hdrEye}>GEOGRAPHY ADVENTURE</Text>
             <Text style={s.hdrTitle}>Compass Quest</Text>
             <Text style={s.hdrSub}>
@@ -585,18 +729,18 @@ export default function CompassQuestGame() {
                       key={adv.id}
                       style={({ pressed }) => [
                         s.advCard,
-                        adv.locked && s.advCardLocked,
+                        isAdvLocked(adv) && s.advCardLocked,
                         pressed && { opacity: 0.85 },
                       ]}
                       onPress={() => {
-                        if (adv.locked) return;
+                        if (isAdvLocked(adv)) return;
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         startAdventure(adv);
                       }}
                     >
                       <Text style={s.advIcon}>{adv.icon}</Text>
                       <View style={s.advInfo}>
-                        <Text style={[s.advTitle, adv.locked && s.advTitleLocked]}>
+                        <Text style={[s.advTitle, isAdvLocked(adv) && s.advTitleLocked]}>
                           {adv.title}
                         </Text>
                         <Text style={s.advSub} numberOfLines={1}>{adv.subtitle}</Text>
@@ -604,7 +748,7 @@ export default function CompassQuestGame() {
                       <View style={s.advRight}>
                         {done ? (
                           <Text style={s.advDone}>{"\u2713"}</Text>
-                        ) : adv.locked ? (
+                        ) : isAdvLocked(adv) ? (
                           <Text style={s.advLock}>{"\uD83D\uDD12"}</Text>
                         ) : (
                           <Text style={s.advArrow}>{"\u2192"}</Text>
@@ -616,33 +760,7 @@ export default function CompassQuestGame() {
               </>
             )}
 
-            {/* AI Custom Quest */}
-            <Text style={s.sectionLabel}>AI ADVENTURE</Text>
-            <Pressable
-              style={({ pressed }) => [s.aiCard, pressed && { opacity: 0.88 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                generateCustomQuest();
-              }}
-              disabled={isGenerating}
-            >
-              <View style={s.aiCardInner}>
-                <View>
-                  <Text style={s.aiTitle}>
-                    {isGenerating ? "Generating Quest..." : "Generate AI Quest"}
-                  </Text>
-                  <Text style={s.aiSub}>
-                    {isGenerating
-                      ? "Our AI is writing your adventure..."
-                      : "NY \u2192 Paris \u2192 Tokyo \u2192 Cairo \u2192 Rio \u2192 Sydney"}
-                  </Text>
-                  {generateError && (
-                    <Text style={s.aiError}>{generateError}</Text>
-                  )}
-                </View>
-                <Text style={s.aiIcon}>{isGenerating ? "\u2728" : "\uD83E\uDDE0"}</Text>
-              </View>
-            </Pressable>
+
 
             {/* Coming soon */}
             {comingSoon.length > 0 && (
@@ -669,6 +787,54 @@ export default function CompassQuestGame() {
   const steps = adventure.steps;
   const step = steps[stepIdx] as QuestStep;
   const totalSteps = steps.length;
+
+
+  // ── HOW TO PLAY ──────────────────────────────────────────────────────────────
+  if (phase === "how_to_play") {
+    const steps_htp = [
+      { icon: "\uD83C\uDFDB\uFE0F", title: "Pick an Adventure", desc: "Choose from a series of quests, each one unlocked after you complete the last." },
+      { icon: "\uD83D\uDD0E", title: "Read the Clue", desc: "Each stop gives you a flag clue, a landmark photo, or a text mystery to crack." },
+      { icon: "\uD83C\uDF0D", title: "Guess the City", desc: "Tap the city you think matches the clue. Get it right for max XP!" },
+      { icon: "\uD83E\uDDED", title: "Find the Direction", desc: "Use the compass to point toward the next city from where you are now." },
+      { icon: "\uD83D\uDC8D", title: "Collect a Fragment", desc: "Arrive at each city and collect one piece of the hidden artifact." },
+      { icon: "\u2728", title: "Complete the Quest", desc: "Gather all fragments to assemble the artifact and finish your adventure!" },
+    ];
+    return (
+      <View style={[s.root, { backgroundColor: "#0F172A" }]}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ paddingTop: insets.top + 16, marginBottom: 24 }}>
+            <Pressable onPress={() => setPhase("adventure_select")}>
+              <Text style={[s.backText, { color: "#94A3B8" }]}>{"\u2190"} Back</Text>
+            </Pressable>
+          </View>
+          <Text style={{ fontFamily: F.bold, fontSize: 28, color: "#F1F5F9", marginBottom: 6 }}>How to Play</Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 15, color: "#94A3B8", marginBottom: 28, lineHeight: 22 }}>
+            Compass Quest is a geography adventure game. Travel the globe city by city, solve clues and collect fragments to complete each quest.
+          </Text>
+          {steps_htp.map((step, i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 22, alignItems: "flex-start" }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "#1E3A5F", alignItems: "center", justifyContent: "center", marginRight: 16, marginTop: 2 }}>
+                <Text style={{ fontSize: 20 }}>{step.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: F.bold, fontSize: 16, color: "#E2E8F0", marginBottom: 3 }}>{i + 1}. {step.title}</Text>
+                <Text style={{ fontFamily: F.medium, fontSize: 14, color: "#94A3B8", lineHeight: 20 }}>{step.desc}</Text>
+              </View>
+            </View>
+          ))}
+          <Pressable
+            style={({ pressed }) => [{ backgroundColor: "#F97316", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 12 }, pressed && { opacity: 0.85 }]}
+            onPress={() => setPhase("adventure_select")}
+          >
+            <Text style={{ fontFamily: F.bold, fontSize: 16, color: "#fff" }}>Got It! {"\u2192"}</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
 
   // ── STORY INTRO ───────────────────────────────────────────────────────────────
   if (phase === "story_intro") {
@@ -782,12 +948,28 @@ export default function CompassQuestGame() {
 
             {clue.clueType === "landmark" && clue.landmarkClue ? (
               <>
+                {(() => {
+                  const lKey = CITY_LANDMARK_MAP[step.correctCity.toLowerCase()];
+                  const lImg = lKey ? LANDMARK_IMAGES[lKey] : null;
+                  return lImg ? (
+                    <Image source={lImg} style={{ width: "100%", height: 160, borderRadius: 10, marginBottom: 10, resizeMode: "cover" }} />
+                  ) : null;
+                })()}
                 <Text style={cg.landmarkName}>{clue.landmarkClue.name}</Text>
                 <Text style={cg.landmarkDesc}>{clue.landmarkClue.description}</Text>
                 <View style={cg.divider} />
               </>
             ) : clue.clueType === "flag" && clue.flagClue ? (
               <>
+                {(() => {
+                  const cc = CITY_COUNTRY_CODES[step.correctCity.toLowerCase()];
+                  return cc ? (
+                    <Image
+                      source={{ uri: `https://flagcdn.com/w320/${cc}.png` }}
+                      style={{ width: "100%", height: 100, borderRadius: 10, marginBottom: 10, resizeMode: "cover" }}
+                    />
+                  ) : null;
+                })()}
                 <Text style={cg.flagHint}>{clue.flagClue.hint}</Text>
                 <View style={cg.divider} />
               </>
@@ -877,23 +1059,18 @@ export default function CompassQuestGame() {
           <Text style={tv.travelLabel}>{label} to</Text>
           <Text style={tv.cityName}>{toCity}</Text>
 
-          {/* SVG route arc */}
+          {/* SVG route arc with animated transport icon */}
           <View style={{ marginVertical: 16 }}>
-            <Svg width={svgW} height={svgH}>
-              {/* Dashed route arc */}
-              <Path
-                d={arcPath}
-                stroke="#F97316"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                fill="none"
-                opacity={0.7}
-              />
-              {/* Origin dot */}
-              <Circle cx={x1} cy={y1} r={5} fill="#F97316" />
-              {/* Destination dot */}
-              <Circle cx={x2} cy={y2} r={7} fill="#F97316" />
-            </Svg>
+            <View style={{ position: "relative", width: svgW, height: svgH }}>
+              <Svg width={svgW} height={svgH} style={{ position: "absolute", top: 0, left: 0 }}>
+                <Path d={arcPath} stroke="#F97316" strokeWidth={2} strokeDasharray="6 4" fill="none" opacity={0.7} />
+                <Circle cx={x1} cy={y1} r={5} fill="#F97316" />
+                <Circle cx={x2} cy={y2} r={7} fill="#F97316" />
+              </Svg>
+              <Text style={{ position: "absolute", left: planePx - 14, top: planePy - 16, fontSize: 24 }}>
+                {icon}
+              </Text>
+            </View>
             <View style={tv.routeRow}>
               <Text style={tv.routeFrom}>{fromCity}</Text>
               <Text style={tv.routeTo}>{toCity}</Text>
@@ -1020,13 +1197,20 @@ export default function CompassQuestGame() {
             <Text style={sf.factText}>{step.travelFact}</Text>
           </View>
 
-          {/* Fragment collection progress */}
+          {/* Fragment collection progress with ring PNG images */}
           <View style={sf.fragmentsRow}>
-            {collected.map((emoji, i) => (
-              <View key={i} style={sf.fragmentDot}>
-                <Text style={sf.fragmentDotEmoji}>{emoji}</Text>
-              </View>
-            ))}
+            {collected.map((_, i) => {
+              const fragImg = RING_FRAGMENTS[i];
+              return fragImg ? (
+                <View key={i} style={[sf.fragmentDot, { backgroundColor: "rgba(249,115,22,0.15)", borderColor: "#F97316" }]}>
+                  <Image source={fragImg} style={{ width: 32, height: 32, resizeMode: "contain" }} />
+                </View>
+              ) : (
+                <View key={i} style={sf.fragmentDot}>
+                  <Text style={sf.fragmentDotEmoji}>{collected[i]}</Text>
+                </View>
+              );
+            })}
             {Array.from({ length: totalSteps - collected.length }).map((_, i) => (
               <View key={`empty-${i}`} style={[sf.fragmentDot, sf.fragmentDotEmpty]}>
                 <Text style={sf.fragmentDotEmptyText}>?</Text>
@@ -1057,7 +1241,12 @@ export default function CompassQuestGame() {
           showsVerticalScrollIndicator={false}
         >
           <View style={ac.heroBlock}>
-            <Text style={ac.rewardEmoji}>{adventure.reward.emoji}</Text>
+            {RING_FRAGMENTS.length > 0 && (
+              <Image
+                source={RING_FRAGMENTS[RING_FRAGMENTS.length - 1]}
+                style={{ width: 100, height: 100, resizeMode: "contain", marginBottom: 8 }}
+              />
+            )}
             <Text style={ac.headline}>Quest Complete!</Text>
             <Text style={ac.rewardTitle}>{adventure.reward.title}</Text>
             <Text style={ac.rewardDesc}>{adventure.reward.description}</Text>
@@ -1078,15 +1267,22 @@ export default function CompassQuestGame() {
             </View>
           </View>
 
-          {/* Fragments */}
+          {/* Fragments assembled with PNG images */}
           <View style={ac.fragmentsWrap}>
             <Text style={ac.fragmentsLabel}>Fragments Collected</Text>
-            <View style={sf.fragmentsRow}>
-              {fragmentsCollected.map((emoji, i) => (
-                <View key={i} style={sf.fragmentDot}>
-                  <Text style={sf.fragmentDotEmoji}>{emoji}</Text>
-                </View>
-              ))}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 8 }}>
+              {fragmentsCollected.map((_, i) => {
+                const fragImg = RING_FRAGMENTS[i];
+                return fragImg ? (
+                  <View key={i} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" }}>
+                    <Image source={fragImg} style={{ width: 36, height: 36, resizeMode: "contain" }} />
+                  </View>
+                ) : (
+                  <View key={i} style={sf.fragmentDot}>
+                    <Text style={sf.fragmentDotEmoji}>{fragmentsCollected[i]}</Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
 
