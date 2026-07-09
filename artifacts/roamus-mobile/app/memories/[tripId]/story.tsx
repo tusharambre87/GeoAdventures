@@ -265,6 +265,8 @@ export default function StoryScreen() {
   // Toast opacity refs
   const savedToastOpacity = useRef(new Animated.Value(0)).current;
   const photoToastOpacity = useRef(new Animated.Value(0)).current;
+  const [photoToastMessage, setPhotoToastMessage] = useState('\uD83D\uDCF7 Photo saved to camera roll');
+  const [savingAll, setSavingAll] = useState(false);
 
   // ViewShot capture ref (on the slide area only, not chrome)
   const slideRef = useRef<View>(null);
@@ -308,7 +310,8 @@ export default function StoryScreen() {
     ]).start();
   }
 
-  function showPhotoToast() {
+  function showPhotoToast(message?: string) {
+    if (message) setPhotoToastMessage(message);
     photoToastOpacity.setValue(1);
     Animated.sequence([
       Animated.delay(2200),
@@ -400,9 +403,43 @@ export default function StoryScreen() {
     if (!uri) { Alert.alert('Could not save', 'Please try again.'); return; }
     try {
       await MediaLibrary.saveToLibraryAsync(uri);
-      showPhotoToast();
+      showPhotoToast('\uD83D\uDCF7 Photo saved to camera roll');
     } catch {
       Alert.alert('Could not save', 'Please try again.');
+    }
+  }
+
+  async function handleSaveAll() {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to save story slides to your camera roll.');
+      return;
+    }
+    setSavingAll(true);
+    const originalSlide = slideIndexRef.current;
+    let savedCount = 0;
+    try {
+      for (let i = 0; i < TOTAL_SLIDES; i++) {
+        // Switch to slide i without animation so captureRef sees the right content
+        slideOpacity.setValue(1);
+        setDisplaySlide(i);
+        // Wait for the state update and layout to flush before capturing
+        await new Promise<void>(resolve => setTimeout(resolve, 220));
+        const uri = await captureSlide();
+        if (uri) {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          savedCount++;
+        }
+      }
+    } finally {
+      // Restore the slide the user was on
+      setDisplaySlide(originalSlide);
+      setSavingAll(false);
+    }
+    if (savedCount === 0) {
+      Alert.alert('Could not save', 'Please try again.');
+    } else {
+      showPhotoToast(`\uD83D\uDCF7 ${savedCount} photo${savedCount === 1 ? '' : 's'} saved to camera roll`);
     }
   }
 
@@ -525,8 +562,17 @@ export default function StoryScreen() {
           <Pressable style={styles.shareSmall} onPress={nextSlide}>
             <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next \u2192' : 'Done \u2713'}</Text>
           </Pressable>
-          <Pressable style={styles.shareSmall} onPress={handleSave}>
-            <Text style={styles.shareSmallText}>{'\u2B07'} Save</Text>
+          <Pressable
+            style={[styles.shareSmall, savingAll && { opacity: 0.6 }]}
+            onPress={handleSave}
+            onLongPress={handleSaveAll}
+            delayLongPress={500}
+            disabled={savingAll}
+          >
+            {savingAll
+              ? <ActivityIndicator size="small" color={C.orange} />
+              : <Text style={styles.shareSmallText}>{'\u2B07'} Save</Text>
+            }
           </Pressable>
         </View>
       </View>
@@ -538,7 +584,7 @@ export default function StoryScreen() {
 
       {/* "Photo saved!" toast */}
       <Animated.View style={[styles.toast, styles.toastBottom, { opacity: photoToastOpacity, bottom: insets.bottom + 110 }]} pointerEvents="none">
-        <Text style={styles.toastText}>{'\uD83D\uDCF7'} Photo saved to camera roll</Text>
+        <Text style={styles.toastText}>{photoToastMessage}</Text>
       </Animated.View>
 
       {isFree && (
