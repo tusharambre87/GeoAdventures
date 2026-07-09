@@ -163,44 +163,45 @@ const LANDMARK_IMAGES: Record<string, number> = {
   "great-wall-china":     require("../../../assets/landmarks/landmark_great_wall_china.png"),
 };
 
-// ─── Ring fragment images (local PNGs) ───────────────────────────────────────
+// ─── Fragment images (local PNGs) ────────────────────────────────────────────
+// Ring/compass piece images — used for Broken Trail (Wayfinder Compass) and Final Ring
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+const RING_PIECES = [
+  require("../../../assets/fragments/ring_1.png"),
+  require("../../../assets/fragments/ring_2.png"),
+  require("../../../assets/fragments/ring_3.png"),
+  require("../../../assets/fragments/ring_4.png"),
+  require("../../../assets/fragments/ring_5.png"),
+  require("../../../assets/fragments/ring_6.png"),
+];
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const RING_FINAL = require("../../../assets/fragments/ring_final.png");
+
+// Crown artifact images — used for wild-signal (The Wayfinder's Path), the adventure that assembles the crown
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CROWN_PIECES = [
+  require("../../../assets/fragments/crown_1.png"),
+  require("../../../assets/fragments/crown_2.png"),
+  require("../../../assets/fragments/crown_3.png"),
+  require("../../../assets/fragments/crown_4.png"),
+  require("../../../assets/fragments/crown_5.png"),
+  require("../../../assets/fragments/crown_6.png"),
+];
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CROWN_FINAL = require("../../../assets/fragments/crown_final.png");
+
+// Per-adventure fragment sets:
+// lost-crown  → 8 steps, "Map Piece 1-8" (no dedicated map images → ring fallback)
+// broken-trail → 6 steps, "Compass Fragment 2-7" (compass/ring pieces)
+// wild-signal  → 6 steps, "Artifact 2-7" 👑 (CROWN — this is the adventure that assembles it!)
+// royal-journal → 6 steps, "Journal Page 2-7" (no dedicated page images → ring fallback)
+// final-ring  → 7 steps, "Ring Fragment 1-7" (ring pieces, ring_1-6 + ring_final = 7 total)
 const ADVENTURE_FRAGMENTS: Record<string, { pieces: number[]; final: number }> = {
-  "lost-crown": {
-    pieces: [
-      require("../../../assets/fragments/crown_1.png"),
-      require("../../../assets/fragments/crown_2.png"),
-      require("../../../assets/fragments/crown_3.png"),
-      require("../../../assets/fragments/crown_4.png"),
-      require("../../../assets/fragments/crown_5.png"),
-      require("../../../assets/fragments/crown_6.png"),
-      require("../../../assets/fragments/crown_7.png"),
-    ],
-    final: require("../../../assets/fragments/crown_final.png"),
-  },
-  "broken-trail": {
-    pieces: [
-      require("../../../assets/fragments/ring_1.png"),
-      require("../../../assets/fragments/ring_2.png"),
-      require("../../../assets/fragments/ring_3.png"),
-      require("../../../assets/fragments/ring_4.png"),
-      require("../../../assets/fragments/ring_5.png"),
-      require("../../../assets/fragments/ring_6.png"),
-    ],
-    final: require("../../../assets/fragments/ring_final.png"),
-  },
+  "broken-trail": { pieces: RING_PIECES, final: RING_FINAL },
+  "wild-signal":  { pieces: CROWN_PIECES, final: CROWN_FINAL },
+  "final-ring":   { pieces: RING_PIECES, final: RING_FINAL },
 };
-const DEFAULT_FRAG_SET = {
-  pieces: [
-    require("../../../assets/fragments/ring_1.png"),
-    require("../../../assets/fragments/ring_2.png"),
-    require("../../../assets/fragments/ring_3.png"),
-    require("../../../assets/fragments/ring_4.png"),
-    require("../../../assets/fragments/ring_5.png"),
-    require("../../../assets/fragments/ring_6.png"),
-  ],
-  final: require("../../../assets/fragments/ring_final.png"),
-};
+const DEFAULT_FRAG_SET = { pieces: RING_PIECES, final: RING_FINAL };
 
 
 // ─── Compass Rose ─────────────────────────────────────────────────────────────
@@ -399,23 +400,15 @@ export default function CompassQuestGame() {
     return () => needleAnim.current.removeListener(id);
   }, []);
 
-  // Drive travel fade-in + animated transport icon along world map arc
+  // Drive travel fade-in + animated transport icon along arc
   useEffect(() => {
     if (phase === "travel" && adventure) {
-      const mapW = 320; const mapH = 160;
-      const fromCoords = stepIdx > 0
-        ? adventure.steps[stepIdx - 1].cityCoords
-        : adventure.startCityCoords;
-      const toCoords = adventure.steps[stepIdx]?.cityCoords ?? { lat: 0, lng: 0 };
-      const project = (lat: number, lng: number) => ({
-        x: ((lng + 180) / 360) * mapW,
-        y: ((90 - lat) / 180) * mapH,
-      });
-      const fromPt = project(fromCoords.lat, fromCoords.lng);
-      const toPt = project(toCoords.lat, toCoords.lng);
-      const dist = Math.sqrt(Math.pow(toPt.x - fromPt.x, 2) + Math.pow(toPt.y - fromPt.y, 2));
-      const cpX = (fromPt.x + toPt.x) / 2;
-      const cpY = (fromPt.y + toPt.y) / 2 - Math.min(dist * 0.45, 65);
+      const svgW = 280; const svgH = 90;
+      const x1 = 32; const y1 = svgH / 2;
+      const x2 = svgW - 32; const y2 = svgH / 2;
+      const cpX = svgW / 2; const cpY = 14;
+      const fromPt = { x: x1, y: y1 };
+      const toPt = { x: x2, y: y2 };
 
       travelAnimRef.current.setValue(0);
       planePosAnim.current.setValue(0);
@@ -1076,20 +1069,11 @@ export default function CompassQuestGame() {
     const fromCity = stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).correctCity : adventure.startCity;
     const toCity = step.correctCity;
 
-    // World map projection (equirectangular)
-    const mapW = 320; const mapH = 160;
-    const fromCoords = stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).cityCoords : adventure.startCityCoords;
-    const toCoords = step.cityCoords;
-    const project = (lat: number, lng: number) => ({
-      x: ((lng + 180) / 360) * mapW,
-      y: ((90 - lat) / 180) * mapH,
-    });
-    const fromPt = project(fromCoords.lat, fromCoords.lng);
-    const toPt = project(toCoords.lat, toCoords.lng);
-    const dist = Math.sqrt(Math.pow(toPt.x - fromPt.x, 2) + Math.pow(toPt.y - fromPt.y, 2));
-    const cpX = (fromPt.x + toPt.x) / 2;
-    const cpY = (fromPt.y + toPt.y) / 2 - Math.min(dist * 0.45, 65);
-    const arcPath = `M ${fromPt.x} ${fromPt.y} Q ${cpX} ${cpY} ${toPt.x} ${toPt.y}`;
+    const svgW = 280; const svgH = 90;
+    const x1 = 32; const y1 = svgH / 2;
+    const x2 = svgW - 32; const y2 = svgH / 2;
+    const cpX = svgW / 2; const cpY = 14;
+    const arcPath = `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`;
 
     return (
       <View style={[s.root, { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" }]}>
@@ -1108,32 +1092,25 @@ export default function CompassQuestGame() {
         </View>
         <Animated.View style={{ alignItems: "center", opacity: travelAnimRef.current }}>
           <Text style={tv.transportIcon}>{icon}</Text>
-          <Text style={tv.travelLabel}>{label.toUpperCase()} TO</Text>
+          <Text style={tv.travelLabel}>{label} to</Text>
           <Text style={tv.cityName}>{toCity}</Text>
 
-          {/* Real world map with route overlay */}
-          <View style={{ marginVertical: 14, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "rgba(249,115,22,0.4)" }}>
-            <Image
-              source={{ uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/800px-World_map_-_low_resolution.svg.png" }}
-              style={{ width: mapW, height: mapH }}
-              resizeMode="stretch"
-            />
-            <Svg width={mapW} height={mapH} style={{ position: "absolute", top: 0, left: 0 }}>
-              <Path d={arcPath} stroke="#F97316" strokeWidth={2} strokeDasharray="5 3" fill="none" opacity={0.9} />
-              <Circle cx={fromPt.x} cy={fromPt.y} r={5} fill="#F97316" opacity={0.9} />
-              <Circle cx={fromPt.x} cy={fromPt.y} r={9} fill="none" stroke="#F97316" strokeWidth={1.5} opacity={0.4} />
-              <Circle cx={toPt.x} cy={toPt.y} r={6} fill="#F97316" opacity={0.9} />
-              <Circle cx={toPt.x} cy={toPt.y} r={11} fill="none" stroke="#F97316" strokeWidth={1.5} opacity={0.4} />
-            </Svg>
-            <Text style={{ position: "absolute", left: planePx - 12, top: planePy - 14, fontSize: 18 }}>
-              {icon}
-            </Text>
-          </View>
-
-          <View style={tv.routeRow}>
-            <Text style={tv.routeFrom}>{fromCity}</Text>
-            <Text style={tv.routeArrow}>{"\u2192"}</Text>
-            <Text style={tv.routeTo}>{toCity}</Text>
+          {/* Animated arc route */}
+          <View style={{ marginVertical: 16 }}>
+            <View style={{ position: "relative", width: svgW, height: svgH }}>
+              <Svg width={svgW} height={svgH} style={{ position: "absolute", top: 0, left: 0 }}>
+                <Path d={arcPath} stroke="#F97316" strokeWidth={2} strokeDasharray="6 4" fill="none" opacity={0.7} />
+                <Circle cx={x1} cy={y1} r={5} fill="#F97316" />
+                <Circle cx={x2} cy={y2} r={7} fill="#F97316" />
+              </Svg>
+              <Text style={{ position: "absolute", left: planePx - 14, top: planePy - 16, fontSize: 24 }}>
+                {icon}
+              </Text>
+            </View>
+            <View style={tv.routeRow}>
+              <Text style={tv.routeFrom}>{fromCity}</Text>
+              <Text style={tv.routeTo}>{toCity}</Text>
+            </View>
           </View>
 
           <Pressable style={tv.skipBtn} onPress={() => setPhase("compass_guess")}>
