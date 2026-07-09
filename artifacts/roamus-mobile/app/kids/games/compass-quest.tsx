@@ -164,20 +164,40 @@ const LANDMARK_IMAGES: Record<string, number> = {
 };
 
 // ─── Fragment images (local PNGs) ────────────────────────────────────────────
-// Ring/compass piece images — used for Broken Trail (Wayfinder Compass) and Final Ring
+// Each adventure has its own dedicated fragment set from the GeoAdventures asset library.
+//
+// lost-crown   → 8 steps → MAP PIECES (green torn map shards → assembled map)
+// broken-trail → 6 steps → COMPASS PIECES (brass arc sections → full Wayfinder Compass)
+// wild-signal  → 6 steps → CROWN PIECES (brass mechanism parts → assembled crown)
+// royal-journal→ 6 steps → JOURNAL PAGES (torn parchment → ornate Royal Journal)
+// final-ring   → 7 steps → RING FRAGMENTS (ring band sections → completed ring)
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const RING_PIECES = [
-  require("../../../assets/fragments/ring_1.png"),
-  require("../../../assets/fragments/ring_2.png"),
-  require("../../../assets/fragments/ring_3.png"),
-  require("../../../assets/fragments/ring_4.png"),
-  require("../../../assets/fragments/ring_5.png"),
-  require("../../../assets/fragments/ring_6.png"),
+const MAP_PIECES = [
+  require("../../../assets/fragments/map_1.png"),
+  require("../../../assets/fragments/map_2.png"),
+  require("../../../assets/fragments/map_3.png"),
+  require("../../../assets/fragments/map_4.png"),
+  require("../../../assets/fragments/map_5.png"),
+  require("../../../assets/fragments/map_6.png"),
+  require("../../../assets/fragments/map_7.png"),
+  require("../../../assets/fragments/map_8.png"),
 ];
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const RING_FINAL = require("../../../assets/fragments/ring_final.png");
+const MAP_FINAL = require("../../../assets/fragments/map_final.png");
 
-// Crown artifact images — used for wild-signal (The Wayfinder's Path), the adventure that assembles the crown
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const COMPASS_PIECES = [
+  require("../../../assets/fragments/compass_1.png"),
+  require("../../../assets/fragments/compass_2.png"),
+  require("../../../assets/fragments/compass_3.png"),
+  require("../../../assets/fragments/compass_4.png"),
+  require("../../../assets/fragments/compass_5.png"),
+  require("../../../assets/fragments/compass_6.png"),
+];
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const COMPASS_FINAL = require("../../../assets/fragments/compass_final.png");
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CROWN_PIECES = [
   require("../../../assets/fragments/crown_1.png"),
@@ -190,18 +210,39 @@ const CROWN_PIECES = [
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CROWN_FINAL = require("../../../assets/fragments/crown_final.png");
 
-// Per-adventure fragment sets:
-// lost-crown  → 8 steps, "Map Piece 1-8" (no dedicated map images → ring fallback)
-// broken-trail → 6 steps, "Compass Fragment 2-7" (compass/ring pieces)
-// wild-signal  → 6 steps, "Artifact 2-7" 👑 (CROWN — this is the adventure that assembles it!)
-// royal-journal → 6 steps, "Journal Page 2-7" (no dedicated page images → ring fallback)
-// final-ring  → 7 steps, "Ring Fragment 1-7" (ring pieces, ring_1-6 + ring_final = 7 total)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const JOURNAL_PIECES = [
+  require("../../../assets/fragments/journal_1.png"),
+  require("../../../assets/fragments/journal_2.png"),
+  require("../../../assets/fragments/journal_3.png"),
+  require("../../../assets/fragments/journal_4.png"),
+  require("../../../assets/fragments/journal_5.png"),
+  require("../../../assets/fragments/journal_6.png"),
+];
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const JOURNAL_FINAL = require("../../../assets/fragments/journal_final.png");
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const RING_PIECES = [
+  require("../../../assets/fragments/ring_1.png"),
+  require("../../../assets/fragments/ring_2.png"),
+  require("../../../assets/fragments/ring_3.png"),
+  require("../../../assets/fragments/ring_4.png"),
+  require("../../../assets/fragments/ring_5.png"),
+  require("../../../assets/fragments/ring_6.png"),
+  require("../../../assets/fragments/ring_7.png"),
+];
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const RING_FINAL = require("../../../assets/fragments/ring_final.png");
+
 const ADVENTURE_FRAGMENTS: Record<string, { pieces: number[]; final: number }> = {
-  "broken-trail": { pieces: RING_PIECES, final: RING_FINAL },
-  "wild-signal":  { pieces: CROWN_PIECES, final: CROWN_FINAL },
-  "final-ring":   { pieces: RING_PIECES, final: RING_FINAL },
+  "lost-crown":    { pieces: MAP_PIECES,     final: MAP_FINAL },
+  "broken-trail":  { pieces: COMPASS_PIECES, final: COMPASS_FINAL },
+  "wild-signal":   { pieces: CROWN_PIECES,   final: CROWN_FINAL },
+  "royal-journal": { pieces: JOURNAL_PIECES, final: JOURNAL_FINAL },
+  "final-ring":    { pieces: RING_PIECES,    final: RING_FINAL },
 };
-const DEFAULT_FRAG_SET = { pieces: RING_PIECES, final: RING_FINAL };
+const DEFAULT_FRAG_SET = { pieces: COMPASS_PIECES, final: COMPASS_FINAL };
 
 
 // ─── Compass Rose ─────────────────────────────────────────────────────────────
