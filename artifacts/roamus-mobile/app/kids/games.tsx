@@ -42,7 +42,7 @@ const GRID_GAMES = [
     border: "#C7D2FE",
     titleColor: "#3730A3",
     badge: "NEW" as string | undefined,
-    ageBadge: "AGES 8+" as string | undefined,
+    ageBadge: undefined as string | undefined,
     route: "kids/games/compass-quest" as string | undefined,
   },
   {
@@ -187,9 +187,7 @@ export default function GameHub() {
 
           {/* 2×2 grid — compass-quest hidden for young age band */}
           <View style={s.grid}>
-            {GRID_GAMES.filter((game) =>
-              !(game.type === "compass-quest" && ageBand === "young")
-            ).map((game) => (
+            {GRID_GAMES.map((game) => (
               <Pressable
                 key={game.name}
                 style={({ pressed }) => [
