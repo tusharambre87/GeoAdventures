@@ -171,7 +171,9 @@ export default function CompassQuestGame() {
   const [fragmentsCollected, setFragmentsCollected] = useState<string[]>([]);
   const [startTime, setStartTime] = useState(0);
   const [allProgress, setAllProgress] = useState<Record<string, AdventureProgress>>({});
-  const [needleAnim] = useState(new Animated.Value(0));
+  const needleAnim = useRef(new Animated.Value(0));
+  const [needleDisplayDeg, setNeedleDisplayDeg] = useState(0);
+  const travelAnimRef = useRef(new Animated.Value(0));
   const resultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [customAdventure, setCustomAdventure] = useState<Adventure | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -182,6 +184,24 @@ export default function CompassQuestGame() {
     return () => { if (resultTimer.current) clearTimeout(resultTimer.current); };
   }, [effectiveExplorerId]);
 
+  // Connect needleAnim → needleDisplayDeg so CompassRose renders animated needle
+  useEffect(() => {
+    const id = needleAnim.current.addListener(({ value }) => setNeedleDisplayDeg(value));
+    return () => needleAnim.current.removeListener(id);
+  }, []);
+
+  // Drive travel fade-in from a ref (not inside render) to avoid anti-pattern
+  useEffect(() => {
+    if (phase === "travel") {
+      travelAnimRef.current.setValue(0);
+      Animated.timing(travelAnimRef.current, {
+        toValue: 1, duration: 1200, useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setPhase("compass_guess");
+      });
+    }
+  }, [phase]);
+
   // ── Age gate — redirect 'young' kids back to games ───────────────────────────
   useEffect(() => {
     if (ageBand === "young") {
@@ -190,6 +210,36 @@ export default function CompassQuestGame() {
   }, [ageBand]);
 
   if (ageBand === "young") return null;
+
+  // ── Middle band gate — coming soon for younger explorers ─────────────────────
+  if (ageBand === "middle") {
+    return (
+      <View style={[s.root, { backgroundColor: "#0F172A" }]}>
+        <View style={[s.header, { paddingTop: insets.top + 16, paddingBottom: 24 }]}>
+          <Pressable style={s.backRow} onPress={() => router.back()}>
+            <Text style={s.backText}>{"\u2190"} Back</Text>
+          </Pressable>
+          <Text style={s.hdrEye}>COMPASS QUEST</Text>
+          <Text style={s.hdrTitle}>For Older Explorers</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
+          <Text style={{ fontSize: 56, marginBottom: 20 }}>{"\uD83E\uDDED"}</Text>
+          <Text style={{ fontFamily: F.bold, fontSize: 22, color: "#E2E8F0", textAlign: "center", marginBottom: 12 }}>
+            Coming Soon for Junior Explorers
+          </Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 15, color: "#94A3B8", textAlign: "center", lineHeight: 24, marginBottom: 32 }}>
+            Compass Quest opens at age 9+. Keep discovering the other games and check back soon!
+          </Text>
+          <Pressable
+            style={{ backgroundColor: "#F97316", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 }}
+            onPress={() => router.back()}
+          >
+            <Text style={{ fontFamily: F.bold, fontSize: 15, color: "#fff" }}>Back to Games</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   const startAdventure = useCallback((adv: Adventure) => {
     const steps = adv.steps ?? [];
@@ -268,9 +318,10 @@ export default function CompassQuestGame() {
     setCompassCorrect(correct);
     if (!correct) setWrongGuesses((w) => w + 1);
 
-    // Animate needle to correct direction
+    // Animate needle to correct direction (drives needleDisplayDeg via listener)
     const targetDeg = step.compassDirection.degrees;
-    Animated.timing(needleAnim, {
+    needleAnim.current.setValue(0);
+    Animated.timing(needleAnim.current, {
       toValue: targetDeg,
       duration: 800,
       useNativeDriver: false,
@@ -280,7 +331,7 @@ export default function CompassQuestGame() {
     resultTimer.current = setTimeout(() => {
       setPhase("step_fact");
     }, 1400);
-  }, [adventure, stepIdx, needleAnim]);
+  }, [adventure, stepIdx]);
 
   const onNextStep = useCallback(async () => {
     if (!adventure) return;
@@ -305,12 +356,24 @@ export default function CompassQuestGame() {
     setAllProgress((prev) => ({ ...prev, [adventure.id]: progress }));
 
     if (isLast) {
+      // Award XP on backend via existing player rewards endpoint
+      if (explorerId) {
+        const token = await AsyncStorage.getItem("authToken");
+        const xp = calculateXP(wrongGuesses, adventure.steps.length);
+        const stars = Math.max(1, Math.floor(xp / 50));
+        fetch(`${API_BASE}/api/players/${explorerId}/add-game-rewards`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ stars, gamesPlayed: true }),
+        }).catch(() => {}); // fire-and-forget; progress already in AsyncStorage
+      }
       setPhase("adventure_complete");
       return;
     }
 
     setStepIdx(nextIdx);
-    needleAnim.setValue(0);
+    needleAnim.current.setValue(0);
+    setNeedleDisplayDeg(0);
 
     const nextStep = adventure.steps[nextIdx];
     if (nextStep.storyBeat) {
@@ -318,7 +381,7 @@ export default function CompassQuestGame() {
     } else {
       prepareStep(adventure, nextIdx);
     }
-  }, [adventure, stepIdx, fragmentsCollected, wrongGuesses, startTime, effectiveExplorerId, needleAnim, prepareStep]);
+  }, [adventure, stepIdx, fragmentsCollected, wrongGuesses, startTime, effectiveExplorerId, explorerId, prepareStep]);
 
   // ── Generate custom AI quest ──────────────────────────────────────────────────
   const generateCustomQuest = useCallback(async () => {
@@ -727,13 +790,20 @@ export default function CompassQuestGame() {
 
   // ── TRAVEL PHASE ─────────────────────────────────────────────────────────────
   if (phase === "travel") {
-    const transportMode = step.transportMode ?? "car";
-    const icon = TRANSPORT_ICONS[transportMode] ?? "\uD83D\uDE97";
-    const label = TRANSPORT_LABELS[transportMode] ?? "Travelling";
-    const travelAnim = new Animated.Value(0);
-    Animated.timing(travelAnim, { toValue: 1, duration: 1200, useNativeDriver: true }).start(() => {
-      setPhase("compass_guess");
-    });
+    const transportMode = step.transportMode ?? "plane";
+    const icon = TRANSPORT_ICONS[transportMode] ?? "\u2708\uFE0F";
+    const label = TRANSPORT_LABELS[transportMode] ?? "Flying";
+    const fromCity = stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).correctCity : adventure.startCity;
+    const toCity = step.correctCity;
+
+    // SVG arc route: two city dots connected by a curved dashed path
+    const svgW = 280;
+    const svgH = 90;
+    const x1 = 32; const y1 = svgH / 2;
+    const x2 = svgW - 32; const y2 = svgH / 2;
+    const cpX = svgW / 2; const cpY = 14; // control point arcs upward
+    const arcPath = `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`;
+
     return (
       <View style={[s.root, { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" }]}>
         <View style={[cg.topBar, { position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 12 }]}>
@@ -749,21 +819,36 @@ export default function CompassQuestGame() {
             <Text style={cg.xpText}>{stepIdx + 1}/{totalSteps}</Text>
           </View>
         </View>
-        <Animated.View style={{ alignItems: "center", opacity: travelAnim }}>
+        <Animated.View style={{ alignItems: "center", opacity: travelAnimRef.current }}>
+          {/* Transport icon */}
           <Text style={tv.transportIcon}>{icon}</Text>
           <Text style={tv.travelLabel}>{label} to</Text>
-          <Text style={tv.cityName}>{step.correctCity}</Text>
-          <View style={tv.routeRow}>
-            <Text style={tv.routeFrom}>
-              {stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).correctCity : adventure.startCity}
-            </Text>
-            <Text style={tv.routeArrow}>{"\u2192"}</Text>
-            <Text style={tv.routeTo}>{step.correctCity}</Text>
+          <Text style={tv.cityName}>{toCity}</Text>
+
+          {/* SVG route arc */}
+          <View style={{ marginVertical: 16 }}>
+            <Svg width={svgW} height={svgH}>
+              {/* Dashed route arc */}
+              <Path
+                d={arcPath}
+                stroke="#F97316"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                fill="none"
+                opacity={0.7}
+              />
+              {/* Origin dot */}
+              <Circle cx={x1} cy={y1} r={5} fill="#F97316" />
+              {/* Destination dot */}
+              <Circle cx={x2} cy={y2} r={7} fill="#F97316" />
+            </Svg>
+            <View style={tv.routeRow}>
+              <Text style={tv.routeFrom}>{fromCity}</Text>
+              <Text style={tv.routeTo}>{toCity}</Text>
+            </View>
           </View>
-          <Pressable
-            style={tv.skipBtn}
-            onPress={() => setPhase("compass_guess")}
-          >
+
+          <Pressable style={tv.skipBtn} onPress={() => setPhase("compass_guess")}>
             <Text style={tv.skipText}>Continue {"\u2192"}</Text>
           </Pressable>
         </Animated.View>
@@ -774,8 +859,6 @@ export default function CompassQuestGame() {
   // ── COMPASS GUESS ──────────────────────────────────────────────────────────────
   if (phase === "compass_guess" || phase === "compass_result") {
     const isResult = phase === "compass_result";
-    const needleDeg = isResult ? step.compassDirection.degrees : 0;
-
     return (
       <View style={[s.root, { backgroundColor: "#0F172A" }]}>
         <ScrollView
@@ -796,11 +879,11 @@ export default function CompassQuestGame() {
             </View>
           </View>
 
-          {/* Compass + clue */}
+          {/* Compass + clue — needle driven by needleDisplayDeg (animated via listener) */}
           <View style={cs.compassSection}>
             <Text style={cs.compassLabel}>Which direction is {step.correctCity}?</Text>
             <View style={cs.roseWrap}>
-              <CompassRose needleDeg={needleDeg} size={180} />
+              <CompassRose needleDeg={isResult ? needleDisplayDeg : 0} size={180} />
             </View>
             <View style={cs.compassClueBox}>
               <Text style={cs.compassClueText}>{step.compassClue}</Text>
@@ -964,7 +1047,7 @@ export default function CompassQuestGame() {
               setStepIdx(0);
               setFragmentsCollected([]);
               setWrongGuesses(0);
-              needleAnim.setValue(0);
+              needleAnim.current.setValue(0);
             }}
           >
             <Text style={ac.btnPrimaryText}>Back to Adventures</Text>
@@ -1234,11 +1317,13 @@ const ac = StyleSheet.create({
 const tv = StyleSheet.create({
   transportIcon: { fontSize: 52, marginBottom: 16 },
   travelLabel: { fontFamily: F.medium, fontSize: 13, color: "#64748B", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 },
-  cityName: { fontFamily: F.bold, fontSize: 28, color: "#E2E8F0", marginBottom: 20 },
-  routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 32 },
-  routeFrom: { fontFamily: F.medium, fontSize: 13, color: "#94A3B8" },
-  routeArrow: { fontFamily: F.bold, fontSize: 16, color: "#F97316" },
-  routeTo: { fontFamily: F.bold, fontSize: 13, color: "#E2E8F0" },
+  cityName: { fontFamily: F.bold, fontSize: 28, color: "#E2E8F0", marginBottom: 4 },
+  routeRow: {
+    flexDirection: "row", justifyContent: "space-between",
+    width: 280, paddingHorizontal: 8, marginTop: 4,
+  },
+  routeFrom: { fontFamily: F.medium, fontSize: 12, color: "#64748B" },
+  routeTo: { fontFamily: F.bold, fontSize: 12, color: "#F97316" },
   skipBtn: {
     backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14,
     paddingHorizontal: 28, paddingVertical: 12,
