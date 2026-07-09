@@ -1096,5 +1096,5 @@ export function getContinentForCity(city: string): string | null {
   return CITY_CONTINENT_MAP[city] || null;
 }
 
-export { getDistanceMiles, getBearing, getMapForRoute, type RegionMap } from "./maps.js";
+export { getDistanceMiles, getBearing, getMapForRoute, type RegionMap } from "./maps";
 
