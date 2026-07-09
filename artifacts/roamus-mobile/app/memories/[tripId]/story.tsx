@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
+import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 import { useAuth } from '@/lib/authContext';
 import { isFreePlan } from '@/lib/subscription';
@@ -136,6 +136,7 @@ function Slide2Map({ trip }: { trip: any }) {
         <Text style={styles.mapPillText}>{'\uD83D\uDCCD'} {visitedCount} places explored</Text>
       </View>
 
+      <View style={{ height: 100 }} />
       <Wordmark opacity={0.3} />
     </View>
   );
@@ -351,11 +352,22 @@ export default function StoryScreen() {
     );
     return {
       heroPhoto: photos[0] ?? null,
-      collagePhotos: [photos[0] ?? null, photos[1] ?? null, photos[2] ?? null, photos[3] ?? null],
+      // Fall back to stop hero images when user hasn't taken photos yet
+      ...((() => {
+        const stopPhotos = (trip?.stops ?? [] as any[]).map((s: any) => {
+          const raw = s.heroImageUrl as string | null | undefined;
+          if (!raw) return null;
+          return raw.startsWith('stop-images/')
+            ? `${API_BASE}/api/travel/stops/${s.id}/hero-img`
+            : raw;
+        }).filter(Boolean);
+        const fill = (idx: number) => photos[idx] ?? stopPhotos[idx] ?? null;
+        return { collagePhotos: [fill(0), fill(1), fill(2), fill(3)] as (string | null)[] };
+      })()),
       closingPhoto: photos[photos.length - 1] ?? photos[0] ?? null,
       highlights: story?.highlights ?? [],
     };
-  }, [moments, story]);
+  }, [moments, story, trip]);
 
   function nextSlide() {
     const cur = slideIndexRef.current;
@@ -425,7 +437,7 @@ export default function StoryScreen() {
         slideOpacity.setValue(1);
         setDisplaySlide(i);
         // Wait for the state update and layout to flush before capturing
-        await new Promise<void>(resolve => setTimeout(resolve, 220));
+        await new Promise<void>(resolve => setTimeout(resolve, 500));
         const uri = await captureSlide();
         if (uri) {
           await MediaLibrary.saveToLibraryAsync(uri);

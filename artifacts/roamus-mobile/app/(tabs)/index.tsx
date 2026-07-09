@@ -81,6 +81,8 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
       router.push(`/memories/${trip.id}/story` as any);
     } else if (isActiveNow) {
       router.push({ pathname: "/(tabs)/today", params: { tripId: trip.id } } as any);
+    } else if (isTripPast) {
+      router.push({ pathname: "/(tabs)/today", params: { tripId: trip.id, forceComplete: '1' } } as any);
     } else {
       router.push(`/trip/${trip.id}` as any);
     }
@@ -156,7 +158,9 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
               ? `\u25B6 Continue Day ${activeDay}`
               : isActiveNow
                 ? '\u25B6 Start Day 1'
-                : 'View trip plan \u2192'}
+                : isTripPast
+                  ? 'Wrap up your trip \u2192'
+                  : 'View trip plan \u2192'}
         </Text>
       </Pressable>
 

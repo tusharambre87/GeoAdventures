@@ -511,7 +511,7 @@ export default function TodayScreen() {
   const { speak, isSpeaking } = useSpeech();
   const kids = useKids();
   useFrauncesFonts({ Fraunces_900Black }); // load Fraunces display font
-  const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string }>();
+  const params = useLocalSearchParams<{ tripId?: string; dayIndex?: string; forceComplete?: string }>();
 
   const rawDevState = __DEV__
     ? (params as Record<string, string>).state
@@ -990,7 +990,13 @@ export default function TodayScreen() {
           const _tripEnd = t.endDate ? parseLocalDate(t.endDate) : null;
           if (_tripEnd) _tripEnd.setHours(23, 59, 59, 999);
           if (_tripEnd != null && _tripEnd.getTime() < Date.now() && t.status !== 'completed') {
-            setTodayState('trip_complete');
+            // Only show trip_complete when user tapped 'Wrap up your trip' on Home.
+            // Direct navigation from the trip plan stays in morning so nothing fires unexpectedly.
+            if (params.forceComplete === '1') {
+              setTodayState('trip_complete');
+            } else {
+              setTodayState('morning');
+            }
           } else {
             const allVisited = stops.length > 0 && stops.every(s => s.isVisited || s.visited);
             const lastVisited = stops.reduce(
@@ -4001,7 +4007,7 @@ export default function TodayScreen() {
     const tripDays = totalDays;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
           <LinearGradient
             colors={['#2D1B69', '#1E1145', '#150D33']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -4053,19 +4059,20 @@ export default function TodayScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={tc.newTripBtn} activeOpacity={0.85}
-            onPress={() => router.push('/onboarding/splash' as never)}
-          >
-            <Text style={tc.newTripBtnText}>Plan your next adventure →</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={tc.gamesBtn} activeOpacity={0.85}
-            onPress={() => router.push('/kids/games' as never)}
-          >
-            <Text style={tc.gamesBtnText}>{'\uD83C\uDFAE'} Travel games for the way home</Text>
-          </TouchableOpacity>
+          <View style={tc.bottomBtnRow}>
+            <TouchableOpacity
+              style={[tc.newTripBtn, tc.halfBtn]} activeOpacity={0.85}
+              onPress={() => router.push('/onboarding/splash' as never)}
+            >
+              <Text style={tc.newTripBtnText}>Plan a trip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[tc.gamesBtn, tc.halfBtn]} activeOpacity={0.85}
+              onPress={() => router.push('/kids/games' as never)}
+            >
+              <Text style={tc.gamesBtnText}>Travel games</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
         {menuOverlay}
       </View>
@@ -4719,10 +4726,12 @@ const tc = StyleSheet.create({
   kidName:  { fontFamily: F.medium, fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2, textAlign: 'right' },
   kidAttrib: { fontFamily: F.bold, fontSize: 12, color: C.muted },
   gamesBtn: {
-    marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
+    marginHorizontal: 0, marginBottom: 0, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimaryLt, alignItems: 'center',
   },
   gamesBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
+  bottomBtnRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 20, gap: 10 },
+  halfBtn: { flex: 1, marginHorizontal: 0 },
 });
 
 // DAY_HISTORY
