@@ -195,9 +195,11 @@ export default function GameHub() {
                 style={({ pressed }) => [
                   s.gridCard,
                   { backgroundColor: game.cardBg, borderColor: game.border },
-                  pressed && { opacity: 0.82 },
+                  pressed && game.type !== "compass-quest" && { opacity: 0.82 },
+                  game.type === "compass-quest" && ageBand === "middle" && { opacity: 0.6 },
                 ]}
                 onPress={() => {
+                  if (game.type === "compass-quest" && ageBand === "middle") return;
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   if (game.route) {
                     router.push(`/${game.route}` as never);
@@ -208,10 +210,12 @@ export default function GameHub() {
               >
                 {game.badge && (
                   <View style={s.gridBadge}>
-                    <Text style={s.gridBadgeText}>{game.badge}</Text>
+                    <Text style={s.gridBadgeText}>
+                      {game.type === "compass-quest" && ageBand === "middle" ? "COMING SOON" : game.badge}
+                    </Text>
                   </View>
                 )}
-                {"ageBadge" in game && game.ageBadge && (
+                {"ageBadge" in game && game.ageBadge && ageBand !== "middle" && (
                   <View style={[s.gridBadge, { top: 30, backgroundColor: "#1E3A5F" }]}>
                     <Text style={[s.gridBadgeText, { color: "#93C5FD" }]}>{game.ageBadge}</Text>
                   </View>

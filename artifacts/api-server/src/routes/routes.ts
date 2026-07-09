@@ -17817,6 +17817,22 @@ CRITICAL RULES:
     }
   });
 
+  // Find an existing incomplete attempt for resume (called on game screen entry)
+  app.get('/api/attempts', async (req, res) => {
+    try {
+      const { playerName, questKey } = req.query as { playerName?: string; questKey?: string };
+      if (!playerName || !questKey) {
+        return res.status(400).json({ error: 'playerName and questKey are required' });
+      }
+      const attempt = await storage.findIncompleteAttempt(playerName, questKey);
+      if (!attempt) return res.json(null);
+      res.json(attempt);
+    } catch (error) {
+      console.error('Error finding incomplete attempt:', error);
+      res.status(500).json({ error: 'Failed to find attempt' });
+    }
+  });
+
   // Create a new attempt record
   app.post('/api/attempts', async (req, res) => {
     try {

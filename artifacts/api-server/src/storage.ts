@@ -510,6 +510,7 @@ export interface IStorage {
   createCompassAttempt(data: InsertCompassAttempt): Promise<CompassAttempt>;
   completeCompassAttempt(attemptId: string, xp: number, timeMs: number, wrongGuesses: number, accuracy: number): Promise<CompassAttempt | undefined>;
   getCompassAttemptById(attemptId: string): Promise<CompassAttempt | undefined>;
+  findIncompleteAttempt(playerName: string, questKey: string): Promise<CompassAttempt | undefined>;
   createCompassChallenge(data: InsertCompassChallenge): Promise<CompassChallenge>;
   getCompassChallengeByCode(shareCode: string): Promise<(CompassChallenge & { quest: CompassQuest; creatorAttempt: CompassAttempt }) | undefined>;
   compareCompassAttempts(shareCode: string, challengerAttemptId: string): Promise<{
@@ -5677,6 +5678,24 @@ export class DatabaseStorage implements IStorage {
 
   async getCompassAttemptById(attemptId: string): Promise<CompassAttempt | undefined> {
     const [attempt] = await db.select().from(compassAttempts).where(eq(compassAttempts.id, attemptId));
+    return attempt;
+  }
+
+  async findIncompleteAttempt(playerName: string, questKey: string): Promise<CompassAttempt | undefined> {
+    const quest = await this.getCompassQuestByKey(questKey);
+    if (!quest) return undefined;
+    const [attempt] = await db
+      .select()
+      .from(compassAttempts)
+      .where(
+        and(
+          eq(compassAttempts.playerName, playerName),
+          eq(compassAttempts.questId, quest.id),
+          eq(compassAttempts.completed, false)
+        )
+      )
+      .orderBy(desc(compassAttempts.createdAt))
+      .limit(1);
     return attempt;
   }
 

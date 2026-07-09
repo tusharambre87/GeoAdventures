@@ -188,14 +188,15 @@ export default function CompassQuestGame() {
     return () => { if (resultTimer.current) clearTimeout(resultTimer.current); };
   }, [effectiveExplorerId]);
 
-  // ── Backend persistence: upsert quest, create attempt ─────────────────────
+  // ── Backend persistence: upsert quest, resume or create attempt ──────────
   const startQuestAttempt = useCallback(async (adv: Adventure) => {
     try {
       const token = await AsyncStorage.getItem("authToken");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
+      const playerName = kidName || explorerId || "Explorer";
 
-      // 1. Upsert the quest record
+      // 1. Upsert the quest record (idempotent)
       const questRes = await fetch(`${API_BASE}/api/quests`, {
         method: "POST",
         headers,
@@ -215,8 +216,19 @@ export default function CompassQuestGame() {
       const quest = await questRes.json() as { id: string };
       questIdRef.current = quest.id;
 
-      // 2. Create an attempt for this player
-      const playerName = kidName || explorerId || "Explorer";
+      // 2. Try to resume an existing incomplete attempt before creating a new one
+      const resumeUrl = `${API_BASE}/api/attempts?playerName=${encodeURIComponent(playerName)}&questKey=${encodeURIComponent(adv.id)}`;
+      const resumeRes = await fetch(resumeUrl, { headers });
+      if (resumeRes.ok) {
+        const existing = await resumeRes.json() as { id: string } | null;
+        if (existing?.id) {
+          // Resume: reuse the existing attempt record
+          attemptIdRef.current = existing.id;
+          return;
+        }
+      }
+
+      // 3. No incomplete attempt found — create a new one
       const attemptRes = await fetch(`${API_BASE}/api/attempts`, {
         method: "POST",
         headers,
@@ -226,7 +238,7 @@ export default function CompassQuestGame() {
       const attempt = await attemptRes.json() as { id: string };
       attemptIdRef.current = attempt.id;
     } catch {
-      // Non-critical — progress is already saved in AsyncStorage
+      // Non-critical — AsyncStorage progress is the local fallback
     }
   }, [kidName, explorerId]);
 
@@ -502,7 +514,7 @@ if (ageBand === "young") return null;
             Coming Soon for Junior Explorers
           </Text>
           <Text style={{ fontFamily: F.medium, fontSize: 15, color: "#94A3B8", textAlign: "center", lineHeight: 24, marginBottom: 32 }}>
-            Compass Quest opens at age 9+. Keep discovering the other games and check back soon!
+            Compass Quest opens at age 8+. Keep discovering the other games and check back soon!
           </Text>
           <Pressable
             style={{ backgroundColor: "#F97316", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32 }}
