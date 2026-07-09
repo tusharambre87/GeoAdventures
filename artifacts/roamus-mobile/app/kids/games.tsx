@@ -116,6 +116,7 @@ export default function GameHub() {
   const kids = useKids();
   const stopName = kids.stopName || "your stop";
   const stopId = kids.stopId || "";
+  const ageBand = kids.ageBand;
 
   const [gameContent, setGameContent] = useState<Record<string, any> | null>(null);
 
@@ -183,9 +184,11 @@ export default function GameHub() {
             </View>
           </Pressable>
 
-          {/* 2×2 grid */}
+          {/* 2×2 grid — compass-quest hidden for young age band */}
           <View style={s.grid}>
-            {GRID_GAMES.map((game) => (
+            {GRID_GAMES.filter((game) =>
+              !(game.type === "compass-quest" && ageBand === "young")
+            ).map((game) => (
               <Pressable
                 key={game.name}
                 style={({ pressed }) => [

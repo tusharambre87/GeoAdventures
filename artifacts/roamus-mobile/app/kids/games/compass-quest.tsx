@@ -14,6 +14,7 @@ import {
 import Svg, { Circle, Line, Path, Polygon, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { API_BASE } from "@/lib/apiClient";
 import { useKids } from "@/lib/kidsContext";
 import { F } from "@/lib/tokens";
 import {
@@ -34,10 +35,25 @@ type GamePhase =
   | "story_beat"
   | "city_guess"
   | "city_result"
+  | "travel"
   | "compass_guess"
   | "compass_result"
   | "step_fact"
-  | "adventure_complete";
+  | "adventure_complete"
+  | "custom_quest";
+
+const TRANSPORT_ICONS: Record<string, string> = {
+  plane: "\u2708\uFE0F",
+  ship: "\uD83D\uDEA2",
+  train: "\uD83D\uDE82",
+  car: "\uD83D\uDE97",
+};
+const TRANSPORT_LABELS: Record<string, string> = {
+  plane: "Flying",
+  ship: "Sailing",
+  train: "Taking the train",
+  car: "Driving",
+};
 
 // ─── Compass Rose ─────────────────────────────────────────────────────────────
 
@@ -157,6 +173,9 @@ export default function CompassQuestGame() {
   const [allProgress, setAllProgress] = useState<Record<string, AdventureProgress>>({});
   const [needleAnim] = useState(new Animated.Value(0));
   const resultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [customAdventure, setCustomAdventure] = useState<Adventure | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAllProgress(effectiveExplorerId).then(setAllProgress);
@@ -234,7 +253,7 @@ export default function CompassQuestGame() {
     setPhase("city_result");
 
     resultTimer.current = setTimeout(() => {
-      setPhase("compass_guess");
+      setPhase("travel");
     }, 1400);
   }, [adventure, stepIdx]);
 
@@ -300,6 +319,68 @@ export default function CompassQuestGame() {
       prepareStep(adventure, nextIdx);
     }
   }, [adventure, stepIdx, fragmentsCollected, wrongGuesses, startTime, effectiveExplorerId, needleAnim, prepareStep]);
+
+  // ── Generate custom AI quest ──────────────────────────────────────────────────
+  const generateCustomQuest = useCallback(async () => {
+    setIsGenerating(true);
+    setGenerateError(null);
+    const defaultCities = ["Paris", "Tokyo", "Rio de Janeiro", "Cairo", "Sydney"];
+    const startCity = "New York";
+    try {
+      const token = await AsyncStorage.getItem("authToken");
+      const res = await fetch(`${API_BASE}/api/compass/generate-quest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ cities: defaultCities, startCity }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      const raw = await res.json();
+      if (!Array.isArray(raw.steps) || raw.steps.length === 0) throw new Error("No steps returned");
+
+      const steps = raw.steps.map((s: Record<string, unknown>, i: number) => ({
+        stepIndex: i,
+        storyBeat: String(s.story_beat ?? ""),
+        clueType: String(s.clue_type ?? "text") as "text" | "landmark" | "flag",
+        cityClue: String(s.clue ?? ""),
+        cityOptions: Array.isArray(s.options) ? s.options.map(String) : [],
+        correctCity: String(s.correct_answer ?? ""),
+        compassClue: String(s.compass_clue ?? ""),
+        compassDirection: {
+          label: String(s.direction ?? "N"),
+          degrees: { North: 0, Northeast: 45, East: 90, Southeast: 135, South: 180, Southwest: 225, West: 270, Northwest: 315 }[String(s.direction ?? "N")] ?? 0,
+        },
+        travelFact: String(s.fun_fact ?? ""),
+        fragmentName: `Crown Fragment ${i + 1}`,
+        fragmentEmoji: "\uD83D\uDC51",
+        cityCoords: { lat: 0, lng: 0 },
+      }));
+
+      const custom: Adventure = {
+        id: `custom_${Date.now()}`,
+        title: String(raw.quest_title ?? "Custom Quest"),
+        subtitle: `A ${startCity} adventure`,
+        icon: "\uD83E\uDDED",
+        description: `AI-generated quest starting in ${startCity}`,
+        storyIntro: `Your adventure begins in ${startCity}.\n\nThe compass is ready.\n\nLet the quest begin!`,
+        startCity,
+        startCityEmoji: "\uD83D\uDDFD",
+        startCityCoords: { lat: 40.71, lng: -74.01 },
+        locked: false,
+        reward: {
+          title: "Custom Quest Complete",
+          emoji: "\uD83C\uDF1F",
+          description: "You completed your AI-generated adventure!",
+        },
+        steps,
+      };
+      setCustomAdventure(custom);
+      setIsGenerating(false);
+      startAdventure(custom);
+    } catch (err) {
+      setGenerateError("Could not generate quest. Try again.");
+      setIsGenerating(false);
+    }
+  }, [startAdventure]);
 
   // ── ADVENTURE SELECT ─────────────────────────────────────────────────────────
   if (phase === "adventure_select") {
@@ -419,6 +500,34 @@ export default function CompassQuestGame() {
                 })}
               </>
             )}
+
+            {/* AI Custom Quest */}
+            <Text style={s.sectionLabel}>AI ADVENTURE</Text>
+            <Pressable
+              style={({ pressed }) => [s.aiCard, pressed && { opacity: 0.88 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                generateCustomQuest();
+              }}
+              disabled={isGenerating}
+            >
+              <View style={s.aiCardInner}>
+                <View>
+                  <Text style={s.aiTitle}>
+                    {isGenerating ? "Generating Quest..." : "Generate AI Quest"}
+                  </Text>
+                  <Text style={s.aiSub}>
+                    {isGenerating
+                      ? "Our AI is writing your adventure..."
+                      : "NY \u2192 Paris \u2192 Tokyo \u2192 Cairo \u2192 Rio \u2192 Sydney"}
+                  </Text>
+                  {generateError && (
+                    <Text style={s.aiError}>{generateError}</Text>
+                  )}
+                </View>
+                <Text style={s.aiIcon}>{isGenerating ? "\u2728" : "\uD83E\uDDE0"}</Text>
+              </View>
+            </Pressable>
 
             {/* Coming soon */}
             {comingSoon.length > 0 && (
@@ -612,6 +721,52 @@ export default function CompassQuestGame() {
             </View>
           )}
         </ScrollView>
+      </View>
+    );
+  }
+
+  // ── TRAVEL PHASE ─────────────────────────────────────────────────────────────
+  if (phase === "travel") {
+    const transportMode = step.transportMode ?? "car";
+    const icon = TRANSPORT_ICONS[transportMode] ?? "\uD83D\uDE97";
+    const label = TRANSPORT_LABELS[transportMode] ?? "Travelling";
+    const travelAnim = new Animated.Value(0);
+    Animated.timing(travelAnim, { toValue: 1, duration: 1200, useNativeDriver: true }).start(() => {
+      setPhase("compass_guess");
+    });
+    return (
+      <View style={[s.root, { backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" }]}>
+        <View style={[cg.topBar, { position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top + 12 }]}>
+          <Pressable onPress={() => setPhase("adventure_select")}>
+            <Text style={cg.quitText}>{"\u2190"} Quit</Text>
+          </Pressable>
+          <View style={cg.progressRow}>
+            {steps.map((_, i) => (
+              <View key={i} style={[cg.dot, i < stepIdx && cg.dotDone, i === stepIdx && cg.dotActive]} />
+            ))}
+          </View>
+          <View style={cg.xpBadge}>
+            <Text style={cg.xpText}>{stepIdx + 1}/{totalSteps}</Text>
+          </View>
+        </View>
+        <Animated.View style={{ alignItems: "center", opacity: travelAnim }}>
+          <Text style={tv.transportIcon}>{icon}</Text>
+          <Text style={tv.travelLabel}>{label} to</Text>
+          <Text style={tv.cityName}>{step.correctCity}</Text>
+          <View style={tv.routeRow}>
+            <Text style={tv.routeFrom}>
+              {stepIdx > 0 ? (steps[stepIdx - 1] as QuestStep).correctCity : adventure.startCity}
+            </Text>
+            <Text style={tv.routeArrow}>{"\u2192"}</Text>
+            <Text style={tv.routeTo}>{step.correctCity}</Text>
+          </View>
+          <Pressable
+            style={tv.skipBtn}
+            onPress={() => setPhase("compass_guess")}
+          >
+            <Text style={tv.skipText}>Continue {"\u2192"}</Text>
+          </Pressable>
+        </Animated.View>
       </View>
     );
   }
@@ -891,6 +1046,16 @@ const s = StyleSheet.create({
   advDone: { fontFamily: F.bold, fontSize: 16, color: "#4ADE80" },
   advLock: { fontSize: 16 },
   advArrow: { fontFamily: F.bold, fontSize: 18, color: "#94A3B8" },
+  // AI card
+  aiCard: {
+    backgroundColor: "#1A1A2E", borderRadius: 16, padding: 18,
+    borderWidth: 1.5, borderColor: "#4F46E5",
+  },
+  aiCardInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  aiTitle: { fontFamily: F.bold, fontSize: 15, color: "#A5B4FC", marginBottom: 4 },
+  aiSub: { fontFamily: F.medium, fontSize: 12, color: "#6366F1" },
+  aiError: { fontFamily: F.medium, fontSize: 11, color: "#F87171", marginTop: 4 },
+  aiIcon: { fontSize: 28 },
   // Coming soon
   comingSoonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   comingCard: {
@@ -1064,4 +1229,20 @@ const ac = StyleSheet.create({
     borderRadius: 16, paddingVertical: 14, alignItems: "center",
   },
   btnGhostText: { fontFamily: F.bold, fontSize: 14, color: "rgba(255,255,255,0.7)" },
+});
+
+const tv = StyleSheet.create({
+  transportIcon: { fontSize: 52, marginBottom: 16 },
+  travelLabel: { fontFamily: F.medium, fontSize: 13, color: "#64748B", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 },
+  cityName: { fontFamily: F.bold, fontSize: 28, color: "#E2E8F0", marginBottom: 20 },
+  routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 32 },
+  routeFrom: { fontFamily: F.medium, fontSize: 13, color: "#94A3B8" },
+  routeArrow: { fontFamily: F.bold, fontSize: 16, color: "#F97316" },
+  routeTo: { fontFamily: F.bold, fontSize: 13, color: "#E2E8F0" },
+  skipBtn: {
+    backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 14,
+    paddingHorizontal: 28, paddingVertical: 12,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+  },
+  skipText: { fontFamily: F.bold, fontSize: 14, color: "#94A3B8" },
 });
