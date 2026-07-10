@@ -973,6 +973,9 @@ export default function TodayScreen() {
         setCurrentStopIndex(Math.min(lastVisited + 1, stops.length - 1));
       }
 
+      // Source of truth: if the server already marks this trip completed,
+      // reflect it immediately so trip_complete survives tab-switches/remounts.
+      if (t.status === 'completed') { setTodayState('trip_complete'); return; }
 
       if (forceReset && !devState) {
         // "Start Day N" was tapped explicitly — always land on morning regardless of DB visited state
@@ -3621,6 +3624,35 @@ export default function TodayScreen() {
               }}>
                 <Text style={sc.wrapBtnText}>Wrap up Day {resolvedDayIndex + 1} →</Text>
               </TouchableOpacity>
+              {(() => {
+                // Part B: on the last populated day show a direct story shortcut + extend option
+                const scNonMeals = (trip?.stops ?? []).filter((s: any) => !isMealStop(s.stopType));
+                const scLastDay = scNonMeals.length > 0
+                  ? Math.max(...scNonMeals.map((s: any) => s.dayIndex ?? 0))
+                  : (trip?.plannerTripDays ?? trip?.tripDays ?? 1) - 1;
+                if (resolvedDayIndex < scLastDay) return null;
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={[sc.wrapBtn, { backgroundColor: C.orange, marginTop: 10 }]}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setWrapPhotos(prev => mergeVisitedIntoWrap(visitedPhotos, prev));
+                        setTodayState('trip_complete');
+                      }}
+                    >
+                      <Text style={sc.wrapBtnText}>See your trip story →</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => trip?.id && router.push(`/trip/${trip.id}` as never)}
+                      style={{ marginTop: 12, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20 }}
+                    >
+                      <Text style={{ color: C.muted, fontFamily: F.medium, fontSize: 14 }}>{'+ Add a day'}</Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              })()}
             </View>
           ) : (
             <View style={sc.card}>
