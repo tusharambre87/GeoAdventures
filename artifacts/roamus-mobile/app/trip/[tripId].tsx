@@ -192,7 +192,7 @@ type TripData = {
 };
 
 type RunMode = 'balanced' | 'faster' | 'easier';
-type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop' | 'preferences' | 'dateEditor' | 'stopPreview';
+type ActiveSheet = 'none' | 'stopDetail' | 'replace' | 'runDay' | 'options' | 'compare' | 'addStop' | 'preferences' | 'dateEditor' | 'stopPreview' | 'tripMap';
 type PreviewCtx = 'add' | 'replace' | 'swap';
 type PreviewStopData = {
   opt: StopOption;
@@ -3178,6 +3178,7 @@ function TripOptionsSheet({
   activeTripDay,
   onClose,
   onCompare,
+  onOpenMap,
   onOpenChecklist,
   onOpenPreferences,
   onOpenDateEditor,
@@ -3192,6 +3193,7 @@ function TripOptionsSheet({
   activeTripDay: number;
   onClose: () => void;
   onCompare: () => void;
+  onOpenMap: () => void;
   onOpenChecklist: () => void;
   onOpenPreferences: () => void;
   onOpenDateEditor: () => void;
@@ -3307,6 +3309,7 @@ function TripOptionsSheet({
         },
         { icon: <IconCheck />, bg: '#FDF0E9', name: 'Packing list', sub: "Check off what you're bringing", onPress: () => { onClose(); setTimeout(() => onOpenChecklist(), 350); } },
         { icon: <IconBars />, bg: '#E8F7EF', name: 'Compare days', sub: 'See balance and pace across all days', onPress: () => { onClose(); onCompare(); } },
+        { icon: <Ionicons name="map-outline" size={20} color="#E8692A" />, bg: '#FDF0E9', name: 'Trip Map', sub: 'See all your stops on an interactive map', onPress: () => { onClose(); onOpenMap(); } },
       ],
     },
     {
@@ -3411,6 +3414,7 @@ function CompareDaysSheet({
   onClose,
   onSelectDay,
   onStopPress,
+  initialTab,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -3420,8 +3424,9 @@ function CompareDaysSheet({
   onClose: () => void;
   onSelectDay: (d: number) => void;
   onStopPress: (stop: Stop) => void;
+  initialTab?: 'summary' | 'timeline' | 'map';
 }) {
-  const [tab, setTab] = useState<'summary' | 'timeline' | 'map'>('summary');
+  const [tab, setTab] = useState<'summary' | 'timeline' | 'map'>(initialTab ?? 'summary');
 
   const allDayStops = Array.from({ length: totalDays }, (_, i) => getStopsForDay(i + 1));
   const anyPacked = allDayStops.some(ds => ds.length >= 4);
@@ -5089,6 +5094,7 @@ export default function TripPlanScreen() {
             activeTripDay={activeTripDay}
             onClose={closeSheet}
             onCompare={() => setActiveSheet('compare')}
+            onOpenMap={() => setActiveSheet('tripMap')}
             onOpenChecklist={() => { closeSheet(); setTimeout(() => setChecklistOpen(true), 300); }}
             onOpenPreferences={() => setActiveSheet('preferences')}
             onOpenDateEditor={() => setActiveSheet('dateEditor')}
@@ -5150,6 +5156,22 @@ export default function TripPlanScreen() {
             onClose={closeSheet}
             onSelectDay={(d) => { closeSheet(); goToDay(d); }}
             onStopPress={(s) => setMapDetailStop(s)}
+          />
+        </SheetModal>
+      )}
+
+      {activeSheet === 'tripMap' && (
+        <SheetModal visible onClose={closeSheet}>
+          <CompareDaysSheet
+            trip={trip}
+            stops={localStops}
+            totalDays={totalDays}
+            getDayStatus={getDayStatus}
+            getStopsForDay={getStopsForDay}
+            onClose={closeSheet}
+            onSelectDay={(d) => { closeSheet(); goToDay(d); }}
+            onStopPress={(s) => setMapDetailStop(s)}
+            initialTab='map'
           />
         </SheetModal>
       )}
