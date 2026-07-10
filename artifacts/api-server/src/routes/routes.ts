@@ -6718,26 +6718,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const candidates = visited.length > 0 ? visited : withCoords;
       const pins       = candidates.slice(0, 9);
 
-      const url = new URL('https://maps.googleapis.com/maps/api/staticmap');
-      url.searchParams.set('size', `${width}x${height}`);
-      url.searchParams.set('scale', '2');
-      url.searchParams.set('maptype', 'roadmap');
-      url.searchParams.set('key', apiKey);
-      // Suppress clutter
-      url.searchParams.append('style', 'feature:poi|element:labels|visibility:off');
-      url.searchParams.append('style', 'feature:transit|visibility:off');
-
       if (pins.length === 0) {
         // No coordinate data — return 204 so the client falls back to the text list
         return res.status(204).end();
       }
+
+      // Compute bounding box and derive center + zoom so ALL pins fit with padding.
+      // (Auto-fit without explicit center/zoom clips stops that lie outside the portrait viewport.)
+      const parsedLats = pins.map(s => parseFloat(String(s.latitude)));
+      const parsedLons = pins.map(s => parseFloat(String(s.longitude)));
+      const minLat = Math.min(...parsedLats), maxLat = Math.max(...parsedLats);
+      const minLon = Math.min(...parsedLons), maxLon = Math.max(...parsedLons);
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLon = (minLon + maxLon) / 2;
+
+      let zoom: number;
+      if (pins.length === 1) {
+        zoom = 14;
+      } else {
+        // At zoom z, 256px covers 360° of longitude (Mercator).
+        // Use 55% of the shorter image dimension as the target span coverage.
+        const lonSpan = Math.max(maxLon - minLon, 0.001);
+        const latSpanMerc = Math.max(maxLat - minLat, 0.001) / Math.cos(centerLat * Math.PI / 180);
+        const lonZoom = Math.log2((width  * 0.55 * 360) / (256 * lonSpan));
+        const latZoom = Math.log2((height * 0.55 * 360) / (256 * latSpanMerc));
+        zoom = Math.max(2, Math.min(15, Math.floor(Math.min(lonZoom, latZoom))));
+      }
+
+      const url = new URL('https://maps.googleapis.com/maps/api/staticmap');
+      url.searchParams.set('size', `${width}x${height}`);
+      url.searchParams.set('scale', '2');
+      url.searchParams.set('maptype', 'roadmap');
+      url.searchParams.set('center', `${centerLat},${centerLon}`);
+      url.searchParams.set('zoom', String(zoom));
+      url.searchParams.set('key', apiKey);
+      // Suppress clutter
+      url.searchParams.append('style', 'feature:poi|element:labels|visibility:off');
+      url.searchParams.append('style', 'feature:transit|visibility:off');
 
       // Numbered orange markers
       pins.forEach((s, i) => {
         url.searchParams.append('markers', `color:0xFF6600|label:${i + 1}|${s.latitude},${s.longitude}`);
       });
 
-      // Dashed polyline path between stops (weight:2 is the thinnest Google Static Maps supports)
+      // Orange polyline path between stops
       if (pins.length > 1) {
         const coords = pins.map(s => `${s.latitude},${s.longitude}`).join('|');
         url.searchParams.append('path', `color:0xFF660088|weight:2|${coords}`);

@@ -89,7 +89,7 @@ function Slide2Map({ trip }: { trip: any }) {
   const city = trip?.destination ?? '';
   const numDays = trip?.tripDays ?? trip?.days ?? 0;
   const visitedCount = visited.length;
-  const mapUri = trip?.id ? `${API_BASE}/api/travel/trips/${trip.id}/story-map` : null;
+  const mapUri = trip?.id ? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2` : null;
   const showMap = !!mapUri && !mapErr;
 
   return (
