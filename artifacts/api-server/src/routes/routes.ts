@@ -6684,6 +6684,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Story map — numbered orange pins for all visited stops, used by the carousel Slide 2.
+  // No auth required; tripId UUID is the only gate (unguessable).
+  app.get('/api/travel/trips/:tripId/story-map', async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const width  = Number(req.query.width  ?? 390);
+      const height = Number(req.query.height ?? 500);
+      const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+      if (!apiKey) return res.status(503).end();
+
+      // Fetch all stops for this trip
+      const stops = await db
+        .select({
+          name: travelStops.name,
+          latitude: travelStops.latitude,
+          longitude: travelStops.longitude,
+          displayOrder: travelStops.displayOrder,
+          dayIndex: travelStops.dayIndex,
+          isVisited: travelStops.isVisited,
+          stopType: travelStops.stopType,
+        })
+        .from(travelStops)
+        .where(eq(travelStops.tripId, tripId))
+        .orderBy(asc(travelStops.dayIndex), asc(travelStops.displayOrder));
+
+      const mealTypes = new Set(['restaurant','food','cafe','market','meal','street_food','diner','eatery']);
+      const isMeal = (t: string | null | undefined) =>
+        t ? mealTypes.has(t.toLowerCase()) : false;
+
+      const withCoords = stops.filter(s => s.latitude != null && s.longitude != null && !isMeal(s.stopType));
+      const visited    = withCoords.filter(s => s.isVisited);
+      const candidates = visited.length > 0 ? visited : withCoords;
+      const pins       = candidates.slice(0, 9);
+
+      const url = new URL('https://maps.googleapis.com/maps/api/staticmap');
+      url.searchParams.set('size', `${width}x${height}`);
+      url.searchParams.set('scale', '2');
+      url.searchParams.set('maptype', 'roadmap');
+      url.searchParams.set('key', apiKey);
+      // Suppress clutter
+      url.searchParams.append('style', 'feature:poi|element:labels|visibility:off');
+      url.searchParams.append('style', 'feature:transit|visibility:off');
+
+      if (pins.length === 0) {
+        // No coordinate data — return 204 so the client falls back to the text list
+        return res.status(204).end();
+      }
+
+      // Numbered orange markers
+      pins.forEach((s, i) => {
+        url.searchParams.append('markers', `color:0xFF6600|label:${i + 1}|${s.latitude},${s.longitude}`);
+      });
+
+      // Dashed polyline path between stops (weight:2 is the thinnest Google Static Maps supports)
+      if (pins.length > 1) {
+        const coords = pins.map(s => `${s.latitude},${s.longitude}`).join('|');
+        url.searchParams.append('path', `color:0xFF660088|weight:2|${coords}`);
+      }
+
+      const upstream = await fetch(url.toString());
+      if (!upstream.ok) return res.status(502).end();
+
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      const buf = await upstream.arrayBuffer();
+      return res.end(Buffer.from(buf));
+    } catch (err) {
+      req.log?.error({ err }, '[StoryMap] error');
+      return res.status(500).end();
+    }
+  });
+
   // Guest: create a trip without authentication (returns guestToken for later access)
   app.post('/api/travel/trips/guest-create', travelModeGuard, async (req: any, res) => {
     try {
