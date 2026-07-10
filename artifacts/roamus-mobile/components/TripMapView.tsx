@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+import type { Region } from 'react-native-maps';
 
 type Stop = {
   id: string;
@@ -15,42 +16,86 @@ type Stop = {
 
 type Props = {
   stops: Stop[];
+  totalDays: number;
   onMarkerPress: (stop: Stop) => void;
 };
 
-export default function TripMapView({ stops, onMarkerPress }: Props) {
-  const pinStops = useMemo(() => {
-    return stops
-      .filter(s => {
-        if (s.latitude == null || s.longitude == null) return false;
-        const lat = parseFloat(String(s.latitude));
-        const lon = parseFloat(String(s.longitude));
-        return !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
-      })
-      .slice()
-      .sort((a, b) => {
-        const dDay = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
-        return dDay !== 0 ? dDay : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
-      });
-  }, [stops]);
+const EDGE_PADDING = { top: 64, right: 40, bottom: 40, left: 40 };
 
-  const region = useMemo(() => {
-    if (pinStops.length === 0) return null;
-    const lats = pinStops.map(s => parseFloat(String(s.latitude)));
-    const lons = pinStops.map(s => parseFloat(String(s.longitude)));
+function hasCoord(s: Stop): boolean {
+  const lat = parseFloat(String(s.latitude));
+  const lon = parseFloat(String(s.longitude));
+  return (
+    s.latitude != null &&
+    s.longitude != null &&
+    !isNaN(lat) &&
+    !isNaN(lon) &&
+    (lat !== 0 || lon !== 0)
+  );
+}
+
+function toCoord(s: Stop) {
+  return {
+    latitude: parseFloat(String(s.latitude)),
+    longitude: parseFloat(String(s.longitude)),
+  };
+}
+
+export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) {
+  const mapRef = useRef<MapView>(null);
+  const mapReady = useRef(false);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  // All coord-valid stops (for initial region computation)
+  const allPinStops = useMemo(() => stops.filter(hasCoord), [stops]);
+
+  // Filtered + sorted stops for the current chip selection
+  const pinStops = useMemo(() => {
+    const base = selectedDay == null
+      ? allPinStops
+      : allPinStops.filter(s => s.dayIndex === selectedDay);
+    return base.slice().sort((a, b) => {
+      const dDay = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
+      return dDay !== 0 ? dDay : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+    });
+  }, [allPinStops, selectedDay]);
+
+  // Fallback region used before the map is ready
+  const initialRegion = useMemo<Region | undefined>(() => {
+    if (allPinStops.length === 0) return undefined;
+    const lats = allPinStops.map(s => parseFloat(String(s.latitude)));
+    const lons = allPinStops.map(s => parseFloat(String(s.longitude)));
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
     const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-    const latDelta = Math.max(maxLat - minLat, 0.025) * 1.5;
-    const lonDelta = Math.max(maxLon - minLon, 0.025) * 1.5;
     return {
       latitude: (minLat + maxLat) / 2,
       longitude: (minLon + maxLon) / 2,
-      latitudeDelta: latDelta,
-      longitudeDelta: lonDelta,
+      latitudeDelta: Math.max(maxLat - minLat, 0.025) * 1.5,
+      longitudeDelta: Math.max(maxLon - minLon, 0.025) * 1.5,
     };
+  }, [allPinStops]);
+
+  function fitToPins(animated: boolean) {
+    if (!mapRef.current || pinStops.length === 0) return;
+    mapRef.current.fitToCoordinates(pinStops.map(toCoord), {
+      edgePadding: EDGE_PADDING,
+      animated,
+    });
+  }
+
+  // Re-frame whenever the filtered set changes (chip tap or stops update)
+  useEffect(() => {
+    if (mapReady.current) {
+      fitToPins(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinStops]);
 
-  if (!region) {
+  const polyCoords = pinStops.map(toCoord);
+  // Dashed polyline only when a single day is selected — all-days is pins-only
+  const showPolyline = selectedDay !== null && polyCoords.length > 1;
+
+  if (!initialRegion) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>No location data for this trip yet</Text>
@@ -58,35 +103,38 @@ export default function TripMapView({ stops, onMarkerPress }: Props) {
     );
   }
 
-  const polyCoords = pinStops.map(s => ({
-    latitude: parseFloat(String(s.latitude)),
-    longitude: parseFloat(String(s.longitude)),
-  }));
+  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
 
   return (
     <View style={styles.container}>
+      {/* Map fills the container */}
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
-        initialRegion={region}
+        initialRegion={initialRegion}
+        onMapReady={() => {
+          mapReady.current = true;
+          fitToPins(false);
+        }}
         showsUserLocation={false}
         showsPointsOfInterest={false}
         showsBuildings={false}
       >
-        {polyCoords.length > 1 && (
+        {showPolyline && (
           <Polyline
             coordinates={polyCoords}
-            strokeColor="rgba(232,105,42,0.6)"
-            strokeWidth={2}
+            strokeColor="rgba(232,105,42,0.8)"
+            strokeWidth={2.5}
+            lineDashPattern={[6, 4]}
           />
         )}
         {pinStops.map((stop, i) => {
           const isVisited = stop.isVisited || stop.visited;
-          const lat = parseFloat(String(stop.latitude));
-          const lon = parseFloat(String(stop.longitude));
+          const coord = toCoord(stop);
           return (
             <Marker
               key={stop.id}
-              coordinate={{ latitude: lat, longitude: lon }}
+              coordinate={coord}
               onPress={() => onMarkerPress(stop)}
               title={stop.name}
               anchor={{ x: 0.5, y: 0.5 }}
@@ -98,24 +146,72 @@ export default function TripMapView({ stops, onMarkerPress }: Props) {
           );
         })}
       </MapView>
+
+      {/* Chip row floats above the map */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipRow}
+        contentContainerStyle={styles.chipContent}
+        pointerEvents="box-none"
+      >
+        <Pressable
+          style={[styles.chip, selectedDay === null && styles.chipOn]}
+          onPress={() => setSelectedDay(null)}
+        >
+          <Text style={[styles.chipText, selectedDay === null && styles.chipTextOn]}>
+            All days
+          </Text>
+        </Pressable>
+        {days.map(d => (
+          <Pressable
+            key={d}
+            style={[styles.chip, selectedDay === d && styles.chipOn]}
+            onPress={() => setSelectedDay(d)}
+          >
+            <Text style={[styles.chipText, selectedDay === d && styles.chipTextOn]}>
+              Day {d}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
+const C = { orange: '#E8692A', green: '#3DAA6E', bg: '#F5F2EE', text: '#2E2E2E' };
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F2EE',
+    backgroundColor: C.bg,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#888',
+  emptyText: { fontSize: 14, color: '#888' },
+  chipRow: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
+  chipContent: { paddingHorizontal: 12, gap: 6, flexDirection: 'row' },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  chipOn: { backgroundColor: C.orange },
+  chipText: { fontSize: 13, fontWeight: '600', color: C.text },
+  chipTextOn: { color: '#fff' },
   pin: {
     width: 28,
     height: 28,
@@ -128,15 +224,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  pinUnvisited: {
-    backgroundColor: '#E8692A',
-  },
-  pinVisited: {
-    backgroundColor: '#3DAA6E',
-  },
-  pinLabel: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  pinUnvisited: { backgroundColor: C.orange },
+  pinVisited: { backgroundColor: C.green },
+  pinLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
 });

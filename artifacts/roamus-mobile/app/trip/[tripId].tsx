@@ -3410,6 +3410,7 @@ function CompareDaysSheet({
   getStopsForDay,
   onClose,
   onSelectDay,
+  onStopPress,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -3418,6 +3419,7 @@ function CompareDaysSheet({
   getStopsForDay: (d: number) => Stop[];
   onClose: () => void;
   onSelectDay: (d: number) => void;
+  onStopPress: (stop: Stop) => void;
 }) {
   const [tab, setTab] = useState<'summary' | 'timeline' | 'map'>('summary');
 
@@ -3462,8 +3464,9 @@ function CompareDaysSheet({
 
       {tab === 'map' ? (
         <TripMapView
-          stops={trip.stops ?? []}
-          onMarkerPress={(s) => { onClose(); onSelectDay(s.dayIndex ?? 1); }}
+          stops={stops}
+          totalDays={totalDays}
+          onMarkerPress={onStopPress}
         />
       ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={cds.body}>
@@ -4716,6 +4719,7 @@ export default function TripPlanScreen() {
   const [showCommunityShare, setShowCommunityShare] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+  const [mapDetailStop, setMapDetailStop] = useState<Stop | null>(null);
   const [runMode, setRunMode]           = useState<RunMode>('balanced');
   // Seed localStops from the React Query cache synchronously so DayDetail never
   // mounts with an empty list when data is already available (prevents blank screen).
@@ -5145,6 +5149,28 @@ export default function TripPlanScreen() {
             getStopsForDay={getStopsForDay}
             onClose={closeSheet}
             onSelectDay={(d) => { closeSheet(); goToDay(d); }}
+            onStopPress={(s) => setMapDetailStop(s)}
+          />
+        </SheetModal>
+      )}
+
+      {/* Map pin → stop detail; compare sheet stays mounted behind this */}
+      {mapDetailStop && (
+        <SheetModal visible onClose={() => setMapDetailStop(null)}>
+          <TripPlanStopSheet
+            stop={mapDetailStop}
+            onClose={() => setMapDetailStop(null)}
+            onReplace={(s) => { setMapDetailStop(null); openReplaceSheet(s as any); }}
+            onDelete={deleteStop}
+            tripId={tripId ?? ''}
+            currentDayIndex={mapDetailStop?.dayIndex ?? 0}
+            tripDays={Array.from({ length: totalDays }, (_, i) => ({
+              dayIndex: i,
+              dayNum: i + 1,
+              date: trip.startDate ? formatDate(trip.startDate, i) : null,
+              stops: getStopsForDay(i + 1),
+            }))}
+            onMove={handleMoveStop}
           />
         </SheetModal>
       )}
