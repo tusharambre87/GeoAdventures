@@ -68,6 +68,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
   const daysSince     = tripStart ? Math.floor((today.getTime() - tripStart.getTime()) / 86_400_000) : 0;
   const activeDayIdx  = Math.max(0, Math.min(daysSince, Math.max(totalDays - 1, 0)));
   const activeDay     = activeDayIdx + 1;
+  const isLastDay     = isActiveNow && activeDay === totalDays && trip.status !== 'completed';
 
   // ── Next unvisited stop for active day ─────────────────────────────────────
   const dayStops = [...(trip.stops ?? [])]
@@ -154,13 +155,15 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
         <Text style={s.continueBtnText}>
           {trip.status === 'completed'
             ? 'View memories →'
-            : isActiveNow && activeDay > 1
-              ? `\u25B6 Continue Day ${activeDay}`
-              : isActiveNow
-                ? '\u25B6 Start Day 1'
-                : isTripPast
-                  ? 'Wrap up your trip \u2192'
-                  : 'View trip plan \u2192'}
+            : isLastDay
+              ? 'Complete your trip \u2192'
+              : isActiveNow && activeDay > 1
+                ? `\u25B6 Continue Day ${activeDay}`
+                : isActiveNow
+                  ? '\u25B6 Start Day 1'
+                  : isTripPast
+                    ? 'Wrap up your trip \u2192'
+                    : 'View trip plan \u2192'}
         </Text>
       </Pressable>
 

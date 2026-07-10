@@ -3978,6 +3978,17 @@ export default function TodayScreen() {
           >
             <Text style={dc.kidsZoneBtnText}>{'\uD83E\uDDF8'} Kids zone →</Text>
           </TouchableOpacity>
+
+          {/* Complete trip CTA — visible on the last day of the trip */}
+          {resolvedDayIndex + 1 >= totalDays && (trip as any)?.status !== 'completed' && (
+            <TouchableOpacity
+              style={dc.completeBtn} activeOpacity={0.85}
+              onPress={() => setTodayState('trip_complete')}
+            >
+              <Text style={dc.completeBtnTitle}>{'\uD83C\uDFC6'} Your trip is complete!</Text>
+              <Text style={dc.completeBtnSub}>Tap to wrap up and view your shareable story</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
         <KidPickerScreen
           visible={kidPickerVisible}
@@ -4689,6 +4700,12 @@ const dc = StyleSheet.create({
   kidsXpRow:  { marginHorizontal: 20, marginBottom: 10, alignItems: 'center' },
   kidsXpText: { fontFamily: F.medium, fontSize: 14, color: '#3DAA6E' },
   kidsXpNum:  { fontFamily: F.bold, fontSize: 14, color: '#3DAA6E' },
+  completeBtn: {
+    marginHorizontal: 16, marginBottom: 12, borderRadius: 16, paddingVertical: 18,
+    paddingHorizontal: 20, backgroundColor: C.orange, alignItems: 'center', gap: 4,
+  },
+  completeBtnTitle: { fontFamily: F.bold, fontSize: 17, color: '#fff' },
+  completeBtnSub:   { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
   kidsZoneBtn: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimary, alignItems: 'center',
