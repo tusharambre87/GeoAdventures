@@ -29,6 +29,7 @@ import { FlatList, TouchableOpacity as GHTouchable, Swipeable } from "react-nati
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
+import TripMapView from '@/components/TripMapView';
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -3418,7 +3419,7 @@ function CompareDaysSheet({
   onClose: () => void;
   onSelectDay: (d: number) => void;
 }) {
-  const [tab, setTab] = useState<'summary' | 'timeline'>('summary');
+  const [tab, setTab] = useState<'summary' | 'timeline' | 'map'>('summary');
 
   const allDayStops = Array.from({ length: totalDays }, (_, i) => getStopsForDay(i + 1));
   const anyPacked = allDayStops.some(ds => ds.length >= 4);
@@ -3447,13 +3448,24 @@ function CompareDaysSheet({
         <Pressable style={[cds.tb, tab === 'timeline' && cds.tbOn]} onPress={() => showToast('Timeline view coming soon')}>
           <Text style={[cds.tbText, tab === 'timeline' && cds.tbTextOn]}>Timeline</Text>
         </Pressable>
+        <Pressable style={[cds.tb, tab === 'map' && cds.tbOn]} onPress={() => setTab('map')}>
+          <Text style={[cds.tbText, tab === 'map' && cds.tbTextOn]}>Map</Text>
+        </Pressable>
       </View>
 
-      {/* Status banner */}
-      <View style={cds.statusBanner}>
-        <Text style={cds.statusText}>{statusMsg}</Text>
-      </View>
+      {/* Status banner — hidden in map mode */}
+      {tab !== 'map' && (
+        <View style={cds.statusBanner}>
+          <Text style={cds.statusText}>{statusMsg}</Text>
+        </View>
+      )}
 
+      {tab === 'map' ? (
+        <TripMapView
+          stops={trip.stops ?? []}
+          onMarkerPress={(s) => { onClose(); onSelectDay(s.dayIndex ?? 1); }}
+        />
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={cds.body}>
         {Array.from({ length: totalDays }, (_, i) => i + 1)
           .filter(dayNum => {
@@ -3491,6 +3503,7 @@ function CompareDaysSheet({
           );
         })}
       </ScrollView>
+      )}
     </View>
   );
 }
