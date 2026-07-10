@@ -999,23 +999,65 @@ export default function AtStopScreen() {
                   </View>
                 ))}
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (trip?.id) {
-                    router.push({
-                      pathname: '/trip/[tripId]' as never,
-                      params: { tripId: trip.id, initialDay: String(dayIndex + 2), fromDayWrap: 'true' },
-                    } as never);
-                  } else {
-                    router.push('/(tabs)/today');
-                  }
-                }}
-                style={{ backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center' }}
-              >
-                <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>
-                  See Tomorrow's Plan {'→'}
-                </Text>
-              </TouchableOpacity>
+              {(() => {
+                // Last-day branch: on the last populated day steer to story,
+                // not a nonexistent next day.
+                const _nm = (trip?.stops ?? []).filter((s: any) => {
+                  const _t = (s.stopType ?? '').toLowerCase();
+                  return !['restaurant','food','cafe','market','meal',
+                    'street_food','diner','eatery'].some(k => _t.includes(k));
+                });
+                const _lastDay = _nm.length > 0
+                  ? Math.max(..._nm.map((s: any) => s.dayIndex ?? 0))
+                  : (trip?.plannerTripDays ?? trip?.tripDays ?? 1) - 1;
+                if (dayIndex >= _lastDay) {
+                  return (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => router.push('/(tabs)/today' as never)}
+                        style={{ backgroundColor: '#E8692A', borderRadius: 14,
+                          paddingVertical: 14, paddingHorizontal: 32,
+                          width: '100%', alignItems: 'center', marginBottom: 10 }}
+                      >
+                        <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>
+                          {'See your trip story →'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => trip?.id &&
+                          router.push({ pathname: '/trip/[tripId]' as never,
+                            params: { tripId: trip.id } } as never)}
+                        style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 20 }}
+                      >
+                        <Text style={{ fontFamily: F.medium, fontSize: 14, color: '#8A8FA8' }}>
+                          {'+ Add a day'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (trip?.id) {
+                        router.push({
+                          pathname: '/trip/[tripId]' as never,
+                          params: { tripId: trip.id, initialDay: String(dayIndex + 2), fromDayWrap: 'true' },
+                        } as never);
+                      } else {
+                        router.push('/(tabs)/today');
+                      }
+                    }}
+                    style={{ backgroundColor: '#E8692A', borderRadius: 14,
+                      paddingVertical: 14, paddingHorizontal: 32,
+                      width: '100%', alignItems: 'center' }}
+                  >
+                    <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>
+                      {"See Tomorrow's Plan →"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
           )}
           {dayStops.length === 0 && (
