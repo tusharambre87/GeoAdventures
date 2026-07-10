@@ -11509,13 +11509,30 @@ Return ONLY valid JSON in this exact format:
       const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
       if (!bucketId) return res.status(500).end();
       const { stopId } = req.params;
-      const [stop] = await db.select({ heroImageUrl: travelStops.heroImageUrl, tripId: travelStops.tripId })
-        .from(travelStops).where(eq(travelStops.id, stopId)).limit(1);
+      const [stop] = await db.select({
+        heroImageUrl: travelStops.heroImageUrl,
+        tripId: travelStops.tripId,
+        name: travelStops.name,
+        cityGroup: travelStops.cityGroup,
+      }).from(travelStops).where(eq(travelStops.id, stopId)).limit(1);
       if (!stop) return res.status(404).end();
-      const path = stop.heroImageUrl;
-      if (!path || !path.startsWith('stop-images/')) return res.status(404).end();
+
+      let imagePath = stop.heroImageUrl;
+
+      // Fallback: if this travelStop has no heroImageUrl, look up stop_library by name + city
+      if ((!imagePath || !imagePath.startsWith('stop-images/')) && stop.name) {
+        const libConditions = [eq(stopLibrary.name, stop.name)];
+        if (stop.cityGroup) libConditions.push(eq(stopLibrary.city, stop.cityGroup));
+        const [libRow] = await db.select({ imageUrl: stopLibrary.imageUrl })
+          .from(stopLibrary)
+          .where(and(...libConditions))
+          .limit(1);
+        imagePath = libRow?.imageUrl ?? null;
+      }
+
+      if (!imagePath || !imagePath.startsWith('stop-images/')) return res.status(404).end();
       const bucket = objectStorageClient.bucket(bucketId);
-      const file = bucket.file(path);
+      const file = bucket.file(imagePath);
       const [exists] = await file.exists();
       if (!exists) return res.status(404).end();
       res.setHeader('Content-Type', 'image/png');

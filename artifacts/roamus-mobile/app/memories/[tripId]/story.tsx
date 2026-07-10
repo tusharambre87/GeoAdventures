@@ -366,13 +366,10 @@ export default function StoryScreen() {
       heroPhoto: photos[0] ?? null,
       // Fall back to stop hero images when user hasn't taken photos yet
       ...((() => {
-        const stopPhotos = (trip?.stops ?? [] as any[]).map((s: any) => {
-          const raw = s.heroImageUrl as string | null | undefined;
-          if (!raw) return null;
-          return raw.startsWith('stop-images/')
-            ? `${API_BASE}/api/travel/stops/${s.id}/hero-img`
-            : raw;
-        }).filter(Boolean);
+        // hero-img endpoint falls back to stop_library, so try for every stop
+        const stopPhotos = (trip?.stops ?? [] as any[]).map((s: any) =>
+          s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null
+        ).filter(Boolean);
         const fill = (idx: number) => photos[idx] ?? stopPhotos[idx] ?? null;
         return { collagePhotos: [fill(0), fill(1), fill(2), fill(3)] as (string | null)[] };
       })()),
@@ -449,7 +446,7 @@ export default function StoryScreen() {
         slideOpacity.setValue(1);
         setDisplaySlide(i);
         // Wait for the state update and layout to flush before capturing
-        await new Promise<void>(resolve => setTimeout(resolve, 500));
+        await new Promise<void>(resolve => setTimeout(resolve, 1500));
         const uri = await captureSlide();
         if (uri) {
           await MediaLibrary.saveToLibraryAsync(uri);
