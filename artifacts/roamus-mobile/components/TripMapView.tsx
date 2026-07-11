@@ -20,7 +20,7 @@ type Props = {
   onMarkerPress: (stop: Stop) => void;
 };
 
-const EDGE_PADDING = { top: 64, right: 40, bottom: 40, left: 40 };
+const EDGE_PADDING = { top: 64, right: 48, bottom: 48, left: 48 };
 
 function hasCoord(s: Stop): boolean {
   const lat = parseFloat(String(s.latitude));
@@ -46,10 +46,8 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
   const mapReady = useRef(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  // All coord-valid stops (for initial region computation)
   const allPinStops = useMemo(() => stops.filter(hasCoord), [stops]);
 
-  // Filtered + sorted stops for the current chip selection
   const pinStops = useMemo(() => {
     const base = selectedDay == null
       ? allPinStops
@@ -60,7 +58,6 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
     });
   }, [allPinStops, selectedDay]);
 
-  // Fallback region used before the map is ready
   const initialRegion = useMemo<Region | undefined>(() => {
     if (allPinStops.length === 0) return undefined;
     const lats = allPinStops.map(s => parseFloat(String(s.latitude)));
@@ -83,16 +80,12 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
     });
   }
 
-  // Re-frame whenever the filtered set changes (chip tap or stops update)
   useEffect(() => {
-    if (mapReady.current) {
-      fitToPins(true);
-    }
+    if (mapReady.current) fitToPins(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinStops]);
 
   const polyCoords = pinStops.map(toCoord);
-  // Dashed polyline only when a single day is selected — all-days is pins-only
   const showPolyline = selectedDay !== null && polyCoords.length > 1;
 
   if (!initialRegion) {
@@ -107,7 +100,6 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
 
   return (
     <View style={styles.container}>
-      {/* Map fills the container */}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -131,16 +123,25 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
         {pinStops.map((stop, i) => {
           const isVisited = stop.isVisited || stop.visited;
           const coord = toCoord(stop);
+          // Truncate long names for the label
+          const label = stop.name.length > 18
+            ? stop.name.slice(0, 17).trimEnd() + '\u2026'
+            : stop.name;
           return (
             <Marker
               key={stop.id}
               coordinate={coord}
               onPress={() => onMarkerPress(stop)}
-              title={stop.name}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 0 }}
+              tracksViewChanges={false}
             >
-              <View style={[styles.pin, isVisited ? styles.pinVisited : styles.pinUnvisited]}>
-                <Text style={styles.pinLabel}>{i + 1}</Text>
+              <View style={styles.markerWrap}>
+                <View style={[styles.pin, isVisited ? styles.pinVisited : styles.pinUnvisited]}>
+                  <Text style={styles.pinLabel}>{i + 1}</Text>
+                </View>
+                <View style={styles.nameWrap}>
+                  <Text style={styles.nameTxt} numberOfLines={1}>{label}</Text>
+                </View>
               </View>
             </Marker>
           );
@@ -179,7 +180,7 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
   );
 }
 
-const C = { orange: '#E8692A', green: '#3DAA6E', bg: '#F5F2EE', text: '#2E2E2E' };
+const C = { orange: '#E8692A', green: '#65CC94', bg: '#F5F2EE', text: '#2E2E2E' };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -190,6 +191,47 @@ const styles = StyleSheet.create({
     backgroundColor: C.bg,
   },
   emptyText: { fontSize: 14, color: '#888' },
+
+  // Marker
+  markerWrap: {
+    alignItems: 'center',
+  },
+  pin: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.28,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  pinUnvisited: { backgroundColor: C.orange },
+  pinVisited: { backgroundColor: C.green },
+  pinLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  nameWrap: {
+    marginTop: 3,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    maxWidth: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.14,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  nameTxt: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.text,
+    textAlign: 'center',
+  },
+
+  // Chips
   chipRow: {
     position: 'absolute',
     top: 10,
@@ -212,19 +254,4 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: C.orange },
   chipText: { fontSize: 13, fontWeight: '600', color: C.text },
   chipTextOn: { color: '#fff' },
-  pin: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  pinUnvisited: { backgroundColor: C.orange },
-  pinVisited: { backgroundColor: C.green },
-  pinLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
 });
