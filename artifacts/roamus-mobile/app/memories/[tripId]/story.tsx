@@ -441,8 +441,8 @@ export default function StoryScreen() {
     return {
       // Slide 1: first user photo, else first stop image
       heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
-      // Slide 3 collage: user photos ONLY — null cells render stop-name cards (no network needed)
-      collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? null)) as (string | null)[],
+      // Slide 3 collage: user photo first, then stop hero-img; null → stop-name gradient card
+      collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? stopPhotos[i] ?? null)) as (string | null)[],
       // Slide 5: last user photo (visual variety vs. cover), else last stop image
       closingPhoto: photos[photos.length - 1] ?? photos[0]
         ?? stopPhotos[stopPhotos.length - 1] ?? stopPhotos[0] ?? null,
