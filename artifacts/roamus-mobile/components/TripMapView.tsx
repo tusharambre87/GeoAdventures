@@ -6,6 +6,7 @@ import type { Region } from 'react-native-maps';
 type Stop = {
   id: string;
   name: string;
+  stopType?: string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
   displayOrder?: number | null;
@@ -41,6 +42,14 @@ function toCoord(s: Stop) {
   };
 }
 
+function isHotel(s: Stop) {
+  return (
+    s.stopType === 'hotel' ||
+    s.stopType === 'lodging' ||
+    s.stopType === 'accommodation'
+  );
+}
+
 export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) {
   const mapRef = useRef<MapView>(null);
   const mapReady = useRef(false);
@@ -48,16 +57,18 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
 
   const allPinStops = useMemo(() => stops.filter(hasCoord), [stops]);
 
+  // dayIndex in the DB is 0-based; chip selectedDay is 1-based
   const pinStops = useMemo(() => {
     const base = selectedDay == null
       ? allPinStops
-      : allPinStops.filter(s => s.dayIndex === selectedDay);
+      : allPinStops.filter(s => s.dayIndex === selectedDay - 1);
     return base.slice().sort((a, b) => {
       const dDay = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
       return dDay !== 0 ? dDay : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
     });
   }, [allPinStops, selectedDay]);
 
+  // Fallback region from all coord-valid stops
   const initialRegion = useMemo<Region | undefined>(() => {
     if (allPinStops.length === 0) return undefined;
     const lats = allPinStops.map(s => parseFloat(String(s.latitude)));
@@ -73,7 +84,17 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
   }, [allPinStops]);
 
   function fitToPins(animated: boolean) {
-    if (!mapRef.current || pinStops.length === 0) return;
+    if (!mapRef.current) return;
+    if (pinStops.length === 0) return;
+    if (pinStops.length === 1) {
+      // fitToCoordinates with a single point can behave unexpectedly — use animateToRegion
+      const c = toCoord(pinStops[0]);
+      mapRef.current.animateToRegion(
+        { ...c, latitudeDelta: 0.12, longitudeDelta: 0.12 },
+        animated ? 400 : 0,
+      );
+      return;
+    }
     mapRef.current.fitToCoordinates(pinStops.map(toCoord), {
       edgePadding: EDGE_PADDING,
       animated,
@@ -86,6 +107,7 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
   }, [pinStops]);
 
   const polyCoords = pinStops.map(toCoord);
+  // Dashed polyline only for single-day view (all-days is pins-only)
   const showPolyline = selectedDay !== null && polyCoords.length > 1;
 
   if (!initialRegion) {
@@ -120,13 +142,14 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
             lineDashPattern={[6, 4]}
           />
         )}
-        {pinStops.map((stop, i) => {
-          const isVisited = stop.isVisited || stop.visited;
+        {pinStops.length === 0 ? null : pinStops.map((stop, i) => {
+          const visited = stop.isVisited || stop.visited;
+          const hotel = isHotel(stop);
           const coord = toCoord(stop);
-          // Truncate long names for the label
-          const label = stop.name.length > 18
-            ? stop.name.slice(0, 17).trimEnd() + '\u2026'
-            : stop.name;
+          const label =
+            stop.name.length > 18
+              ? stop.name.slice(0, 17).trimEnd() + '\u2026'
+              : stop.name;
           return (
             <Marker
               key={stop.id}
@@ -136,8 +159,11 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
               tracksViewChanges={false}
             >
               <View style={styles.markerWrap}>
-                <View style={[styles.pin, isVisited ? styles.pinVisited : styles.pinUnvisited]}>
-                  <Text style={styles.pinLabel}>{i + 1}</Text>
+                <View style={[
+                  styles.pin,
+                  hotel ? styles.pinHotel : visited ? styles.pinVisited : styles.pinUnvisited,
+                ]}>
+                  <Text style={styles.pinLabel}>{hotel ? 'H' : i + 1}</Text>
                 </View>
                 <View style={styles.nameWrap}>
                   <Text style={styles.nameTxt} numberOfLines={1}>{label}</Text>
@@ -176,80 +202,70 @@ export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) 
           </Pressable>
         ))}
       </ScrollView>
+
+      {/* Empty state overlay when a day has no coord-valid stops */}
+      {selectedDay !== null && pinStops.length === 0 && (
+        <View style={styles.emptyOverlay} pointerEvents="none">
+          <View style={styles.emptyBadge}>
+            <Text style={styles.emptyBadgeText}>No location data for Day {selectedDay}</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
-const C = { orange: '#E8692A', green: '#65CC94', bg: '#F5F2EE', text: '#2E2E2E' };
+const C = { orange: '#E8692A', green: '#65CC94', hotel: '#5B8DEF', bg: '#F5F2EE', text: '#2E2E2E' };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.bg,
-  },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
   emptyText: { fontSize: 14, color: '#888' },
-
-  // Marker
-  markerWrap: {
-    alignItems: 'center',
-  },
-  pin: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    top: 52, // below chip row
+  },
+  emptyBadge: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.28,
-    shadowRadius: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
     elevation: 3,
+  },
+  emptyBadgeText: { fontSize: 13, fontWeight: '600', color: '#555' },
+  // Markers
+  markerWrap: { alignItems: 'center' },
+  pin: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.28, shadowRadius: 2, elevation: 3,
   },
   pinUnvisited: { backgroundColor: C.orange },
   pinVisited: { backgroundColor: C.green },
+  pinHotel: { backgroundColor: C.hotel },
   pinLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
   nameWrap: {
-    marginTop: 3,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    marginTop: 3, backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
     maxWidth: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.14,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.14, shadowRadius: 2, elevation: 2,
   },
-  nameTxt: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: C.text,
-    textAlign: 'center',
-  },
-
+  nameTxt: { fontSize: 10, fontWeight: '600', color: C.text, textAlign: 'center' },
   // Chips
-  chipRow: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
+  chipRow: { position: 'absolute', top: 10, left: 0, right: 0, zIndex: 10 },
   chipContent: { paddingHorizontal: 12, gap: 6, flexDirection: 'row' },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
   },
   chipOn: { backgroundColor: C.orange },
   chipText: { fontSize: 13, fontWeight: '600', color: C.text },

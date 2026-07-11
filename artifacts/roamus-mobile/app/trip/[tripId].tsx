@@ -30,6 +30,7 @@ import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatli
 import type { RenderItemParams } from 'react-native-draggable-flatlist';
 import { BlurView } from "expo-blur";
 import TripMapView from '@/components/TripMapView';
+import DayMapCard from '@/components/DayMapCard';
 import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -1891,6 +1892,8 @@ function DayDetail({
             )}
           </View>
         )}
+
+        <DayMapCard stops={stops} dayNum={selectedDay} />
 
         {/* Weather warning banner */}
         {weatherWarning && (
