@@ -1197,19 +1197,24 @@ async function fetchGeoGuessAnswer(
   question: string,
   stopId?: string,
 ): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const token = await AsyncStorage.getItem("authToken");
     const res = await fetch(`${API_BASE}/api/geoguess/answer`, {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ target, question, stopId, token }),
     });
+    clearTimeout(timer);
     const data = await res.json();
     return data.answer || "That depends";
   } catch {
+    clearTimeout(timer);
     const fallbacks = ["Yes", "No", "Sometimes", "Kind of", "That depends"];
     return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }

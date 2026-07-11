@@ -498,8 +498,9 @@ function haversineDistMi(lat1: number, lon1: number, lat2: number, lon2: number)
 /** Parse date string as LOCAL midnight — strips UTC offset so June 10 00:00Z stays June 10 on any device timezone. */
 function parseLocalDate(s: string | null | undefined): Date | null {
   if (!s) return null;
-  const ymd = s.split('T')[0].split('-').map(Number);
-  if (ymd.length !== 3 || ymd.some(isNaN)) return new Date(s);
+  const datePart = s.split('T')[0].split(' ')[0];
+  const ymd = datePart.split('-').map(Number);
+  if (ymd.length !== 3 || ymd.some(isNaN)) return null;
   return new Date(ymd[0], ymd[1] - 1, ymd[2]);
 }
 
@@ -931,7 +932,16 @@ export default function TodayScreen() {
           const s = parseLocalDate(t.startDate)!; s.setHours(0,0,0,0);
           const e = parseLocalDate(t.endDate)!;   e.setHours(23,59,59,999);
           return todayMs >= s.getTime() && todayMs <= e.getTime();
-        }) ?? sortedTrips.find(t => t.startDate) ?? sortedTrips[0];
+        })
+        ?? sortedTrips.find(t => {
+          if (!t.startDate || t.status === 'completed') return false;
+          const s = parseLocalDate(t.startDate);
+          if (!s) return false;
+          s.setHours(0, 0, 0, 0);
+          return s.getTime() > todayMs;
+        })
+        ?? sortedTrips.find(t => t.startDate)
+        ?? sortedTrips[0];
         if (!active) {
           if (!devState) setTodayState('no_trip');
           return;
