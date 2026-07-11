@@ -41,7 +41,8 @@ function greeting() {
 
 function parseLocalDate(s: string | null | undefined): Date | null {
   if (!s) return null;
-  const [y, m, d] = s.split('-').map(Number);
+  const datePart = s.split('T')[0].split(' ')[0];
+  const [y, m, d] = datePart.split('-').map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d);
 }
@@ -62,7 +63,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
   const tripStart = trip.startDate ? parseLocalDate(trip.startDate) : null;
   const totalDays = trip.tripDays
     ?? (trip.startDate && trip.endDate
-      ? Math.round((parseLocalDate(trip.endDate)!.getTime() - parseLocalDate(trip.startDate!)!.getTime()) / 86_400_000) + 1
+      ? Math.round(((parseLocalDate(trip.endDate)?.getTime() ?? 0) - (parseLocalDate(trip.startDate)?.getTime() ?? 0)) / 86_400_000) + 1
       : 0);
   const tripEnd       = trip.endDate ? parseLocalDate(trip.endDate) : null;
   if (tripEnd) tripEnd.setHours(23, 59, 59, 999);
