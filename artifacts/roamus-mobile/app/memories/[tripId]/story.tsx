@@ -22,6 +22,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -81,30 +82,100 @@ function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null
 }
 
 function Slide2Map({ trip }: { trip: any }) {
-  const [mapErr, setMapErr] = React.useState(false);
-  const allStops = trip?.stops ?? [];
-  const visited = allStops
-    .filter((s: any) => s.isVisited || s.visited)
-    .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  const mapRef = React.useRef<MapView>(null);
+  const allStops: any[] = trip?.stops ?? [];
   const city = trip?.destination ?? '';
   const numDays = trip?.tripDays ?? trip?.days ?? 0;
-  const visitedCount = visited.length;
-  const mapUri = trip?.id ? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2` : null;
-  const showMap = !!mapUri && !mapErr;
+
+  const pinStops = React.useMemo(() => {
+    return allStops
+      .filter((s: any) => {
+        const lat = parseFloat(String(s.latitude));
+        const lon = parseFloat(String(s.longitude));
+        return s.latitude != null && s.longitude != null &&
+          !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
+      })
+      .sort((a: any, b: any) => {
+        const di = (a.dayIndex ?? 0) - (b.dayIndex ?? 0);
+        return di !== 0 ? di : (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+      });
+  }, [allStops]);
+
+  const toCoord = (s: any) => ({
+    latitude: parseFloat(String(s.latitude)),
+    longitude: parseFloat(String(s.longitude)),
+  });
+
+  const initialRegion = React.useMemo(() => {
+    if (pinStops.length === 0) {
+      return { latitude: 39.5, longitude: -98.35, latitudeDelta: 30, longitudeDelta: 30 };
+    }
+    const lats = pinStops.map((s: any) => parseFloat(String(s.latitude)));
+    const lons = pinStops.map((s: any) => parseFloat(String(s.longitude)));
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+    return {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLon + maxLon) / 2,
+      latitudeDelta: Math.max(maxLat - minLat, 0.04) * 1.7,
+      longitudeDelta: Math.max(maxLon - minLon, 0.04) * 1.7,
+    };
+  }, [pinStops]);
+
+  function fitMap() {
+    if (!mapRef.current || pinStops.length === 0) return;
+    if (pinStops.length === 1) {
+      mapRef.current.animateToRegion({ ...toCoord(pinStops[0]), latitudeDelta: 0.08, longitudeDelta: 0.08 }, 0);
+    } else {
+      mapRef.current.fitToCoordinates(pinStops.map(toCoord), {
+        edgePadding: { top: 100, right: 48, bottom: 64, left: 48 },
+        animated: false,
+      });
+    }
+  }
 
   return (
     <View style={styles.slide}>
-      {showMap ? (
-        <ExpoImage
-          source={{ uri: mapUri! }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="disk"
-          onError={() => setMapErr(true)}
-        />
-      ) : (
-        <LinearGradient colors={['#1A1F2E', '#0d1520']} style={StyleSheet.absoluteFill} />
-      )}
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        initialRegion={initialRegion}
+        showsUserLocation={false}
+        showsPointsOfInterest={false}
+        showsBuildings={false}
+        onMapReady={() => setTimeout(fitMap, 120)}
+      >
+        {pinStops.length > 1 && (
+          <Polyline
+            coordinates={pinStops.map(toCoord)}
+            strokeColor="rgba(232,105,42,0.75)"
+            strokeWidth={2.5}
+            lineDashPattern={[6, 4]}
+          />
+        )}
+        {pinStops.map((stop: any, i: number) => {
+          const label = stop.name.length > 16
+            ? stop.name.slice(0, 15).trimEnd() + '\u2026'
+            : stop.name;
+          return (
+            <Marker
+              key={stop.id}
+              coordinate={toCoord(stop)}
+              anchor={{ x: 0.5, y: 0 }}
+              tracksViewChanges={false}
+            >
+              <View style={s2m.wrap}>
+                <View style={s2m.pin}>
+                  <Text style={s2m.num}>{i + 1}</Text>
+                </View>
+                <View style={s2m.badge}>
+                  <Text style={s2m.badgeTxt} numberOfLines={1}>{label}</Text>
+                </View>
+              </View>
+            </Marker>
+          );
+        })}
+      </MapView>
 
       {/* Top gradient overlay */}
       <LinearGradient
@@ -114,43 +185,12 @@ function Slide2Map({ trip }: { trip: any }) {
         <Text style={styles.mapEyebrow}>YOUR JOURNEY</Text>
         <Text style={styles.mapTripName}>{trip?.name ?? 'Our Trip'}</Text>
         <Text style={styles.mapSubline}>
-          {[city, visitedCount > 0 ? `${visitedCount} stops` : null, numDays > 0 ? `${numDays} days` : null]
+          {[city, pinStops.length > 0 ? `${pinStops.length} stops` : null, numDays > 0 ? `${numDays} days` : null]
             .filter(Boolean).join(' \u00B7 ')}
         </Text>
       </LinearGradient>
 
-      {/* Bottom gradient overlay — numbered stop list */}
-      <LinearGradient
-        colors={['transparent', 'rgba(10,14,26,0.75)', 'rgba(10,14,26,0.97)']}
-        style={styles.mapBottomOverlay}
-      >
-        <View style={styles.mapStopList}>
-          {visited.slice(0, 6).map((s: any, i: number) => {
-            const visitedAt = s.visitedAt ?? s.updatedAt ?? null;
-            const timeLabel = visitedAt
-              ? new Date(visitedAt).toLocaleTimeString('default', { hour: 'numeric', minute: '2-digit' })
-              : '';
-            return (
-              <View key={s.id} style={styles.mapStopRow}>
-                <View style={styles.mapNumberBadge}>
-                  <Text style={styles.mapNumberText}>{i + 1}</Text>
-                </View>
-                <View style={styles.mapStopInfo}>
-                  <Text style={styles.mapStopName} numberOfLines={1}>{s.name}</Text>
-                  {timeLabel ? <Text style={styles.mapStopTime}>{timeLabel}</Text> : null}
-                </View>
-              </View>
-            );
-          })}
-          {visitedCount === 0 && (
-            <Text style={styles.mapEmptyHint}>Stops you visit will appear here</Text>
-          )}
-        </View>
-        <View style={styles.mapPill}>
-          <Text style={styles.mapPillText}>{'\uD83D\uDCCD'} {visitedCount} places explored</Text>
-        </View>
-        <Wordmark opacity={0.35} />
-      </LinearGradient>
+      <Wordmark opacity={0.35} />
     </View>
   );
 }
@@ -362,18 +402,19 @@ export default function StoryScreen() {
     const photos = (moments as Moment[]).flatMap(m =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
+    // hero-img endpoint falls back to stop_library images — one per stop
+    const stopPhotos = (trip?.stops ?? [] as any[])
+      .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)
+      .filter(Boolean) as string[];
+    const fill = (idx: number) => photos[idx] ?? stopPhotos[idx] ?? null;
     return {
-      heroPhoto: photos[0] ?? null,
-      // Fall back to stop hero images when user hasn't taken photos yet
-      ...((() => {
-        // hero-img endpoint falls back to stop_library, so try for every stop
-        const stopPhotos = (trip?.stops ?? [] as any[]).map((s: any) =>
-          s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null
-        ).filter(Boolean);
-        const fill = (idx: number) => photos[idx] ?? stopPhotos[idx] ?? null;
-        return { collagePhotos: [fill(0), fill(1), fill(2), fill(3)] as (string | null)[] };
-      })()),
-      closingPhoto: photos[photos.length - 1] ?? photos[0] ?? null,
+      // Slide 1: first user photo, else first stop image
+      heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
+      // Slide 3 collage: user photos first, then stop images for any empty cells
+      collagePhotos: [fill(0), fill(1), fill(2), fill(3)] as (string | null)[],
+      // Slide 5: last user photo, else last stop image (different from cover = visual variety)
+      closingPhoto: photos[photos.length - 1] ?? photos[0]
+        ?? stopPhotos[stopPhotos.length - 1] ?? stopPhotos[0] ?? null,
       highlights: story?.highlights ?? [],
     };
   }, [moments, story, trip]);
@@ -783,4 +824,24 @@ const styles = StyleSheet.create({
   emptyQuotesText: { fontFamily: F.medium, fontSize: 15, color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
   addQuoteBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   addQuoteBtnText: { fontFamily: F.semibold, fontSize: 14, color: '#fff' },
+});
+
+// Slide 2 map marker styles
+const s2m = StyleSheet.create({
+  wrap: { alignItems: 'center', gap: 3 },
+  pin: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#E8692A',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  num: { fontSize: 12, fontFamily: F.bold, color: '#fff', lineHeight: 14 },
+  badge: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+    maxWidth: 110,
+  },
+  badgeTxt: { fontSize: 10, fontFamily: F.medium, color: '#1A1F2E', lineHeight: 14 },
 });
