@@ -49,6 +49,7 @@ export default function RecapScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
+  const [heroErr, setHeroErr] = useState(false);
 
   const { data: trip, isLoading: tripLoading } = useQuery({
     queryKey: ['trip', tripId],
@@ -74,8 +75,9 @@ export default function RecapScreen() {
     const allPhotos = moments.flatMap((m: Moment) =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
+    const firstStopId = (trip?.stops as any[])?.[0]?.id;
     const heroPhoto = allPhotos[0]
-      ?? (tripId ? `${API_BASE}/api/travel/trips/${tripId}/story-map?v=2` : null);
+      ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null);
     const photoCount = allPhotos.length;
 
     const momentsByStop: Record<string, { name: string; count: number }> = {};
@@ -162,8 +164,8 @@ export default function RecapScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Hero */}
         <View style={styles.hero}>
-          {heroPhoto ? (
-            <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          {heroPhoto && !heroErr ? (
+            <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setHeroErr(true)} />
           ) : (
             <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
           )}

@@ -93,8 +93,10 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
   const visited = visitedCount(trip);
   const total_ = stopCount(trip);
   const remaining = Math.max(0, total_ - visited);
-  const heroPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
-    ?? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2`;
+  const [heroErr, setHeroErr] = React.useState(false);
+  const firstStopId = (trip as any).stops?.[0]?.id;
+  const heroPhotoUrl = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
+    ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null);
 
   return (
     <Pressable
@@ -103,8 +105,8 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
     >
       {/* Photo / gradient */}
       <View style={s.heroPhotoArea}>
-        {heroPhoto
-          ? <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        {heroPhotoUrl && !heroErr
+          ? <ExpoImage source={{ uri: heroPhotoUrl }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setHeroErr(true)} />
           : <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
         }
         <LinearGradient
@@ -158,9 +160,11 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
 type CompactCardVariant = 'current' | 'completed';
 
 function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: number; variant: CompactCardVariant }) {
+  const [thumbErr, setThumbErr] = React.useState(false);
   const total_ = stopCount(trip);
-  const thumbPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
-    ?? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2`;
+  const firstStopId = (trip as any).stops?.[0]?.id;
+  const thumbPhotoUrl = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
+    ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null);
   const hasStory = !!(trip as any).storySaved;
 
   const dest = variant === 'completed'
@@ -171,8 +175,8 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
     <Pressable style={s.compactCard} onPress={() => router.push(dest as any)}>
       {/* Thumbnail */}
       <View style={s.compactThumb}>
-        {thumbPhoto
-          ? <ExpoImage source={{ uri: thumbPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        {thumbPhotoUrl && !thumbErr
+          ? <ExpoImage source={{ uri: thumbPhotoUrl }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setThumbErr(true)} />
           : <LinearGradient colors={gradPair(gradIndex)} style={StyleSheet.absoluteFill} />
         }
       </View>

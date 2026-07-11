@@ -54,11 +54,12 @@ function Wordmark({ opacity = 0.4, right = false }: { opacity?: number; right?: 
 // ─── Individual slides ────────────────────────────────────────────────────────
 
 function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null }) {
+  const [imgErr, setImgErr] = React.useState(false);
   const stopTotal = trip?.stops?.length ?? 0;
   return (
     <View style={styles.slide}>
-      {heroPhoto
-        ? <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      {heroPhoto && !imgErr
+        ? <ExpoImage source={{ uri: heroPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setImgErr(true)} />
         : <LinearGradient colors={['#1a2a1a', '#0d1f2d']} style={StyleSheet.absoluteFill} />
       }
       <LinearGradient
@@ -304,10 +305,11 @@ function Slide4Quotes({
 }
 
 function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: string | null }) {
+  const [imgErr, setImgErr] = React.useState(false);
   return (
     <View style={styles.slide}>
-      {closingPhoto
-        ? <ExpoImage source={{ uri: closingPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      {closingPhoto && !imgErr
+        ? <ExpoImage source={{ uri: closingPhoto }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setImgErr(true)} />
         : <LinearGradient colors={['#0d1a0d', '#1a1f0d']} style={StyleSheet.absoluteFill} />
       }
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
@@ -432,15 +434,18 @@ export default function StoryScreen() {
     const photos = (moments as Moment[]).flatMap(m =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
-    // Story-map image is a great fallback for cover/closing — shows the real trip geography
-    const mapFallback = trip?.id ? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2` : null;
+    // Stop hero-img URLs — actual photos of each place (populated by Stop Image Backfill)
+    const stopPhotos = (trip?.stops ?? [] as any[])
+      .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)
+      .filter(Boolean) as string[];
     return {
-      // Slide 1: first user photo, else trip map image
-      heroPhoto: photos[0] ?? mapFallback ?? null,
-      // Slide 3 collage: user photos ONLY — null cells render stop-name cards (no broken requests)
+      // Slide 1: first user photo, else first stop image
+      heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
+      // Slide 3 collage: user photos ONLY — null cells render stop-name cards (no network needed)
       collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? null)) as (string | null)[],
-      // Slide 5: last user photo (different stop = visual variety), else map
-      closingPhoto: photos[photos.length - 1] ?? photos[0] ?? mapFallback ?? null,
+      // Slide 5: last user photo (visual variety vs. cover), else last stop image
+      closingPhoto: photos[photos.length - 1] ?? photos[0]
+        ?? stopPhotos[stopPhotos.length - 1] ?? stopPhotos[0] ?? null,
       highlights: story?.highlights ?? [],
     };
   }, [moments, story, trip]);
