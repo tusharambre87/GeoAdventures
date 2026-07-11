@@ -64,7 +64,12 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
   const isActiveNow   = tripStart
     ? (tripEnd ? tripStart <= today && tripEnd >= today : tripStart <= today)
     : false;
-  const isTripPast    = !isActiveNow && !!tripStart && tripStart <= today;
+  // isTripPast: trip dates are fully in the past.
+  // Also catches the common case where startDate is missing but endDate proves the trip is over.
+  const isTripPast    = !isActiveNow && (
+    (!!tripStart && tripStart <= today) ||
+    (!!tripEnd && tripEnd < today)
+  );
   const daysSince     = tripStart ? Math.floor((today.getTime() - tripStart.getTime()) / 86_400_000) : 0;
   const activeDayIdx  = Math.max(0, Math.min(daysSince, Math.max(totalDays - 1, 0)));
   const activeDay     = activeDayIdx + 1;
@@ -116,8 +121,10 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
 
       {/* Day + next stop */}
       <Text style={s.heroMeta} numberOfLines={1}>
-        {totalDays > 0 ? `Day ${activeDay} of ${totalDays}` : ''}
-        {nextStop ? ` · Next: ${nextStop.name}` : ''}
+        {isTripPast
+          ? 'Your trip has ended'
+          : ((totalDays > 0 ? `Day ${activeDay} of ${totalDays}` : '')
+             + (nextStop ? ` \u00b7 Next: ${nextStop.name}` : ''))}
       </Text>
 
       {isFree ? (
@@ -162,7 +169,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
                 : isActiveNow
                   ? '\u25B6 Start Day 1'
                   : isTripPast
-                    ? 'Wrap up your trip \u2192'
+                    ? 'View Trip Story \u2192'
                     : 'View trip plan \u2192'}
         </Text>
       </Pressable>

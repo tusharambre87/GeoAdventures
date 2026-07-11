@@ -1344,6 +1344,7 @@ function TripOverview({
   totalDays,
   activeTripDay,
   tripStarted,
+  tripEnded,
   getDayStatus,
   getStopsForDay,
   onSelectDay,
@@ -1357,6 +1358,7 @@ function TripOverview({
   totalDays: number;
   activeTripDay: number;
   tripStarted: boolean;
+  tripEnded: boolean;
   getDayStatus: (d: number) => DayStatus;
   getStopsForDay: (d: number) => Stop[];
   onSelectDay: (d: number) => void;
@@ -1502,14 +1504,24 @@ function TripOverview({
         )}
       </ScrollView>
 
-      {/* Footer — Run Today (only if trip has started) */}
-      {tripStarted && (
+      {/* Footer — Run Today (active) / View Trip Story (ended) */}
+      {tripStarted && !tripEnded && trip.status !== 'completed' && (
         <View style={[ov.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
           <Pressable style={ov.runTodayBtn} onPress={onRunToday}>
             <IconPlay />
             <Text style={ov.runTodayText}>Run Today — Day {activeTripDay}</Text>
           </Pressable>
           <Text style={ov.runSub}>Jump straight to live mode for today</Text>
+        </View>
+      )}
+      {tripEnded && trip.status !== 'completed' && (
+        <View style={[ov.footer, { paddingBottom: TAB_BAR_H + insets.bottom + 12 }]}>
+          <Pressable style={ov.runTodayBtn} onPress={() =>
+            router.push({ pathname: '/(tabs)/today', params: { tripId: trip.id, forceComplete: '1' } } as any)
+          }>
+            <Text style={ov.runTodayText}>View Trip Story</Text>
+          </Pressable>
+          <Text style={ov.runSub}>Tap to complete your trip</Text>
         </View>
       )}
 
@@ -4790,6 +4802,8 @@ export default function TripPlanScreen() {
   })();
 
   const tripStarted = tripStartDate ? tripStartDate <= today : false;
+  const tripEndDate = trip?.endDate ? parseLocalDate(trip.endDate) : null;
+  const tripEnded   = tripEndDate ? tripEndDate < today : false;
 
   const getStopsForDay = useCallback((dayNum: number): Stop[] => {
     const direct = [...localStops]
@@ -4984,6 +4998,7 @@ export default function TripPlanScreen() {
           totalDays={totalDays}
           activeTripDay={activeTripDay}
           tripStarted={tripStarted}
+          tripEnded={tripEnded}
           getDayStatus={getDayStatus}
           getStopsForDay={getStopsForDay}
           onSelectDay={(d) => goToDay(d)}
