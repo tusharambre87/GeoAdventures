@@ -1352,6 +1352,7 @@ function TripOverview({
   onOpenOptions,
   onOpenChecklist,
   checklistCloseCount,
+  initialTab,
 }: {
   trip: TripData;
   stops: Stop[];
@@ -1366,6 +1367,7 @@ function TripOverview({
   onOpenOptions: () => void;
   onOpenChecklist: () => void;
   checklistCloseCount: number;
+  initialTab?: 'summary' | 'timeline' | 'map';
 }) {
   const insets = useSafeAreaInsets();
   const totalTickets  = stops.filter(s => needsTicket(s)).length;
@@ -4672,7 +4674,7 @@ const pps = StyleSheet.create({
 // ─── Root screen ──────────────────────────────────────────────────────────────
 
 export default function TripPlanScreen() {
-  const { tripId, openAddStop, addStopDefaultFilter, initialDay, fromDayWrap } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string; initialDay?: string; fromDayWrap?: string }>();
+  const { tripId, openAddStop, addStopDefaultFilter, initialDay, fromDayWrap, tab } = useLocalSearchParams<{ tripId: string; openAddStop?: string; addStopDefaultFilter?: string; initialDay?: string; fromDayWrap?: string; tab?: string }>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   useFrauncesFonts({ Fraunces_900Black });
@@ -5006,6 +5008,7 @@ export default function TripPlanScreen() {
           onOpenOptions={() => setActiveSheet('options')}
           onOpenChecklist={() => setChecklistOpen(true)}
           checklistCloseCount={checklistCloseCount}
+          initialTab={tab === 'map' ? 'map' : undefined}
         />
       ) : (
         <DayDetail

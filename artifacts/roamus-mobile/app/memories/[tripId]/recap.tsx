@@ -204,8 +204,8 @@ export default function RecapScreen() {
         <View style={styles.actionsGrid}>
           {[
             { icon: '\uD83D\uDCD6', title: 'View your story', sub: 'Full trip recap', onPress: () => router.push(`/memories/${tripId}/story` as any) },
-            { icon: '\uD83D\uDCF7', title: 'View memories', sub: 'Photos & moments', onPress: () => {} },
-            { icon: '\uD83D\uDDFA', title: 'See journey', sub: 'Map & places', onPress: () => router.push(`/memories/${tripId}/story` as any) },
+            { icon: '\uD83D\uDCF7', title: 'View memories', sub: 'Photos & moments', onPress: () => router.push(`/memories/${tripId}` as any) },
+            { icon: '\uD83D\uDDFA', title: 'See journey', sub: 'Map & places', onPress: () => router.push({ pathname: `/trip/${tripId}` as any, params: { tab: 'map' } }) },
             { icon: '\uD83D\uDCCB', title: 'View trip plan', sub: 'Day by day', onPress: () => router.push(`/trip/${tripId}` as any) },
           ].map(a => (
             <Pressable key={a.title} style={styles.actionCard} onPress={a.onPress}>
