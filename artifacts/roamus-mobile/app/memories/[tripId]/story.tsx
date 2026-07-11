@@ -432,19 +432,15 @@ export default function StoryScreen() {
     const photos = (moments as Moment[]).flatMap(m =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
-    // hero-img endpoint falls back to stop_library images — one per stop
-    const stopPhotos = (trip?.stops ?? [] as any[])
-      .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)
-      .filter(Boolean) as string[];
-    const fill = (idx: number) => photos[idx] ?? stopPhotos[idx] ?? null;
+    // Story-map image is a great fallback for cover/closing — shows the real trip geography
+    const mapFallback = trip?.id ? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2` : null;
     return {
-      // Slide 1: first user photo, else first stop image
-      heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
-      // Slide 3 collage: user photos first, then stop images for any empty cells
-      collagePhotos: [fill(0), fill(1), fill(2), fill(3)] as (string | null)[],
-      // Slide 5: last user photo, else last stop image (different from cover = visual variety)
-      closingPhoto: photos[photos.length - 1] ?? photos[0]
-        ?? stopPhotos[stopPhotos.length - 1] ?? stopPhotos[0] ?? null,
+      // Slide 1: first user photo, else trip map image
+      heroPhoto: photos[0] ?? mapFallback ?? null,
+      // Slide 3 collage: user photos ONLY — null cells render stop-name cards (no broken requests)
+      collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? null)) as (string | null)[],
+      // Slide 5: last user photo (different stop = visual variety), else map
+      closingPhoto: photos[photos.length - 1] ?? photos[0] ?? mapFallback ?? null,
       highlights: story?.highlights ?? [],
     };
   }, [moments, story, trip]);

@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { memoriesAPI, travelAPI, Moment } from '@/lib/apiClient';
+import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -74,7 +74,8 @@ export default function RecapScreen() {
     const allPhotos = moments.flatMap((m: Moment) =>
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
-    const heroPhoto = allPhotos[0] ?? null;
+    const heroPhoto = allPhotos[0]
+      ?? (tripId ? `${API_BASE}/api/travel/trips/${tripId}/story-map?v=2` : null);
     const photoCount = allPhotos.length;
 
     const momentsByStop: Record<string, { name: string; count: number }> = {};
@@ -112,15 +113,27 @@ export default function RecapScreen() {
   }, [moments, trip, story]);
 
   async function handleRegenerate() {
-    setRegenerating(true);
-    try {
-      await memoriesAPI.regenerateStory(tripId);
-      await queryClient.invalidateQueries({ queryKey: ['story', tripId] });
-    } catch {
-      Alert.alert('Error', 'Could not regenerate story. Please try again.');
-    } finally {
-      setRegenerating(false);
-    }
+    Alert.alert(
+      'Regenerate story?',
+      'This creates a fresh story using all your current memories and any photos you\'ve added. Your previous story will be replaced.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Regenerate',
+          onPress: async () => {
+            setRegenerating(true);
+            try {
+              await memoriesAPI.regenerateStory(tripId);
+              await queryClient.invalidateQueries({ queryKey: ['story', tripId] });
+            } catch {
+              Alert.alert('Error', 'Could not regenerate story. Please try again.');
+            } finally {
+              setRegenerating(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function handleShare() {

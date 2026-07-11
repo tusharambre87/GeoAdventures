@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import StopPickerSheet from '@/components/StopPickerSheet';
 import { useQuery } from '@tanstack/react-query';
 
-import { travelAPI, Trip } from '@/lib/apiClient';
+import { travelAPI, Trip, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 const C = {
@@ -93,7 +93,8 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
   const visited = visitedCount(trip);
   const total_ = stopCount(trip);
   const remaining = Math.max(0, total_ - visited);
-  const heroPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl ?? null;
+  const heroPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
+    ?? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2`;
 
   return (
     <Pressable
@@ -158,7 +159,8 @@ type CompactCardVariant = 'current' | 'completed';
 
 function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: number; variant: CompactCardVariant }) {
   const total_ = stopCount(trip);
-  const thumbPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl ?? null;
+  const thumbPhoto = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
+    ?? `${API_BASE}/api/travel/trips/${trip.id}/story-map?v=2`;
   const hasStory = !!(trip as any).storySaved;
 
   const dest = variant === 'completed'
