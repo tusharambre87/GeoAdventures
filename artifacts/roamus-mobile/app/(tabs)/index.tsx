@@ -25,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
-import { travelAPI, type Trip } from "@/lib/apiClient";
+import { travelAPI, type Trip, API_BASE } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 import { isFreePlan } from "@/lib/subscription";
 import { useOnboarding } from "@/lib/onboardingContext";
@@ -47,10 +47,15 @@ function parseLocalDate(s: string | null | undefined): Date | null {
 }
 
 function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePress, onDownloadPress }: { trip: Trip; offlineReady?: boolean; isDownloading?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void; onDownloadPress?: () => void }) {
+  const [bgErr, setBgErr] = React.useState(false);
   const isFree = isFreePlan(user?.subscriptionTier);
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
-  const bg   = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
+  const firstStopId = (trip as any).stops?.[0]?.id;
+  const bg = !bgErr
+    ? (CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl
+        ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null))
+    : null;
 
   // ── Active day computation ──────────────────────────────────────────────────
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
@@ -105,7 +110,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
       <LinearGradient colors={['#1A3A2A', '#0D2118']} style={StyleSheet.absoluteFill} />
       {bg && (
         <>
-          <Image source={{ uri: bg }} style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} contentFit="cover" />
+          <Image source={{ uri: bg }} style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} contentFit="cover" onError={() => setBgErr(true)} />
           <LinearGradient colors={["transparent", "rgba(8,22,14,0.94)"]} locations={[0.15, 1]} style={StyleSheet.absoluteFill} />
         </>
       )}
@@ -187,9 +192,14 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
 }
 
 function TripCard({ trip }: { trip: Trip }) {
+  const [bgErr, setBgErr] = React.useState(false);
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
-  const bg = CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl ?? null;
+  const firstStopId = (trip as any).stops?.[0]?.id;
+  const bg = !bgErr
+    ? (CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl
+        ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null))
+    : null;
   const isCompleted = trip.status === "completed";
 
   function handlePress() {
@@ -203,7 +213,7 @@ function TripCard({ trip }: { trip: Trip }) {
       onPress={handlePress}
     >
       {bg ? (
-        <Image source={{ uri: bg }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image source={{ uri: bg }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setBgErr(true)} />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: G.muted + "33", alignItems: "center", justifyContent: "center" }]}>
           <Ionicons name="map-outline" size={24} color={G.muted} />
