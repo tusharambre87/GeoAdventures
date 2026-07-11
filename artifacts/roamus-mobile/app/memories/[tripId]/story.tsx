@@ -194,9 +194,23 @@ function Slide2Map({ trip }: { trip: any }) {
     </View>
   );
 }
-function Slide3Collage({ collagePhotos, onAddPhoto }: { collagePhotos: (string | null)[]; onAddPhoto?: () => void }) {
+function Slide3Collage({ collagePhotos, trip, onAddPhoto }: {
+  collagePhotos: (string | null)[];
+  trip?: any;
+  onAddPhoto?: () => void;
+}) {
+  const [failedIdx, setFailedIdx] = React.useState<Set<number>>(new Set());
   const cells = [0, 1, 2, 3];
-  const placeholderBg = ['#2a4a3a', '#1a3a5f', '#3a2a1a', '#2a1a3a'];
+  // Distinct warm/cool gradients so each cell reads as a different place
+  const gradients: [string, string][] = [
+    ['#1d3a2a', '#2e5c42'],
+    ['#1a2d4a', '#2d4472'],
+    ['#3a1e0a', '#6b3420'],
+    ['#2a1a3a', '#4a2d6b'],
+  ];
+  // First 4 stops as fallback content when no image loads
+  const fallbackStops: any[] = (trip?.stops ?? []).slice(0, 4);
+
   return (
     <View style={styles.slide}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: C.deep }]} />
@@ -205,11 +219,27 @@ function Slide3Collage({ collagePhotos, onAddPhoto }: { collagePhotos: (string |
         <Text style={styles.collageTitle}>A few things we won't forget</Text>
       </View>
       <View style={styles.collageGrid}>
-        {cells.map(i => (
-          <View key={i} style={[styles.collageCell, { backgroundColor: placeholderBg[i] }]}>
-            {collagePhotos[i]
-              ? <ExpoImage source={{ uri: collagePhotos[i]! }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              : (
+        {cells.map(i => {
+          const url = collagePhotos[i];
+          const hasPhoto = !!url && !failedIdx.has(i);
+          const stop = fallbackStops[i];
+          return (
+            <LinearGradient key={i} colors={gradients[i]} style={styles.collageCell}>
+              {hasPhoto ? (
+                <ExpoImage
+                  source={{ uri: url! }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  onError={() => setFailedIdx(prev => new Set([...prev, i]))}
+                />
+              ) : stop ? (
+                <View style={s3m.card}>
+                  <View style={s3m.numBadge}>
+                    <Text style={s3m.numTxt}>{i + 1}</Text>
+                  </View>
+                  <Text style={s3m.stopName} numberOfLines={3}>{stop.name}</Text>
+                </View>
+              ) : (
                 <Pressable
                   style={[StyleSheet.absoluteFill, styles.collagePlaceholder]}
                   onPress={onAddPhoto}
@@ -217,10 +247,10 @@ function Slide3Collage({ collagePhotos, onAddPhoto }: { collagePhotos: (string |
                   <Text style={styles.collagePlaceholderIcon}>{'\uFF0B'}</Text>
                   <Text style={styles.collagePlaceholderText}>Add a photo</Text>
                 </Pressable>
-              )
-            }
-          </View>
-        ))}
+              )}
+            </LinearGradient>
+          );
+        })}
       </View>
       <Wordmark opacity={0.3} />
     </View>
@@ -572,7 +602,7 @@ export default function StoryScreen() {
   const slideContent = [
     <Slide1Cover key="1" trip={trip} heroPhoto={heroPhoto} />,
     <Slide2Map key="2" trip={trip} />,
-    <Slide3Collage key="3" collagePhotos={collagePhotos} onAddPhoto={handleAddPhoto} />,
+    <Slide3Collage key="3" collagePhotos={collagePhotos} trip={trip} onAddPhoto={handleAddPhoto} />,
     <Slide4Quotes key="4" highlights={highlights} generating={generating} onAddQuote={handleAddQuote} />,
     <Slide5Closing key="5" trip={trip} closingPhoto={closingPhoto} />,
   ];
@@ -824,6 +854,26 @@ const styles = StyleSheet.create({
   emptyQuotesText: { fontFamily: F.medium, fontSize: 15, color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
   addQuoteBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24, paddingHorizontal: 22, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   addQuoteBtnText: { fontFamily: F.semibold, fontSize: 14, color: '#fff' },
+});
+
+// Slide 3 collage stop-name fallback card styles
+const s3m = StyleSheet.create({
+  card: {
+    flex: 1,
+    padding: 14,
+    justifyContent: 'flex-end',
+  },
+  numBadge: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  numTxt: { fontSize: 12, fontFamily: F.bold, color: '#fff' },
+  stopName: {
+    fontSize: 13, fontFamily: F.semibold, color: '#fff',
+    lineHeight: 18, opacity: 0.92,
+  },
 });
 
 // Slide 2 map marker styles
