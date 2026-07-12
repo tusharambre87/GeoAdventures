@@ -243,6 +243,9 @@ export default function TripsScreen() {
   const [overrideHeroId, setOverrideHeroId] = useState<string | null>(null);
   const [cachedTrips, setCachedTrips] = useState<Trip[] | null>(null);
   const [fromCache, setFromCache] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const fabAnim = useRef(new Animated.Value(0)).current;
+  const fabCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem('heroTripOverride').then(id => {
@@ -256,6 +259,25 @@ export default function TripsScreen() {
     resetOnboarding();
     setOnboarding({ onboardingInProgress: true, returningUser: true, travelers: existingTravelers });
     router.push("/onboarding/where" as any);
+  }
+
+  function handleFabPress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (fabExpanded) {
+      if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
+      setFabExpanded(false);
+      Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      startNewTrip();
+    } else {
+      if (fabCollapseTimer.current) clearTimeout(fabCollapseTimer.current);
+      setFabExpanded(true);
+      Animated.spring(fabAnim, { toValue: 1, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      fabCollapseTimer.current = setTimeout(() => {
+        setFabExpanded(false);
+        Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+        fabCollapseTimer.current = null;
+      }, 3000);
+    }
   }
 
   async function handleLogout() {
@@ -538,10 +560,21 @@ export default function TripsScreen() {
       {/* Plan a trip FAB */}
       <TouchableOpacity
         style={[s.planTripFab, { bottom: insets.bottom + 90 }]}
-        onPress={startNewTrip}
+        onPress={handleFabPress}
         activeOpacity={0.85}
       >
-        <Text style={s.planTripFabText}>＋ Plan a trip</Text>
+        <Animated.View style={[s.planTripFabInner, {
+          width: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [52, 164] }),
+        }]}>
+          <Text style={s.planTripFabPlus}>＋</Text>
+          <Animated.View style={{
+            overflow: 'hidden',
+            width: fabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 104] }),
+            opacity: fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+          }}>
+            <Text style={s.planTripFabLabel} numberOfLines={1}> Plan a trip</Text>
+          </Animated.View>
+        </Animated.View>
       </TouchableOpacity>
 
       <UpgradeSheet
@@ -759,13 +792,21 @@ const s = StyleSheet.create({
 
   planTripFab: {
     position: "absolute", right: 20,
-    backgroundColor: "#E8692A",
-    borderRadius: 20,
-    paddingHorizontal: 20, paddingVertical: 14,
-    flexDirection: "row", alignItems: "center", gap: 6,
     shadowColor: "#E8692A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
   },
-  planTripFabText: {
+  planTripFabInner: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#E8692A",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  planTripFabPlus: {
+    color: "#fff", fontSize: 22, fontFamily: F.bold, lineHeight: 26,
+  },
+  planTripFabLabel: {
     color: "#fff", fontSize: 14, fontWeight: "800", fontFamily: F.bold,
   },
 
