@@ -566,13 +566,13 @@ export default function TripsScreen() {
         <Animated.View style={[s.planTripFabInner, {
           width: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [52, 164] }),
         }]}>
-          <Text style={s.planTripFabPlus}>＋</Text>
+          <Ionicons name="add" size={26} color="#fff" />
           <Animated.View style={{
             overflow: 'hidden',
             width: fabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 104] }),
             opacity: fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
           }}>
-            <Text style={s.planTripFabLabel} numberOfLines={1}> Plan a trip</Text>
+            <Text style={s.planTripFabLabel} numberOfLines={1}>Plan a trip</Text>
           </Animated.View>
         </Animated.View>
       </TouchableOpacity>
