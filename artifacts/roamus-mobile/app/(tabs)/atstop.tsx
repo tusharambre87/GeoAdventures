@@ -496,6 +496,8 @@ export default function AtStopScreen() {
   const [currentStop, setCurrentStop] = useState<Stop | null>(null);
   const [dayStops, setDayStops]       = useState<Stop[]>([]);
   const [dayIndex, setDayIndex]       = useState(0);
+  const [prevDayStops, setPrevDayStops] = useState<Stop[]>([]);
+  const [prevDayFeedbackDone, setPrevDayFeedbackDone] = useState(false);
   const [loadErr, setLoadErr]         = useState<string | null>(null);
 
   // ── Detail state ──
@@ -621,6 +623,7 @@ export default function AtStopScreen() {
     if (currentStop) setMealDone(isStopVisited(currentStop));
     else setMealDone(false);
     setMealFeedbackDone(false);
+    setPrevDayFeedbackDone(false);
   }, [currentStop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load on focus ──
@@ -696,6 +699,11 @@ export default function AtStopScreen() {
       const ts = (tripData.stops ?? []).filter(s => (s.dayIndex ?? 0) === di)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(ts);
+      const prevTs = di > 0
+        ? (tripData.stops ?? []).filter(s => (s.dayIndex ?? 0) === di - 1)
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+        : [];
+      setPrevDayStops(prevTs);
       if (params.stopId) {
         const target = ts.find(s => s.id === params.stopId);
         if (target) { setCurrentStop(target); setMode('detail'); return; }
@@ -757,10 +765,20 @@ export default function AtStopScreen() {
         });
       }
       // Mark visited locally
-      setDayStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s));
+      const isPrevDay = typeof currentStop.dayIndex === 'number' && currentStop.dayIndex < dayIndex;
+      if (isPrevDay) {
+        setPrevDayStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s));
+      } else {
+        setDayStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s));
+      }
     } catch { /* best effort */ }
     setSubmittingFeedback(false);
     setActiveSheet('none');
+    // For previous-day stops: stay on this stop with Save/Back footer
+    if (typeof currentStop.dayIndex === 'number' && currentStop.dayIndex < dayIndex) {
+      setPrevDayFeedbackDone(true);
+      return;
+    }
     // Signal today tab that a stop was completed
     await AsyncStorage.setItem('today_state_override', 'stop_complete');
     // Advance to the next unvisited stop if one exists; otherwise go to picker
@@ -804,6 +822,8 @@ export default function AtStopScreen() {
   const stopIdx     = currentStop ? dayStops.indexOf(currentStop) : -1;
   const nextStop    = stopIdx >= 0 ? dayStops[stopIdx + 1] : null;
   const paddingTop  = insets.top + 12;
+  const isPrevDayStop = !!(currentStop && typeof currentStop.dayIndex === 'number' && currentStop.dayIndex < dayIndex);
+  const prevDayStopIdx = isPrevDayStop ? prevDayStops.indexOf(currentStop!) : -1;
 
   const openRescue = (type: RescueType) => { setRescueType(type); setActiveSheet('rescue'); };
 
@@ -977,6 +997,40 @@ export default function AtStopScreen() {
               })}
             </>
           )}
+
+          {/* Previous day stops — catch-up section */}
+          {prevDayStops.length > 0 && dayIndex > 0 && (
+            <>
+              <Text style={[sc.sectionLabel, { marginTop: 28 }]}>YESTERDAY — TAP TO ADD PHOTOS OR MARK VISITED</Text>
+              {prevDayStops.map((stop, gi) => {
+                const wasVisited = isStopVisited(stop);
+                const bgColor    = STOP_HERO_BG[stop.stopType ?? ''] ?? STOP_HERO_BG.default;
+                const emoji      = STOP_HERO_EMOJI[stop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
+                return (
+                  <TouchableOpacity key={stop.id}
+                    style={[sc.stopCard, wasVisited && { opacity: 0.55 }]}
+                    activeOpacity={0.88}
+                    onPress={() => { setCurrentStop(stop); setMode('detail'); }}>
+                    <View style={[sc.stopBanner, { backgroundColor: bgColor }]}>
+                      <Text style={sc.stopBannerEmoji}>{emoji}</Text>
+                      <Text style={sc.stopBannerName} numberOfLines={1}>{stop.name}</Text>
+                    </View>
+                    <View style={sc.stopBody}>
+                      <Text style={sc.stopMeta}>Yesterday · Stop {gi + 1} · {stop.durationMinutes ?? 60} min</Text>
+                      <View style={sc.tagsRow}>
+                        {wasVisited
+                          ? <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>{'\u2713'} Visited</Text></View>
+                          : <View style={[sc.tag, sc.tagRed]}><Text style={[sc.tagTxt, sc.tagTxtRed]}>Not visited</Text></View>
+                        }
+                      </View>
+                    </View>
+                    <Text style={sc.stopChevron}>{'›'}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
+
           {/* All stops done for today */}
           {dayStops.length > 0 && unvisited.length === 0 && (
             <View style={{ alignItems: 'center', padding: 32 }}>
@@ -1103,8 +1157,8 @@ function isMealStop(t?: string | null): boolean {
   // Ticket: prefer placeReferenceData, fall back to metadata.ticketSignal
   const hasTicket   = pRef.bookingRequired === true || meta.ticketSignal === true;
   const isFree      = pRef.bookingRequired === false || meta.ticketSignal === false;
-  const stopOrderNum = stopIdx + 1;
-  const totalStops   = dayStops.length;
+  const stopOrderNum = isPrevDayStop ? prevDayStopIdx + 1 : stopIdx + 1;
+  const totalStops   = isPrevDayStop ? prevDayStops.length : dayStops.length;
   const stopTypeLabel = (currentStop.stopType ?? 'stop').charAt(0).toUpperCase()
     + (currentStop.stopType ?? 'stop').slice(1);
   const duration     = currentStop.durationMinutes ?? 60;
@@ -1297,7 +1351,7 @@ function isMealStop(t?: string | null): boolean {
             style={StyleSheet.absoluteFill}
           />
 
-          {!tripNotStarted && (
+          {!tripNotStarted && !isPrevDayStop && (
             <>
           {/* Hero top row: Change Stop + Didn’t Visit (left) · SOS (right) */}
           <View style={[dt.heroPills, { top: paddingTop }]}>
@@ -1362,7 +1416,7 @@ function isMealStop(t?: string | null): boolean {
 
 
         {/* ── Flat action buttons: Directions + Tickets ────────────────────────────── */}
-        <View style={dt.actionsRow}>
+        <View style={[dt.actionsRow, isPrevDayStop && { opacity: 0.3 }]} pointerEvents={isPrevDayStop ? 'none' : 'auto'}>
           <TouchableOpacity style={[dt.actBtn, { flexDirection: 'row', gap: 6 }]} activeOpacity={0.8}
             onPress={() => {
               const url = stopLat && stopLon
@@ -1396,7 +1450,9 @@ function isMealStop(t?: string | null): boolean {
         {/* ── 2×2 action grid ────────────────────────────────────────────────────────────────────────────── */}
         <View style={dt.gridRow}>
           {/* What to expect */}
-          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
+          <TouchableOpacity style={[dt.gridCard, isPrevDayStop && { opacity: 0.3 }]}
+            activeOpacity={isPrevDayStop ? 1 : 0.8}
+            disabled={isPrevDayStop}
             onPress={() => { keepDetailOnFocus.current = true; router.push({ pathname: '/atstop/expect' as never, params: {
               stopId: currentStop.id,
               tripId: trip?.id ?? '',
@@ -1451,7 +1507,9 @@ function isMealStop(t?: string | null): boolean {
           </TouchableOpacity>
 
           {/* Need something? */}
-          <TouchableOpacity style={dt.gridCard} activeOpacity={0.8}
+          <TouchableOpacity style={[dt.gridCard, isPrevDayStop && { opacity: 0.3 }]}
+            activeOpacity={isPrevDayStop ? 1 : 0.8}
+            disabled={isPrevDayStop}
             onPress={() => setShowAtstopRescue(true)}>
             <Text style={dt.gridIcon}>{'\uD83D\uDD00'}</Text>
             <Text style={dt.gridTitle}>Need something?</Text>
@@ -1589,10 +1647,29 @@ function isMealStop(t?: string | null): boolean {
       </ScrollView>
 
 
-      {/* ── CTA: We visited + Didn’t make it (fixed footer) ────────── */}
+       {/* ── CTA: footer (prev day · trip-not-started · normal) ────────── */}
       <View style={{ backgroundColor: C.bg, paddingHorizontal: 20, paddingTop: 10,
         paddingBottom: TAB_BAR_H + insets.bottom + 10, borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)' }}>
-        {tripNotStarted ? (
+        {isPrevDayStop ? (
+          <>
+            {!isStopVisited(currentStop) && !prevDayFeedbackDone ? (
+              <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+                onPress={() => openSheet('feedback')}>
+                <Text style={dt.ctaPrimaryText}>{'✓'} Mark as visited</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={dt.ctaPrimary} activeOpacity={0.88}
+                onPress={() => { setCurrentStop(null); setMode('picker'); }}>
+                <Text style={dt.ctaPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity activeOpacity={0.7}
+              style={{ alignItems: 'center', paddingVertical: 10 }}
+              onPress={() => { setCurrentStop(null); setMode('picker'); }}>
+              <Text style={{ fontFamily: F.semibold, fontSize: 13, color: C.muted }}>Back</Text>
+            </TouchableOpacity>
+          </>
+        ) : tripNotStarted ? (
           <TouchableOpacity style={dt.ctaSecondary} activeOpacity={0.7}
             onPress={() => router.back()}>
             <Text style={dt.ctaSecondaryText}>Got it</Text>
