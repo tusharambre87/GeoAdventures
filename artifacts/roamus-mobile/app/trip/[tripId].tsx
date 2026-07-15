@@ -1907,7 +1907,17 @@ function DayDetail({
           </View>
         )}
 
-        <DayMapCard stops={stops} dayNum={selectedDay} />
+        <DayMapCard
+          stops={stops}
+          dayNum={selectedDay}
+          origin={(() => {
+            const loc =
+              trip.stayLocations?.find(s => !s.cityName || s.cityName === (trip.destination ?? trip.city ?? '')) ??
+              trip.stayLocations?.[0];
+            if (loc?.lat != null && loc?.lng != null) return { lat: Number(loc.lat), lng: Number(loc.lng) };
+            return null;
+          })()}
+        />
 
         {/* Weather warning banner */}
         {weatherWarning && (

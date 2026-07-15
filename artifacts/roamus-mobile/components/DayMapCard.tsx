@@ -19,6 +19,7 @@ type Stop = {
 type Props = {
   stops: Stop[];
   dayNum: number; // 1-based display day
+  origin?: { lat: number; lng: number } | null; // hotel / starting point
 };
 
 const MAP_H = 220;
@@ -44,12 +45,18 @@ function isHotel(s: Stop) {
   return s.stopType === 'hotel' || s.stopType === 'lodging' || s.stopType === 'accommodation';
 }
 
-export default function DayMapCard({ stops, dayNum }: Props) {
+export default function DayMapCard({ stops, dayNum, origin }: Props) {
   const [expanded, setExpanded] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const mapRef = useRef<MapView>(null);
 
-  // dayIndex in DB is 0-based; dayNum prop is 1-based
+  // All stops for this day (for header count — includes stops without coords)
+  const allDayStops = useMemo(() =>
+    stops.filter(s => s.dayIndex === dayNum - 1),
+    [stops, dayNum],
+  );
+
+  // dayIndex in DB is 0-based; dayNum prop is 1-based — only coord-valid for map pins
   const dayStops = useMemo(() =>
     stops
       .filter(s => hasCoord(s) && s.dayIndex === dayNum - 1)
@@ -58,10 +65,28 @@ export default function DayMapCard({ stops, dayNum }: Props) {
     [stops, dayNum],
   );
 
+  // Origin coord for hotel marker + polyline start
+  const originCoord = useMemo(() => {
+    if (!origin || isNaN(origin.lat) || isNaN(origin.lng)) return null;
+    return { latitude: origin.lat, longitude: origin.lng };
+  }, [origin]);
+
+  // Full polyline: hotel → stop 1 → stop 2 → … stop N
+  const polyCoords = useMemo(() => {
+    const stopCoords = dayStops.map(toCoord);
+    return originCoord ? [originCoord, ...stopCoords] : stopCoords;
+  }, [dayStops, originCoord]);
+
+  // All coords including origin (for fitToCoordinates)
+  const allCoords = useMemo(() => {
+    const base = dayStops.map(toCoord);
+    return originCoord ? [originCoord, ...base] : base;
+  }, [dayStops, originCoord]);
+
   const initialRegion = useMemo(() => {
-    if (dayStops.length === 0) return undefined;
-    const lats = dayStops.map(s => parseFloat(String(s.latitude)));
-    const lons = dayStops.map(s => parseFloat(String(s.longitude)));
+    if (allCoords.length === 0) return undefined;
+    const lats = allCoords.map(c => c.latitude);
+    const lons = allCoords.map(c => c.longitude);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
     const minLon = Math.min(...lons), maxLon = Math.max(...lons);
     return {
@@ -70,17 +95,17 @@ export default function DayMapCard({ stops, dayNum }: Props) {
       latitudeDelta: Math.max(maxLat - minLat, 0.04) * 1.6,
       longitudeDelta: Math.max(maxLon - minLon, 0.04) * 1.6,
     };
-  }, [dayStops]);
+  }, [allCoords]);
 
   function fitMap() {
-    if (!mapRef.current || dayStops.length === 0) return;
-    if (dayStops.length === 1) {
+    if (!mapRef.current || allCoords.length === 0) return;
+    if (allCoords.length === 1) {
       mapRef.current.animateToRegion(
-        { ...toCoord(dayStops[0]), latitudeDelta: 0.1, longitudeDelta: 0.1 },
+        { ...allCoords[0], latitudeDelta: 0.1, longitudeDelta: 0.1 },
         300,
       );
     } else {
-      mapRef.current.fitToCoordinates(dayStops.map(toCoord), {
+      mapRef.current.fitToCoordinates(allCoords, {
         edgePadding: EDGE,
         animated: true,
       });
@@ -89,7 +114,6 @@ export default function DayMapCard({ stops, dayNum }: Props) {
 
   function toggle() {
     const next = !expanded;
-    // Mount first, then animate open — unmount after animating closed
     if (next) setExpanded(true);
     Animated.timing(anim, {
       toValue: next ? 1 : 0,
@@ -102,6 +126,9 @@ export default function DayMapCard({ stops, dayNum }: Props) {
 
   const mapHeight = anim.interpolate({ inputRange: [0, 1], outputRange: [0, MAP_H] });
 
+  // Header count uses all day stops (not just coord-filtered)
+  const displayCount = allDayStops.length;
+
   return (
     <View style={styles.card}>
       <Pressable onPress={toggle} style={styles.header} hitSlop={4}>
@@ -111,8 +138,8 @@ export default function DayMapCard({ stops, dayNum }: Props) {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Trip Map</Text>
           <Text style={styles.sub}>
-            {dayStops.length > 0
-              ? `Day ${dayNum} \u00b7 ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}`
+            {displayCount > 0
+              ? `Day ${dayNum} \u00b7 ${displayCount} stop${displayCount !== 1 ? 's' : ''}`
               : `Day ${dayNum} \u00b7 no location data`}
           </Text>
         </View>
@@ -133,18 +160,39 @@ export default function DayMapCard({ stops, dayNum }: Props) {
             showsPointsOfInterest={false}
             showsBuildings={false}
             onMapReady={() => {
-              // Delay slightly so animation has started and map has a real frame
               setTimeout(fitMap, 220);
             }}
           >
-            {dayStops.length > 1 && (
+            {/* Dashed route line from hotel → stops in order */}
+            {polyCoords.length > 1 && (
               <Polyline
-                coordinates={dayStops.map(toCoord)}
+                coordinates={polyCoords}
                 strokeColor="rgba(232,105,42,0.8)"
                 strokeWidth={2.5}
                 lineDashPattern={[6, 4]}
               />
             )}
+
+            {/* Hotel / starting-point marker */}
+            {originCoord && (
+              <Marker
+                key="__origin__"
+                coordinate={originCoord}
+                anchor={{ x: 0.5, y: 0 }}
+                tracksViewChanges={false}
+              >
+                <View style={styles.markerWrap}>
+                  <View style={[styles.pin, styles.pinHotel]}>
+                    <Text style={styles.pinLabel}>H</Text>
+                  </View>
+                  <View style={styles.nameWrap}>
+                    <Text style={styles.nameTxt} numberOfLines={1}>Start</Text>
+                  </View>
+                </View>
+              </Marker>
+            )}
+
+            {/* Stop markers (numbered 1…N, skipping stops without coords) */}
             {dayStops.map((stop, i) => {
               const visited = stop.isVisited || stop.visited;
               const hotel = isHotel(stop);
@@ -217,21 +265,32 @@ const styles = StyleSheet.create({
   // Markers
   markerWrap: { alignItems: 'center' },
   pin: {
-    width: 26, height: 26, borderRadius: 13,
+    width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25, shadowRadius: 2, elevation: 3,
+    shadowOpacity: 0.28, shadowRadius: 2, elevation: 3,
   },
   pinUnvisited: { backgroundColor: C.orange },
   pinVisited: { backgroundColor: C.green },
   pinHotel: { backgroundColor: C.hotel },
-  pinLabel: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  pinLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
   nameWrap: {
-    marginTop: 2, backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2,
-    maxWidth: 100,
+    marginTop: 3, backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
+    maxWidth: 110,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1, shadowRadius: 2, elevation: 2,
+    shadowOpacity: 0.14, shadowRadius: 2, elevation: 2,
   },
-  nameTxt: { fontSize: 10, fontWeight: '600', color: '#2E2E2E', textAlign: 'center' },
+  nameTxt: { fontSize: 10, fontWeight: '600', color: '#1A1A2E', textAlign: 'center' },
+  // Chips (unused here, kept for compat)
+  chipRow: { position: 'absolute', top: 10, left: 0, right: 0, zIndex: 10 },
+  chipContent: { paddingHorizontal: 12, gap: 6, flexDirection: 'row' },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15, shadowRadius: 3, elevation: 3,
+  },
+  chipOn: { backgroundColor: C.orange },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#1A1A2E' },
+  chipTextOn: { color: '#fff' },
 });
