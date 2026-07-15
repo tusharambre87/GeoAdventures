@@ -569,6 +569,7 @@ export default function AtStopScreen() {
 
   // Prevents useFocusEffect from resetting mode when returning from a sub-screen
   const keepDetailOnFocus = useRef(false);
+  const feedbackScrollRef = useRef<ScrollView>(null);
 
   // ── Fetch Wikipedia images whenever stop changes ──
   useEffect(() => {
@@ -625,6 +626,16 @@ export default function AtStopScreen() {
     setMealFeedbackDone(false);
     setPrevDayFeedbackDone(false);
   }, [currentStop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll feedback sheet content above keyboard when typing
+  useEffect(() => {
+    if (activeSheet !== 'feedback') return;
+    const t = setTimeout(() => feedbackScrollRef.current?.scrollToEnd({ animated: true }), 80);
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      feedbackScrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, [activeSheet]);
 
   // ── Load on focus ──
   useFocusEffect(
@@ -757,12 +768,13 @@ export default function AtStopScreen() {
     setSubmittingFeedback(true);
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
+      // Quality signal is fire-and-forget — its failure must never prevent local state update
       if (!skipFeedback) {
-        await apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
+        apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {
           method: 'POST',
           headers: { 'x-adventure-parent': '1' },
           body: JSON.stringify({ rating: feedbackRating, notes: feedbackText || undefined }),
-        });
+        }).catch(() => {});
       }
       // Mark visited locally
       const isPrevDay = typeof currentStop.dayIndex === 'number' && currentStop.dayIndex < dayIndex;
@@ -1992,6 +2004,7 @@ function isMealStop(t?: string | null): boolean {
 
       {/* ── SHEET: Feedback / Mark Complete ─────────────────────────────── */}
       <SheetModal visible={activeSheet === 'feedback'} onClose={() => { Keyboard.dismiss(); setActiveSheet('none'); }}>
+        <ScrollView ref={feedbackScrollRef} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sh.title}>How was it?</Text>
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
         <View style={sh.emojiRow}>
@@ -2034,6 +2047,7 @@ function isMealStop(t?: string | null): boolean {
         <TouchableOpacity style={sh.skipBtn} onPress={() => handleMarkComplete(true)}>
           <Text style={sh.skipText}>Skip feedback</Text>
         </TouchableOpacity>
+        </ScrollView>
       </SheetModal>
 
       {/* ── SHEET: Rescue ────────────────────────────────────────────────── */}
