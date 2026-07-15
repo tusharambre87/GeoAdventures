@@ -447,11 +447,12 @@ function mapsDirectionsUrl(stop: Stop): string {
 
 // ─── SheetModal ───────────────────────────────────────────────────────────────
 
-function SheetModal({ visible, onClose, children }: {
-  visible: boolean; onClose: () => void; children: React.ReactNode;
+function SheetModal({ visible, onClose, children, keyboardAware }: {
+  visible: boolean; onClose: () => void; children: React.ReactNode; keyboardAware?: boolean;
 }) {
   const sheetInsets = useSafeAreaInsets();
   const anim    = useRef(new Animated.Value(0)).current;
+  const kbAnim  = useRef(new Animated.Value(0)).current;
   const mounted = useRef(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -466,14 +467,28 @@ function SheetModal({ visible, onClose, children }: {
     Animated.spring(anim, { toValue: visible ? 1 : 0, useNativeDriver: true,
       damping: 22, stiffness: 180 }).start();
   }, [visible]);
+  // Lift the sheet above the keyboard when keyboardAware=true
+  useEffect(() => {
+    if (!keyboardAware) return;
+    const show = Keyboard.addListener('keyboardWillShow', e => {
+      Animated.timing(kbAnim, { toValue: e.endCoordinates.height, duration: e.duration || 250, useNativeDriver: true }).start();
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', e => {
+      Animated.timing(kbAnim, { toValue: 0, duration: e.duration || 200, useNativeDriver: true }).start();
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, [keyboardAware]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!mounted.current) return null;
+  // translateY: slide in from bottom via anim; shift up by kbAnim when keyboard shows
+  const slideY = anim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] });
+  const translateY = Animated.subtract(slideY, kbAnim);
   return (
     <Animated.View style={[StyleSheet.absoluteFill, sh.overlay, { opacity: anim }]}
       pointerEvents={visible ? 'auto' : 'none'}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       <Animated.View style={[sh.sheet, {
         paddingBottom: TAB_BAR_H + sheetInsets.bottom + 20,
-        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }],
+        transform: [{ translateY }],
       }]}>
         <View {...pan.panHandlers} style={sh.handle} />
         {children}
@@ -2003,7 +2018,7 @@ function isMealStop(t?: string | null): boolean {
       </SheetModal>
 
       {/* ── SHEET: Feedback / Mark Complete ─────────────────────────────── */}
-      <SheetModal visible={activeSheet === 'feedback'} onClose={() => { Keyboard.dismiss(); setActiveSheet('none'); }}>
+      <SheetModal visible={activeSheet === 'feedback'} onClose={() => { Keyboard.dismiss(); setActiveSheet('none'); }} keyboardAware>
         <ScrollView ref={feedbackScrollRef} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sh.title}>How was it?</Text>
         <Text style={sh.sub}>{currentStop.name} · {duration} min planned</Text>
