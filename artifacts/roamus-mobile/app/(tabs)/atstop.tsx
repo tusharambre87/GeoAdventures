@@ -513,6 +513,7 @@ export default function AtStopScreen() {
   const [dayIndex, setDayIndex]       = useState(0);
   const [prevDayStops, setPrevDayStops] = useState<Stop[]>([]);
   const [prevDayFeedbackDone, setPrevDayFeedbackDone] = useState(false);
+  const [pastStopsOpen, setPastStopsOpen] = useState(false);
   const [loadErr, setLoadErr]         = useState<string | null>(null);
 
   // ── Detail state ──
@@ -1025,12 +1026,23 @@ export default function AtStopScreen() {
             </>
           )}
 
-          {/* Previous day stops — catch-up section */}
+          {/* Previous day stops — collapsible catch-up section */}
           {prevDayStops.length > 0 && dayIndex > 0 && (
             <>
-              <Text style={[sc.sectionLabel, { marginTop: 28 }]}>Past Stops</Text>
-              <Text style={{ fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: '#888', marginBottom: 8, marginTop: 2 }}>Tap to revisit older stops</Text>
-              {prevDayStops.map((stop, gi) => {
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setPastStopsOpen(o => !o)}
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 28, marginBottom: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={sc.sectionLabel}>Past Stops</Text>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: '#888', marginTop: 2 }}>
+                    Tap to revisit older stops
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18, color: '#bbb', marginLeft: 8, transform: [{ rotate: pastStopsOpen ? '90deg' : '0deg' }] }}>{'>'}</Text>
+              </TouchableOpacity>
+
+              {pastStopsOpen && prevDayStops.map((stop, gi) => {
                 const wasVisited = isStopVisited(stop);
                 const bgColor    = STOP_HERO_BG[stop.stopType ?? ''] ?? STOP_HERO_BG.default;
                 const emoji      = STOP_HERO_EMOJI[stop.stopType ?? ''] ?? STOP_HERO_EMOJI.default;
@@ -1047,12 +1059,12 @@ export default function AtStopScreen() {
                       <Text style={sc.stopMeta}>Yesterday · Stop {gi + 1} · {stop.durationMinutes ?? 60} min</Text>
                       <View style={sc.tagsRow}>
                         {wasVisited
-                          ? <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>{'\u2713'} Visited</Text></View>
+                          ? <View style={[sc.tag, sc.tagGreen]}><Text style={[sc.tagTxt, sc.tagTxtGreen]}>{'✓'} Visited</Text></View>
                           : <View style={[sc.tag, sc.tagRed]}><Text style={[sc.tagTxt, sc.tagTxtRed]}>Not visited</Text></View>
                         }
                       </View>
                     </View>
-                    <Text style={sc.stopChevron}>{'›'}</Text>
+                    <Text style={sc.stopChevron}>{'>'}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -2268,7 +2280,7 @@ const sc = StyleSheet.create({
   headerTitle: { fontFamily: F.bold, fontSize: 22, color: C.deep },
   headerSub: { fontFamily: F.medium, fontSize: 13, color: C.muted, marginTop: 2 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 2 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 120 },
   sectionLabel: { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 10 },
   stopCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 10, overflow: 'hidden' },
   stopBanner: { height: 80, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 },
