@@ -1001,7 +1001,8 @@ export default function AtStopScreen() {
           {/* Previous day stops — catch-up section */}
           {prevDayStops.length > 0 && dayIndex > 0 && (
             <>
-              <Text style={[sc.sectionLabel, { marginTop: 28 }]}>YESTERDAY — TAP TO ADD PHOTOS OR MARK VISITED</Text>
+              <Text style={[sc.sectionLabel, { marginTop: 28 }]}>Past Stops</Text>
+              <Text style={{ fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: '#888', marginBottom: 8, marginTop: 2 }}>Tap to revisit older stops</Text>
               {prevDayStops.map((stop, gi) => {
                 const wasVisited = isStopVisited(stop);
                 const bgColor    = STOP_HERO_BG[stop.stopType ?? ''] ?? STOP_HERO_BG.default;
