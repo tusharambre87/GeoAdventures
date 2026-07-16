@@ -1072,7 +1072,14 @@ export default function TodayScreen() {
     }
   }, [resolvedTripId, resolvedDayIndex, devState]);
 
-  useFocusEffect(useCallback(() => { loadTrip(); }, [loadTrip]));
+  // Keep viewingDay in sync with the actual current day — initialises to 0 but
+  // the real day only becomes known after the trip loads. This prevents the
+  // "Day 1 banner" from showing when the user is on Day 4+.
+  React.useEffect(() => {
+    if (resolvedDayIndex > viewingDay) setViewingDay(resolvedDayIndex);
+  }, [resolvedDayIndex]);
+
+    useFocusEffect(useCallback(() => { loadTrip(); }, [loadTrip]));
 
   // ── 30-second sync polling for shared trips ──
   useEffect(() => {
