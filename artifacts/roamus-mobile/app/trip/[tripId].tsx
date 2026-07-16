@@ -1634,8 +1634,9 @@ function DayDetail({
     const city = trip.destination ?? (trip as any).city ?? null;
     if (!lat && !lng && !city) return;
     setAreaLoading(true);
+    const cityParam = city ? `&city=${encodeURIComponent(city)}` : '';
     const params = lat && lng
-      ? `lat=${lat}&lng=${lng}`
+      ? `lat=${lat}&lng=${lng}${cityParam}`
       : `city=${encodeURIComponent(city!)}`;
     try {
       const data = await apiFetch<any>(
@@ -1650,7 +1651,7 @@ function DayDetail({
         )
       );
       setAreaLoaded(true);
-    } catch {}
+    } catch { setAreaLoaded(true); }
     finally { setAreaLoading(false); }
   }
 

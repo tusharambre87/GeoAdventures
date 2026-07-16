@@ -6579,7 +6579,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/travel/nearby-landmarks', async (req: any, res) => {
     let { lat, lng, city, radius = '16000' } = req.query as Record<string, string>;
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
+
+    // ── stop_library helper: query our own DB for curated stops in this city ──
+    async function fromStopLibrary(cityQuery: string): Promise<any[]> {
+      const keyword = (cityQuery.split(/[\s,]+/)[0] ?? '').trim();
+      if (!keyword) return [];
+      try {
+        const rows = await db.select({
+          id:        stopLibrary.id,
+          name:      stopLibrary.name,
+          address:   stopLibrary.address,
+          latitude:  stopLibrary.latitude,
+          longitude: stopLibrary.longitude,
+          stopType:  stopLibrary.stopType,
+          gpRating:  stopLibrary.gpRating,
+        }).from(stopLibrary)
+          .where(ilike(stopLibrary.city, `%${keyword}%`))
+          .orderBy(desc(stopLibrary.gpRating))
+          .limit(10);
+        return rows.map(r => ({
+          placeId:       r.id,
+          name:          r.name,
+          vicinity:      r.address ?? '',
+          type:          (r.stopType ?? 'tourist_attraction') as string,
+          rating:        r.gpRating ? parseFloat(String(r.gpRating)) : 4.0,
+          photoReference: null,
+          lat:           r.latitude  ? parseFloat(r.latitude)  : null,
+          lng:           r.longitude ? parseFloat(r.longitude) : null,
+        }));
+      } catch { return []; }
+    }
+
+    // ── No Google Places key: serve directly from stop_library ────────────────
+    if (!apiKey) {
+      if (!city && !lat) return res.status(400).json({ error: 'lat/lng or city required' });
+      const libResults = city ? await fromStopLibrary(city) : [];
+      return res.json({ results: libResults.slice(0, 6) });
+    }
 
     if ((!lat || !lng) && city) {
       try {
@@ -6591,7 +6627,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch {}
     }
 
-    if (!lat || !lng) return res.status(400).json({ error: 'lat/lng or city required' });
+    if (!lat || !lng) {
+      // Still no coords — fall back to stop_library by city name
+      if (city) {
+        const libResults = await fromStopLibrary(city);
+        return res.json({ results: libResults.slice(0, 6) });
+      }
+      return res.status(400).json({ error: 'lat/lng or city required' });
+    }
 
     const lat_n = parseFloat(lat);
     const lng_n = parseFloat(lng);
@@ -6639,6 +6682,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } catch {}
+    }
+
+    // Augment with stop_library if Places returned < 3 results
+    if (results.length < 3 && city) {
+      const libRows = await fromStopLibrary(city);
+      const gpNames = new Set(results.map(r => r.name?.toLowerCase().trim()));
+      for (const r of libRows) {
+        if (!gpNames.has(r.name?.toLowerCase().trim())) results.push(r);
+        if (results.length >= 8) break;
+      }
     }
 
     results.sort((a, b) => b.rating - a.rating);
