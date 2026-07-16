@@ -18,6 +18,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -404,6 +405,23 @@ export default function TripMemoryIndex() {
             tripId={tripId}
             dayIndex={focusDayIndex !== null ? focusDayIndex : undefined}
           />
+
+          {/* Done CTA — returns to Today and advances to next day */}
+          {isDayView && focusDayIndex !== null && (
+            <TouchableOpacity
+              style={dayStyles.doneBtn}
+              activeOpacity={0.85}
+              onPress={async () => {
+                await AsyncStorage.setItem(
+                  `roamus_day_advanced_${tripId}`,
+                  String(focusDayIndex + 1)
+                ).catch(() => {});
+                router.navigate('/(tabs)/today' as never);
+              }}
+            >
+              <Text style={dayStyles.doneBtnText}>Done — see tomorrow’s plan →</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Share section */}
           <View style={[styles.shareSection, { marginTop: 8 }]}>
@@ -819,6 +837,13 @@ const dayStyles = StyleSheet.create({
 
   shareHint: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 8, textAlign: 'center' },
 
+  doneBtn: {
+    marginHorizontal: 20, marginBottom: 12,
+    backgroundColor: '#1A1F2E', borderRadius: 16, padding: 18,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
+  },
+  doneBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#fff' },
   kidsZoneBtn: {
     marginHorizontal: 20,
     marginTop: 16,

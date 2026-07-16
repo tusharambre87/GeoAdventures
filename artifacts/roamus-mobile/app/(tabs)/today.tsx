@@ -547,6 +547,7 @@ export default function TodayScreen() {
   const [error, setError]                       = useState<string | null>(null);
   const [resolvedTripId, setResolvedTripId]     = useState<string | null>(params.tripId ?? null);
   const [dayWrapped, setDayWrapped]             = useState(false);
+  const [dayIndexOverride, setDayIndexOverride] = useState<number | null>(null);
   // Always auto-advance to today's day — no user override
   const todayDayIndex = useMemo(() => {
     if (!trip?.startDate) return 0;
@@ -559,7 +560,7 @@ export default function TodayScreen() {
     );
     return Math.max(0, Math.min(diff, (trip.tripDays ?? 1) - 1));
   }, [trip?.startDate, trip?.tripDays, devDate]);
-  const resolvedDayIndex = todayDayIndex;
+  const resolvedDayIndex = dayIndexOverride ?? todayDayIndex;
 
   // Day-gating flags — derived from trip state, recalculated on every render
   const isDayStarted = typeof trip?.currentDayIndex === 'number'
@@ -972,8 +973,21 @@ export default function TodayScreen() {
         AsyncStorage.setItem(`roamus_trip_cache_${tid}`, JSON.stringify({ data: t, cachedAt: Date.now() })).catch(() => {});
       }
 
+      // Day-advance: if user tapped "Done" on the Day Story screen, advance to next day
+      const dayAdvancedKey = `roamus_day_advanced_${tid}`;
+      const dayAdvancedStr = await AsyncStorage.getItem(dayAdvancedKey);
+      let localDayIdx = resolvedDayIndex;
+      if (dayAdvancedStr !== null) {
+        await AsyncStorage.removeItem(dayAdvancedKey);
+        localDayIdx = Number(dayAdvancedStr);
+        setDayIndexOverride(localDayIdx);
+        setDayWrapped(false);
+        forceReset = true; // unlock day_complete and land on morning
+        setCurrentStopIndex(0);
+      }
+
       const stops = (t.stops ?? [])
-        .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
+        .filter(s => (s.dayIndex ?? 0) === localDayIdx)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
       // Always sync currentStopIndex with server-confirmed visited state so stops
@@ -1026,7 +1040,7 @@ export default function TodayScreen() {
               const lastPopulatedDay = nonMealStops.length > 0
                 ? Math.max(...nonMealStops.map(s => s.dayIndex ?? 0))
                 : (t.plannerTripDays ?? t.tripDays ?? 1) - 1;
-              if (resolvedDayIndex >= lastPopulatedDay) {
+              if (localDayIdx >= lastPopulatedDay) {
                 setTodayState('trip_complete');
               } else {
                 setTodayState('day_complete');
