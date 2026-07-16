@@ -108,9 +108,11 @@ export default function TripMemoryIndex() {
       m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
     );
 
-    // Day-level filter
+    // Day-level filter — include ALL stops for the day so every stop's photos show
     const dayStops = isDayView
-      ? allStops.filter((s: any) => (s.dayIndex ?? 0) === focusDayIndex)
+      ? ((trip?.stops ?? []) as any[])
+          .filter((s: any) => (s.dayIndex ?? 0) === focusDayIndex)
+          .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       : [];
 
     const dayStopIds = new Set(dayStops.map((s: any) => s.id));
@@ -288,7 +290,16 @@ export default function TripMemoryIndex() {
           <View style={dayStyles.heroCard}>
             <Text style={dayStyles.heroEmoji}>{'\uD83C\uDF89'}</Text>
             <Text style={dayStyles.heroTitle}>Day {dayNum} Complete!</Text>
-            <Text style={dayStyles.heroSub}>{dayStops.length} stop{dayStops.length !== 1 ? 's' : ''} visited</Text>
+            {(() => {
+              const visitedCount = dayStops.filter((s: any) => s.isVisited || s.visited).length;
+              return (
+                <Text style={dayStyles.heroSub}>
+                  {visitedCount === dayStops.length
+                    ? `${visitedCount} stop${visitedCount !== 1 ? 's' : ''} visited`
+                    : `${visitedCount} of ${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''} visited`}
+                </Text>
+              );
+            })()}
           </View>
 
           {/* Stops with photos and quotes */}

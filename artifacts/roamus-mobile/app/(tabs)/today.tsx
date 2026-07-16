@@ -546,6 +546,7 @@ export default function TodayScreen() {
   const [checklistOpen, setChecklistOpen]       = useState(false);
   const [error, setError]                       = useState<string | null>(null);
   const [resolvedTripId, setResolvedTripId]     = useState<string | null>(params.tripId ?? null);
+  const [dayWrapped, setDayWrapped]             = useState(false);
   // Always auto-advance to today's day — no user override
   const todayDayIndex = useMemo(() => {
     if (!trip?.startDate) return 0;
@@ -3887,6 +3888,15 @@ export default function TodayScreen() {
             </TouchableOpacity>
           )}
 
+          {dayWrapped ? (
+            <TouchableOpacity
+              style={dc.wrapBtn} activeOpacity={0.85}
+              onPress={() => router.push({ pathname: '/memories/[tripId]' as never, params: { tripId: trip!.id, dayIndex: String(resolvedDayIndex) } } as never)}
+            >
+              <Text style={dc.wrapBtnText}>{'✓'} Story saved — view Day {resolvedDayIndex + 1} again</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
           <View style={dc.storyStrip}>
             <Text style={dc.storyTitle}>Your Day {resolvedDayIndex + 1} story is ready</Text>
             <Text style={dc.storySub}>Auto-written from your stops — tap below to see it</Text>
@@ -3964,6 +3974,7 @@ export default function TodayScreen() {
                   pathname: '/memories/[tripId]' as never,
                   params: { tripId: trip!.id, dayIndex: String(resolvedDayIndex) },
                 } as never);
+                setDayWrapped(true);
               } finally {
                 setIsWrapping(false);
               }
@@ -3978,6 +3989,8 @@ export default function TodayScreen() {
               <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
             )}
           </TouchableOpacity>
+            </>
+          )}
 
           {/* Tomorrow prep card with stops + ticket alerts */}
           {resolvedDayIndex + 1 < totalDays && (() => {
