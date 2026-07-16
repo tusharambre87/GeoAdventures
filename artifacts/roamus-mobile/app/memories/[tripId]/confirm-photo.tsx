@@ -78,12 +78,15 @@ export default function ConfirmPhotoScreen() {
   const savePhotos = async () => {
     if (!tripId || uris.length === 0) return;
     setSaving(true);
+    let saved = 0;
+    let failed = 0;
     try {
       const net = await NetInfo.fetch();
       const isOffline = !(net.isConnected ?? true);
       const isPaid = user?.subscriptionTier !== 'free';
 
       if (isOffline && isPaid) {
+        // Offline queue — all or nothing is acceptable for queuing
         await Promise.all(
           uris.map((uri, i) =>
             queuePhoto({
@@ -94,21 +97,35 @@ export default function ConfirmPhotoScreen() {
             })
           )
         );
+        saved = uris.length;
       } else {
-        const uploadedUrls = await Promise.all(uris.map(uploadPhoto));
-        await Promise.all(
-          uploadedUrls.map((photoUrl, i) =>
-            memoriesAPI.createMoment({
+        // Upload sequentially so one failure doesn't block the rest
+        for (let i = 0; i < uris.length; i++) {
+          try {
+            const photoUrl = await uploadPhoto(uris[i]);
+            await memoriesAPI.createMoment({
               tripId,
               stopId: (stopId as string) || null,
               photoUrls: [photoUrl],
               parentPromptResponse: captions[i] || null,
-            })
-          )
-        );
+            });
+            saved++;
+          } catch {
+            failed++;
+          }
+        }
       }
+
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-      router.dismiss(2);
+
+      const title = failed === 0 ? 'Photos saved!' : 'Partially saved';
+      const msg = failed === 0
+        ? `${saved} photo${saved !== 1 ? 's' : ''} saved \u2014 find them in the Memories tab.`
+        : `${saved} of ${uris.length} photos saved. ${failed} could not upload \u2014 try the rest again.`;
+
+      Alert.alert(title, msg, [
+        { text: 'Got it', onPress: () => router.dismissAll() },
+      ]);
     } catch (err: any) {
       console.error('Save photos failed:', err);
       const msg = err?.message ?? 'Something went wrong. Please try again.';
@@ -126,7 +143,7 @@ export default function ConfirmPhotoScreen() {
     >
       <Text style={cf.taggedIcon}>{stopIcon ?? '\uD83D\uDCF8'}</Text>
       <Text style={cf.taggedName} numberOfLines={1}>{stopName ?? 'General trip photo'}</Text>
-      <Text style={cf.taggedChange}>Change {'→'}</Text>
+      <Text style={cf.taggedChange}>Change {'\u2192'}</Text>
     </TouchableOpacity>
   );
 
@@ -239,7 +256,7 @@ export default function ConfirmPhotoScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={cf.saveBtnText}>
-              Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'→'}
+              Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'\u2192'}
             </Text>
           )}
         </TouchableOpacity>

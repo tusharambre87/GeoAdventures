@@ -975,12 +975,15 @@ export default function TodayScreen() {
         .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
       setDayStops(stops);
-      // Derive current stop index deterministically from server-confirmed visited state
-      if (override === 'stop_complete') {
-        const lastVisited = stops.reduce(
+      // Always sync currentStopIndex with server-confirmed visited state so stops
+      // marked complete from the At Stop tab are reflected when Today refocuses.
+      // This is a floor operation: it can only advance the index, never go back.
+      {
+        const lastVisitedIdx = stops.reduce(
           (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
         );
-        setCurrentStopIndex(Math.min(lastVisited + 1, stops.length - 1));
+        const serverDerivedIdx = Math.min(lastVisitedIdx + 1, stops.length - 1);
+        setCurrentStopIndex(prev => Math.max(prev, serverDerivedIdx));
       }
 
       // Source of truth: if the server already marks this trip completed,

@@ -712,26 +712,34 @@ export default function AtStopScreen() {
       if (!active) { setMode('noTrip'); return; }
       const tripData = await apiFetch<TripData>(`/api/travel/trips/${active.id}`);
       setTrip(tripData);
+      const allStops = tripData.stops ?? [];
+      const maxDayIdx = allStops.reduce(
+        (m: number, s: { dayIndex?: number | null }) => Math.max(m, s.dayIndex ?? 0), 0
+      );
       let di = 0;
       if (tripData.startDate) {
         const diff = Math.floor((Date.now() - parseLocalDate(tripData.startDate)!.getTime()) / 86400000);
-        // Cap against the highest dayIndex actually present in the stops — don't trust
-        // tripDays/plannerTripDays/currentDayIndex which may be stale or null.
-        const maxDayIdx = (tripData.stops ?? []).reduce(
-          (m: number, s: { dayIndex?: number | null }) => Math.max(m, s.dayIndex ?? 0), 0
-        );
+        // Cap against the highest dayIndex actually present in the stops.
         di = Math.max(0, Math.min(diff, maxDayIdx));
       }
-      setDayIndex(di);
-      const ts = (tripData.stops ?? []).filter(s => (s.dayIndex ?? 0) === di)
+      let ts = allStops.filter(s => (s.dayIndex ?? 0) === di)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      // Auto-advance: when every stop for today is already visited and tomorrow exists, show tomorrow's stops
+      if (ts.length > 0 && ts.every(s => isStopVisited(s)) && di < maxDayIdx) {
+        di += 1;
+        ts = allStops.filter(s => (s.dayIndex ?? 0) === di)
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      }
+      setDayIndex(di);
       setDayStops(ts);
       const prevTs = di > 0
-        ? (tripData.stops ?? []).filter(s => (s.dayIndex ?? 0) === di - 1)
+        ? allStops.filter(s => (s.dayIndex ?? 0) === di - 1)
           .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
         : [];
       setPrevDayStops(prevTs);
-      if (params.stopId) {
+      // Only deep-link into a specific stop when that day still has unvisited stops
+      const allTodayDone = ts.every(s => isStopVisited(s));
+      if (params.stopId && !allTodayDone) {
         const target = ts.find(s => s.id === params.stopId);
         if (target) { setCurrentStop(target); setMode('detail'); return; }
       }
