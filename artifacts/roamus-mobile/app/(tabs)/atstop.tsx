@@ -1164,19 +1164,23 @@ export default function AtStopScreen() {
           )}
           {dayStops.length === 0 && (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-              <Text style={{ fontSize: 26, marginBottom: 16 }}>{'\uD83D\uDCCD'}</Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1A1F2E', textAlign: 'center', marginBottom: 8 }}>
-                No stop running yet
+              <Text style={{ fontSize: 40, marginBottom: 16 }}>{'🗺️'}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#1A1F2E', textAlign: 'center', marginBottom: 10, fontFamily: F.bold }}>
+                {'No stops planned yet for Day ' + String(dayIndex + 1)}
               </Text>
-              <Text style={{ fontSize: 14, color: '#8A8FA8', textAlign: 'center', lineHeight: 21, marginBottom: 24 }}>
-                Head to Today to start your day and pick your first stop.
+              <Text style={{ fontSize: 14, color: '#8A8FA8', textAlign: 'center', lineHeight: 21, marginBottom: 28, fontFamily: F.medium }}>
+                {'Want to add a stop? Head to Today to plan your day.'}
               </Text>
               <TouchableOpacity
-                onPress={() => router.push('/(tabs)/today')}
-                style={{ borderWidth: 1.5, borderColor: '#E8692A', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24 }}
+                onPress={() => router.push('/(tabs)/today' as never)}
+                style={{
+                  backgroundColor: '#E8692A', borderRadius: 14,
+                  paddingVertical: 14, paddingHorizontal: 28,
+                  width: '100%', alignItems: 'center',
+                }}
               >
-                <Text style={{ color: '#E8692A', fontSize: 15, fontWeight: '600' }}>
-                  Go to Today {'→'}
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', fontFamily: F.bold }}>
+                  {'+ Add Stop to Day ' + String(dayIndex + 1)}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -168,7 +168,8 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
         <Text style={s.continueBtnText}>
           {trip.status === 'completed'
             ? 'View memories →'
-            : isLastDay
+            // "Complete your trip" only when on the last day AND all stops for that day are done
+            : isLastDay && dayStops.length > 0 && dayStops.every((s: any) => s.isVisited || s.visited)
               ? 'Complete your trip \u2192'
               : isActiveNow && activeDay > 1
                 ? `\u25B6 Continue Day ${activeDay}`
