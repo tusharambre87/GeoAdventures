@@ -1113,7 +1113,9 @@ export default function TodayScreen() {
     }
     setCurrentStopIndex(0);
     executionStartedRef.current = true;
-    setTodayState('en_route');
+    // If no stops planned yet, skip en_route (which shows "No stop to navigate to")
+    // and land directly on the morning planning screen instead.
+    setTodayState(dayStops.length === 0 ? 'morning' : 'en_route');
     Analytics.track('day_started', { trip_id: resolvedTripId ?? trip.id, day_index: resolvedDayIndex });
     // Persist the started day to DB so the gating flag isDayStarted becomes true
     try {
