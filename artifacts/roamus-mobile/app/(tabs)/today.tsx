@@ -733,7 +733,13 @@ export default function TodayScreen() {
         const quotes = (data.moments ?? [])
           .filter((m) => m.kidPromptResponse?.trim())
           .slice(0, 3)
-          .map((m) => ({ quote: m.kidPromptResponse!, name: m.explorerName ?? 'Explorer' }));
+          .map((m) => {
+            const raw = m.kidPromptResponse!;
+            const hasPipe = raw.includes('|');
+            const name = hasPipe ? raw.split('|')[0].trim() : (m.explorerName ?? 'Explorer');
+            const quote = hasPipe ? raw.split('|').slice(1).join('|').trim() : raw;
+            return { quote, name };
+          });
         setTcMomentQuotes(quotes);
       })
       .catch(() => {});
