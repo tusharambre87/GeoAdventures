@@ -2201,13 +2201,20 @@ export default function TodayScreen() {
     }
 
     const moHeroUrl = CITY_IMGS[city] ?? 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80';
-    const handleAddStop = () =>
-      router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex } } as never);
+    const openAddStopSheet = (filter: 'food' | 'kids' | 'landmarks' = 'landmarks') => {
+      const tid = trip?.id ?? resolvedTripId;
+      if (!tid) return;
+      router.push({
+        pathname: '/trip/[tripId]' as never,
+        params: { tripId: tid, openAddStop: 'true', addStopDefaultFilter: filter, initialDay: String(resolvedDayIndex + 1) },
+      } as never);
+    };
+    const handleAddStop = () => openAddStopSheet('landmarks');
     const handleQuickAdd = (category: string) => {
-      const filterMap: Record<string, string> = {
-        'Lunch': 'food', 'Museum': 'museum', 'Park': 'park', 'Treat stop': 'food',
+      const filterMap: Record<string, 'food' | 'kids' | 'landmarks'> = {
+        'Lunch': 'food', 'Museum': 'landmarks', 'Park': 'landmarks', 'Treat stop': 'food',
       };
-      router.push({ pathname: '/discover', params: { dayIndex: currentDayIndex, filter: filterMap[category] ?? 'all' } } as never);
+      openAddStopSheet(filterMap[category] ?? 'landmarks');
     };
     return (
       <>

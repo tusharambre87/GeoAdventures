@@ -9590,18 +9590,19 @@ Return valid JSON only. No markdown.`;
         try {
           const openai = getOpenAI();
           const aiResp = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-mini',
             messages: [
               {
                 role: 'system',
-                content: 'Return ONLY a JSON object (no markdown) with a "results" array of 3 real, family-friendly lunch spots. Each item: name (real place name), stopType (restaurant/food/cafe/market), description (kid appeal, 1 sentence).',
+                content: 'Return ONLY a JSON object with a "results" array of 3–5 real, family-friendly restaurants or cafes. Each item: name (real place name), stopType (restaurant/food/cafe/market), description (kid appeal, 1 sentence). No markdown.',
               },
               {
                 role: 'user',
-                content: `Suggest 3 real family-friendly, kid-approved lunch restaurants in ${cityRaw}. Return only well-known, real places.`,
+                content: `List 3–5 real, family-friendly restaurants near ${cityRaw}. Return well-known, operating places only.`,
               },
             ],
-            max_completion_tokens: 300,
+            response_format: { type: 'json_object' },
+            max_completion_tokens: 400,
           });
           const raw = aiResp.choices[0].message.content ?? '';
           console.log('[Rescue food-options] AI raw response', raw.slice(0, 300));
