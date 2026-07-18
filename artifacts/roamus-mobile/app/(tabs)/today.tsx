@@ -3579,7 +3579,7 @@ export default function TodayScreen() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'stop_complete') {
     const visitedStop = dayStops[currentStopIndex - 1] ?? dayStops[0];
-    const nextStop    = currentStop;
+    const nextStop    = (currentStop && currentStop.id !== visitedStop?.id) ? currentStop : null;
     const isLastStop  = !nextStop || currentStopIndex >= dayStops.length;
     const firstKid    = (trip?.travelers ?? []).find(t => !t.isParent);
     const quoteKey    = visitedStop?.id ?? 'stop';
@@ -3674,7 +3674,7 @@ export default function TodayScreen() {
                 const scLastDay = scNonMeals.length > 0
                   ? Math.max(...scNonMeals.map((s: any) => s.dayIndex ?? 0))
                   : (trip?.plannerTripDays ?? trip?.tripDays ?? 1) - 1;
-                if (resolvedDayIndex < scLastDay) return null;
+                if (resolvedDayIndex < scLastDay && resolvedDayIndex + 1 < totalDays) return null;
                 return (
                   <>
                     <TouchableOpacity
@@ -3685,7 +3685,8 @@ export default function TodayScreen() {
                         setTodayState('trip_complete');
                       }}
                     >
-                      <Text style={sc.wrapBtnText}>See your trip story →</Text>
+                      <Text style={sc.wrapBtnText}>{'\uD83C\uDFC6'} Your trip is complete!</Text>
+                      <Text style={[sc.wrapBtnText, { fontSize: 13, marginTop: 3, opacity: 0.88 }]}>Tap to wrap up and view your shareable story</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       activeOpacity={0.8}
