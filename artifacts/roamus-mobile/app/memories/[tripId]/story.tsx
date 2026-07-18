@@ -233,7 +233,7 @@ function Slide3Collage({ collagePhotos, trip, onAddPhoto }: {
               {hasPhoto ? (
                 <ExpoImage
                   source={{ uri: url! }}
-                  style={StyleSheet.absoluteFill}
+                  style={{ width: '100%', height: '100%' }}
                   contentFit="cover"
                   onError={() => setFailedIdx(prev => new Set([...prev, i]))}
                 />
@@ -296,10 +296,10 @@ function Slide4Quotes({
           </View>
         ) : (
           <View style={styles.emptyQuotes}>
-            <Text style={styles.emptyQuotesText}>Add your explorers' words</Text>
-            <Pressable style={styles.addQuoteBtn} onPress={onAddQuote}>
-              <Text style={styles.addQuoteBtnText}>{'\uFF0B'} Add a kid quote</Text>
-            </Pressable>
+            <Text style={styles.emptyQuotesText}>No kid quotes yet</Text>
+            <Text style={[styles.emptyQuotesText, { fontSize: 13, marginTop: 8, opacity: 0.65, lineHeight: 20 }]}>
+              Wrap up a day and add what the kids said{' —'} they'll appear here.
+            </Text>
           </View>
         )}
       </View>
@@ -674,24 +674,23 @@ export default function StoryScreen() {
         </View>
       </View>
 
-      {/* Replace Image row — shown on slides 1, 3, 5 */}
-      {(slide === 0 || slide === 2 || slide === 4) && (
-        <Pressable
-          style={[styles.replaceBtn, { bottom: insets.bottom + 136 }]}
-          onPress={() => {
-            if (slide === 0) setPickerMode('hero');
-            else if (slide === 2) { setCollageSelected([]); setPickerMode('collage'); }
-            else setPickerMode('closing');
-          }}
-        >
-          <Text style={styles.replaceBtnText}>
-            {slide === 2 ? 'Replace collage images (select 4)' : 'Replace image'}
-          </Text>
-        </Pressable>
-      )}
-
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
+        {/* Replace Image row — only on slides 1, 3, 5 */}
+        {(slide === 0 || slide === 2 || slide === 4) && (
+          <Pressable
+            style={styles.replaceBtn}
+            onPress={() => {
+              if (slide === 0) setPickerMode('hero');
+              else if (slide === 2) { setCollageSelected([]); setPickerMode('collage'); }
+              else setPickerMode('closing');
+            }}
+          >
+            <Text style={styles.replaceBtnText}>
+              {slide === 2 ? 'Replace collage images (select 4)' : 'Replace image'}
+            </Text>
+          </Pressable>
+        )}
         <View style={styles.sharePrimaryRow}>
           <Pressable style={[styles.shareMain, { flex: 1 }]} onPress={handleShareImage}>
             <Text style={styles.shareMainText}>{'\u2197'} Share as image</Text>
@@ -868,13 +867,12 @@ const styles = StyleSheet.create({
   instaBtnText: { fontSize: 22 },
   shareRow: { flexDirection: 'row', gap: 8 },
 
-  // Replace Image button (floats above the bottom bar)
+  // Replace Image button (inside bottom bar, above share buttons)
   replaceBtn: {
-    position: 'absolute', left: 16, right: 16,
-    backgroundColor: 'rgba(232,105,42,0.18)',
-    borderWidth: 1, borderColor: 'rgba(232,105,42,0.6)',
+    backgroundColor: 'rgba(232,105,42,0.15)',
+    borderWidth: 1, borderColor: 'rgba(232,105,42,0.5)',
     borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-    zIndex: 20,
+    marginBottom: 10,
   },
   replaceBtnText: { fontSize: 13, fontFamily: F.bold, color: '#E8692A' },
   shareSmall: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
@@ -1024,8 +1022,8 @@ const pkr = StyleSheet.create({
   cancelBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   cancelTxt: { fontFamily: F.medium, fontSize: 15, color: '#E8692A' },
   grid: { padding: 2 },
-  cell: { width: (SW - 4) / 3 - 2, height: (SW - 4) / 3 - 2, margin: 1, position: 'relative' },
-  thumb: { ...StyleSheet.absoluteFillObject },
+  cell: { width: (SW - 4) / 3 - 2, height: (SW - 4) / 3 - 2, margin: 1, overflow: 'hidden', backgroundColor: '#e0dcd8' },
+  thumb: { width: '100%', height: '100%' },
   badge: {
     position: 'absolute', top: 6, right: 6,
     width: 26, height: 26, borderRadius: 13,
