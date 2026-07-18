@@ -676,28 +676,24 @@ export default function StoryScreen() {
 
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
-        {/* Replace Image row — only on slides 1, 3, 5 */}
-        {(slide === 0 || slide === 2 || slide === 4) && (
-          <Pressable
-            style={styles.replaceBtn}
-            onPress={() => {
-              if (slide === 0) setPickerMode('hero');
-              else if (slide === 2) { setCollageSelected([]); setPickerMode('collage'); }
-              else setPickerMode('closing');
-            }}
-          >
-            <Text style={styles.replaceBtnText}>
-              {slide === 2 ? 'Replace collage images (select 4)' : 'Replace image'}
-            </Text>
-          </Pressable>
-        )}
         <View style={styles.sharePrimaryRow}>
           <Pressable style={[styles.shareMain, { flex: 1 }]} onPress={handleShareImage}>
             <Text style={styles.shareMainText}>{'\u2197'} Share as image</Text>
           </Pressable>
-          <Pressable style={styles.instaBtn} onPress={handleShareInstagram}>
-            <Text style={styles.instaBtnText}>{'\uD83D\uDCF7'}</Text>
-          </Pressable>
+          {(slide === 0 || slide === 2 || slide === 4) && (
+            <Pressable
+              style={styles.replaceBtn}
+              onPress={() => {
+                if (slide === 0) setPickerMode('hero');
+                else if (slide === 2) { setCollageSelected([]); setPickerMode('collage'); }
+                else setPickerMode('closing');
+              }}
+            >
+              <Text style={styles.replaceBtnText}>
+                {slide === 2 ? 'Collage' : 'Replace'}
+              </Text>
+            </Pressable>
+          )}
         </View>
         <View style={styles.shareRow}>
           <Pressable style={styles.shareSmall} onPress={handleShareLink}>
@@ -860,21 +856,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', gap: 8,
   },
   shareMainText: { fontSize: 15, fontFamily: F.bold, color: '#fff' },
-  instaBtn: {
-    width: 52, backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-  },
-  instaBtnText: { fontSize: 22 },
+
   shareRow: { flexDirection: 'row', gap: 8 },
 
-  // Replace Image button (inside bottom bar, above share buttons)
+  // Replace Image button (compact, sits next to Share as image)
   replaceBtn: {
-    backgroundColor: 'rgba(232,105,42,0.15)',
-    borderWidth: 1, borderColor: 'rgba(232,105,42,0.5)',
-    borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-    marginBottom: 10,
+    width: 90,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
   },
-  replaceBtnText: { fontSize: 13, fontFamily: F.bold, color: '#E8692A' },
+  replaceBtnText: { fontSize: 12, fontFamily: F.bold, color: '#E8692A', textAlign: 'center' },
   shareSmall: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   shareSmallText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
 
@@ -895,9 +886,9 @@ const styles = StyleSheet.create({
   wordmark: { position: 'absolute', bottom: 115, left: 24, fontSize: 11, fontFamily: F.bold, letterSpacing: 2, textTransform: 'uppercase' },
 
   // Slide 1
-  slide1Content: { position: 'absolute', bottom: 130, left: 0, right: 0, paddingHorizontal: 24 },
+  slide1Content: { position: 'absolute', bottom: 158, left: 0, right: 0, paddingHorizontal: 24 },
   eyebrow: { fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.6)', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8 },
-  slide1Title: { fontFamily: 'Georgia', fontSize: 34, fontWeight: '800', color: '#fff', lineHeight: 40, marginBottom: 8 },
+  slide1Title: { fontFamily: 'Georgia', fontSize: 28, fontWeight: '800', color: '#fff', lineHeight: 34, marginBottom: 8 },
   slide1Meta: { fontSize: 14, fontFamily: F.regular, color: 'rgba(255,255,255,0.6)' },
 
   // Slide 2 Map — Google Static Map with gradient overlays
