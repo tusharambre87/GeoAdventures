@@ -6,13 +6,17 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import {
   Alert,
   Animated,
+  FlatList,
   Linking,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   Dimensions,
   ActivityIndicator,
@@ -370,6 +374,13 @@ export default function StoryScreen() {
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = React.useState(false);
 
+  // ── Replace-image overrides (user picks from their trip photos) ────────────
+  const [overrideHero,    setOverrideHero]    = useState<string | null>(null);
+  const [overrideClosing, setOverrideClosing] = useState<string | null>(null);
+  const [overrideCollage, setOverrideCollage] = useState<(string|null)[]>([null,null,null,null]);
+  const [pickerMode, setPickerMode] = useState<'hero'|'collage'|'closing'|null>(null);
+  const [collageSelected, setCollageSelected] = useState<string[]>([]);
+
   // Show "Saved to Memories" toast when arriving from trip complete
   useEffect(() => {
     if (fromComplete === '1') {
@@ -430,25 +441,40 @@ export default function StoryScreen() {
     }
   }
 
+  // ── Ranked photo pool: non-food stops first so hero/collage use landmark photos ──
+  const rankedPhotos = useMemo(() => {
+    const stops = trip?.stops ?? [] as any[];
+    const stopTypeMap = new Map<string, string>(stops.map((s: any) => [s.id ?? '', s.stopType ?? '']));
+    const foodTypes = new Set(['restaurant', 'cafe', 'food', 'lunch', 'dinner', 'breakfast', 'meal', 'street_food']);
+    type PE = { url: string; isFood: boolean };
+    const entries: PE[] = (moments as Moment[]).flatMap(m => {
+      const type = m.stopId ? (stopTypeMap.get(m.stopId) ?? '') : '';
+      const isFood = foodTypes.has(type);
+      const urls = m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl as string] : [];
+      return urls.map(url => ({ url, isFood }));
+    });
+    entries.sort((a, b) => Number(a.isFood) - Number(b.isFood));
+    return entries.map(e => e.url);
+  }, [moments, trip]);
+
   const { heroPhoto, collagePhotos, closingPhoto, highlights } = useMemo(() => {
-    const photos = (moments as Moment[]).flatMap(m =>
-      m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
-    );
+    const photos = rankedPhotos;
     // Stop hero-img URLs — actual photos of each place (populated by Stop Image Backfill)
     const stopPhotos = (trip?.stops ?? [] as any[])
       .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)
       .filter(Boolean) as string[];
+    // Kid quotes from in-app entries; fall back to AI highlights
+    const kidQuotes = (moments as Moment[])
+      .filter(m => m.kidPromptResponse?.trim())
+      .map(m => m.kidPromptResponse!.trim());
     return {
-      // Slide 1: first user photo, else first stop image
       heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
-      // Slide 3 collage: user photo first, then stop hero-img; null → stop-name gradient card
       collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? stopPhotos[i] ?? null)) as (string | null)[],
-      // Slide 5: last user photo (visual variety vs. cover), else last stop image
       closingPhoto: photos[photos.length - 1] ?? photos[0]
         ?? stopPhotos[stopPhotos.length - 1] ?? stopPhotos[0] ?? null,
-      highlights: story?.highlights ?? [],
+      highlights: kidQuotes.length > 0 ? kidQuotes : (story?.highlights ?? []),
     };
-  }, [moments, story, trip]);
+  }, [rankedPhotos, moments, story, trip]);
 
   function nextSlide() {
     const cur = slideIndexRef.current;
@@ -600,12 +626,18 @@ export default function StoryScreen() {
   const handleAddPhoto = () => router.push({ pathname: '/(tabs)/today', params: { tripId } } as any);
   const handleAddQuote = () => router.push({ pathname: '/(tabs)/today', params: { tripId } } as any);
 
+  const finalHero    = overrideHero    ?? heroPhoto;
+  const finalClosing = overrideClosing ?? closingPhoto;
+  const finalCollage = overrideCollage.some(p => p !== null)
+    ? ([0,1,2,3].map(i => overrideCollage[i] ?? collagePhotos[i] ?? null) as (string|null)[])
+    : collagePhotos;
+
   const slideContent = [
-    <Slide1Cover key="1" trip={trip} heroPhoto={heroPhoto} />,
+    <Slide1Cover key="1" trip={trip} heroPhoto={finalHero} />,
     <Slide2Map key="2" trip={trip} />,
-    <Slide3Collage key="3" collagePhotos={collagePhotos} trip={trip} onAddPhoto={handleAddPhoto} />,
+    <Slide3Collage key="3" collagePhotos={finalCollage} trip={trip} onAddPhoto={handleAddPhoto} />,
     <Slide4Quotes key="4" highlights={highlights} generating={generating} onAddQuote={handleAddQuote} />,
-    <Slide5Closing key="5" trip={trip} closingPhoto={closingPhoto} />,
+    <Slide5Closing key="5" trip={trip} closingPhoto={finalClosing} />,
   ];
 
   return (
@@ -641,6 +673,22 @@ export default function StoryScreen() {
           ))}
         </View>
       </View>
+
+      {/* Replace Image row — shown on slides 1, 3, 5 */}
+      {(slide === 0 || slide === 2 || slide === 4) && (
+        <Pressable
+          style={[styles.replaceBtn, { bottom: insets.bottom + 136 }]}
+          onPress={() => {
+            if (slide === 0) setPickerMode('hero');
+            else if (slide === 2) { setCollageSelected([]); setPickerMode('collage'); }
+            else setPickerMode('closing');
+          }}
+        >
+          <Text style={styles.replaceBtnText}>
+            {slide === 2 ? 'Replace collage images (select 4)' : 'Replace image'}
+          </Text>
+        </Pressable>
+      )}
 
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
@@ -702,6 +750,85 @@ export default function StoryScreen() {
         onClose={() => setUpgradeVisible(false)}
         context="story"
       />
+
+      {/* ── Photo picker modal ─────────────────────────────────────────── */}
+      <Modal
+        visible={pickerMode !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPickerMode(null)}
+      >
+        <View style={pkr.root}>
+          <View style={pkr.header}>
+            <Text style={pkr.title}>
+              {pickerMode === 'collage' ? 'Select up to 4 photos' : 'Choose a photo'}
+            </Text>
+            <TouchableOpacity onPress={() => setPickerMode(null)} style={pkr.cancelBtn}>
+              <Text style={pkr.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          {rankedPhotos.length === 0 ? (
+            <View style={pkr.empty}>
+              <Text style={pkr.emptyTxt}>No photos found. Add photos to your stops first.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={rankedPhotos}
+              numColumns={3}
+              keyExtractor={(_, i) => String(i)}
+              contentContainerStyle={pkr.grid}
+              renderItem={({ item }) => {
+                const selIdx = collageSelected.indexOf(item);
+                const selected = selIdx >= 0;
+                return (
+                  <Pressable
+                    style={pkr.cell}
+                    onPress={() => {
+                      if (pickerMode === 'hero')    { setOverrideHero(item);    setPickerMode(null); }
+                      else if (pickerMode === 'closing') { setOverrideClosing(item); setPickerMode(null); }
+                      else if (pickerMode === 'collage') {
+                        if (selected) {
+                          setCollageSelected(prev => prev.filter(p => p !== item));
+                        } else if (collageSelected.length < 4) {
+                          setCollageSelected(prev => [...prev, item]);
+                        }
+                      }
+                    }}
+                  >
+                    <ExpoImage source={{ uri: item }} style={pkr.thumb} contentFit="cover" />
+                    {pickerMode === 'collage' && selected && (
+                      <View style={pkr.badge}>
+                        <Text style={pkr.badgeNum}>{selIdx + 1}</Text>
+                      </View>
+                    )}
+                    {pickerMode === 'collage' && !selected && collageSelected.length >= 4 && (
+                      <View style={[pkr.badge, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+                    )}
+                  </Pressable>
+                );
+              }}
+            />
+          )}
+          {pickerMode === 'collage' && (
+            <View style={pkr.doneRow}>
+              <TouchableOpacity
+                style={[pkr.doneBtn, collageSelected.length === 0 && { opacity: 0.45 }]}
+                disabled={collageSelected.length === 0}
+                onPress={() => {
+                  const filled: (string|null)[] = [null,null,null,null];
+                  collageSelected.forEach((p,i) => { filled[i] = p; });
+                  setOverrideCollage(filled);
+                  setPickerMode(null);
+                }}
+              >
+                <Text style={pkr.doneTxt}>
+                  Done {collageSelected.length > 0 ? `(${collageSelected.length}/4 selected)` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -740,6 +867,16 @@ const styles = StyleSheet.create({
   },
   instaBtnText: { fontSize: 22 },
   shareRow: { flexDirection: 'row', gap: 8 },
+
+  // Replace Image button (floats above the bottom bar)
+  replaceBtn: {
+    position: 'absolute', left: 16, right: 16,
+    backgroundColor: 'rgba(232,105,42,0.18)',
+    borderWidth: 1, borderColor: 'rgba(232,105,42,0.6)',
+    borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    zIndex: 20,
+  },
+  replaceBtnText: { fontSize: 13, fontFamily: F.bold, color: '#E8692A' },
   shareSmall: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   shareSmallText: { fontSize: 13, fontFamily: F.bold, color: '#fff' },
 
@@ -875,6 +1012,37 @@ const s3m = StyleSheet.create({
     fontSize: 13, fontFamily: F.semibold, color: '#fff',
     lineHeight: 18, opacity: 0.92,
   },
+});
+
+// ── Picker modal styles ────────────────────────────────────────────────────────
+const pkr = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F5F2EE' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 14,
+    borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
+  title: { fontFamily: F.bold, fontSize: 17, color: '#1A1F2E' },
+  cancelBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  cancelTxt: { fontFamily: F.medium, fontSize: 15, color: '#E8692A' },
+  grid: { padding: 2 },
+  cell: { width: (SW - 4) / 3 - 2, height: (SW - 4) / 3 - 2, margin: 1, position: 'relative' },
+  thumb: { ...StyleSheet.absoluteFillObject },
+  badge: {
+    position: 'absolute', top: 6, right: 6,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: '#E8692A', alignItems: 'center', justifyContent: 'center',
+  },
+  badgeNum: { fontFamily: F.bold, fontSize: 13, color: '#fff' },
+  doneRow: {
+    padding: 16, borderTopWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: '#F5F2EE',
+  },
+  doneBtn: {
+    backgroundColor: '#E8692A', borderRadius: 14, paddingVertical: 15,
+    alignItems: 'center',
+  },
+  doneTxt: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyTxt: { fontFamily: F.medium, fontSize: 15, color: '#8A8FA8', textAlign: 'center', lineHeight: 22 },
 });
 
 // Slide 2 map marker styles
