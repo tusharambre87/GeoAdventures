@@ -968,7 +968,7 @@ const styles = StyleSheet.create({
   quotesTitle: { fontFamily: 'Georgia', fontSize: 26, fontWeight: '800', color: '#fff', lineHeight: 32, marginBottom: 8 },
   quoteItem: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   quoteStar: { color: '#F5A623', fontSize: 14, marginTop: 2 },
-  quoteText: { flex: 1, fontSize: 15, fontFamily: F.regular, color: 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: 24 },
+  quoteText: { fontSize: 15, fontFamily: F.regular, color: 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: 24 },
   quoteAttrib: { fontFamily: F.bold, fontSize: 12, color: '#E8692A', marginTop: 4, letterSpacing: 0.3 },
 
   // Generate story card
