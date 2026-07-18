@@ -282,12 +282,22 @@ function Slide4Quotes({
         <Text style={styles.quotesTitle}>What they'll remember most</Text>
 
         {hasHighlights ? (
-          highlights.slice(0, 4).map((h, i) => (
-            <View key={i} style={styles.quoteItem}>
-              <Text style={styles.quoteStar}>{'\u2726'}</Text>
-              <Text style={styles.quoteText}>"{h}"</Text>
-            </View>
-          ))
+          highlights.slice(0, 4).map((h, i) => {
+            const hasPipe = h.includes('|');
+            const kidName = hasPipe ? h.split('|')[0].trim() : null;
+            const quoteBody = hasPipe ? h.split('|').slice(1).join('|').trim() : h;
+            return (
+              <View key={i} style={styles.quoteItem}>
+                <Text style={styles.quoteStar}>{'\u2726'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quoteText}>"{quoteBody}"</Text>
+                  {kidName && (
+                    <Text style={styles.quoteAttrib}>{'\u2014'} {kidName}</Text>
+                  )}
+                </View>
+              </View>
+            );
+          })
         ) : generating ? (
           <View style={styles.generateCard}>
             <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" />
@@ -959,6 +969,7 @@ const styles = StyleSheet.create({
   quoteItem: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   quoteStar: { color: '#F5A623', fontSize: 14, marginTop: 2 },
   quoteText: { flex: 1, fontSize: 15, fontFamily: F.regular, color: 'rgba(255,255,255,0.9)', fontStyle: 'italic', lineHeight: 24 },
+  quoteAttrib: { fontFamily: F.bold, fontSize: 12, color: '#E8692A', marginTop: 4, letterSpacing: 0.3 },
 
   // Generate story card
   generateCard: {
