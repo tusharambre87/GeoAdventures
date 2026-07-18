@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 import { useAuth } from '@/lib/authContext';
@@ -380,6 +381,34 @@ export default function StoryScreen() {
   const [overrideCollage, setOverrideCollage] = useState<(string|null)[]>([null,null,null,null]);
   const [pickerMode, setPickerMode] = useState<'hero'|'collage'|'closing'|null>(null);
   const [collageSelected, setCollageSelected] = useState<string[]>([]);
+
+  // ── Persist image overrides so they survive navigation ──────────────
+  const storageKey = tripId ? `story-overrides-${tripId}` : null;
+
+  // Load saved overrides on mount
+  useEffect(() => {
+    if (!storageKey) return;
+    AsyncStorage.getItem(storageKey).then(raw => {
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (saved.hero)    setOverrideHero(saved.hero);
+        if (saved.closing) setOverrideClosing(saved.closing);
+        if (saved.collage) setOverrideCollage(saved.collage);
+      } catch {}
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  // Save overrides whenever they change
+  useEffect(() => {
+    if (!storageKey) return;
+    AsyncStorage.setItem(storageKey, JSON.stringify({
+      hero: overrideHero,
+      closing: overrideClosing,
+      collage: overrideCollage,
+    }));
+  }, [storageKey, overrideHero, overrideClosing, overrideCollage]);
 
   // Show "Saved to Memories" toast when arriving from trip complete
   useEffect(() => {
