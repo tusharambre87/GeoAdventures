@@ -3977,12 +3977,12 @@ export type NearbyLandmarksCache = typeof nearbyLandmarksCache.$inferSelect;
 // ── DRIVING LEGS CACHE ────────────────────────────────────────────────────────
 // Caches Google Distance Matrix results keyed by lat/lng coordinate strings.
 // Eliminates repeat API calls for the same origin→destination pair.
+// Shape matches production: no serial PK, computed_at timestamptz NOT NULL.
 export const travelLegs = pgTable("travel_legs", {
-  id:              serial("id").primaryKey(),
   originKey:       text("origin_key").notNull(),
   destKey:         text("dest_key").notNull(),
   durationSeconds: integer("duration_seconds").notNull(),
-  createdAt:       timestamp("created_at").defaultNow(),
+  computedAt:      timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("uq_travel_legs_pair").on(table.originKey, table.destKey),
   index("idx_travel_legs_origin").on(table.originKey),
