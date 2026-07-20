@@ -3973,3 +3973,19 @@ export const nearbyLandmarksCache = pgTable("nearby_landmarks_cache", {
   cachedAt: timestamp("cached_at").defaultNow().notNull(),
 });
 export type NearbyLandmarksCache = typeof nearbyLandmarksCache.$inferSelect;
+
+// ── DRIVING LEGS CACHE ────────────────────────────────────────────────────────
+// Caches Google Distance Matrix results keyed by lat/lng coordinate strings.
+// Eliminates repeat API calls for the same origin→destination pair.
+export const travelLegs = pgTable("travel_legs", {
+  id:              serial("id").primaryKey(),
+  originKey:       text("origin_key").notNull(),
+  destKey:         text("dest_key").notNull(),
+  durationSeconds: integer("duration_seconds").notNull(),
+  createdAt:       timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_travel_legs_pair").on(table.originKey, table.destKey),
+  index("idx_travel_legs_origin").on(table.originKey),
+  index("idx_travel_legs_dest").on(table.destKey),
+]);
+export type TravelLeg = typeof travelLegs.$inferSelect;
