@@ -8080,7 +8080,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.execute(drizzleSql`INSERT INTO travel_legs (origin_key,dest_key,duration_seconds) VALUES (${canonA},${canonB},${secs}) ON CONFLICT DO NOTHING`);
         return secs;
       }
-    }catch{}
+    } catch (err) {
+      console.error('[driveSecondsCached] Cache read/write failed — driving duration not cached:', err);
+    }
     return null;
   }
 
