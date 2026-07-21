@@ -490,7 +490,7 @@ export default function StoryScreen() {
     try {
       await memoriesAPI.regenerateStory(tripId);
       await refetchStory();
-      setPhotoSeed(prev => prev + 1);
+      setPhotoSeed(Math.floor(Math.random() * 999983) + 1);
     } catch {
       setGenError(true);
     } finally {
@@ -514,10 +514,23 @@ export default function StoryScreen() {
     return entries.map(e => e.url);
   }, [moments, trip]);
 
+  // Seeded Fisher-Yates shuffle — same seed => same order; different seed => truly different order
+  function seededShuffle(arr: string[], seed: number): string[] {
+    const a = [...arr];
+    let s = (seed ^ 0xdeadbeef) >>> 0;
+    for (let i = a.length - 1; i > 0; i--) {
+      s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+      s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+      s = (s ^ (s >>> 16)) >>> 0;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   const { heroPhoto, collagePhotos, closingPhoto, highlights } = useMemo(() => {
     const allPhotos = rankedPhotos;
-    const offset = allPhotos.length > 1 ? photoSeed % allPhotos.length : 0;
-    const photos = offset > 0 ? [...allPhotos.slice(offset), ...allPhotos.slice(0, offset)] : allPhotos;
+    const photos = photoSeed > 0 && allPhotos.length > 1 ? seededShuffle(allPhotos, photoSeed) : allPhotos;
     // Stop hero-img URLs — actual photos of each place (populated by Stop Image Backfill)
     const stopPhotos = (trip?.stops ?? [] as any[])
       .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)

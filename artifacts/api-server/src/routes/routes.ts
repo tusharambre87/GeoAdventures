@@ -14142,7 +14142,7 @@ Return ONLY valid JSON in this exact format:
       const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
       if (!trip) return res.status(404).json({ message: 'Trip not found' });
       if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
-      const overrides = (trip.metadata as any)?.storyImageOverrides ?? null;
+      const overrides = (trip.storyImageOverrides as any) ?? null;
       return res.json(overrides);
     } catch (err) {
       req.log.error({ err }, 'Failed to get story overrides');
@@ -14158,9 +14158,8 @@ Return ONLY valid JSON in this exact format:
       const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
       if (!trip) return res.status(404).json({ message: 'Trip not found' });
       if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
-      const existingMeta = ((trip.metadata as any) ?? {}) as Record<string, unknown>;
       await db.update(travelTrips)
-        .set({ metadata: { ...existingMeta, storyImageOverrides: { hero: hero ?? null, closing: closing ?? null, collage: collage ?? null } } })
+        .set({ storyImageOverrides: { hero: hero ?? null, closing: closing ?? null, collage: collage ?? null } })
         .where(eq(travelTrips.id, tripId));
       return res.json({ success: true });
     } catch (err) {

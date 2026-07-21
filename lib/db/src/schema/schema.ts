@@ -937,6 +937,7 @@ export const travelTrips = pgTable("travel_trips", {
   plannerInputSnapshot: jsonb("planner_input_snapshot"),
   parentSuggestions: jsonb("parent_suggestions"),
   restBreaks: jsonb("rest_breaks").default(null), // Break marker metadata: { dayIndex, afterDisplayOrder, label }[]
+  storyImageOverrides: jsonb("story_image_overrides").default(null), // User-chosen cover/closing/collage photos: { hero, closing, collage }
   currentDayIndex: integer("current_day_index"), // Which day the family has explicitly tapped "Start Day"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
