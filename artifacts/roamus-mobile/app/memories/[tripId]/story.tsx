@@ -343,7 +343,7 @@ function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: strin
 // ─── Main carousel ────────────────────────────────────────────────────────────
 
 export default function StoryScreen() {
-  const { tripId, fromComplete } = useLocalSearchParams<{ tripId: string; fromComplete?: string }>();
+  const { tripId, fromComplete, regenerated } = useLocalSearchParams<{ tripId: string; fromComplete?: string; regenerated?: string }>();
   const insets = useSafeAreaInsets();
 
   // Slide state + cross-fade animation
@@ -389,6 +389,8 @@ export default function StoryScreen() {
   const [overrideHero,    setOverrideHero]    = useState<string | null>(null);
   const [overrideClosing, setOverrideClosing] = useState<string | null>(null);
   const [overrideCollage, setOverrideCollage] = useState<(string|null)[]>([null,null,null,null]);
+  const overridesLoaded = useRef(false);
+  const [photoSeed, setPhotoSeed] = useState(() => regenerated === '1' ? 1 : 0);
   const [pickerMode, setPickerMode] = useState<'hero'|'collage'|'closing'|null>(null);
   const [collageSelected, setCollageSelected] = useState<string[]>([]);
 
@@ -397,22 +399,25 @@ export default function StoryScreen() {
 
   // Load saved overrides on mount
   useEffect(() => {
-    if (!storageKey) return;
+    overridesLoaded.current = false;
+    if (!storageKey) { overridesLoaded.current = true; return; }
     AsyncStorage.getItem(storageKey).then(raw => {
-      if (!raw) return;
-      try {
-        const saved = JSON.parse(raw);
-        if (saved.hero)    setOverrideHero(saved.hero);
-        if (saved.closing) setOverrideClosing(saved.closing);
-        if (saved.collage) setOverrideCollage(saved.collage);
-      } catch {}
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw);
+          if (saved.hero)    setOverrideHero(saved.hero);
+          if (saved.closing) setOverrideClosing(saved.closing);
+          if (saved.collage) setOverrideCollage(saved.collage);
+        } catch {}
+      }
+      overridesLoaded.current = true;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  // Save overrides whenever they change
+  // Save overrides whenever they change — but ONLY after initial load to avoid wiping saved data
   useEffect(() => {
-    if (!storageKey) return;
+    if (!storageKey || !overridesLoaded.current) return;
     AsyncStorage.setItem(storageKey, JSON.stringify({
       hero: overrideHero,
       closing: overrideClosing,
@@ -473,6 +478,10 @@ export default function StoryScreen() {
     try {
       await memoriesAPI.regenerateStory(tripId);
       await refetchStory();
+      setPhotoSeed(prev => prev + 1);
+      setOverrideHero(null);
+      setOverrideClosing(null);
+      setOverrideCollage([null, null, null, null]);
     } catch {
       setGenError(true);
     } finally {
@@ -497,7 +506,9 @@ export default function StoryScreen() {
   }, [moments, trip]);
 
   const { heroPhoto, collagePhotos, closingPhoto, highlights } = useMemo(() => {
-    const photos = rankedPhotos;
+    const allPhotos = rankedPhotos;
+    const offset = allPhotos.length > 1 ? photoSeed % allPhotos.length : 0;
+    const photos = offset > 0 ? [...allPhotos.slice(offset), ...allPhotos.slice(0, offset)] : allPhotos;
     // Stop hero-img URLs — actual photos of each place (populated by Stop Image Backfill)
     const stopPhotos = (trip?.stops ?? [] as any[])
       .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)

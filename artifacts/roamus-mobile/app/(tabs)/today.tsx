@@ -948,7 +948,8 @@ export default function TodayScreen() {
           s.setHours(0, 0, 0, 0);
           return s.getTime() > todayMs;
         })
-        ?? sortedTrips.find(t => t.startDate)
+        ?? [...sortedTrips].reverse().find(t => t.startDate)
+        ?? sortedTrips[sortedTrips.length - 1]
         ?? sortedTrips[0];
         if (!active) {
           if (!devState) setTodayState('no_trip');

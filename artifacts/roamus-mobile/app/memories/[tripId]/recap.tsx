@@ -127,6 +127,7 @@ export default function RecapScreen() {
             try {
               await memoriesAPI.regenerateStory(tripId);
               await queryClient.invalidateQueries({ queryKey: ['story', tripId] });
+              router.push(`/memories/${tripId}/story?regenerated=1` as any);
             } catch {
               Alert.alert('Error', 'Could not regenerate story. Please try again.');
             } finally {
