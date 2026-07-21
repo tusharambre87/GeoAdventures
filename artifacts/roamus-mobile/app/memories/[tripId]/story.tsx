@@ -397,32 +397,44 @@ export default function StoryScreen() {
   // ── Persist image overrides so they survive navigation ──────────────
   const storageKey = tripId ? `story-overrides-${tripId}` : null;
 
-  // Load saved overrides on mount
+  // Load saved overrides — server is source of truth, AsyncStorage is fallback
   useEffect(() => {
     overridesLoaded.current = false;
-    if (!storageKey) { overridesLoaded.current = true; return; }
-    AsyncStorage.getItem(storageKey).then(raw => {
-      if (raw) {
-        try {
-          const saved = JSON.parse(raw);
-          if (saved.hero)    setOverrideHero(saved.hero);
-          if (saved.closing) setOverrideClosing(saved.closing);
-          if (saved.collage) setOverrideCollage(saved.collage);
-        } catch {}
-      }
-      overridesLoaded.current = true;
-    });
+    if (!tripId) { overridesLoaded.current = true; return; }
+    const applyRaw = (raw: string | null) => {
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (saved.hero)    setOverrideHero(saved.hero);
+        if (saved.closing) setOverrideClosing(saved.closing);
+        if (saved.collage) setOverrideCollage(saved.collage);
+      } catch {}
+    };
+    const loadFromAsyncStorage = () => {
+      if (!storageKey) { overridesLoaded.current = true; return; }
+      AsyncStorage.getItem(storageKey).then(raw => { applyRaw(raw); overridesLoaded.current = true; });
+    };
+    memoriesAPI.getStoryOverrides(tripId)
+      .then(serverOverrides => {
+        if (serverOverrides?.hero || serverOverrides?.closing || serverOverrides?.collage?.some(Boolean)) {
+          if (serverOverrides.hero)    setOverrideHero(serverOverrides.hero);
+          if (serverOverrides.closing) setOverrideClosing(serverOverrides.closing);
+          if (serverOverrides.collage) setOverrideCollage(serverOverrides.collage);
+          overridesLoaded.current = true;
+        } else {
+          loadFromAsyncStorage();
+        }
+      })
+      .catch(loadFromAsyncStorage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
-  // Save overrides whenever they change — but ONLY after initial load to avoid wiping saved data
+  // Save overrides to server (source of truth) + AsyncStorage (cache) after initial load
   useEffect(() => {
     if (!storageKey || !overridesLoaded.current) return;
-    AsyncStorage.setItem(storageKey, JSON.stringify({
-      hero: overrideHero,
-      closing: overrideClosing,
-      collage: overrideCollage,
-    }));
+    const payload = { hero: overrideHero, closing: overrideClosing, collage: overrideCollage };
+    AsyncStorage.setItem(storageKey, JSON.stringify(payload));
+    if (tripId) memoriesAPI.saveStoryOverrides(tripId, payload);
   }, [storageKey, overrideHero, overrideClosing, overrideCollage]);
 
   // Show "Saved to Memories" toast when arriving from trip complete
@@ -479,9 +491,6 @@ export default function StoryScreen() {
       await memoriesAPI.regenerateStory(tripId);
       await refetchStory();
       setPhotoSeed(prev => prev + 1);
-      setOverrideHero(null);
-      setOverrideClosing(null);
-      setOverrideCollage([null, null, null, null]);
     } catch {
       setGenError(true);
     } finally {

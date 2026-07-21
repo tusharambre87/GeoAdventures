@@ -14132,6 +14132,43 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // ── STORY IMAGE OVERRIDES ──────────────────────────────────────────────────
+  // Persists user-chosen cover/closing/collage photos in trip metadata JSONB.
+  // Client-side AsyncStorage is a cache only; server is source of truth.
+  app.get('/api/travel/trips/:tripId/story-overrides', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+      const overrides = (trip.metadata as any)?.storyImageOverrides ?? null;
+      return res.json(overrides);
+    } catch (err) {
+      req.log.error({ err }, 'Failed to get story overrides');
+      return res.status(500).json({ message: 'Failed to get story overrides' });
+    }
+  });
+
+  app.put('/api/travel/trips/:tripId/story-overrides', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub ?? req.user?.id;
+      const { hero, closing, collage } = req.body;
+      const trip = await db.query.travelTrips.findFirst({ where: eq(travelTrips.id, tripId) });
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+      const existingMeta = ((trip.metadata as any) ?? {}) as Record<string, unknown>;
+      await db.update(travelTrips)
+        .set({ metadata: { ...existingMeta, storyImageOverrides: { hero: hero ?? null, closing: closing ?? null, collage: collage ?? null } } })
+        .where(eq(travelTrips.id, tripId));
+      return res.json({ success: true });
+    } catch (err) {
+      req.log.error({ err }, 'Failed to save story overrides');
+      return res.status(500).json({ message: 'Failed to save story overrides' });
+    }
+  });
+
   // ── END OF DAY REFLECTION ─────────────────────────────────────────────────
   app.post('/api/travel/trips/:tripId/day-reflection', isAuthenticated, travelModeGuard, async (req: any, res) => {
     try {

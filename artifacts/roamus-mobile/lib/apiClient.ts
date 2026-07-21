@@ -240,6 +240,15 @@ export const memoriesAPI = {
     apiFetch<TripStory>(`/api/travel/trips/${tripId}/story/regenerate`, {
       method: 'POST',
     }),
+  getStoryOverrides: (tripId: string) =>
+    apiFetch<{ hero: string | null; closing: string | null; collage: (string | null)[] } | null>(
+      `/api/travel/trips/${tripId}/story-overrides`,
+    ).catch(() => null),
+  saveStoryOverrides: (tripId: string, overrides: { hero: string | null; closing: string | null; collage: (string | null)[] }) =>
+    apiFetch<void>(`/api/travel/trips/${tripId}/story-overrides`, {
+      method: 'PUT',
+      body: JSON.stringify(overrides),
+    }).catch(() => {}),
 };
 
 export type DayReflection = {
