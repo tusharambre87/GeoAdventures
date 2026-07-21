@@ -8857,6 +8857,105 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
     }
   });
 
+  // GET /api/travel/trips/:tripId/stop-pool
+  // Returns every candidate in the city's stop pool (fetched fresh from cityStopPoolCache),
+  // cross-referenced against the trip's selected travel_stops so callers can see the full
+  // picture of what was considered — not just the curated parent_suggestions subset.
+  //
+  // Each item carries: name, type, familyAnchorType, scoreClassicFinal, lat/lon, duration,
+  // selected (bool), and — when selected — the dayIndex and displayOrder from travel_stops.
+  app.get('/api/travel/trips/:tripId/stop-pool', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if ((trip as any).userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      const city: string = (trip as any).city ?? (trip as any).destination ?? '';
+      const country: string = (trip as any).country ?? '';
+      if (!city) return res.status(400).json({ message: 'Trip has no city' });
+
+      const [cachedPool, tripStops] = await Promise.all([
+        storage.getCityStopPool(city, country),
+        storage.getStopsByTripId(tripId),
+      ]);
+
+      if (!cachedPool?.stopPool || !Array.isArray(cachedPool.stopPool) || cachedPool.stopPool.length === 0) {
+        return res.status(404).json({ message: `No stop pool cached for "${city}"` });
+      }
+
+      // Same normalizer used by selectStopsFromPool and the pool path dedup
+      const normN = (n: string): string =>
+        n.toLowerCase()
+          .replace(/^the\s+/, '')
+          .replace(/\bunited\s+states\b/g, 'us')
+          .replace(/\bmount\b/g, 'mt')
+          .replace(/\bsaint\b/g, 'st')
+          .replace(/\bof\s+arts?\b/g, 'of art')
+          .replace(/\s+regional\s+/g, ' ')
+          .replace(/\s+state\s+park\b/g, '')
+          .replace(/\s+national\s+park\b/g, '')
+          .replace(/\s+county\s+park\b/g, '')
+          .replace(/&/g, 'and')
+          .replace(/[^a-z0-9 ]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .split(' ').slice(0, 5).join(' ');
+
+      // Build a lookup: normalizedName → { dayIndex, displayOrder, familyAnchorType }
+      type SelectedMeta = { dayIndex: number | null; displayOrder: number | null; familyAnchorType: string | null };
+      const selectedMap = new Map<string, SelectedMeta>();
+      for (const s of tripStops) {
+        const key = normN(s.name ?? '');
+        if (!selectedMap.has(key)) {
+          selectedMap.set(key, {
+            dayIndex: (s as any).dayIndex ?? null,
+            displayOrder: (s as any).displayOrder ?? null,
+            familyAnchorType: (s as any).metadata?.familyAnchorType ?? null,
+          });
+        }
+      }
+
+      const pool = (cachedPool.stopPool as any[]).map(c => {
+        const key = normN(c.name ?? '');
+        const sel = selectedMap.get(key);
+        return {
+          name: c.name ?? null,
+          type: c.type ?? null,
+          familyAnchorType: c.familyAnchorType ?? null,
+          scoreClassicFinal: c.scoreClassicFinal ?? null,
+          durationMinutes: c.durationMinutes ?? null,
+          minAge: c.minAge ?? null,
+          latitude: c.latitude ?? null,
+          longitude: c.longitude ?? null,
+          address: c.address ?? null,
+          selected: !!sel,
+          dayIndex: sel?.dayIndex ?? null,
+          displayOrder: sel?.displayOrder ?? null,
+        };
+      });
+
+      // Selected stops first, then unselected sorted by descending score
+      pool.sort((a, b) => {
+        if (a.selected !== b.selected) return a.selected ? -1 : 1;
+        return (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0);
+      });
+
+      res.json({
+        pool,
+        selectedCount: pool.filter(p => p.selected).length,
+        totalCount: pool.length,
+        poolCachedAt: (cachedPool as any).updatedAt ?? (cachedPool as any).createdAt ?? null,
+      });
+    } catch (err) {
+      req.log?.error({ err }, '[Travel] stop-pool error');
+      res.status(500).json({ message: 'Failed to fetch stop pool' });
+    }
+  });
+
   // GET /api/travel/trips/:tripId/stops/:stopId/replacement-suggestions (path-param variant)
   // Same as the query-param variant above — supports both URL shapes.
   app.get('/api/travel/trips/:tripId/stops/:stopId/replacement-suggestions', isAuthenticated, travelModeGuard, async (req: any, res) => {
