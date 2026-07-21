@@ -3120,6 +3120,12 @@ export function selectStopsFromPool(
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)
   let zonesInCurrentDay = new Set<string>();
+  // Coordinate-based geographic clustering for the current day.
+  // Each entry is the [lat, lon] of the first stop that started that cluster.
+  // A candidate within GEO_CLUSTER_RADIUS_KM of any centroid joins that cluster;
+  // otherwise it starts a new one. Mirrors the (dead) zone-label logic with real distances.
+  const GEO_CLUSTER_RADIUS_KM = 15;
+  let geoClustersInCurrentDay: Array<[number, number]> = [];
   // Track stop-types selected today (max 1 per type; hard cap for museums and anchors)
   let typesInCurrentDay = new Set<string>();
   let museumsInCurrentDay = 0;
@@ -3206,6 +3212,7 @@ export function selectStopsFromPool(
     // Reset per-day trackers at the start of each new day
     if (dayPosition === 0) {
       zonesInCurrentDay = new Set<string>();
+      geoClustersInCurrentDay = [];
       typesInCurrentDay = new Set<string>();
       museumsInCurrentDay = 0;
       anchorsInCurrentDay = 0;
@@ -3232,7 +3239,14 @@ export function selectStopsFromPool(
         // is never evaluated for the second stop on any 2-stop day.
         const _aLat = anchor.latitude ? parseFloat(String(anchor.latitude)) : null;
         const _aLon = anchor.longitude ? parseFloat(String(anchor.longitude)) : null;
-        if (_aLat && _aLon) { lastLat = _aLat; lastLon = _aLon; }
+        if (_aLat && _aLon) {
+          lastLat = _aLat; lastLon = _aLon;
+          // Seed geo-clusters from injected anchors so filler scoring has context
+          const nearCluster = geoClustersInCurrentDay.some(
+            ([cLat, cLon]) => haversineKm(cLat, cLon, _aLat, _aLon) <= GEO_CLUSTER_RADIUS_KM
+          );
+          if (!nearCluster) geoClustersInCurrentDay.push([_aLat, _aLon]);
+        }
         _injected++;
       }
       if (_injected > 0) continue;
@@ -3300,15 +3314,24 @@ export function selectStopsFromPool(
         adjustedScore -= 30;
       }
 
-      // Zone clustering bonus/penalty (skipped for India canonical trips)
-      if (!isCanonicalTripForSelection && c.neighborhoodZone) {
-        const zone = c.neighborhoodZone;
-        if (zonesInCurrentDay.has(zone)) {
-          // +10 for matching a zone already in today's plan (geographic clustering)
-          adjustedScore += 10;
-        } else if (zonesInCurrentDay.size >= 2) {
-          // -15 for introducing a 3rd distinct zone to the day (scattered geography)
-          adjustedScore -= 15;
+      // Coordinate-based geographic clustering bonus/penalty.
+      // Replaces the dead neighborhoodZone label scoring (zone tags are absent for all cities).
+      // Uses the same two-tier logic: +10 if candidate is near an existing cluster in today's
+      // plan (encourages same-area grouping), -15 if it would start a 3rd distinct cluster
+      // (discourages scatter across 3 sub-areas in a single day). Only fires when the
+      // candidate has coordinates and at least one stop is already placed today.
+      if (geoClustersInCurrentDay.length > 0) {
+        const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+        const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+        if (cLat && cLon) {
+          const nearExistingCluster = geoClustersInCurrentDay.some(
+            ([kLat, kLon]) => haversineKm(kLat, kLon, cLat, cLon) <= GEO_CLUSTER_RADIUS_KM
+          );
+          if (nearExistingCluster) {
+            adjustedScore += 10;
+          } else if (geoClustersInCurrentDay.length >= 2) {
+            adjustedScore -= 15;
+          }
         }
       }
 
@@ -3378,6 +3401,17 @@ export function selectStopsFromPool(
     if (["museum", "history", "culture"].includes(bestCandidate.type)) learningHeavyCount++;
     if (bestCandidate.neighborhoodZone) {
       zonesInCurrentDay.add(bestCandidate.neighborhoodZone);
+    }
+    // Update coordinate clusters for the current day
+    {
+      const _sLat = bestCandidate.latitude ? parseFloat(String(bestCandidate.latitude)) : null;
+      const _sLon = bestCandidate.longitude ? parseFloat(String(bestCandidate.longitude)) : null;
+      if (_sLat && _sLon) {
+        const nearCluster = geoClustersInCurrentDay.some(
+          ([cLat, cLon]) => haversineKm(cLat, cLon, _sLat, _sLon) <= GEO_CLUSTER_RADIUS_KM
+        );
+        if (!nearCluster) geoClustersInCurrentDay.push([_sLat, _sLon]);
+      }
     }
     typesInCurrentDay.add(bestCandidate.type);
     if (bestCandidate.type === 'museum') { museumsInCurrentDay++; museumsTotal++; }
