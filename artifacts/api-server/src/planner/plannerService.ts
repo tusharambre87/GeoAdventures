@@ -3861,6 +3861,290 @@ export function selectStopsFromPool(
   return { stops: result, parentSuggestions: allParentSuggestions };
 }
 
+// ── Day-bucketing output type ─────────────────────────────────────────────────
+export type DayBucket = {
+  dayNumber: number;
+  stops: GeneratedStop[];
+  targetCount: number;
+  actualCount: number;
+  /** True whenever actualCount < targetCount — leg-cap blocked every remaining
+   *  candidate before the slot was filled. Callers must surface this; do NOT
+   *  silently relax the cap or fall through to an unconstrained fill. */
+  closedShort: boolean;
+};
+
+/**
+ * Assign an already-selected (possibly user-edited) list of stop candidates to
+ * trip days — independent of any day assignments the original automatic generation
+ * produced (which are meaningless once the user has edited the list).
+ *
+ * Contract:
+ * - Input candidates must carry familyAnchorType, scoreClassicFinal, and
+ *   coordinates intact, exactly as returned by GET /stop-pool.
+ * - If coordinates are missing from a candidate the leg-cap cannot fire for
+ *   that pair, so that candidate is treated as zero-distance (may be placed
+ *   anywhere). This is intentional: the leg-cap is a guard, not a gate on
+ *   coordinateless stops.
+ * - closedShort: true is a first-class signal — callers infer nothing from
+ *   comparing counts themselves.
+ *
+ * Reused as-is (no modification):
+ *   getStopsPerDay, getPaceConfig, dayRoleCap, effectiveDuration,
+ *   familyDurationFloor, stopsForDay[]/dayStarts[], sequenceDayBySlot,
+ *   geoSequenceDay, candidateToGeneratedStop, haversineKm, estimateTravelMins.
+ */
+export function bucketStopsTodays(
+  candidates: CachedStopCandidate[],
+  input: PlannerInput,
+): DayBucket[] {
+  // ── Constants (same values as selectStopsFromPool) ────────────────────────
+  const GEO_CLUSTER_RADIUS_KM = 15;
+  const transportMode = input.transportMode ?? 'driving';
+  // Leg-cap: max single-leg driving time (minutes) before a candidate is rejected.
+  // Uses only the valid pace enum values from PlannerInput ("relaxed" | "moderate" | "busy").
+  const legCap = input.pace === 'relaxed' ? 20 : input.pace === 'busy' ? 40 : 25;
+  const dayCap = input.pace === 'busy' ? 120 : 90;
+
+  // ── Per-day budgets (mirrors selectStopsFromPool exactly) ─────────────────
+  const _basePaceConfig = getStopsPerDay(input.pace);
+  const _baseAnchorsPerDay = input.stopsPerDayOverride
+    ? Math.ceil(input.stopsPerDayOverride * 0.5)
+    : _basePaceConfig.anchors;
+
+  const stopsForDay: number[] = [];
+  const anchorsForDayArr: number[] = [];
+  for (let _d = 0; _d < input.tripDays; _d++) {
+    const _cap = input.perDayCaps?.[_d];
+    const effectiveStopsPerDay = input.stopsPerDayOverride ?? _basePaceConfig.total;
+    stopsForDay.push(_cap ? _cap.anchors + _cap.fillers : effectiveStopsPerDay);
+    anchorsForDayArr.push(_cap ? _cap.anchors : _baseAnchorsPerDay);
+  }
+
+  // ── Separate anchors from non-anchors ─────────────────────────────────────
+  const anchors = [...candidates]
+    .filter(c => c.familyAnchorType === 'anchor')
+    .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0));
+  const nonAnchors = candidates.filter(c => c.familyAnchorType !== 'anchor');
+
+  // ── Pass 1: Distribute anchors round-robin to days ────────────────────────
+  // Best-scoring anchor → Day 0, next → Day 1, etc. — matching selectStopsFromPool Pass 1.
+  const anchorsByDay = new Map<number, CachedStopCandidate[]>();
+  for (let d = 0; d < input.tripDays; d++) anchorsByDay.set(d, []);
+
+  const usedAnchors = new Set<CachedStopCandidate>();
+  let anchorDayIndex = 0;
+  for (const anchor of anchors) {
+    if (usedAnchors.size >= anchors.length) break;
+    const dayIdx = anchorDayIndex % input.tripDays;
+    const dayAnchors = anchorsByDay.get(dayIdx)!;
+    if (dayAnchors.length < anchorsForDayArr[dayIdx]) {
+      dayAnchors.push(anchor);
+      usedAnchors.add(anchor);
+    }
+    anchorDayIndex++;
+    if (anchorDayIndex >= Math.max(anchors.length * 2, input.tripDays * 2)) break;
+  }
+
+  // ── Inner helpers (same logic as sequenceDayBySlot / geoSequenceDay) ──────
+  const _sequenceDayBySlot = (dayStops: CachedStopCandidate[]): CachedStopCandidate[] => {
+    const hasSI = dayStops.some(
+      s => s.morningFitScore !== undefined &&
+           s.afterLunchFitScore !== undefined &&
+           s.lateDayFitScore !== undefined,
+    );
+    if (!hasSI) {
+      const anchorOrder: Record<string, number> = { anchor: 0, support: 1, filler: 2, meal: 3, reset: 3 };
+      return [...dayStops].sort(
+        (a, b) => (anchorOrder[a.familyAnchorType] ?? 2) - (anchorOrder[b.familyAnchorType] ?? 2),
+      );
+    }
+    const ordered: CachedStopCandidate[] = [];
+    const pool = new Set(dayStops);
+    for (let slot = 0; slot < dayStops.length; slot++) {
+      const scoreKey: keyof CachedStopCandidate =
+        slot === 0 ? 'morningFitScore' : slot === 1 ? 'afterLunchFitScore' : 'lateDayFitScore';
+      let best: CachedStopCandidate | null = null;
+      let bestPrimary = -Infinity, bestTiebreaker = -Infinity;
+      for (const s of pool) {
+        const primary = (s[scoreKey] as number | undefined) ?? 0;
+        const tiebreaker = s.anchorStopFitScore ?? 0;
+        if (primary > bestPrimary || (primary === bestPrimary && tiebreaker > bestTiebreaker)) {
+          bestPrimary = primary; bestTiebreaker = tiebreaker; best = s;
+        }
+      }
+      if (!best) break;
+      ordered.push(best);
+      pool.delete(best);
+    }
+    return ordered;
+  };
+
+  const GEO_SEQUENCE_THRESHOLD_KM = 15;
+  const _geoSequenceDay = (dayStops: CachedStopCandidate[]): CachedStopCandidate[] => {
+    if (dayStops.length <= 2) return dayStops;
+    const withCoords = dayStops.filter(
+      s => s.latitude && s.longitude &&
+           !isNaN(parseFloat(String(s.latitude))) && !isNaN(parseFloat(String(s.longitude))),
+    );
+    if (withCoords.length < 2) return dayStops;
+    let maxDist = 0;
+    for (let i = 0; i < withCoords.length; i++) {
+      for (let j = i + 1; j < withCoords.length; j++) {
+        const d = haversineKm(
+          parseFloat(String(withCoords[i].latitude)), parseFloat(String(withCoords[i].longitude)),
+          parseFloat(String(withCoords[j].latitude)), parseFloat(String(withCoords[j].longitude)),
+        );
+        if (d > maxDist) maxDist = d;
+      }
+    }
+    if (maxDist <= GEO_SEQUENCE_THRESHOLD_KM) return dayStops;
+    const ordered: CachedStopCandidate[] = [dayStops[0]];
+    const rem = new Set(dayStops.slice(1));
+    while (rem.size > 0) {
+      const last = ordered[ordered.length - 1];
+      const lLat = last.latitude ? parseFloat(String(last.latitude)) : null;
+      const lLon = last.longitude ? parseFloat(String(last.longitude)) : null;
+      if (!lLat || !lLon) { for (const s of rem) ordered.push(s); break; }
+      let nearest: CachedStopCandidate | null = null;
+      let nearestDist = Infinity;
+      for (const s of rem) {
+        const sLat = s.latitude ? parseFloat(String(s.latitude)) : null;
+        const sLon = s.longitude ? parseFloat(String(s.longitude)) : null;
+        if (!sLat || !sLon) continue;
+        const d = haversineKm(lLat, lLon, sLat, sLon);
+        if (d < nearestDist) { nearestDist = d; nearest = s; }
+      }
+      if (nearest) { ordered.push(nearest); rem.delete(nearest); }
+      else { for (const s of rem) ordered.push(s); break; }
+    }
+    return ordered;
+  };
+
+  // ── Day-by-day fill ───────────────────────────────────────────────────────
+  // Non-anchors are drawn sequentially: Day 1 picks first, Day 2 from remainder, etc.
+  // This is intentional — anchor distribution already balanced the high-value content.
+  const remainingNonAnchors = new Set(nonAnchors);
+  const buckets: DayBucket[] = [];
+
+  for (let dayIdx = 0; dayIdx < input.tripDays; dayIdx++) {
+    const dayNumber = dayIdx + 1;
+    const dayAnchors = anchorsByDay.get(dayIdx) ?? [];
+    const targetCount = stopsForDay[dayIdx];
+    const anchorTargetCount = anchorsForDayArr[dayIdx];
+
+    const dayPlaced: CachedStopCandidate[] = [...dayAnchors];
+    let lastLat: number | null = null;
+    let lastLon: number | null = null;
+    let dailyTravelMins = 0;
+    let dailyTravelKm = 0;
+    let geoClusters: Array<[number, number]> = [];
+
+    // Seed geo-clusters and last-position from anchors
+    for (const anchor of dayAnchors) {
+      const aLat = anchor.latitude ? parseFloat(String(anchor.latitude)) : null;
+      const aLon = anchor.longitude ? parseFloat(String(anchor.longitude)) : null;
+      if (aLat && aLon) {
+        lastLat = aLat; lastLon = aLon;
+        const near = geoClusters.some(([cLat, cLon]) => haversineKm(cLat, cLon, aLat, aLon) <= GEO_CLUSTER_RADIUS_KM);
+        if (!near) geoClusters.push([aLat, aLon]);
+      }
+    }
+
+    // Fill non-anchor slots.
+    // Use dayAnchors.length (actual anchors placed this day), NOT the budget cap
+    // (anchorsForDayArr[dayIdx]). Days where the pool ran out of anchors get all
+    // their slots filled from non-anchors — dropping to anchorTargetCount would
+    // silently under-fill those days.
+    const fillerSlotsNeeded = targetCount - dayAnchors.length;
+    let closedShort = false;
+
+    for (let slot = 0; slot < fillerSlotsNeeded; slot++) {
+      let bestCandidate: CachedStopCandidate | null = null;
+      let bestScore = -Infinity;
+
+      for (const c of remainingNonAnchors) {
+        let score = c.scoreClassicFinal ?? 0;
+
+        // Geo-cluster bonus/penalty (same shape as selectStopsFromPool)
+        if (geoClusters.length > 0) {
+          const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+          const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+          if (cLat && cLon) {
+            const nearCluster = geoClusters.some(
+              ([kLat, kLon]) => haversineKm(kLat, kLon, cLat, cLon) <= GEO_CLUSTER_RADIUS_KM,
+            );
+            if (nearCluster) score += 10;
+            else if (geoClusters.length >= 2) score -= 15;
+          }
+        }
+
+        // Leg-cap: hard reject when last-stop coords are known (same rule as selectStopsFromPool)
+        if (lastLat !== null && lastLon !== null) {
+          const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+          const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+          if (cLat && cLon) {
+            const distKm = haversineKm(lastLat, lastLon, cLat, cLon);
+            const legMins = estimateTravelMins(distKm, transportMode);
+            if (legMins > legCap) continue;
+            if (dailyTravelMins + legMins > dayCap) continue;
+          }
+        }
+
+        if (score > bestScore) { bestScore = score; bestCandidate = c; }
+      }
+
+      if (!bestCandidate) {
+        // No candidate passes the leg-cap — close day short.
+        // Do NOT relax the cap; do NOT fall through to an unconstrained fill.
+        closedShort = true;
+        console.log(`[BucketStops] Day ${dayNumber}: closed short (filler slot ${slot + 1}/${fillerSlotsNeeded}) — no remaining candidate within ${legCap}-min leg-cap`);
+        break;
+      }
+
+      remainingNonAnchors.delete(bestCandidate);
+      dayPlaced.push(bestCandidate);
+
+      // Update trackers
+      const selLat = bestCandidate.latitude ? parseFloat(String(bestCandidate.latitude)) : null;
+      const selLon = bestCandidate.longitude ? parseFloat(String(bestCandidate.longitude)) : null;
+      if (lastLat !== null && lastLon !== null && selLat && selLon) {
+        const legKm = haversineKm(lastLat, lastLon, selLat, selLon);
+        dailyTravelKm += legKm;
+        dailyTravelMins += estimateTravelMins(legKm, transportMode);
+      }
+      lastLat = selLat;
+      lastLon = selLon;
+      if (selLat && selLon) {
+        const nearCluster = geoClusters.some(
+          ([cLat, cLon]) => haversineKm(cLat, cLon, selLat, selLon) <= GEO_CLUSTER_RADIUS_KM,
+        );
+        if (!nearCluster) geoClusters.push([selLat, selLon]);
+      }
+    }
+
+    // Sequence within day (slot-aware → geo-nearest-neighbour for dispersed destinations)
+    let orderedSlice = _sequenceDayBySlot(dayPlaced);
+    if (transportMode === 'driving') orderedSlice = _geoSequenceDay(orderedSlice);
+
+    const stops: GeneratedStop[] = orderedSlice.map((stop, idx) => {
+      const gs = candidateToGeneratedStop(stop, dayNumber, idx);
+      const _cap = input.perDayCaps?.[dayIdx];
+      if (_cap) { gs.dayRole = _cap.dayRole; gs.capReason = _cap.capReason; }
+      return gs;
+    });
+
+    buckets.push({
+      dayNumber,
+      stops,
+      targetCount,
+      actualCount: stops.length,
+      closedShort,
+    });
+  }
+
+  return buckets;
+}
+
 /** Compute days-per-city for a multi-city trip.
  *  Priority order:
  *  1. routeStops[].nights (explicit per-city days set in the wizard)
