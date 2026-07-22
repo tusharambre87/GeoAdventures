@@ -3,14 +3,17 @@
  *
  * Two modes, shared selected-name state:
  *
- *   LIST mode  — flat list with row-level swipe gestures (left=Remove, right=Add)
- *                and inline Add/Remove buttons. Search, "Let us pick for you", Confirm CTA.
+ *   LIST mode  — flat list with swipe-gesture actions (left=Remove, right=Add),
+ *                inline Add/Remove buttons, and a per-row "Preview" link.
  *
  *   SWIPE mode — card-stack (one card at a time, active decision on every item).
- *                Each card: color header (type-based), category tag, name, duration,
- *                Anchor badge, Selected indicator. ✕ button (left) = skip/remove.
- *                ♥ button (right) = add/keep. Full left/right swipe gesture also works.
- *                Progress bar shows position in the stack.
+ *                Color header (type-based), category tag, name, description when
+ *                present, duration, X/Heart buttons, progress bar.
+ *                Preview pill on the active card only → same StopPreviewSheet.
+ *
+ * StopPreviewSheet — shared between both modes. Wikipedia hero image (gradient
+ *   fallback), type/duration pills, address + Maps link, description ("WHY
+ *   FAMILIES LOVE IT") when present, Add/Remove footer action.
  *
  * Spec invariants:
  *   - "Selected" tag — shown wherever selected === true, no confidence language.
@@ -32,9 +35,12 @@ import {
   ActivityIndicator,
   Easing,
   FlatList,
+  Image,
+  Linking,
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -52,8 +58,9 @@ import { F, G } from '@/lib/tokens';
 
 const SWIPE_THRESHOLD = 110;
 
-// Saturated card-header colors keyed by stop type substring.
-// Deliberately darker than STOP_HERO_BG so white text reads at WCAG AA contrast.
+// Saturated card-header backgrounds keyed on stop-type substrings.
+// Deliberately darker than the pastel STOP_HERO_BG map so white text reads
+// at WCAG AA contrast on the 140px card header.
 const CARD_HEADER_BG: Record<string, string> = {
   museum:    '#1565C0',
   aquarium:  '#0277BD',
@@ -80,11 +87,21 @@ function cardHeaderBg(type: string | null | undefined): string {
   return key ? CARD_HEADER_BG[key] : CARD_HEADER_BG.default;
 }
 
+function previewGradient(type: string | null | undefined): [string, string] {
+  const t = (type ?? '').toLowerCase();
+  if (t.includes('park') || t.includes('garden') || t.includes('nature')) return ['#2D6A4F', '#7A9E8E'];
+  if (t.includes('museum') || t.includes('gallery'))    return ['#1B3A5C', '#6B4FA8'];
+  if (t.includes('aquarium') || t.includes('zoo'))      return ['#0277BD', '#2D6A4F'];
+  if (t.includes('beach') || t.includes('lake'))        return ['#01579B', '#3DAA6E'];
+  if (t.includes('bridge') || t.includes('viewpoint'))  return ['#37474F', '#546E7A'];
+  if (t.includes('landmark') || t.includes('culture'))  return ['#4A148C', '#7B1FA2'];
+  if (t.includes('restaurant') || t.includes('food') || t.includes('cafe')) return ['#BF360C', '#E8692A'];
+  return ['#C0560A', '#E8692A'];
+}
+
 function typeLabel(type: string | null | undefined): string {
   if (!type) return 'Stop';
-  return type
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,6 +116,7 @@ type PoolEntry = {
   latitude:          number | null;
   longitude:         number | null;
   address:           string | null;
+  description:       string | null;   // stop_library.description — 99.7% coverage
   selected:          boolean;
   dayIndex:          number | null;
   displayOrder:      number | null;
@@ -139,6 +157,143 @@ function SelectedTag({ small }: { small?: boolean }) {
   );
 }
 
+// ─── Stop preview sheet (shared between list and swipe modes) ─────────────────
+
+type PreviewSheetProps = {
+  entry:      PoolEntry;
+  isSelected: boolean;
+  onClose:    () => void;
+  onToggle:   (name: string) => void;
+  insets:     { bottom: number; top: number };
+};
+
+function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: PreviewSheetProps) {
+  const [heroUri, setHeroUri] = useState<string | null>(null);
+  const grad = previewGradient(entry.type);
+  const dur = entry.durationMinutes != null
+    ? entry.durationMinutes < 60
+      ? `${entry.durationMinutes} min`
+      : `${Math.floor(entry.durationMinutes / 60)}\u2013${Math.floor(entry.durationMinutes / 60) + 1} hr`
+    : null;
+  const mapsUrl = entry.name
+    ? `https://maps.apple.com/?q=${encodeURIComponent(entry.name)}`
+    : null;
+
+  useEffect(() => {
+    if (!entry.name) return;
+    let cancelled = false;
+    fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(entry.name)}&prop=pageimages&format=json&pithumbsize=600&origin=*`
+    )
+      .then(r => r.json())
+      .then(d => {
+        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
+        const page = Object.values(pages)[0] as any;
+        if (!cancelled && page?.thumbnail?.source) setHeroUri(page.thumbnail.source as string);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [entry.name]);
+
+  return (
+    <View style={ps.overlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={[ps.sheet, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={ps.handle} />
+
+        {/* Header row */}
+        <View style={ps.hdrRow}>
+          <Text style={ps.hdrName} numberOfLines={2}>{entry.name ?? ''}</Text>
+          <Pressable style={ps.closeBtn} onPress={onClose} hitSlop={10}>
+            <Text style={ps.closeTxt}>{'\u2715'}</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={ps.body}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero */}
+          <View style={ps.hero}>
+            {heroUri ? (
+              <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: grad[0] }]} />
+            )}
+            <View style={[ps.heroOverlay, { backgroundColor: `${grad[0]}55` }]} />
+          </View>
+
+          {/* Pills */}
+          <View style={ps.pillRow}>
+            <View style={ps.typePill}>
+              <Text style={ps.typePillTxt}>{typeLabel(entry.type)}</Text>
+            </View>
+            {dur != null && (
+              <View style={ps.durPill}>
+                <Text style={ps.durPillTxt}>{dur}</Text>
+              </View>
+            )}
+            {entry.familyAnchorType === 'anchor' && (
+              <View style={ps.anchorPill}>
+                <Text style={ps.anchorPillTxt}>Anchor stop</Text>
+              </View>
+            )}
+            {entry.minAge != null && entry.minAge > 0 && (
+              <View style={ps.durPill}>
+                <Text style={ps.durPillTxt}>Ages {entry.minAge}+</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Description — WHY FAMILIES LOVE IT */}
+          {entry.description != null && entry.description.length > 0 && (
+            <View style={ps.card}>
+              <Text style={ps.cardLabel}>WHY FAMILIES LOVE IT</Text>
+              <Text style={ps.cardBody}>{entry.description}</Text>
+            </View>
+          )}
+
+          {/* Address */}
+          <View style={ps.card}>
+            <Text style={ps.cardLabel}>LOCATION</Text>
+            {entry.address != null && entry.address.length > 0 ? (
+              <Text style={ps.cardBody}>{entry.address}</Text>
+            ) : (
+              <Text style={[ps.cardBody, { color: G.muted, fontStyle: 'italic' }]}>
+                Address not confirmed
+              </Text>
+            )}
+            {mapsUrl != null && (
+              <Pressable
+                style={ps.mapsLink}
+                onPress={() => Linking.openURL(mapsUrl).catch(() => {})}
+              >
+                <Text style={ps.mapsLinkTxt}>Open in Maps</Text>
+              </Pressable>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Footer action */}
+        <View style={ps.footer}>
+          <Pressable
+            style={[ps.footerBtn, isSelected && ps.footerBtnRemove]}
+            onPress={() => {
+              onToggle(entry.name ?? '');
+              onClose();
+            }}
+          >
+            <Text style={[ps.footerBtnTxt, isSelected && ps.footerBtnTxtRemove]}>
+              {isSelected ? 'Remove from trip' : 'Add to trip'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── List mode ────────────────────────────────────────────────────────────────
 
 function SwipeRemove({ onPress }: { onPress: () => void }) {
@@ -157,9 +312,14 @@ function SwipeAdd({ onPress }: { onPress: () => void }) {
   );
 }
 
-type RowProps = { item: PoolEntry; isSelected: boolean; onToggle: (name: string) => void };
+type RowProps = {
+  item:       PoolEntry;
+  isSelected: boolean;
+  onToggle:   (name: string) => void;
+  onPreview:  (entry: PoolEntry) => void;
+};
 
-function StopRow({ item, isSelected, onToggle }: RowProps) {
+function StopRow({ item, isSelected, onToggle, onPreview }: RowProps) {
   const swipeRef = useRef<Swipeable>(null);
   const name = item.name ?? '';
 
@@ -181,8 +341,8 @@ function StopRow({ item, isSelected, onToggle }: RowProps) {
       friction={2}
       overshootLeft={false}
       overshootRight={false}
-      renderRightActions={isSelected   ? () => <SwipeRemove onPress={closeAndToggle} /> : undefined}
-      renderLeftActions={!isSelected   ? () => <SwipeAdd    onPress={closeAndToggle} /> : undefined}
+      renderRightActions={isSelected  ? () => <SwipeRemove onPress={closeAndToggle} /> : undefined}
+      renderLeftActions={!isSelected  ? () => <SwipeAdd    onPress={closeAndToggle} /> : undefined}
     >
       <View style={[lt.row, isSelected && lt.rowSel]}>
         <View style={lt.content}>
@@ -195,6 +355,9 @@ function StopRow({ item, isSelected, onToggle }: RowProps) {
                 <Text style={lt.chipTxt}>{item.durationMinutes} min</Text>
               </View>
             )}
+            <Pressable onPress={() => onPreview(item)} hitSlop={8}>
+              <Text style={lt.previewLink}>Preview</Text>
+            </Pressable>
           </View>
         </View>
         <Pressable
@@ -213,15 +376,16 @@ function StopRow({ item, isSelected, onToggle }: RowProps) {
 
 // ─── Swipe card mode ──────────────────────────────────────────────────────────
 
-function SwipeCardContent({
-  item,
-  isSelected,
-}: {
-  item: PoolEntry;
-  isSelected: boolean;
-}) {
-  const hdrBg  = cardHeaderBg(item.type);
-  const label  = typeLabel(item.type);
+type CardContentProps = {
+  item:        PoolEntry;
+  isSelected:  boolean;
+  showPreview: boolean;
+  onPreview:   () => void;
+};
+
+function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardContentProps) {
+  const hdrBg = cardHeaderBg(item.type);
+  const label = typeLabel(item.type);
 
   return (
     <View style={sw.cardInner}>
@@ -238,6 +402,11 @@ function SwipeCardContent({
       <View style={sw.cardBody}>
         <Text style={sw.cardName} numberOfLines={3}>{item.name ?? ''}</Text>
 
+        {/* Description — shown when present; silent when null (99.7% populated) */}
+        {item.description != null && item.description.length > 0 && (
+          <Text style={sw.cardDesc} numberOfLines={3}>{item.description}</Text>
+        )}
+
         <View style={sw.cardChips}>
           {item.durationMinutes != null && (
             <View style={sw.cardChip}>
@@ -249,11 +418,13 @@ function SwipeCardContent({
               <Text style={sw.cardChipTxt}>Ages {item.minAge}+</Text>
             </View>
           )}
+          {/* Preview pill — active card only */}
+          {showPreview && (
+            <Pressable style={sw.previewPill} onPress={onPreview} hitSlop={8}>
+              <Text style={sw.previewPillTxt}>Preview</Text>
+            </Pressable>
+          )}
         </View>
-
-        {item.address != null && (
-          <Text style={sw.cardAddr} numberOfLines={2}>{item.address}</Text>
-        )}
       </View>
     </View>
   );
@@ -263,7 +434,7 @@ function SwipeDoneView({
   count,
   onViewList,
 }: {
-  count: number;
+  count:      number;
   onViewList: () => void;
 }) {
   return (
@@ -271,7 +442,7 @@ function SwipeDoneView({
       <Text style={sw.doneEmoji}>{'\u2705'}</Text>
       <Text style={sw.doneTitle}>All done!</Text>
       <Text style={sw.doneSub}>
-        {count} stop{count !== 1 ? 's' : ''} selected. Review your picks or confirm.
+        {count} stop{count !== 1 ? 's' : ''} selected.{'\n'}Review your picks or confirm.
       </Text>
       <Pressable style={[s.ctaBtn, { marginTop: 24 }]} onPress={onViewList}>
         <Text style={s.ctaBtnTxt}>Review picks in list</Text>
@@ -284,14 +455,15 @@ type SwipeModeProps = {
   pool:          PoolEntry[];
   selectedNames: Set<string>;
   onToggle:      (name: string) => void;
+  onPreview:     (entry: PoolEntry) => void;
   onSwitchList:  () => void;
 };
 
-function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeModeProps) {
+function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList }: SwipeModeProps) {
   const [swipeIndex, setSwipeIndex] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
 
-  // advanceRef lets the PanResponder (created once) always call the latest advance.
+  // advanceRef pattern: PanResponder is created once; calls always use latest advance.
   const advanceRef = useRef<(action: 'heart' | 'x') => void>(() => {});
 
   const advance = useCallback(
@@ -299,7 +471,6 @@ function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeMod
       const item = pool[swipeIndex];
       if (!item?.name) return;
 
-      // Toggle state: heart adds, x removes (only when a real state change is needed).
       const isSelected = selectedNames.has(item.name);
       if (action === 'heart' && !isSelected) onToggle(item.name);
       if (action === 'x'     &&  isSelected) onToggle(item.name);
@@ -326,7 +497,8 @@ function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeMod
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove:  (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
       onPanResponderRelease: (_, g) => {
         if (g.dx >  SWIPE_THRESHOLD) advanceRef.current('heart');
@@ -340,28 +512,22 @@ function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeMod
     return <SwipeDoneView count={selectedNames.size} onViewList={onSwitchList} />;
   }
 
-  const currentItem = pool[swipeIndex];
-  const nextItem    = pool[swipeIndex + 1];
-  const isCurrentSel = selectedNames.has(currentItem?.name ?? '');
+  const currentItem   = pool[swipeIndex];
+  const nextItem      = pool[swipeIndex + 1];
+  const isCurrentSel  = selectedNames.has(currentItem?.name ?? '');
+  const progress      = pool.length > 0 ? swipeIndex / pool.length : 0;
 
   const rotate = pan.x.interpolate({
     inputRange:  [-200, 0, 200],
     outputRange: ['-12deg', '0deg', '12deg'],
     extrapolate: 'clamp',
   });
-
   const xOpacity = pan.x.interpolate({
-    inputRange:  [-SWIPE_THRESHOLD, 0],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
+    inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp',
   });
   const heartOpacity = pan.x.interpolate({
-    inputRange:  [0, SWIPE_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
+    inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp',
   });
-
-  const progress = pool.length > 0 ? swipeIndex / pool.length : 0;
 
   return (
     <View style={sw.root}>
@@ -375,52 +541,56 @@ function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeMod
 
       {/* Card stack */}
       <View style={sw.stack}>
-        {/* Background card (next) */}
         {nextItem != null && (
           <View style={sw.bgCard} pointerEvents="none">
-            <SwipeCardContent item={nextItem} isSelected={selectedNames.has(nextItem.name ?? '')} />
+            <SwipeCardContent
+              item={nextItem}
+              isSelected={selectedNames.has(nextItem.name ?? '')}
+              showPreview={false}
+              onPreview={() => {}}
+            />
           </View>
         )}
 
-        {/* Top card (interactive) */}
         <Animated.View
           style={[sw.card, { transform: [{ translateX: pan.x }, { rotate }] }]}
           {...panResponder.panHandlers}
         >
-          <SwipeCardContent item={currentItem} isSelected={isCurrentSel} />
+          <SwipeCardContent
+            item={currentItem}
+            isSelected={isCurrentSel}
+            showPreview={true}
+            onPreview={() => onPreview(currentItem)}
+          />
         </Animated.View>
 
-        {/* Swipe hint overlays */}
-        <Animated.View style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]} pointerEvents="none">
-          <Text style={sw.hintTxt}>REMOVE</Text>
+        {/* Swipe-direction stamp overlays */}
+        <Animated.View
+          style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]}
+          pointerEvents="none"
+        >
+          <Text style={[sw.hintTxt, { color: '#EF4444' }]}>REMOVE</Text>
         </Animated.View>
-        <Animated.View style={[sw.hintOverlay, sw.hintHeart, { opacity: heartOpacity }]} pointerEvents="none">
-          <Text style={sw.hintTxt}>ADD</Text>
+        <Animated.View
+          style={[sw.hintOverlay, sw.hintHeart, { opacity: heartOpacity }]}
+          pointerEvents="none"
+        >
+          <Text style={[sw.hintTxt, { color: '#22C55E' }]}>ADD</Text>
         </Animated.View>
       </View>
 
-      {/* X / Heart buttons */}
+      {/* Action buttons */}
       <View style={sw.actions}>
-        <Pressable
-          style={[sw.actionBtn, sw.xBtn]}
-          onPress={() => advance('x')}
-          hitSlop={8}
-        >
+        <Pressable style={[sw.actionBtn, sw.xBtn]} onPress={() => advance('x')} hitSlop={8}>
           <Text style={sw.actionTxt}>{'\u2715'}</Text>
         </Pressable>
-
         <View style={sw.actionMid}>
           <Text style={sw.actionHintTxt}>
             {isCurrentSel ? 'Currently selected' : 'Not selected'}
           </Text>
           <Text style={sw.actionHintSub}>Swipe or tap</Text>
         </View>
-
-        <Pressable
-          style={[sw.actionBtn, sw.heartBtn]}
-          onPress={() => advance('heart')}
-          hitSlop={8}
-        >
+        <Pressable style={[sw.actionBtn, sw.heartBtn]} onPress={() => advance('heart')} hitSlop={8}>
           <Text style={sw.actionTxt}>{'\u2665'}</Text>
         </Pressable>
       </View>
@@ -428,7 +598,7 @@ function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeMod
   );
 }
 
-// ─── Unplaced banner ─────────────────────────────────────────────────────────
+// ─── Unplaced banner ──────────────────────────────────────────────────────────
 
 function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
   if (stops.length === 0) return null;
@@ -438,8 +608,8 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
         {stops.length} stop{stops.length !== 1 ? 's' : ''} could not fit
       </Text>
       <Text style={ub.sub}>
-        Evaluated against every day but couldn{'\u2019'}t be placed — geography or timing
-        blocked it. Remove them to keep your selection clean.
+        Evaluated against every day but couldn{'\u2019'}t be placed — geography or
+        timing blocked it. Remove them to keep your selection clean.
       </Text>
       {stops.map((st, i) => (
         <Text key={i} style={ub.item}>
@@ -455,30 +625,30 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
 type Mode = 'list' | 'swipe';
 
 export default function ReviewStopsScreen() {
-  const { tripId }        = useLocalSearchParams<{ tripId: string }>();
-  const { token }         = useAuth();
-  const insets            = useSafeAreaInsets();
+  const { tripId }     = useLocalSearchParams<{ tripId: string }>();
+  const { token }      = useAuth();
+  const insets         = useSafeAreaInsets();
 
-  const [pool, setPool]               = useState<PoolEntry[]>([]);
-  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [pool, setPool]                     = useState<PoolEntry[]>([]);
+  const [selectedNames, setSelectedNames]   = useState<Set<string>>(new Set());
   const [algorithmNames, setAlgorithmNames] = useState<Set<string>>(new Set());
-  const [search, setSearch]           = useState('');
-  const [mode, setMode]               = useState<Mode>('list');
-  const [loading, setLoading]         = useState(true);
-  const [fetchError, setFetchError]   = useState<string | null>(null);
-  const [submitting, setSubmitting]   = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [search, setSearch]                 = useState('');
+  const [mode, setMode]                     = useState<Mode>('list');
+  const [loading, setLoading]               = useState(true);
+  const [fetchError, setFetchError]         = useState<string | null>(null);
+  const [submitting, setSubmitting]         = useState(false);
+  const [submitError, setSubmitError]       = useState<string | null>(null);
   const [unplacedResult, setUnplacedResult] = useState<ApplyResult['unplacedStops']>([]);
-  const [showResult, setShowResult]   = useState(false);
+  const [showResult, setShowResult]         = useState(false);
+  const [previewEntry, setPreviewEntry]     = useState<PoolEntry | null>(null);
 
-  // name → full pool entry (send full objects, not bare IDs)
   const poolByName = useMemo(() => {
     const m = new Map<string, PoolEntry>();
     for (const p of pool) { if (p.name) m.set(p.name, p); }
     return m;
   }, [pool]);
 
-  // ── Load pool ─────────────────────────────────────────────────────────────
+  // ── Load pool ──────────────────────────────────────────────────────────────
 
   const loadPool = useCallback(() => {
     if (!tripId || !token) return;
@@ -501,7 +671,7 @@ export default function ReviewStopsScreen() {
 
   useEffect(() => { loadPool(); }, [loadPool]);
 
-  // ── Toggle ────────────────────────────────────────────────────────────────
+  // ── Toggle ─────────────────────────────────────────────────────────────────
 
   const toggle = useCallback((name: string) => {
     setSelectedNames(prev => {
@@ -513,7 +683,7 @@ export default function ReviewStopsScreen() {
     setShowResult(false);
   }, []);
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit ─────────────────────────────────────────────────────────────────
 
   const submit = useCallback(async (names: Set<string>) => {
     if (!tripId || !token) return;
@@ -525,7 +695,7 @@ export default function ReviewStopsScreen() {
     setSubmitError(null);
     setShowResult(false);
     try {
-      const res  = await fetch(
+      const res = await fetch(
         `${API_BASE}/api/travel/trips/${tripId}/apply-pool-selection`,
         {
           method:  'POST',
@@ -554,8 +724,8 @@ export default function ReviewStopsScreen() {
     }
   }, [tripId, token, poolByName]);
 
-  const handleConfirm      = useCallback(() => submit(selectedNames),   [submit, selectedNames]);
-  const handleAutoPick     = useCallback(() => submit(algorithmNames),  [submit, algorithmNames]);
+  const handleConfirm        = useCallback(() => submit(selectedNames),  [submit, selectedNames]);
+  const handleAutoPick       = useCallback(() => submit(algorithmNames), [submit, algorithmNames]);
   const handleContinueAnyway = useCallback(() => {
     if (!tripId) return;
     router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
@@ -633,6 +803,7 @@ export default function ReviewStopsScreen() {
           pool={pool}
           selectedNames={selectedNames}
           onToggle={toggle}
+          onPreview={setPreviewEntry}
           onSwitchList={() => setMode('list')}
         />
       )}
@@ -707,6 +878,7 @@ export default function ReviewStopsScreen() {
                 item={item}
                 isSelected={selectedNames.has(item.name ?? '')}
                 onToggle={toggle}
+                onPreview={setPreviewEntry}
               />
             )}
             contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
@@ -740,7 +912,16 @@ export default function ReviewStopsScreen() {
         </>
       )}
 
-      {/* Confirm CTA also shown in swipe mode (floating, after all cards done) */}
+      {/* Preview sheet — shared between list and swipe, rendered above everything */}
+      {previewEntry != null && (
+        <StopPreviewSheet
+          entry={previewEntry}
+          isSelected={selectedNames.has(previewEntry.name ?? '')}
+          onClose={() => setPreviewEntry(null)}
+          onToggle={name => { toggle(name); }}
+          insets={insets}
+        />
+      )}
     </View>
   );
 }
@@ -751,44 +932,30 @@ const s = StyleSheet.create({
   root:   { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  header:  { paddingHorizontal: 16, paddingBottom: 8 },
+  header:    { paddingHorizontal: 16, paddingBottom: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
 
   backBtn: {
-    backgroundColor: 'rgba(26,31,46,0.07)',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 18,
+    paddingHorizontal: 12, paddingVertical: 7,
   },
-  backTxt:  { fontFamily: F.bold, fontSize: 13, color: G.deep },
-  title:    { fontFamily: F.bold, fontSize: 24, color: G.deep, letterSpacing: -0.4 },
-  sub:      { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
+  backTxt: { fontFamily: F.bold, fontSize: 13, color: G.deep },
+  title:   { fontFamily: F.bold, fontSize: 24, color: G.deep, letterSpacing: -0.4 },
+  sub:     { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
 
   modeToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(26,31,46,0.07)',
-    borderRadius: 10,
-    padding: 3,
-    gap: 2,
+    flexDirection: 'row', backgroundColor: 'rgba(26,31,46,0.07)',
+    borderRadius: 10, padding: 3, gap: 2,
   },
-  modeBtn: {
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  modeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 1 },
-  modeBtnTxt:    { fontFamily: F.bold, fontSize: 13, color: G.muted },
+  modeBtn:        { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  modeBtnActive:  { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 1 },
+  modeBtnTxt:     { fontFamily: F.bold, fontSize: 13, color: G.muted },
   modeBtnTxtActive: { color: G.deep },
 
   autoPick: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    backgroundColor: G.oLt,
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: G.oLt, borderRadius: 14, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   autoPickBtn:  { backgroundColor: G.orange, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   autoPickTxt:  { fontFamily: F.bold,    fontSize: 13, color: '#fff' },
@@ -842,13 +1009,14 @@ const lt = StyleSheet.create({
   metaRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   chip:     { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   chipTxt:  { fontFamily: F.regular, fontSize: 11, color: G.muted },
+  previewLink: { fontFamily: F.bold, fontSize: 11, color: G.orange },
 
-  btn:          { borderRadius: 9, paddingHorizontal: 13, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', minWidth: 68 },
-  btnAdd:       { backgroundColor: G.oLt },
-  btnRemove:    { backgroundColor: 'rgba(26,31,46,0.07)' },
-  btnTxt:       { fontFamily: F.bold, fontSize: 12 },
-  btnTxtAdd:    { color: G.orange },
-  btnTxtRemove: { color: G.muted },
+  btn:           { borderRadius: 9, paddingHorizontal: 13, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', minWidth: 68 },
+  btnAdd:        { backgroundColor: G.oLt },
+  btnRemove:     { backgroundColor: 'rgba(26,31,46,0.07)' },
+  btnTxt:        { fontFamily: F.bold, fontSize: 12 },
+  btnTxtAdd:     { color: G.orange },
+  btnTxtRemove:  { color: G.muted },
 
   swipeRemove: {
     backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center',
@@ -868,100 +1036,130 @@ const lt = StyleSheet.create({
 const sw = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 20 },
 
-  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
-  progressTrack:{ flex: 1, height: 4, backgroundColor: 'rgba(26,31,46,0.12)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, backgroundColor: G.orange, borderRadius: 2 },
-  progressTxt:  { fontFamily: F.bold, fontSize: 12, color: G.muted, minWidth: 48, textAlign: 'right' },
+  progressRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
+  progressTrack: { flex: 1, height: 4, backgroundColor: 'rgba(26,31,46,0.12)', borderRadius: 2, overflow: 'hidden' },
+  progressFill:  { height: 4, backgroundColor: G.orange, borderRadius: 2 },
+  progressTxt:   { fontFamily: F.bold, fontSize: 12, color: G.muted, minWidth: 48, textAlign: 'right' },
 
-  stack:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  stack: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  // Background card: slightly smaller, offset down
   bgCard: {
-    position: 'absolute',
-    width:    '100%',
+    position: 'absolute', width: '100%',
     transform: [{ scale: 0.94 }, { translateY: 12 }],
-    borderRadius: 20,
-    overflow: 'hidden',
+    borderRadius: 20, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 12, elevation: 4,
   },
-
-  // Top (active) card
   card: {
-    width: '100%',
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#fff',
+    width: '100%', borderRadius: 20, overflow: 'hidden', backgroundColor: '#fff',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 8,
   },
 
-  cardInner: { overflow: 'hidden', borderRadius: 20 },
+  cardInner:   { overflow: 'hidden', borderRadius: 20 },
+  cardHeader:  { height: 130, padding: 18, justifyContent: 'space-between' },
+  cardTypeLbl: { fontFamily: F.bold, fontSize: 11, color: 'rgba(255,255,255,0.85)', letterSpacing: 1, textTransform: 'uppercase' },
+  cardBadgeRow:{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
 
-  cardHeader: {
-    height: 140,
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  cardTypeLbl:  { fontFamily: F.bold, fontSize: 13, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.8, textTransform: 'uppercase' },
-  cardBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-
-  cardBody:    { backgroundColor: '#fff', padding: 20, minHeight: 130 },
-  cardName:    { fontFamily: F.bold, fontSize: 22, color: G.deep, letterSpacing: -0.4, lineHeight: 28, marginBottom: 12 },
-  cardChips:   { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 10 },
+  cardBody:    { backgroundColor: '#fff', padding: 18, minHeight: 120 },
+  cardName:    { fontFamily: F.bold, fontSize: 20, color: G.deep, letterSpacing: -0.3, lineHeight: 26, marginBottom: 8 },
+  cardDesc:    { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 19, marginBottom: 10 },
+  cardChips:   { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
   cardChip:    { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   cardChipTxt: { fontFamily: F.regular, fontSize: 12, color: G.muted },
-  cardAddr:    { fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 17 },
 
-  // Swipe hint overlays
-  hintOverlay: {
-    position: 'absolute', top: 20, borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderWidth: 2.5,
-  },
-  hintX:     { left: 24, borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.85)', transform: [{ rotate: '-12deg' }] },
-  hintHeart: { right: 24, borderColor: '#22C55E', backgroundColor: 'rgba(240,253,244,0.85)', transform: [{ rotate: '12deg' }] },
-  hintTxt:   { fontFamily: F.bold, fontSize: 14, letterSpacing: 1 },
+  previewPill:    { borderWidth: 1.5, borderColor: G.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  previewPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
 
-  // Action buttons
-  actions: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 20, gap: 12,
-  },
-  actionBtn: {
-    width: 64, height: 64, borderRadius: 32,
-    alignItems: 'center', justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.20, shadowRadius: 8, elevation: 4,
-  },
-  xBtn:     { backgroundColor: '#FEE2E2', shadowColor: '#EF4444' },
-  heartBtn: { backgroundColor: '#DCFCE7', shadowColor: '#22C55E' },
-  actionTxt:{ fontFamily: F.bold, fontSize: 24, color: G.deep },
+  hintOverlay: { position: 'absolute', top: 22, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2.5 },
+  hintX:       { left: 20,  borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.88)', transform: [{ rotate: '-12deg' }] },
+  hintHeart:   { right: 20, borderColor: '#22C55E', backgroundColor: 'rgba(240,253,244,0.88)', transform: [{ rotate: '12deg'  }] },
+  hintTxt:     { fontFamily: F.bold, fontSize: 13, letterSpacing: 1 },
+
+  actions:      { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, gap: 12 },
+  actionBtn:    { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.20, shadowRadius: 8, elevation: 4 },
+  xBtn:         { backgroundColor: '#FEE2E2', shadowColor: '#EF4444' },
+  heartBtn:     { backgroundColor: '#DCFCE7', shadowColor: '#22C55E' },
+  actionTxt:    { fontFamily: F.bold, fontSize: 24, color: G.deep },
 
   actionMid:     { flex: 1, alignItems: 'center' },
   actionHintTxt: { fontFamily: F.bold,    fontSize: 12, color: G.deep,  textAlign: 'center' },
   actionHintSub: { fontFamily: F.regular, fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 2 },
 
-  // Done screen
   doneWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   doneEmoji: { fontSize: 48, marginBottom: 16 },
   doneTitle: { fontFamily: F.bold, fontSize: 26, color: G.deep, letterSpacing: -0.4, marginBottom: 8 },
   doneSub:   { fontFamily: F.regular, fontSize: 15, color: G.muted, textAlign: 'center', lineHeight: 22 },
 });
 
+// ─── Preview sheet styles ─────────────────────────────────────────────────────
+
+const ps = StyleSheet.create({
+  overlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.42)', zIndex: 100 },
+  sheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: '86%' as any,
+    backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    flexDirection: 'column',
+  },
+  handle: { width: 32, height: 3, backgroundColor: '#E0DDD8', borderRadius: 2, alignSelf: 'center', marginTop: 10 },
+
+  hdrRow: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4,
+  },
+  hdrName:  { fontFamily: F.bold, fontSize: 19, color: G.deep, lineHeight: 24, flex: 1, paddingRight: 10 },
+  closeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  closeTxt: { fontSize: 12, color: G.deep, fontFamily: F.bold },
+
+  body: { paddingHorizontal: 18, paddingBottom: 12 },
+
+  hero:        { height: 130, borderRadius: 14, marginTop: 12, overflow: 'hidden', backgroundColor: '#DDD' },
+  heroOverlay: { ...StyleSheet.absoluteFillObject },
+
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  typePill: {
+    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
+    borderWidth: 1.5, borderColor: G.orange,
+  },
+  typePillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
+  durPill: {
+    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
+    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.15)',
+  },
+  durPillTxt: { fontFamily: F.medium, fontSize: 11, color: G.muted },
+  anchorPill: {
+    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
+    backgroundColor: '#E8692A22',
+  },
+  anchorPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
+
+  card:      { marginTop: 10, backgroundColor: '#fff', borderRadius: 14, padding: 13 },
+  cardLabel: { fontFamily: F.bold, fontSize: 9, color: G.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
+  cardBody:  { fontFamily: F.regular, fontSize: 13, color: G.deep, lineHeight: 19 },
+
+  mapsLink:    { marginTop: 7 },
+  mapsLinkTxt: { fontFamily: F.bold, fontSize: 12, color: G.orange },
+
+  footer: {
+    paddingHorizontal: 18, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)',
+  },
+  footerBtn: {
+    backgroundColor: G.orange, borderRadius: 13, paddingVertical: 14, alignItems: 'center',
+    shadowColor: G.orange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 6, elevation: 3,
+  },
+  footerBtnRemove:    { backgroundColor: '#FEE2E2', shadowColor: 'transparent', elevation: 0 },
+  footerBtnTxt:       { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  footerBtnTxtRemove: { color: '#B91C1C' },
+});
+
 // ─── Atom styles ──────────────────────────────────────────────────────────────
 
 const at = StyleSheet.create({
-  badge: {
-    backgroundColor: '#E8692A22', borderRadius: 5,
-    paddingHorizontal: 6, paddingVertical: 2,
-  },
-  badgeSm: { paddingHorizontal: 5, paddingVertical: 2 },
-  badgeTxt:   { fontFamily: F.bold, fontSize: 10, color: G.orange,  letterSpacing: 0.2 },
+  badge:      { backgroundColor: '#E8692A22', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  badgeSm:    { paddingHorizontal: 5, paddingVertical: 2 },
+  badgeTxt:   { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 0.2 },
   badgeTxtSm: { fontFamily: F.bold, fontSize: 9,  color: G.orange },
 
-  selTag: {
-    backgroundColor: '#F0FDF4', borderRadius: 5,
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 1, borderColor: '#86EFAC',
-  },
+  selTag:   { backgroundColor: '#F0FDF4', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#86EFAC' },
   selTagSm: { paddingHorizontal: 5, paddingVertical: 2 },
   selTxt:   { fontFamily: F.bold, fontSize: 10, color: '#15803D', letterSpacing: 0.2 },
   selTxtSm: { fontFamily: F.bold, fontSize: 9,  color: '#15803D' },
@@ -971,9 +1169,8 @@ const at = StyleSheet.create({
 
 const ub = StyleSheet.create({
   banner: {
-    marginHorizontal: 16, marginBottom: 10,
-    backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#FDE68A',
+    marginHorizontal: 16, marginBottom: 10, backgroundColor: '#FFFBEB',
+    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FDE68A',
   },
   title: { fontFamily: F.bold,    fontSize: 14, color: '#92400E', marginBottom: 4 },
   sub:   { fontFamily: F.regular, fontSize: 12, color: '#78350F', lineHeight: 18, marginBottom: 8 },

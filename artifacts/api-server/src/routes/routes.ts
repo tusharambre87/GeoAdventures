@@ -8930,18 +8930,19 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         const key = normN(c.name ?? '');
         const sel = selectedMap.get(key);
         return {
-          name: c.name ?? null,
-          type: c.type ?? null,
-          familyAnchorType: c.familyAnchorType ?? null,
+          name:              c.name ?? null,
+          type:              c.type ?? null,
+          familyAnchorType:  c.familyAnchorType ?? null,
           scoreClassicFinal: c.scoreClassicFinal ?? null,
-          durationMinutes: c.durationMinutes ?? null,
-          minAge: c.minAge ?? null,
-          latitude: c.latitude ?? null,
-          longitude: c.longitude ?? null,
-          address: c.address ?? null,
-          selected: !!sel,
-          dayIndex: sel?.dayIndex ?? null,
-          displayOrder: sel?.displayOrder ?? null,
+          durationMinutes:   c.durationMinutes ?? null,
+          minAge:            c.minAge ?? null,
+          latitude:          c.latitude ?? null,
+          longitude:         c.longitude ?? null,
+          address:           c.address ?? null,
+          description:       null as string | null,
+          selected:          !!sel,
+          dayIndex:          sel?.dayIndex ?? null,
+          displayOrder:      sel?.displayOrder ?? null,
         };
       });
 
@@ -9015,6 +9016,44 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         if (a.selected !== b.selected) return a.selected ? -1 : 1;
         return (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0);
       });
+
+      // Enrich pool entries with description and verified address from stop_library.
+      // Pool cache entries are built at seeding time and do not carry stop_library prose.
+      // description: 99.7% library coverage, gpAddressVerified: 98.7% — core content.
+      // Non-fatal: pool is still returned without enrichment if the join fails.
+      //
+      // Uses IN (...) with individual placeholders via drizzleSql.join rather than
+      // ANY($1::text[]) because the Neon HTTP driver does not serialize JS arrays
+      // for the ANY() operator the same way node-postgres does.
+      try {
+        const lcNames = pool
+          .map(p => (p.name ?? '').toLowerCase().trim())
+          .filter(Boolean);
+        if (lcNames.length > 0) {
+          const namePlaceholders = lcNames.map(n => drizzleSql`${n}`);
+          const libResult = await db.execute(
+            drizzleSql`
+              SELECT name, description, gp_address_verified AS address
+              FROM   stop_library
+              WHERE  city = ${city}
+                AND  LOWER(TRIM(name)) IN (${drizzleSql.join(namePlaceholders, drizzleSql`, `)})
+            `
+          );
+          const libRows: Array<{ name: string; description: string | null; address: string | null }> =
+            (libResult as any).rows ?? (libResult as any) ?? [];
+          const libByName = new Map(
+            libRows.map(r => [String(r.name ?? '').toLowerCase().trim(), r])
+          );
+          for (const entry of pool) {
+            const lib = libByName.get((entry.name ?? '').toLowerCase().trim());
+            if (!lib) continue;
+            if (!entry.description && lib.description) entry.description = lib.description;
+            if (!entry.address    && lib.address)      entry.address    = lib.address;
+          }
+        }
+      } catch (enrichErr) {
+        req.log?.warn({ enrichErr }, '[stop-pool] stop_library description/address enrichment — non-fatal');
+      }
 
       res.json({
         pool,
