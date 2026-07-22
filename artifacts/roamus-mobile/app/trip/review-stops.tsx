@@ -246,10 +246,10 @@ function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: Prev
             )}
           </View>
 
-          {/* Description — WHY FAMILIES LOVE IT */}
+          {/* Description — WHY KIDS LOVE IT */}
           {entry.description != null && entry.description.length > 0 && (
             <View style={ps.card}>
-              <Text style={ps.cardLabel}>WHY FAMILIES LOVE IT</Text>
+              <Text style={ps.cardLabel}>WHY KIDS LOVE IT</Text>
               <Text style={ps.cardBody}>{entry.description}</Text>
             </View>
           )}
@@ -400,9 +400,19 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
 
       {/* Body */}
       <View style={sw.cardBody}>
-        <Text style={sw.cardName} numberOfLines={3}>{item.name ?? ''}</Text>
+        {/* Preview pill — absolute top-right, active (front) card only */}
+        {showPreview && (
+          <Pressable style={sw.previewPill} onPress={onPreview} hitSlop={8}>
+            <Text style={sw.previewPillTxt}>Preview</Text>
+          </Pressable>
+        )}
 
-        {/* Description — shown when present; silent when null (99.7% populated) */}
+        {/* Name — right-padded so it never runs under the pill */}
+        <Text style={[sw.cardName, showPreview && sw.cardNameWithPill]} numberOfLines={3}>
+          {item.name ?? ''}
+        </Text>
+
+        {/* Description — shown when present; silent when null */}
         {item.description != null && item.description.length > 0 && (
           <Text style={sw.cardDesc} numberOfLines={3}>{item.description}</Text>
         )}
@@ -417,12 +427,6 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
             <View style={sw.cardChip}>
               <Text style={sw.cardChipTxt}>Ages {item.minAge}+</Text>
             </View>
-          )}
-          {/* Preview pill — active card only */}
-          {showPreview && (
-            <Pressable style={sw.previewPill} onPress={onPreview} hitSlop={8}>
-              <Text style={sw.previewPillTxt}>Preview</Text>
-            </Pressable>
           )}
         </View>
       </View>
@@ -1066,8 +1070,9 @@ const sw = StyleSheet.create({
   cardChip:    { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   cardChipTxt: { fontFamily: F.regular, fontSize: 12, color: G.muted },
 
-  previewPill:    { borderWidth: 1.5, borderColor: G.orange, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  previewPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
+  previewPill:        { position: 'absolute', top: 12, right: 14, zIndex: 1, borderWidth: 1.5, borderColor: G.orange, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: G.oLt },
+  previewPillTxt:     { fontFamily: F.bold, fontSize: 11, color: G.orange },
+  cardNameWithPill:   { paddingRight: 72 },
 
   hintOverlay: { position: 'absolute', top: 22, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2.5 },
   hintX:       { left: 20,  borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.88)', transform: [{ rotate: '-12deg' }] },
