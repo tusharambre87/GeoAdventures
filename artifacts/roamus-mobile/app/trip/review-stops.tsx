@@ -1,17 +1,23 @@
 /**
- * Step 3 — Flat stop review screen
+ * Step 3 — Stop review screen
  *
- * Loads GET /api/travel/trips/:tripId/stop-pool and lets the user
- * add/remove stops before the itinerary is bucketed into days.
+ * Two modes, shared selected-name state:
  *
- * Rules (non-negotiable per spec):
- *   - "Selected" tag on every item where selected === true. Nothing on others.
- *   - "Anchor" badge where familyAnchorType === 'anchor'. Real data, not decorative.
- *   - NO day labels or day mentions anywhere on this screen.
- *   - List mode: Add on unselected, Remove on selected.
- *   - Swipe left → rejects (removes if selected). Swipe right → selects (adds if not).
- *   - "Let us pick for you" submits algorithm defaults with zero edits.
+ *   LIST mode  — flat list with row-level swipe gestures (left=Remove, right=Add)
+ *                and inline Add/Remove buttons. Search, "Let us pick for you", Confirm CTA.
+ *
+ *   SWIPE mode — card-stack (one card at a time, active decision on every item).
+ *                Each card: color header (type-based), category tag, name, duration,
+ *                Anchor badge, Selected indicator. ✕ button (left) = skip/remove.
+ *                ♥ button (right) = add/keep. Full left/right swipe gesture also works.
+ *                Progress bar shows position in the stack.
+ *
+ * Spec invariants:
+ *   - "Selected" tag — shown wherever selected === true, no confidence language.
+ *   - "Anchor" badge — only where familyAnchorType === 'anchor', real data.
+ *   - NO day labels anywhere on this screen.
  *   - Submit sends full pool-entry objects, not bare IDs.
+ *   - "Let us pick for you" = submit algorithm defaults with zero edits.
  */
 
 import React, {
@@ -22,8 +28,11 @@ import React, {
   useState,
 } from 'react';
 import {
+  Animated,
   ActivityIndicator,
+  Easing,
   FlatList,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -39,85 +48,116 @@ import * as Haptics from 'expo-haptics';
 import { API_BASE, useAuth } from '@/lib/authContext';
 import { F, G } from '@/lib/tokens';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SWIPE_THRESHOLD = 110;
+
+// Saturated card-header colors keyed by stop type substring.
+// Deliberately darker than STOP_HERO_BG so white text reads at WCAG AA contrast.
+const CARD_HEADER_BG: Record<string, string> = {
+  museum:    '#1565C0',
+  aquarium:  '#0277BD',
+  zoo:       '#558B2F',
+  park:      '#2E7D32',
+  nature:    '#1B5E20',
+  landmark:  '#6A1B9A',
+  shopping:  '#880E4F',
+  bridge:    '#37474F',
+  beach:     '#01579B',
+  restaurant:'#BF360C',
+  food:      '#BF360C',
+  cafe:      '#795548',
+  culture:   '#E65100',
+  theater:   '#4A148C',
+  castle:    '#4E342E',
+  palace:    '#4E342E',
+  default:   '#C0560A',
+};
+
+function cardHeaderBg(type: string | null | undefined): string {
+  const t = (type ?? '').toLowerCase();
+  const key = Object.keys(CARD_HEADER_BG).find(k => k !== 'default' && t.includes(k));
+  return key ? CARD_HEADER_BG[key] : CARD_HEADER_BG.default;
+}
+
+function typeLabel(type: string | null | undefined): string {
+  if (!type) return 'Stop';
+  return type
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PoolEntry = {
-  name: string | null;
-  type: string | null;
-  familyAnchorType: string | null;
+  name:              string | null;
+  type:              string | null;
+  familyAnchorType:  string | null;
   scoreClassicFinal: number | null;
-  durationMinutes: number | null;
-  minAge: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  address: string | null;
-  selected: boolean;
-  dayIndex: number | null;
-  displayOrder: number | null;
+  durationMinutes:   number | null;
+  minAge:            number | null;
+  latitude:          number | null;
+  longitude:         number | null;
+  address:           string | null;
+  selected:          boolean;
+  dayIndex:          number | null;
+  displayOrder:      number | null;
 };
 
 type ApplyResult = {
-  success: boolean;
-  placed: number;
-  buckets: Array<{
-    dayNumber: number;
-    stopCount: number;
+  success:    boolean;
+  placed:     number;
+  buckets:    Array<{
+    dayNumber:   number;
+    stopCount:   number;
     targetCount: number;
     closedShort: boolean;
-    stops: Array<{ name: string; familyAnchorType: string | null }>;
+    stops:       Array<{ name: string; familyAnchorType: string | null }>;
   }>;
   unplacedStops: Array<{
-    name: string;
-    familyAnchorType: string | null;
+    name:              string;
+    familyAnchorType:  string | null;
     scoreClassicFinal: number | null;
   }>;
 };
 
-// ─── Small UI atoms ───────────────────────────────────────────────────────────
+// ─── Shared atoms ─────────────────────────────────────────────────────────────
 
-function AnchorBadge() {
+function AnchorBadge({ small }: { small?: boolean }) {
   return (
-    <View style={a.badge}>
-      <Text style={a.badgeTxt}>Anchor</Text>
+    <View style={[at.badge, small && at.badgeSm]}>
+      <Text style={[at.badgeTxt, small && at.badgeTxtSm]}>Anchor</Text>
     </View>
   );
 }
 
-function SelectedTag() {
+function SelectedTag({ small }: { small?: boolean }) {
   return (
-    <View style={a.selTag}>
-      <Text style={a.selTagTxt}>Selected</Text>
+    <View style={[at.selTag, small && at.selTagSm]}>
+      <Text style={[at.selTxt, small && at.selTxtSm]}>Selected</Text>
     </View>
   );
 }
 
-// ─── Swipe actions ───────────────────────────────────────────────────────────
-// renderRightActions  →  revealed by swiping LEFT  →  Remove
-// renderLeftActions   →  revealed by swiping RIGHT →  Add
+// ─── List mode ────────────────────────────────────────────────────────────────
 
 function SwipeRemove({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable style={a.swipeRemove} onPress={onPress}>
-      <Text style={a.swipeTxt}>Remove</Text>
+    <Pressable style={lt.swipeRemove} onPress={onPress}>
+      <Text style={lt.swipeTxt}>Remove</Text>
     </Pressable>
   );
 }
 
 function SwipeAdd({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable style={a.swipeAdd} onPress={onPress}>
-      <Text style={a.swipeTxt}>Add</Text>
+    <Pressable style={lt.swipeAdd} onPress={onPress}>
+      <Text style={lt.swipeTxt}>Add</Text>
     </Pressable>
   );
 }
 
-// ─── Stop row ─────────────────────────────────────────────────────────────────
-
-type RowProps = {
-  item: PoolEntry;
-  isSelected: boolean;
-  onToggle: (name: string) => void;
-};
+type RowProps = { item: PoolEntry; isSelected: boolean; onToggle: (name: string) => void };
 
 function StopRow({ item, isSelected, onToggle }: RowProps) {
   const swipeRef = useRef<Swipeable>(null);
@@ -141,28 +181,28 @@ function StopRow({ item, isSelected, onToggle }: RowProps) {
       friction={2}
       overshootLeft={false}
       overshootRight={false}
-      renderRightActions={isSelected ? () => <SwipeRemove onPress={closeAndToggle} /> : undefined}
-      renderLeftActions={!isSelected ? () => <SwipeAdd onPress={closeAndToggle} /> : undefined}
+      renderRightActions={isSelected   ? () => <SwipeRemove onPress={closeAndToggle} /> : undefined}
+      renderLeftActions={!isSelected   ? () => <SwipeAdd    onPress={closeAndToggle} /> : undefined}
     >
-      <View style={[r.row, isSelected && r.rowSel]}>
-        <View style={r.content}>
-          <Text style={r.name} numberOfLines={2}>{name}</Text>
-          <View style={r.metaRow}>
+      <View style={[lt.row, isSelected && lt.rowSel]}>
+        <View style={lt.content}>
+          <Text style={lt.name} numberOfLines={2}>{name}</Text>
+          <View style={lt.metaRow}>
             {item.familyAnchorType === 'anchor' && <AnchorBadge />}
             {isSelected && <SelectedTag />}
             {item.durationMinutes != null && (
-              <View style={r.chip}>
-                <Text style={r.chipTxt}>{item.durationMinutes} min</Text>
+              <View style={lt.chip}>
+                <Text style={lt.chipTxt}>{item.durationMinutes} min</Text>
               </View>
             )}
           </View>
         </View>
         <Pressable
-          style={[r.btn, isSelected ? r.btnRemove : r.btnAdd]}
+          style={[lt.btn, isSelected ? lt.btnRemove : lt.btnAdd]}
           onPress={doToggle}
           hitSlop={10}
         >
-          <Text style={[r.btnTxt, isSelected ? r.btnTxtRemove : r.btnTxtAdd]}>
+          <Text style={[lt.btnTxt, isSelected ? lt.btnTxtRemove : lt.btnTxtAdd]}>
             {isSelected ? 'Remove' : 'Add'}
           </Text>
         </Pressable>
@@ -171,61 +211,274 @@ function StopRow({ item, isSelected, onToggle }: RowProps) {
   );
 }
 
-// ─── Unplaced banner ─────────────────────────────────────────────────────────
+// ─── Swipe card mode ──────────────────────────────────────────────────────────
 
-type UnplacedBannerProps = {
-  stops: ApplyResult['unplacedStops'];
+function SwipeCardContent({
+  item,
+  isSelected,
+}: {
+  item: PoolEntry;
+  isSelected: boolean;
+}) {
+  const hdrBg  = cardHeaderBg(item.type);
+  const label  = typeLabel(item.type);
+
+  return (
+    <View style={sw.cardInner}>
+      {/* Color header */}
+      <View style={[sw.cardHeader, { backgroundColor: hdrBg }]}>
+        <Text style={sw.cardTypeLbl}>{label}</Text>
+        <View style={sw.cardBadgeRow}>
+          {item.familyAnchorType === 'anchor' && <AnchorBadge small />}
+          {isSelected && <SelectedTag small />}
+        </View>
+      </View>
+
+      {/* Body */}
+      <View style={sw.cardBody}>
+        <Text style={sw.cardName} numberOfLines={3}>{item.name ?? ''}</Text>
+
+        <View style={sw.cardChips}>
+          {item.durationMinutes != null && (
+            <View style={sw.cardChip}>
+              <Text style={sw.cardChipTxt}>{item.durationMinutes} min</Text>
+            </View>
+          )}
+          {item.minAge != null && item.minAge > 0 && (
+            <View style={sw.cardChip}>
+              <Text style={sw.cardChipTxt}>Ages {item.minAge}+</Text>
+            </View>
+          )}
+        </View>
+
+        {item.address != null && (
+          <Text style={sw.cardAddr} numberOfLines={2}>{item.address}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function SwipeDoneView({
+  count,
+  onViewList,
+}: {
+  count: number;
+  onViewList: () => void;
+}) {
+  return (
+    <View style={sw.doneWrap}>
+      <Text style={sw.doneEmoji}>{'\u2705'}</Text>
+      <Text style={sw.doneTitle}>All done!</Text>
+      <Text style={sw.doneSub}>
+        {count} stop{count !== 1 ? 's' : ''} selected. Review your picks or confirm.
+      </Text>
+      <Pressable style={[s.ctaBtn, { marginTop: 24 }]} onPress={onViewList}>
+        <Text style={s.ctaBtnTxt}>Review picks in list</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+type SwipeModeProps = {
+  pool:          PoolEntry[];
+  selectedNames: Set<string>;
+  onToggle:      (name: string) => void;
+  onSwitchList:  () => void;
 };
 
-function UnplacedBanner({ stops }: UnplacedBannerProps) {
+function SwipeModeView({ pool, selectedNames, onToggle, onSwitchList }: SwipeModeProps) {
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  // advanceRef lets the PanResponder (created once) always call the latest advance.
+  const advanceRef = useRef<(action: 'heart' | 'x') => void>(() => {});
+
+  const advance = useCallback(
+    (action: 'heart' | 'x') => {
+      const item = pool[swipeIndex];
+      if (!item?.name) return;
+
+      // Toggle state: heart adds, x removes (only when a real state change is needed).
+      const isSelected = selectedNames.has(item.name);
+      if (action === 'heart' && !isSelected) onToggle(item.name);
+      if (action === 'x'     &&  isSelected) onToggle(item.name);
+
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+
+      const toX = action === 'heart' ? 700 : -700;
+      Animated.timing(pan.x, {
+        toValue:         toX,
+        duration:        220,
+        easing:          Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => {
+        pan.setValue({ x: 0, y: 0 });
+        setSwipeIndex(i => i + 1);
+      });
+    },
+    [swipeIndex, pool, selectedNames, onToggle, pan],
+  );
+
+  advanceRef.current = advance;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove:  (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx >  SWIPE_THRESHOLD) advanceRef.current('heart');
+        else if (g.dx < -SWIPE_THRESHOLD) advanceRef.current('x');
+        else Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
+
+  if (swipeIndex >= pool.length) {
+    return <SwipeDoneView count={selectedNames.size} onViewList={onSwitchList} />;
+  }
+
+  const currentItem = pool[swipeIndex];
+  const nextItem    = pool[swipeIndex + 1];
+  const isCurrentSel = selectedNames.has(currentItem?.name ?? '');
+
+  const rotate = pan.x.interpolate({
+    inputRange:  [-200, 0, 200],
+    outputRange: ['-12deg', '0deg', '12deg'],
+    extrapolate: 'clamp',
+  });
+
+  const xOpacity = pan.x.interpolate({
+    inputRange:  [-SWIPE_THRESHOLD, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const heartOpacity = pan.x.interpolate({
+    inputRange:  [0, SWIPE_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const progress = pool.length > 0 ? swipeIndex / pool.length : 0;
+
+  return (
+    <View style={sw.root}>
+      {/* Progress */}
+      <View style={sw.progressRow}>
+        <View style={sw.progressTrack}>
+          <View style={[sw.progressFill, { width: `${progress * 100}%` as any }]} />
+        </View>
+        <Text style={sw.progressTxt}>{swipeIndex + 1} of {pool.length}</Text>
+      </View>
+
+      {/* Card stack */}
+      <View style={sw.stack}>
+        {/* Background card (next) */}
+        {nextItem != null && (
+          <View style={sw.bgCard} pointerEvents="none">
+            <SwipeCardContent item={nextItem} isSelected={selectedNames.has(nextItem.name ?? '')} />
+          </View>
+        )}
+
+        {/* Top card (interactive) */}
+        <Animated.View
+          style={[sw.card, { transform: [{ translateX: pan.x }, { rotate }] }]}
+          {...panResponder.panHandlers}
+        >
+          <SwipeCardContent item={currentItem} isSelected={isCurrentSel} />
+        </Animated.View>
+
+        {/* Swipe hint overlays */}
+        <Animated.View style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]} pointerEvents="none">
+          <Text style={sw.hintTxt}>REMOVE</Text>
+        </Animated.View>
+        <Animated.View style={[sw.hintOverlay, sw.hintHeart, { opacity: heartOpacity }]} pointerEvents="none">
+          <Text style={sw.hintTxt}>ADD</Text>
+        </Animated.View>
+      </View>
+
+      {/* X / Heart buttons */}
+      <View style={sw.actions}>
+        <Pressable
+          style={[sw.actionBtn, sw.xBtn]}
+          onPress={() => advance('x')}
+          hitSlop={8}
+        >
+          <Text style={sw.actionTxt}>{'\u2715'}</Text>
+        </Pressable>
+
+        <View style={sw.actionMid}>
+          <Text style={sw.actionHintTxt}>
+            {isCurrentSel ? 'Currently selected' : 'Not selected'}
+          </Text>
+          <Text style={sw.actionHintSub}>Swipe or tap</Text>
+        </View>
+
+        <Pressable
+          style={[sw.actionBtn, sw.heartBtn]}
+          onPress={() => advance('heart')}
+          hitSlop={8}
+        >
+          <Text style={sw.actionTxt}>{'\u2665'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Unplaced banner ─────────────────────────────────────────────────────────
+
+function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
   if (stops.length === 0) return null;
   return (
-    <View style={u.banner}>
-      <Text style={u.title}>
+    <View style={ub.banner}>
+      <Text style={ub.title}>
         {stops.length} stop{stops.length !== 1 ? 's' : ''} could not fit
       </Text>
-      <Text style={u.sub}>
-        These were evaluated against every day but couldn't be placed — geography
-        or timing didn't allow it. You can remove them to keep your selection clean.
+      <Text style={ub.sub}>
+        Evaluated against every day but couldn{'\u2019'}t be placed — geography or timing
+        blocked it. Remove them to keep your selection clean.
       </Text>
-      {stops.map((s, i) => (
-        <Text key={i} style={u.item}>
-          {'\u2022'} {s.name}
-          {s.familyAnchorType === 'anchor' ? '  [Anchor]' : ''}
+      {stops.map((st, i) => (
+        <Text key={i} style={ub.item}>
+          {'\u2022'} {st.name}{st.familyAnchorType === 'anchor' ? '  [Anchor]' : ''}
         </Text>
       ))}
     </View>
   );
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+// ─── Root screen ──────────────────────────────────────────────────────────────
+
+type Mode = 'list' | 'swipe';
 
 export default function ReviewStopsScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const { token } = useAuth();
-  const insets = useSafeAreaInsets();
+  const { tripId }        = useLocalSearchParams<{ tripId: string }>();
+  const { token }         = useAuth();
+  const insets            = useSafeAreaInsets();
 
-  const [pool, setPool] = useState<PoolEntry[]>([]);
+  const [pool, setPool]               = useState<PoolEntry[]>([]);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
   const [algorithmNames, setAlgorithmNames] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch]           = useState('');
+  const [mode, setMode]               = useState<Mode>('list');
+  const [loading, setLoading]         = useState(true);
+  const [fetchError, setFetchError]   = useState<string | null>(null);
+  const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [unplacedResult, setUnplacedResult] = useState<ApplyResult['unplacedStops']>([]);
-  const [showResult, setShowResult] = useState(false);
+  const [showResult, setShowResult]   = useState(false);
 
-  // name → full pool entry for submission (send full objects, not bare IDs)
+  // name → full pool entry (send full objects, not bare IDs)
   const poolByName = useMemo(() => {
     const m = new Map<string, PoolEntry>();
-    for (const p of pool) {
-      if (p.name) m.set(p.name, p);
-    }
+    for (const p of pool) { if (p.name) m.set(p.name, p); }
     return m;
   }, [pool]);
 
-  // ── Load pool ──────────────────────────────────────────────────────────────
+  // ── Load pool ─────────────────────────────────────────────────────────────
 
   const loadPool = useCallback(() => {
     if (!tripId || !token) return;
@@ -238,11 +491,9 @@ export default function ReviewStopsScreen() {
       .then((data: { pool?: PoolEntry[] }) => {
         const p = data.pool ?? [];
         setPool(p);
-        const algoSel = new Set(
-          p.filter(e => e.selected && e.name).map(e => e.name!)
-        );
-        setAlgorithmNames(algoSel);
-        setSelectedNames(new Set(algoSel));
+        const algo = new Set(p.filter(e => e.selected && e.name).map(e => e.name!));
+        setAlgorithmNames(algo);
+        setSelectedNames(new Set(algo));
       })
       .catch(() => setFetchError('Failed to load stops. Please try again.'))
       .finally(() => setLoading(false));
@@ -250,7 +501,7 @@ export default function ReviewStopsScreen() {
 
   useEffect(() => { loadPool(); }, [loadPool]);
 
-  // ── Selection state ────────────────────────────────────────────────────────
+  // ── Toggle ────────────────────────────────────────────────────────────────
 
   const toggle = useCallback((name: string) => {
     setSelectedNames(prev => {
@@ -262,7 +513,7 @@ export default function ReviewStopsScreen() {
     setShowResult(false);
   }, []);
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────────────────────
 
   const submit = useCallback(async (names: Set<string>) => {
     if (!tripId || !token) return;
@@ -274,16 +525,13 @@ export default function ReviewStopsScreen() {
     setSubmitError(null);
     setShowResult(false);
     try {
-      const res = await fetch(
+      const res  = await fetch(
         `${API_BASE}/api/travel/trips/${tripId}/apply-pool-selection`,
         {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ selectedStops }),
-        }
+          method:  'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ selectedStops }),
+        },
       );
       const data: ApplyResult = await res.json();
       if (!res.ok) throw new Error((data as any).message ?? 'Failed');
@@ -292,16 +540,13 @@ export default function ReviewStopsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
-      if (data.unplacedStops?.length > 0) {
+      if ((data.unplacedStops?.length ?? 0) > 0) {
         setUnplacedResult(data.unplacedStops);
         setShowResult(true);
         return;
       }
 
-      router.replace({
-        pathname: '/trip/[tripId]' as any,
-        params: { tripId },
-      });
+      router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
     } catch (err: any) {
       setSubmitError(err?.message ?? 'Could not save your stop selection. Please try again.');
     } finally {
@@ -309,14 +554,14 @@ export default function ReviewStopsScreen() {
     }
   }, [tripId, token, poolByName]);
 
-  const handleConfirm = useCallback(() => submit(selectedNames), [submit, selectedNames]);
-  const handleAutoPick = useCallback(() => submit(algorithmNames), [submit, algorithmNames]);
+  const handleConfirm      = useCallback(() => submit(selectedNames),   [submit, selectedNames]);
+  const handleAutoPick     = useCallback(() => submit(algorithmNames),  [submit, algorithmNames]);
   const handleContinueAnyway = useCallback(() => {
     if (!tripId) return;
     router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
   }, [tripId]);
 
-  // ── Filter ────────────────────────────────────────────────────────────────
+  // ── Filtered pool (list mode) ──────────────────────────────────────────────
 
   const filteredPool = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -326,7 +571,7 @@ export default function ReviewStopsScreen() {
 
   const selectedCount = selectedNames.size;
 
-  // ── Loading / error states ─────────────────────────────────────────────────
+  // ── Loading / error ────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -348,16 +593,33 @@ export default function ReviewStopsScreen() {
     );
   }
 
-  // ─── Main render ──────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
-          <Text style={s.backTxt}>{'\u2039'} Back</Text>
-        </Pressable>
+        <View style={s.headerTop}>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
+            <Text style={s.backTxt}>{'\u2039'} Back</Text>
+          </Pressable>
+          {/* Mode toggle */}
+          <View style={s.modeToggle}>
+            <Pressable
+              style={[s.modeBtn, mode === 'list' && s.modeBtnActive]}
+              onPress={() => setMode('list')}
+            >
+              <Text style={[s.modeBtnTxt, mode === 'list' && s.modeBtnTxtActive]}>List</Text>
+            </Pressable>
+            <Pressable
+              style={[s.modeBtn, mode === 'swipe' && s.modeBtnActive]}
+              onPress={() => setMode('swipe')}
+            >
+              <Text style={[s.modeBtnTxt, mode === 'swipe' && s.modeBtnTxtActive]}>Swipe</Text>
+            </Pressable>
+          </View>
+        </View>
         <Text style={s.title}>Review stops</Text>
         <Text style={s.sub}>
           {selectedCount} stop{selectedCount !== 1 ? 's' : ''} selected
@@ -365,131 +627,158 @@ export default function ReviewStopsScreen() {
         </Text>
       </View>
 
-      {/* ── Auto-pick row ── */}
-      <View style={s.autoPick}>
-        <Pressable
-          style={[s.autoPickBtn, submitting && { opacity: 0.55 }]}
-          onPress={handleAutoPick}
-          disabled={submitting}
-        >
-          <Text style={s.autoPickTxt}>Let us pick for you</Text>
-        </Pressable>
-        <Text style={s.autoPickNote}>Accept AI selection — no changes needed</Text>
-      </View>
+      {/* ── SWIPE mode ── */}
+      {mode === 'swipe' && (
+        <SwipeModeView
+          pool={pool}
+          selectedNames={selectedNames}
+          onToggle={toggle}
+          onSwitchList={() => setMode('list')}
+        />
+      )}
 
-      {/* ── Unplaced banner (shown after submit with unplaced stops) ── */}
-      {showResult && (
+      {/* ── LIST mode ── */}
+      {mode === 'list' && (
         <>
-          <UnplacedBanner stops={unplacedResult} />
-          <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', gap: 10 }}>
+          {/* Auto-pick */}
+          <View style={s.autoPick}>
             <Pressable
-              style={[s.ctaBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
-              onPress={() => setShowResult(false)}
+              style={[s.autoPickBtn, submitting && { opacity: 0.55 }]}
+              onPress={handleAutoPick}
+              disabled={submitting}
             >
-              <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Edit selection</Text>
+              <Text style={s.autoPickTxt}>Let us pick for you</Text>
             </Pressable>
-            <Pressable
-              style={[s.ctaBtn, { flex: 1 }]}
-              onPress={handleContinueAnyway}
-            >
-              <Text style={s.ctaBtnTxt}>Continue anyway</Text>
-            </Pressable>
+            <Text style={s.autoPickNote}>Accept AI selection — no changes needed</Text>
           </View>
+
+          {/* Unplaced banner */}
+          {showResult && (
+            <>
+              <UnplacedBanner stops={unplacedResult} />
+              <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  style={[s.ctaBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
+                  onPress={() => setShowResult(false)}
+                >
+                  <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Edit selection</Text>
+                </Pressable>
+                <Pressable style={[s.ctaBtn, { flex: 1 }]} onPress={handleContinueAnyway}>
+                  <Text style={s.ctaBtnTxt}>Continue anyway</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+
+          {/* Submit error */}
+          {submitError != null && (
+            <View style={s.submitErr}>
+              <Text style={s.submitErrTxt}>{submitError}</Text>
+            </View>
+          )}
+
+          {/* Search */}
+          <View style={s.searchWrap}>
+            <View style={s.searchBar}>
+              <Text style={s.searchIcon}>{'\uD83D\uDD0D'}</Text>
+              <TextInput
+                style={s.searchInput}
+                placeholder="Search stops..."
+                placeholderTextColor="#B0B5C4"
+                value={search}
+                onChangeText={setSearch}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              {search.length > 0 && (
+                <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                  <Text style={{ fontSize: 13, color: '#8A8FA8' }}>{'\u2715'}</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Pool list */}
+          <FlatList
+            data={filteredPool}
+            keyExtractor={(item, i) => item.name ?? String(i)}
+            renderItem={({ item }) => (
+              <StopRow
+                item={item}
+                isSelected={selectedNames.has(item.name ?? '')}
+                onToggle={toggle}
+              />
+            )}
+            contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={
+              <View style={s.empty}>
+                <Text style={s.emptyTxt}>
+                  {search.trim() ? 'No stops match your search.' : 'No stops in pool yet.'}
+                </Text>
+              </View>
+            }
+          />
+
+          {/* Sticky confirm CTA */}
+          {!showResult && (
+            <View style={[s.ctaBar, { paddingBottom: insets.bottom + 12 }]}>
+              <Pressable
+                style={[s.ctaBtn, (submitting || selectedCount === 0) && { opacity: 0.45 }]}
+                onPress={handleConfirm}
+                disabled={submitting || selectedCount === 0}
+              >
+                <Text style={s.ctaBtnTxt}>
+                  {submitting
+                    ? 'Saving...'
+                    : `Confirm ${selectedCount} stop${selectedCount !== 1 ? 's' : ''}`}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </>
       )}
 
-      {/* ── Submit error ── */}
-      {submitError != null && (
-        <View style={s.submitError}>
-          <Text style={s.submitErrorTxt}>{submitError}</Text>
-        </View>
-      )}
-
-      {/* ── Search bar ── */}
-      <View style={s.searchWrap}>
-        <View style={s.searchBar}>
-          <Text style={s.searchIcon}>{'\uD83D\uDD0D'}</Text>
-          <TextInput
-            style={s.searchInput}
-            placeholder="Search stops..."
-            placeholderTextColor="#B0B5C4"
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-          {search.length > 0 && (
-            <Pressable onPress={() => setSearch('')} hitSlop={8}>
-              <Text style={{ fontSize: 13, color: '#8A8FA8' }}>{'\u2715'}</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {/* ── Pool list ── */}
-      <FlatList
-        data={filteredPool}
-        keyExtractor={(item, i) => item.name ?? String(i)}
-        renderItem={({ item }) => (
-          <StopRow
-            item={item}
-            isSelected={selectedNames.has(item.name ?? '')}
-            onToggle={toggle}
-          />
-        )}
-        contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListEmptyComponent={
-          <View style={s.empty}>
-            <Text style={s.emptyTxt}>
-              {search.trim() ? 'No stops match your search.' : 'No stops in pool yet.'}
-            </Text>
-          </View>
-        }
-      />
-
-      {/* ── Sticky confirm CTA ── */}
-      {!showResult && (
-        <View style={[s.ctaBar, { paddingBottom: insets.bottom + 12 }]}>
-          <Pressable
-            style={[
-              s.ctaBtn,
-              (submitting || selectedCount === 0) && { opacity: 0.45 },
-            ]}
-            onPress={handleConfirm}
-            disabled={submitting || selectedCount === 0}
-          >
-            <Text style={s.ctaBtnTxt}>
-              {submitting
-                ? 'Saving...'
-                : `Confirm ${selectedCount} stop${selectedCount !== 1 ? 's' : ''}`}
-            </Text>
-          </Pressable>
-        </View>
-      )}
+      {/* Confirm CTA also shown in swipe mode (floating, after all cards done) */}
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Shared screen styles ─────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root:  { flex: 1 },
+  root:   { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  header: { paddingHorizontal: 16, paddingBottom: 10 },
+  header:  { paddingHorizontal: 16, paddingBottom: 8 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+
   backBtn: {
-    alignSelf: 'flex-start',
     backgroundColor: 'rgba(26,31,46,0.07)',
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    marginBottom: 10,
   },
   backTxt:  { fontFamily: F.bold, fontSize: 13, color: G.deep },
   title:    { fontFamily: F.bold, fontSize: 24, color: G.deep, letterSpacing: -0.4 },
   sub:      { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
+
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(26,31,46,0.07)',
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  modeBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  modeBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 1 },
+  modeBtnTxt:    { fontFamily: F.bold, fontSize: 13, color: G.muted },
+  modeBtnTxtActive: { color: G.deep },
 
   autoPick: {
     marginHorizontal: 16,
@@ -501,60 +790,34 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  autoPickBtn: {
-    backgroundColor: G.orange,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
+  autoPickBtn:  { backgroundColor: G.orange, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   autoPickTxt:  { fontFamily: F.bold,    fontSize: 13, color: '#fff' },
   autoPickNote: { fontFamily: F.regular, fontSize: 12, color: G.oDk, flex: 1, lineHeight: 17 },
 
   searchWrap: { paddingHorizontal: 16, paddingBottom: 8 },
-  searchBar:  {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#F5F2EE',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 13,
-    borderWidth: 1.5,
-    borderColor: 'rgba(26,31,46,0.09)',
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F5F2EE', borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 13,
+    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.09)',
   },
   searchIcon:  { fontSize: 15, color: '#8A8FA8' },
   searchInput: { flex: 1, fontSize: 14, color: G.deep, fontFamily: F.regular },
 
   ctaBar: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: G.bg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(26,31,46,0.08)',
-    paddingTop: 12,
-    paddingHorizontal: 16,
+    borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)',
+    paddingTop: 12, paddingHorizontal: 16,
   },
   ctaBtn: {
-    backgroundColor: G.orange,
-    borderRadius: 13,
-    paddingVertical: 15,
-    alignItems: 'center',
-    shadowColor: G.orange,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: G.orange, borderRadius: 13, paddingVertical: 15, alignItems: 'center',
+    shadowColor: G.orange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 6, elevation: 3,
   },
   ctaBtnTxt: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
 
-  submitError: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 10,
-    padding: 12,
-  },
-  submitErrorTxt: { fontFamily: F.regular, fontSize: 13, color: '#B91C1C', lineHeight: 19 },
+  submitErr:    { marginHorizontal: 16, marginBottom: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12 },
+  submitErrTxt: { fontFamily: F.regular, fontSize: 13, color: '#B91C1C', lineHeight: 19 },
 
   empty:    { alignItems: 'center', paddingVertical: 48 },
   emptyTxt: { fontFamily: F.regular, fontSize: 14, color: G.muted },
@@ -563,109 +826,154 @@ const s = StyleSheet.create({
   errorTxt:   { fontFamily: F.regular, fontSize: 14, color: G.deep, textAlign: 'center', lineHeight: 21 },
 });
 
-// Row styles
-const r = StyleSheet.create({
+// ─── List mode styles ─────────────────────────────────────────────────────────
+
+const lt = StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(26,31,46,0.07)',
-    gap: 12,
+    marginHorizontal: 16, marginBottom: 8,
+    borderRadius: 14, padding: 14,
+    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.07)', gap: 12,
   },
-  rowSel: {
-    borderColor: G.orange,
-    backgroundColor: '#FFFAF7',
-  },
-  content: { flex: 1, gap: 6 },
-  name: {
-    fontFamily: F.semibold,
-    fontSize: 14,
-    color: G.deep,
-    lineHeight: 20,
-  },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  rowSel:   { borderColor: G.orange, backgroundColor: '#FFFAF7' },
+  content:  { flex: 1, gap: 6 },
+  name:     { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 20 },
+  metaRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  chip:     { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  chipTxt:  { fontFamily: F.regular, fontSize: 11, color: G.muted },
 
-  chip: {
-    backgroundColor: 'rgba(26,31,46,0.07)',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  chipTxt: { fontFamily: F.regular, fontSize: 11, color: G.muted },
-
-  btn: {
-    borderRadius: 9,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 68,
-  },
-  btnAdd:    { backgroundColor: G.oLt },
-  btnRemove: { backgroundColor: 'rgba(26,31,46,0.07)' },
-  btnTxt:    { fontFamily: F.bold, fontSize: 12 },
+  btn:          { borderRadius: 9, paddingHorizontal: 13, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', minWidth: 68 },
+  btnAdd:       { backgroundColor: G.oLt },
+  btnRemove:    { backgroundColor: 'rgba(26,31,46,0.07)' },
+  btnTxt:       { fontFamily: F.bold, fontSize: 12 },
   btnTxtAdd:    { color: G.orange },
   btnTxtRemove: { color: G.muted },
-});
-
-// Atom styles
-const a = StyleSheet.create({
-  badge: {
-    backgroundColor: '#E8692A22',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeTxt: { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 0.2 },
-
-  selTag: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-  },
-  selTagTxt: { fontFamily: F.bold, fontSize: 10, color: '#15803D', letterSpacing: 0.2 },
 
   swipeRemove: {
-    backgroundColor: '#FEE2E2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 22,
-    marginBottom: 8,
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
-    marginRight: 16,
+    backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 22, marginBottom: 8,
+    borderTopRightRadius: 14, borderBottomRightRadius: 14, marginRight: 16,
   },
   swipeAdd: {
-    backgroundColor: '#F0FDF4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 22,
-    marginBottom: 8,
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
-    marginLeft: 16,
+    backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 22, marginBottom: 8,
+    borderTopLeftRadius: 14, borderBottomLeftRadius: 14, marginLeft: 16,
   },
   swipeTxt: { fontFamily: F.bold, fontSize: 12, color: G.deep },
 });
 
-// Unplaced banner styles
-const u = StyleSheet.create({
+// ─── Swipe card mode styles ───────────────────────────────────────────────────
+
+const sw = StyleSheet.create({
+  root: { flex: 1, paddingHorizontal: 20 },
+
+  progressRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
+  progressTrack:{ flex: 1, height: 4, backgroundColor: 'rgba(26,31,46,0.12)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: 4, backgroundColor: G.orange, borderRadius: 2 },
+  progressTxt:  { fontFamily: F.bold, fontSize: 12, color: G.muted, minWidth: 48, textAlign: 'right' },
+
+  stack:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Background card: slightly smaller, offset down
+  bgCard: {
+    position: 'absolute',
+    width:    '100%',
+    transform: [{ scale: 0.94 }, { translateY: 12 }],
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 12, elevation: 4,
+  },
+
+  // Top (active) card
+  card: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 8,
+  },
+
+  cardInner: { overflow: 'hidden', borderRadius: 20 },
+
+  cardHeader: {
+    height: 140,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  cardTypeLbl:  { fontFamily: F.bold, fontSize: 13, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.8, textTransform: 'uppercase' },
+  cardBadgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+
+  cardBody:    { backgroundColor: '#fff', padding: 20, minHeight: 130 },
+  cardName:    { fontFamily: F.bold, fontSize: 22, color: G.deep, letterSpacing: -0.4, lineHeight: 28, marginBottom: 12 },
+  cardChips:   { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 10 },
+  cardChip:    { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  cardChipTxt: { fontFamily: F.regular, fontSize: 12, color: G.muted },
+  cardAddr:    { fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 17 },
+
+  // Swipe hint overlays
+  hintOverlay: {
+    position: 'absolute', top: 20, borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderWidth: 2.5,
+  },
+  hintX:     { left: 24, borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.85)', transform: [{ rotate: '-12deg' }] },
+  hintHeart: { right: 24, borderColor: '#22C55E', backgroundColor: 'rgba(240,253,244,0.85)', transform: [{ rotate: '12deg' }] },
+  hintTxt:   { fontFamily: F.bold, fontSize: 14, letterSpacing: 1 },
+
+  // Action buttons
+  actions: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 20, gap: 12,
+  },
+  actionBtn: {
+    width: 64, height: 64, borderRadius: 32,
+    alignItems: 'center', justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.20, shadowRadius: 8, elevation: 4,
+  },
+  xBtn:     { backgroundColor: '#FEE2E2', shadowColor: '#EF4444' },
+  heartBtn: { backgroundColor: '#DCFCE7', shadowColor: '#22C55E' },
+  actionTxt:{ fontFamily: F.bold, fontSize: 24, color: G.deep },
+
+  actionMid:     { flex: 1, alignItems: 'center' },
+  actionHintTxt: { fontFamily: F.bold,    fontSize: 12, color: G.deep,  textAlign: 'center' },
+  actionHintSub: { fontFamily: F.regular, fontSize: 11, color: G.muted, textAlign: 'center', marginTop: 2 },
+
+  // Done screen
+  doneWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  doneEmoji: { fontSize: 48, marginBottom: 16 },
+  doneTitle: { fontFamily: F.bold, fontSize: 26, color: G.deep, letterSpacing: -0.4, marginBottom: 8 },
+  doneSub:   { fontFamily: F.regular, fontSize: 15, color: G.muted, textAlign: 'center', lineHeight: 22 },
+});
+
+// ─── Atom styles ──────────────────────────────────────────────────────────────
+
+const at = StyleSheet.create({
+  badge: {
+    backgroundColor: '#E8692A22', borderRadius: 5,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  badgeSm: { paddingHorizontal: 5, paddingVertical: 2 },
+  badgeTxt:   { fontFamily: F.bold, fontSize: 10, color: G.orange,  letterSpacing: 0.2 },
+  badgeTxtSm: { fontFamily: F.bold, fontSize: 9,  color: G.orange },
+
+  selTag: {
+    backgroundColor: '#F0FDF4', borderRadius: 5,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: '#86EFAC',
+  },
+  selTagSm: { paddingHorizontal: 5, paddingVertical: 2 },
+  selTxt:   { fontFamily: F.bold, fontSize: 10, color: '#15803D', letterSpacing: 0.2 },
+  selTxtSm: { fontFamily: F.bold, fontSize: 9,  color: '#15803D' },
+});
+
+// ─── Unplaced banner styles ───────────────────────────────────────────────────
+
+const ub = StyleSheet.create({
   banner: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#FDE68A',
   },
   title: { fontFamily: F.bold,    fontSize: 14, color: '#92400E', marginBottom: 4 },
   sub:   { fontFamily: F.regular, fontSize: 12, color: '#78350F', lineHeight: 18, marginBottom: 8 },
