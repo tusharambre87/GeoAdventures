@@ -27,3 +27,4 @@
 - [booking-link-bug](booking-link-bug.md) — "Book now" Text in tripId.tsx ~1846 has no onPress; needs Pressable → sheet of ticket stops + Linking.openURL per stop
 - [P1 pool join punctuation bug](pool-join-punctuation-p1.md) — LOWER(TRIM()) join in pool selection silently drops stops with punctuation mismatches; affects every live trip; fix after GP scoring migration lands
 - [GP floor orphan gate](gp-orphan-gate.md) — orphan = non-overridden PSI match with score IS NULL after loop; stops with only manually_overridden PSI rows are NOT orphans; use DB EXISTS query, not in-process set
+- [unplacedStops UI contract](unplaced-stops-ui-contract.md) — BucketResult.unplacedStops must surface in the Step 3 review screen; silently discarding it defeats the redesign's core promise
