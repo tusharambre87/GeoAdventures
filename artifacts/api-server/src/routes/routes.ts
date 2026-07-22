@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, nearbyLandmarksCache, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, bucketStopsTodays, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -9025,6 +9025,168 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
     } catch (err) {
       req.log?.error({ err }, '[Travel] stop-pool error');
       res.status(500).json({ message: 'Failed to fetch stop pool' });
+    }
+  });
+
+  // POST /api/travel/trips/:tripId/apply-pool-selection
+  // Receives the user's final stop selection from the flat review screen,
+  // runs bucketStopsTodays to assign stops to days, and replaces the trip's
+  // current stops with the bucketed result.
+  //
+  // Body: { selectedStops: PoolEntry[] }
+  //   selectedStops — full pool-entry objects exactly as returned by GET /stop-pool
+  //                   (name, familyAnchorType, scoreClassicFinal, latitude, longitude, ...)
+  //                   NOT bare IDs. The server cross-references names against the pool
+  //                   cache to get the complete CachedStopCandidate objects for bucketing.
+  //
+  // Response: { success, placed, buckets, unplacedStops }
+  //   unplacedStops — stops that were in selectedStops but could not fit any day
+  //                   (leg-cap or score); the review screen must surface these.
+  app.post('/api/travel/trips/:tripId/apply-pool-selection', isAuthenticated, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+      const trip = await storage.getTripById(tripId);
+      if (!trip) return res.status(404).json({ message: 'Trip not found' });
+      if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      const { selectedStops } = req.body as { selectedStops: Array<Record<string, unknown>> };
+      if (!Array.isArray(selectedStops)) {
+        return res.status(400).json({ message: 'selectedStops must be an array of pool entry objects' });
+      }
+
+      // ── Resolve full CachedStopCandidate objects from the city pool cache ────
+      // The pool cache holds the complete enriched objects; the client sends a
+      // subset (name, familyAnchorType, score, coords). We look up by normalized
+      // name and use the full cache entry for bucketStopsTodays so that
+      // candidateToGeneratedStop receives complete parentSupportData etc.
+      const destination = (trip as any).city ?? trip.destination ?? '';
+      const country     = (trip as any).country ?? 'USA';
+      const cachedPool  = await storage.getCityStopPool(destination, country);
+      const poolArray: any[] = (cachedPool?.stopPool as any[]) ?? [];
+
+      const normN = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const poolByName = new Map<string, any>(
+        poolArray.map((c: any) => [normN(c.name ?? ''), c])
+      );
+
+      const fullCandidates: any[] = [];
+      for (const s of selectedStops) {
+        const key  = normN(String(s.name ?? ''));
+        const full = poolByName.get(key);
+        // Prefer the full cached object; fall back to what the client sent
+        // (handles stops added via search that weren't in the original pool).
+        fullCandidates.push(full ?? s);
+      }
+
+      // ── Map trip metadata → PlannerInput ─────────────────────────────────────
+      // Stored pace is 'chill' | 'balanced' | 'packed'; plannerService uses
+      // 'relaxed' | 'moderate' | 'busy'.
+      const rawPace = String((trip as any).pace ?? 'balanced');
+      const plannerPace: 'relaxed' | 'moderate' | 'busy' =
+        ['chill', 'relaxed', 'easy', 'slow'].includes(rawPace)           ? 'relaxed'
+        : ['packed', 'busy', 'active', 'intense', 'gogetter'].includes(rawPace) ? 'busy'
+        : 'moderate';
+
+      // tripDays: prefer startDate/endDate computation; fall back to stored field.
+      let tripDays = (trip as any).tripDays ?? 3;
+      if ((trip as any).startDate && (trip as any).endDate) {
+        const sd   = new Date((trip as any).startDate as string);
+        const ed   = new Date((trip as any).endDate   as string);
+        const diff = Math.round((ed.getTime() - sd.getTime()) / 86400000);
+        if (diff > 0) tripDays = diff + 1;
+      }
+
+      // childrenAges from trip.travelers JSONB: [{ name, isParent, age }, ...]
+      const childrenAges: number[] = ((trip as any).travelers ?? [] as any[])
+        .filter((t: any) => !t.isParent && t.age != null)
+        .map((t: any) => Number(t.age))
+        .filter((a: number) => Number.isFinite(a));
+
+      const plannerInput: PlannerInput = {
+        destination,
+        tripDays,
+        childrenAges,
+        pace:          plannerPace,
+        transportMode: 'driving',
+      } as PlannerInput;
+
+      // ── Bucket ────────────────────────────────────────────────────────────────
+      const bucketResult = bucketStopsTodays(fullCandidates, plannerInput);
+
+      // ── Persist: replace all existing stops with the bucketed result ──────────
+      // We replace unconditionally (no visited-stop guard) because this endpoint
+      // is called from the pre-trip review screen, before the trip has started.
+      const existingStops = await storage.getStopsByTripId(tripId);
+      for (const s of existingStops) {
+        await storage.deleteStop(s.id);
+      }
+
+      const cityName = (trip as any).city ?? destination;
+      for (const bucket of bucketResult.buckets) {
+        for (let idx = 0; idx < bucket.stops.length; idx++) {
+          const stop = bucket.stops[idx];
+          await storage.createStop({
+            tripId,
+            name:              stop.name,
+            stopType:          stop.type ?? 'landmark',
+            displayOrder:      idx,
+            dayIndex:          bucket.dayNumber - 1,
+            address:           stop.address    ?? null,
+            description:       null,
+            latitude:          stop.latitude   ?? null,
+            longitude:         stop.longitude  ?? null,
+            missionType:       null,
+            missionQuestion:   null,
+            missionHint:       null,
+            missionAnswer:     null,
+            missionDifficulty: 'normal',
+            missionKeepsakeReward: false,
+            stopMissions:      null,
+            cityGroup:         cityName,
+            selectionReason:   stop.selectionReason ?? null,
+            metadata: {
+              durationMinutes:  familyDurationFloor(stop.type ?? 'landmark', stop.durationMinutes, null, cityName, stop.name),
+              sessionFit:       null,
+              durationClass:    null,
+              anchorScore:      null,
+              dropPriority:     null,
+              ticketSignal:     null,
+              familyAnchorType: stop.familyAnchorType ?? null,
+            },
+          });
+        }
+      }
+
+      const placed = bucketResult.buckets.reduce((sum, b) => sum + b.actualCount, 0);
+      req.log?.info({ placed, unplaced: bucketResult.unplacedStops.length }, '[Travel] apply-pool-selection complete');
+
+      res.json({
+        success: true,
+        placed,
+        buckets: bucketResult.buckets.map(b => ({
+          dayNumber:   b.dayNumber,
+          stopCount:   b.actualCount,
+          targetCount: b.targetCount,
+          closedShort: b.closedShort,
+          stops:       b.stops.map(s => ({
+            name:              s.name,
+            familyAnchorType:  s.familyAnchorType,
+            latitude:          s.latitude  ?? null,
+            longitude:         s.longitude ?? null,
+          })),
+        })),
+        unplacedStops: bucketResult.unplacedStops.map(s => ({
+          name:              s.name,
+          familyAnchorType:  s.familyAnchorType ?? null,
+          scoreClassicFinal: s.scoreClassicFinal ?? null,
+        })),
+      });
+    } catch (err) {
+      req.log?.error({ err }, '[Travel] apply-pool-selection error');
+      res.status(500).json({ message: 'Failed to apply stop selection' });
     }
   });
 

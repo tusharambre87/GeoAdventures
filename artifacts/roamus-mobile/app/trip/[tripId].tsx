@@ -1445,6 +1445,20 @@ function TripOverview({
         contentContainerStyle={[ov.body, { paddingBottom: insets.bottom + 120 + TAB_BAR_H }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Review stops — pre-trip stop editor */}
+        <Pressable
+          style={cl.row}
+          onPress={() => router.push({ pathname: '/trip/review-stops' as any, params: { tripId: trip.id } })}
+        >
+          <View style={cl.rowLeft}>
+            <Text style={cl.rowTitle}>Review stops</Text>
+            <Text style={cl.rowSub}>Add or remove stops before your trip</Text>
+          </View>
+          <View style={[cl.badge, cl.badgePending]}>
+            <Text style={[cl.badgeText, cl.badgeTextPending]}>Edit</Text>
+          </View>
+        </Pressable>
+
         {/* Before you go — checklist entry row */}
         {clCounts !== null && (
           <Pressable
