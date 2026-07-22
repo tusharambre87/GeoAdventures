@@ -8945,9 +8945,43 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         };
       });
 
-      // Proximity dedup: collapse candidates within 400m of each other into one entry.
-      // Rule: prefer the selected item; if both unselected, prefer the higher-scoring one.
-      // Mirrors the 0.4 km proximity check in the greedy loop of selectStopsFromPool.
+      // Name-similarity gate: two stops are only auto-collapsed when their names are
+      // clearly variants of each other — not merely co-located separate attractions.
+      // Rules (any one is sufficient):
+      //   1. ≥2 significant tokens overlap AND one token-set is a subset of the other
+      //   2. Jaccard similarity of significant tokens ≥ 0.5 (most words shared)
+      //   3. One cleaned name is a substring of the other (≥8 chars — avoids single-word hits)
+      const _STOPWORDS = new Set([
+        'the','of','a','an','and','in','at','by','to','for','from','with',
+        'de','du','le','la','los','las','its','near','via','area','park',
+      ]);
+      const _tok = (s: string): string[] => {
+        return s.toLowerCase()
+          .replace(/[()[\]{}'".&,;/\\-]/g, ' ')
+          .split(/\s+/)
+          .filter(t => t.length >= 2 && !_STOPWORDS.has(t));
+      };
+      const _nameSimilar = (a: string, b: string): boolean => {
+        const ta = new Set(_tok(a));
+        const tb = new Set(_tok(b));
+        const overlap = [...ta].filter(t => tb.has(t));
+        // Rule 1: ≥2 shared tokens AND one set is a subset of the other
+        if (overlap.length >= 2 && ([...ta].every(t => tb.has(t)) || [...tb].every(t => ta.has(t)))) return true;
+        // Rule 2: Jaccard ≥ 0.5
+        const union = new Set([...ta, ...tb]);
+        if (union.size > 0 && overlap.length / union.size >= 0.5) return true;
+        // Rule 3: one cleaned name is contained within the other (minimum 8 chars)
+        const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const ca = clean(a), cb = clean(b);
+        if (ca.length >= 8 && cb.includes(ca)) return true;
+        if (cb.length >= 8 && ca.includes(cb)) return true;
+        return false;
+      };
+
+      // Proximity dedup: collapse candidates within 400m ONLY when names are similar.
+      // Distance alone can't distinguish "same landmark, different viewpoint name"
+      // from "different landmarks that happen to be neighbours" — name similarity
+      // provides that signal. Pairs within 400m but name-dissimilar are surfaced as-is.
       const PROX_DEDUP_KM = 0.4;
       const kept: typeof rawPool = [];
       for (const candidate of rawPool) {
@@ -8960,12 +8994,12 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
             const kLat = k.latitude ? parseFloat(String(k.latitude)) : null;
             const kLon = k.longitude ? parseFloat(String(k.longitude)) : null;
             if (kLat === null || kLon === null) continue;
-            if (_havKm(cLat, cLon, kLat, kLon) < PROX_DEDUP_KM) {
-              // Within 400m — decide which to keep
+            if (_havKm(cLat, cLon, kLat, kLon) < PROX_DEDUP_KM && _nameSimilar(candidate.name ?? '', k.name ?? '')) {
+              // Within 400m AND name-similar — decide which to keep
               const keepCandidate =
                 candidate.selected && !k.selected ? true          // candidate is selected, kept is not → swap
                 : !candidate.selected && k.selected ? false       // kept is selected → keep it
-                : (candidate.scoreClassicFinal ?? 0) > (k.scoreClassicFinal ?? 0); // both same selection state → higher score wins
+                : (candidate.scoreClassicFinal ?? 0) > (k.scoreClassicFinal ?? 0); // both same state → higher score wins
               if (keepCandidate) kept[i] = candidate;
               merged = true;
               break;
