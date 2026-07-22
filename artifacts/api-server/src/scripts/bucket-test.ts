@@ -14,6 +14,7 @@
 import { storage } from '../storage.js';
 import { bucketStopsTodays } from '../planner/plannerService.js';
 import type { CachedStopCandidate } from '@workspace/db';
+import type { BucketResult } from '../planner/plannerService.js';
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
@@ -21,34 +22,45 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function printBuckets(label: string, buckets: ReturnType<typeof bucketStopsTodays>) {
+function printBuckets(label: string, result: BucketResult) {
+  const { buckets, unplacedStops } = result;
   console.log(`\n${'='.repeat(70)}`);
   console.log(`${label}`);
   console.log('='.repeat(70));
+
+  let placedCount = 0;
   for (const b of buckets) {
     const flag = b.closedShort ? ' !! CLOSED SHORT' : '';
     console.log(`  Day ${b.dayNumber} [${b.actualCount}/${b.targetCount}${flag}]:`);
+    placedCount += b.actualCount;
     for (const s of b.stops) {
       const coord = (s.latitude && s.longitude)
         ? `${parseFloat(s.latitude).toFixed(4)},${parseFloat(s.longitude).toFixed(4)}`
         : 'NO_COORD';
       console.log(`    [${(s.familyAnchorType ?? '?').padEnd(7)}] ${s.name.padEnd(55)} ${coord}`);
     }
-    // Intra-day scatter check
     const withCoords = b.stops.filter(s => s.latitude && s.longitude).map(s => ({
-      name: s.name,
-      lat: parseFloat(s.latitude!),
-      lon: parseFloat(s.longitude!),
+      lat: parseFloat(s.latitude!), lon: parseFloat(s.longitude!),
     }));
     let maxKm = 0;
-    for (let i = 0; i < withCoords.length; i++) {
-      for (let j = i + 1; j < withCoords.length; j++) {
-        const km = haversineKm(withCoords[i].lat, withCoords[i].lon, withCoords[j].lat, withCoords[j].lon);
-        if (km > maxKm) maxKm = km;
-      }
+    for (let i = 0; i < withCoords.length; i++)
+      for (let j = i + 1; j < withCoords.length; j++)
+        maxKm = Math.max(maxKm, haversineKm(withCoords[i].lat, withCoords[i].lon, withCoords[j].lat, withCoords[j].lon));
+    console.log(`    → ${maxKm > 30 ? `!! SCATTER ${maxKm.toFixed(1)}km` : `OK (max ${maxKm.toFixed(1)}km)`}`);
+  }
+
+  const totalSelected = placedCount + unplacedStops.length;
+  console.log(`\n  ACCOUNTING: ${placedCount}/${totalSelected} selected stops placed`);
+  if (unplacedStops.length === 0) {
+    console.log(`  unplacedStops: none — all selected stops appear in the plan ✓`);
+  } else {
+    console.log(`  unplacedStops (${unplacedStops.length}) — evaluated against every day, never placed:`);
+    for (const s of unplacedStops) {
+      const coord = (s.latitude && s.longitude)
+        ? `${parseFloat(String(s.latitude)).toFixed(4)},${parseFloat(String(s.longitude)).toFixed(4)}`
+        : 'NO_COORD';
+      console.log(`    [${(s.familyAnchorType ?? '?').padEnd(7)}] ${s.name.padEnd(55)} score=${s.scoreClassicFinal} ${coord}`);
     }
-    const scatter = maxKm > 30 ? `!! SCATTER ${maxKm.toFixed(1)}km` : `OK (max ${maxKm.toFixed(1)}km)`;
-    console.log(`    → ${scatter}`);
   }
 }
 
@@ -91,21 +103,24 @@ async function run() {
     console.log(`\nManually edited Yosemite selection (${selected.length} stops):`);
     selected.forEach(c => console.log(`  [${(c.familyAnchorType ?? '?').padEnd(7)}] ${c.name} [${c.scoreClassicFinal}]`));
 
-    const buckets = bucketStopsTodays(selected, {
+    const yosResult = bucketStopsTodays(selected, {
       destination: 'Yosemite',
       tripDays: 5,
       childrenAges: [7],
       pace: 'moderate',
       transportMode: 'driving',
     });
-    printBuckets('Yosemite — manually edited (remove Museum+MistTrail, add ElCapMeadow+Tuolumne)', buckets);
+    printBuckets('Yosemite — manually edited (remove Museum+MistTrail, add ElCapMeadow+Tuolumne)', yosResult);
 
-    // Verify El Capitan trio resolution: El Capitan + El Capitan Meadow should be
-    // in the selection but on DIFFERENT days (both survive — no dedup inside bucketing)
-    const elCapStops = buckets.flatMap(b => b.stops.filter(s => s.name.toLowerCase().includes('el capitan')));
+    // El Capitan trio: El Capitan + El Capitan Meadow are 0.0 km apart (same physical location).
+    // Both survive in the bucketing output (bucketing doesn't proximity-dedup — that's the pool
+    // endpoint's job). In live usage the pool endpoint collapses them to one, so a user can't
+    // select both simultaneously.
+    const { buckets: yosBuckets } = yosResult;
+    const elCapStops = yosBuckets.flatMap(b => b.stops.filter(s => s.name.toLowerCase().includes('el capitan')));
     console.log(`\n  El Capitan stops in output: ${elCapStops.map(s => `Day${s.dayNumber} "${s.name}"`).join(', ')}`);
     const elCapDays = new Set(elCapStops.map(s => s.dayNumber));
-    console.log(`  Same day? ${elCapDays.size === 1 ? 'YES (potential proximity pair on same day)' : 'NO — correctly on different days'}`);
+    console.log(`  Same day? ${elCapDays.size === 1 ? 'YES — same physical location, pool endpoint prevents dual-selection in live usage' : 'NO — on different days'}`);
   }
 
   // ── Yellowstone: manually-edited selection ───────────────────────────────
@@ -152,24 +167,25 @@ async function run() {
     console.log(`\nManually edited Yellowstone selection (${selected.length} stops):`);
     selected.forEach(c => console.log(`  [${(c.familyAnchorType ?? '?').padEnd(7)}] ${c.name} [${c.scoreClassicFinal}]`));
 
-    const buckets = bucketStopsTodays(selected, {
+    const yelResult = bucketStopsTodays(selected, {
       destination: 'Yellowstone',
       tripDays: 7,
       childrenAges: [7],
       pace: 'moderate',
       transportMode: 'driving',
     });
-    printBuckets('Yellowstone — manually edited (remove Albright/CanyonVC, add MammothTerraces+ArtistPoint+UncleTom)', buckets);
+    printBuckets('Yellowstone — manually edited (remove Albright/CanyonVC, add MammothTerraces+ArtistPoint+UncleTom)', yelResult);
 
-    // Verify Artist Point + Uncle Tom's Trail: should be on SAME day (78m apart, pass 400m check in algo)
-    // But in bucketing they're just separate stops — both in selection, bucketed by geo-score
-    const gpStops = buckets.flatMap(b => b.stops.filter(s => s.name.toLowerCase().includes('grand prismatic') || s.name.toLowerCase().includes('midway geyser')));
-    console.log(`\n  Grand Prismatic / GPS-cluster stops in output: ${gpStops.map(s => `Day${s.dayNumber} "${s.name}"`).join(', ')}`);
+    const { buckets: yelBuckets } = yelResult;
+    const gpStops = yelBuckets.flatMap(b => b.stops.filter(s => s.name.toLowerCase().includes('grand prismatic') || s.name.toLowerCase().includes('midway geyser')));
+    console.log(`\n  Grand Prismatic cluster: ${gpStops.map(s => `Day${s.dayNumber} "${s.name}"`).join(', ') || 'not found'}`);
 
-    const artistPoint = buckets.flatMap(b => b.stops.filter(s => s.name.includes('Artist Point')));
-    const uncleTom   = buckets.flatMap(b => b.stops.filter(s => s.name.includes("Uncle Tom")));
-    console.log(`  Artist Point: ${artistPoint.map(s => `Day${s.dayNumber}`).join(',') || 'not found'}`);
-    console.log(`  Uncle Tom's Trail: ${uncleTom.map(s => `Day${s.dayNumber}`).join(',') || 'not found'}`);
+    const artistPoint = yelBuckets.flatMap(b => b.stops.filter(s => s.name.includes('Artist Point')));
+    const uncleTom   = yelBuckets.flatMap(b => b.stops.filter(s => s.name.includes("Uncle Tom")));
+    console.log(`  Artist Point: ${artistPoint.map(s => `Day${s.dayNumber}`).join(',') || 'not found in any day'}`);
+    console.log(`  Uncle Tom's Trail: ${uncleTom.map(s => `Day${s.dayNumber}`).join(',') || 'not found in any day'}`);
+    if (artistPoint.length && uncleTom.length)
+      console.log(`  Same day? ${artistPoint[0].dayNumber === uncleTom[0].dayNumber ? 'YES ✓' : 'NO'}`);
   }
 
   // ── Grizzly/Wolf West-Entrance closedShort test ──────────────────────────
@@ -197,7 +213,7 @@ async function run() {
     const testCandidates = [oldFaithful, grizzlyWolf, ...[blackSand, lamarValley].filter(Boolean) as CachedStopCandidate[]];
     console.log(`\nSelection: ${testCandidates.map(c => `"${c.name}" [${c.familyAnchorType}]`).join(', ')}`);
 
-    const buckets = bucketStopsTodays(testCandidates, {
+    const gwResult = bucketStopsTodays(testCandidates, {
       destination: 'Yellowstone',
       tripDays: 2,
       childrenAges: [7],
@@ -205,25 +221,16 @@ async function run() {
       transportMode: 'driving',
     });
 
-    printBuckets('Grizzly/Wolf closedShort test', buckets);
+    printBuckets('Grizzly/Wolf closedShort test', gwResult);
 
-    const shortDay = buckets.find(b => b.closedShort);
+    const { buckets: gwBuckets } = gwResult;
+    const shortDay = gwBuckets.find(b => b.closedShort);
     if (shortDay) {
       console.log(`\n  ✓ closedShort: true on Day ${shortDay.dayNumber} — Grizzly/Wolf (West Entrance) correctly closes short`);
-      console.log(`    Actual: ${shortDay.actualCount} stop(s), target was ${shortDay.targetCount}`);
+      console.log(`    actualCount=${shortDay.actualCount}, targetCount=${shortDay.targetCount}`);
     } else {
-      const grizzlyDays = buckets.filter(b => b.stops.some(s => s.name === 'Grizzly and Wolf Discovery Center'));
+      const grizzlyDays = gwBuckets.filter(b => b.stops.some(s => s.name === 'Grizzly and Wolf Discovery Center'));
       console.log(`  ✗ No closedShort day found. Grizzly/Wolf on: Day ${grizzlyDays.map(b => b.dayNumber).join(',')}`);
-      console.log('  Investigating intra-day distances...');
-      for (const b of buckets) {
-        const coords = b.stops.filter(s => s.latitude && s.longitude).map(s => ({
-          name: s.name, lat: parseFloat(s.latitude!), lon: parseFloat(s.longitude!),
-        }));
-        if (coords.length >= 2) {
-          const km = haversineKm(coords[0].lat, coords[0].lon, coords[1].lat, coords[1].lon);
-          console.log(`  Day ${b.dayNumber}: "${coords[0].name}" ↔ "${coords[1]?.name}" = ${km.toFixed(1)}km`);
-        }
-      }
     }
   }
 

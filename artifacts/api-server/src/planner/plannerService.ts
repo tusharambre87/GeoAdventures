@@ -3861,7 +3861,7 @@ export function selectStopsFromPool(
   return { stops: result, parentSuggestions: allParentSuggestions };
 }
 
-// ── Day-bucketing output type ─────────────────────────────────────────────────
+// ── Day-bucketing output types ────────────────────────────────────────────────
 export type DayBucket = {
   dayNumber: number;
   stops: GeneratedStop[];
@@ -3871,6 +3871,23 @@ export type DayBucket = {
    *  candidate before the slot was filled. Callers must surface this; do NOT
    *  silently relax the cap or fall through to an unconstrained fill. */
   closedShort: boolean;
+};
+
+/**
+ * Top-level result from bucketStopsTodays.
+ *
+ * unplacedStops: stops the user selected that did not land in any day.
+ * This is a distinct signal from per-day closedShort:
+ *   - closedShort tells you a specific day ended short.
+ *   - unplacedStops tells you a stop was evaluated against every day and
+ *     never placed — either always outscored in first-slot competition or
+ *     always failing the leg-cap as a second+ slot candidate.
+ * Callers must surface this list explicitly. Silent omission from the plan
+ * breaks the trust contract of the review screen.
+ */
+export type BucketResult = {
+  buckets: DayBucket[];
+  unplacedStops: CachedStopCandidate[];
 };
 
 /**
@@ -3896,7 +3913,7 @@ export type DayBucket = {
 export function bucketStopsTodays(
   candidates: CachedStopCandidate[],
   input: PlannerInput,
-): DayBucket[] {
+): BucketResult {
   // ── Constants (same values as selectStopsFromPool) ────────────────────────
   const GEO_CLUSTER_RADIUS_KM = 15;
   const transportMode = input.transportMode ?? 'driving';
@@ -4142,7 +4159,26 @@ export function bucketStopsTodays(
     });
   }
 
-  return buckets;
+  // ── Unplaced stops ────────────────────────────────────────────────────────
+  // Any candidate that is still in remainingNonAnchors after all days have been
+  // processed was evaluated against every day and never placed. Report it
+  // explicitly — silent absence from the plan breaks the review-screen trust
+  // contract. Callers must surface this list to the user; do not treat it as
+  // overflow to silently discard.
+  //
+  // Also collect anchors that weren't assigned to any day in Pass 1 (more
+  // anchors selected than trip days × anchorsPerDay budget).
+  const unplacedAnchors = anchors.filter(a => !usedAnchors.has(a));
+  const unplacedStops: CachedStopCandidate[] = [...unplacedAnchors, ...remainingNonAnchors];
+
+  if (unplacedStops.length > 0) {
+    console.log(
+      `[BucketStops] ${unplacedStops.length} unplaced stop(s) — evaluated against every day but never placed:`,
+      unplacedStops.map(s => `"${s.name}"`).join(', '),
+    );
+  }
+
+  return { buckets, unplacedStops };
 }
 
 /** Compute days-per-city for a multi-city trip.
