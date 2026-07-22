@@ -8919,7 +8919,14 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         }
       }
 
-      const pool = (cachedPool.stopPool as any[]).map(c => {
+      // Inline haversine for 400m proximity dedup below
+      const _havKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+
+      const rawPool = (cachedPool.stopPool as any[]).map(c => {
         const key = normN(c.name ?? '');
         const sel = selectedMap.get(key);
         return {
@@ -8938,7 +8945,38 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         };
       });
 
+      // Proximity dedup: collapse candidates within 400m of each other into one entry.
+      // Rule: prefer the selected item; if both unselected, prefer the higher-scoring one.
+      // Mirrors the 0.4 km proximity check in the greedy loop of selectStopsFromPool.
+      const PROX_DEDUP_KM = 0.4;
+      const kept: typeof rawPool = [];
+      for (const candidate of rawPool) {
+        const cLat = candidate.latitude ? parseFloat(String(candidate.latitude)) : null;
+        const cLon = candidate.longitude ? parseFloat(String(candidate.longitude)) : null;
+        let merged = false;
+        if (cLat !== null && cLon !== null) {
+          for (let i = 0; i < kept.length; i++) {
+            const k = kept[i];
+            const kLat = k.latitude ? parseFloat(String(k.latitude)) : null;
+            const kLon = k.longitude ? parseFloat(String(k.longitude)) : null;
+            if (kLat === null || kLon === null) continue;
+            if (_havKm(cLat, cLon, kLat, kLon) < PROX_DEDUP_KM) {
+              // Within 400m — decide which to keep
+              const keepCandidate =
+                candidate.selected && !k.selected ? true          // candidate is selected, kept is not → swap
+                : !candidate.selected && k.selected ? false       // kept is selected → keep it
+                : (candidate.scoreClassicFinal ?? 0) > (k.scoreClassicFinal ?? 0); // both same selection state → higher score wins
+              if (keepCandidate) kept[i] = candidate;
+              merged = true;
+              break;
+            }
+          }
+        }
+        if (!merged) kept.push(candidate);
+      }
+
       // Selected stops first, then unselected sorted by descending score
+      const pool = kept;
       pool.sort((a, b) => {
         if (a.selected !== b.selected) return a.selected ? -1 : 1;
         return (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0);

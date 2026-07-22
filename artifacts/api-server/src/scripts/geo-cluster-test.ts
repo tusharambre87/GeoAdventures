@@ -1,13 +1,10 @@
 /**
- * geo-cluster-test.ts — geo-cluster fix validation
+ * geo-cluster-test.ts
  *
- * Runs selectStopsFromPool against the live cached pool for three cities,
- * then reports:
- *   1. Coord coverage in the pool
- *   2. Per-day stop list with coordinates
- *   3. Non-adjacent-day scatter (close stops on days that are 2+ apart)
- *   4. Intra-day scatter (same-day stops > 30 km apart)
- *   5. Missing-coord chain-break analysis (LA-specific)
+ * 1. Scans Yosemite / Yellowstone / LA city pools for within-400m near-duplicate pairs
+ *    — these are what the stop-pool endpoint's proximity dedup must collapse.
+ * 2. Runs selectStopsFromPool for each city and reports per-day intra-day distances
+ *    and scatter metrics.
  *
  * Usage:
  *   pnpm --filter @workspace/api-server exec tsx src/scripts/geo-cluster-test.ts
@@ -16,110 +13,75 @@
 import { storage } from '../storage.js';
 import { selectStopsFromPool } from '../planner/plannerService.js';
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
+function havKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const TEST_CITIES = [
-  { city: 'Yosemite',      country: 'USA', tripDays: 5, pace: 'moderate' as const, label: 'Yosemite (dispersed national park)' },
-  { city: 'Los Angeles',   country: 'USA', tripDays: 4, pace: 'moderate' as const, label: 'Los Angeles (26% missing coords)'     },
-  { city: 'Washington DC', country: 'USA', tripDays: 3, pace: 'moderate' as const, label: 'Washington DC (compact, already clean)' },
+const PROX_KM = 0.4;
+
+const CITIES = [
+  { city: 'Yosemite',      country: 'USA', tripDays: 5, pace: 'moderate' as const },
+  { city: 'Yellowstone',   country: 'USA', tripDays: 7, pace: 'moderate' as const },
+  { city: 'Los Angeles',   country: 'USA', tripDays: 4, pace: 'moderate' as const },
 ];
 
 async function run() {
-  for (const cfg of TEST_CITIES) {
-    console.log(`\n${'='.repeat(72)}`);
-    console.log(`CITY: ${cfg.label}`);
-    console.log('='.repeat(72));
+  for (const cfg of CITIES) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`POOL NEAR-DUPLICATE SCAN — ${cfg.city}`);
+    console.log('='.repeat(70));
 
     const poolRow = await storage.getCityStopPool(cfg.city, cfg.country);
     if (!poolRow?.stopPool || !(poolRow.stopPool as any[]).length) {
-      console.log(`  !! No pool cached for "${cfg.city}" — skip`);
-      continue;
+      console.log('  !! No pool cached — skip'); continue;
     }
-
     const pool = poolRow.stopPool as any[];
     const withCoords = pool.filter(c => c.latitude && c.longitude);
-    const noCoords   = pool.filter(c => !c.latitude || !c.longitude);
-    console.log(`  Pool size: ${pool.length}  with-coords: ${withCoords.length}  missing: ${noCoords.length} (${Math.round(noCoords.length / pool.length * 100)}%)`);
-    if (noCoords.length) console.log(`  Missing-coord pool stops: ${noCoords.map((c: any) => c.name).join(', ')}`);
+    console.log(`  Pool: ${pool.length} candidates, ${withCoords.length} with coords`);
 
-    const plannerInput = {
-      tripDays:        cfg.tripDays,
-      pace:            cfg.pace,
-      destination:     cfg.city,
-      childrenAges:    [7],
-      strollerNeeded:  false,
-      indoorLean:      false,
-      transportMode:   'driving' as const,
-    } as any;
+    // Find all within-400m pairs
+    const pairs: Array<{ a: string; aS: number | null; b: string; bS: number | null; m: number }> = [];
+    for (let i = 0; i < withCoords.length; i++) {
+      for (let j = i + 1; j < withCoords.length; j++) {
+        const a = withCoords[i], b = withCoords[j];
+        const km = havKm(parseFloat(a.latitude), parseFloat(a.longitude), parseFloat(b.latitude), parseFloat(b.longitude));
+        if (km < PROX_KM) pairs.push({ a: a.name, aS: a.scoreClassicFinal ?? null, b: b.name, bS: b.scoreClassicFinal ?? null, m: Math.round(km * 1000) });
+      }
+    }
 
-    const { stops: selected } = selectStopsFromPool(pool as any, plannerInput, undefined, cfg.city);
+    if (!pairs.length) {
+      console.log('  No within-400m pairs — nothing to collapse in endpoint');
+    } else {
+      console.log(`  ${pairs.length} within-400m pair(s) — endpoint will collapse each to one:`);
+      pairs.forEach(p => {
+        const keep = (p.aS !== null && p.bS !== null)
+          ? (p.aS >= p.bS ? p.a : p.b)
+          : p.a;
+        console.log(`  ${String(p.m).padStart(3)}m: "${p.a}" [${p.aS ?? 'null'}] ↔ "${p.b}" [${p.bS ?? 'null'}] → keep "${keep}"`);
+      });
+    }
+
+    // ── Selection + intra-day scatter ──────────────────────────────────────
+    console.log(`\n  --- selectStopsFromPool (${cfg.tripDays} days, ${cfg.pace}) ---`);
+    const input = { tripDays: cfg.tripDays, pace: cfg.pace, destination: cfg.city, childrenAges: [7], strollerNeeded: false, indoorLean: false, transportMode: 'driving' as const } as any;
+    const { stops: selected } = selectStopsFromPool(pool as any, input, undefined, cfg.city);
 
     const byDay = new Map<number, typeof selected>();
-    for (const s of selected) {
-      const d = s.dayNumber ?? 1;
-      if (!byDay.has(d)) byDay.set(d, []);
-      byDay.get(d)!.push(s);
-    }
+    for (const s of selected) { const d = s.dayNumber ?? 1; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d)!.push(s); }
 
-    console.log(`\n  Selected: ${selected.length} stops / ${byDay.size} days`);
+    const intraProblems: string[] = [];
     for (const [day, stops] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
-      console.log(`\n  Day ${day}:`);
-      for (const s of stops) {
-        const lat = s.latitude ? parseFloat(String(s.latitude)) : null;
-        const lon = s.longitude ? parseFloat(String(s.longitude)) : null;
-        const coord = lat && lon ? `${lat.toFixed(4)},${lon.toFixed(4)}` : 'NO_COORDS';
-        console.log(`    [${(s.familyAnchorType ?? '?').padEnd(7)}] ${s.name.padEnd(50)} ${coord}`);
-      }
+      const cs = stops.filter(s => s.latitude && s.longitude).map(s => ({ name: s.name, lat: parseFloat(String(s.latitude)), lon: parseFloat(String(s.longitude)) }));
+      const pairs2 = cs.flatMap((a, i) => cs.slice(i + 1).map(b => ({ a: a.name, b: b.name, km: havKm(a.lat, a.lon, b.lat, b.lon) })));
+      const maxKm = pairs2.length ? Math.max(...pairs2.map(p => p.km)) : 0;
+      const status = maxKm > 30 ? `!! SCATTER ${maxKm.toFixed(1)} km` : `OK (max ${maxKm.toFixed(1)} km)`;
+      console.log(`  Day ${day}: ${stops.map(s => s.name).join(' | ')} — ${status}`);
+      if (maxKm > 30) pairs2.filter(p => p.km > 30).forEach(p => intraProblems.push(`    Day${day}: "${p.a}" ↔ "${p.b}" = ${p.km.toFixed(1)} km`));
     }
-
-    // ── Non-adjacent-day scatter: pairs < 10 km, days differ by ≥ 2 ────────
-    const cs = selected
-      .filter(s => s.latitude && s.longitude)
-      .map(s => ({ name: s.name, day: s.dayNumber ?? 1, lat: parseFloat(String(s.latitude)), lon: parseFloat(String(s.longitude)) }));
-
-    const scatter: string[] = [];
-    for (let i = 0; i < cs.length; i++) {
-      for (let j = i + 1; j < cs.length; j++) {
-        if (cs[i].day === cs[j].day) continue;
-        if (Math.abs(cs[i].day - cs[j].day) < 2) continue;
-        const km = haversineKm(cs[i].lat, cs[i].lon, cs[j].lat, cs[j].lon);
-        if (km < 10) scatter.push(`    Day${cs[i].day} "${cs[i].name}" ↔ Day${cs[j].day} "${cs[j].name}" → ${km.toFixed(1)} km`);
-      }
-    }
-    console.log(`\n  ── Non-adjacent-day scatter (< 10 km, days ≥ 2 apart) ──`);
-    console.log(scatter.length ? scatter.join('\n') : '    CLEAN');
-
-    // ── Intra-day scatter: same-day pairs > 30 km ────────────────────────
-    const intra: string[] = [];
-    for (const [day, stops] of byDay.entries()) {
-      const dc = stops.filter(s => s.latitude && s.longitude).map(s => ({ name: s.name, lat: parseFloat(String(s.latitude)), lon: parseFloat(String(s.longitude)) }));
-      for (let i = 0; i < dc.length; i++) {
-        for (let j = i + 1; j < dc.length; j++) {
-          const km = haversineKm(dc[i].lat, dc[i].lon, dc[j].lat, dc[j].lon);
-          if (km > 30) intra.push(`    Day${day}: "${dc[i].name}" ↔ "${dc[j].name}" → ${km.toFixed(1)} km`);
-        }
-      }
-    }
-    console.log(`\n  ── Intra-day scatter (same day, > 30 km apart) ──`);
-    console.log(intra.length ? intra.join('\n') : '    CLEAN');
-
-    // ── Missing-coord chain-break (LA-specific) ───────────────────────────
-    const selNoCoord = selected.filter(s => !s.latitude || !s.longitude);
-    if (selNoCoord.length) {
-      console.log(`\n  ── Missing-coord chain-break ──`);
-      console.log(`    ${selNoCoord.length} selected stop(s) lack coordinates:`);
-      selNoCoord.forEach(s => console.log(`      "${s.name}" (Day ${s.dayNumber})`));
-      console.log(`    Effect: each breaks the lastLat/lastLon chain → next stop's leg-cap`);
-      console.log(`    and cluster-bonus both silently degrade to score-only for that pair.`);
-    }
+    if (intraProblems.length) { console.log('  INTRA-DAY SCATTER PROBLEMS:'); intraProblems.forEach(s => console.log(s)); }
+    else console.log('  Intra-day scatter: CLEAN');
   }
   process.exit(0);
 }
