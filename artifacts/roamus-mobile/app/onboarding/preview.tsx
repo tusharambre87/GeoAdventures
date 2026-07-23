@@ -423,8 +423,16 @@ export default function PreviewScreen() {
   const routeStr = isMulti ? data.cities.join(" → ") : "";
 
   const handleSave = async () => {
-    if (!data.returningUser) { router.push("/onboarding/account"); return; }
-    if (!token) { router.push("/onboarding/account"); return; }
+    console.log('[TRACE][preview.handleSave] fired — returningUser:', data.returningUser, '| token present:', !!token);
+    if (!data.returningUser) {
+      console.log('[TRACE][preview.handleSave] BRANCH: !returningUser → push /onboarding/account, RETURNING');
+      router.push("/onboarding/account"); return;
+    }
+    if (!token) {
+      console.log('[TRACE][preview.handleSave] BRANCH: !token → push /onboarding/account, RETURNING');
+      router.push("/onboarding/account"); return;
+    }
+    console.log('[TRACE][preview.handleSave] BRANCH: authenticated — calling trip-creation API');
     setSaving(true);
     try {
       const city = data.cities[0] ?? "Chicago";
@@ -496,6 +504,7 @@ export default function PreviewScreen() {
             headers: { Authorization: `Bearer ${token}` },
           }).then(r => r.json());
           if (detail.stops && detail.stops.length > 0) {
+            console.log('[TRACE][preview.handleSave] savedStops SET — count:', detail.stops.length, '| tripId:', trip.id);
             setSavedStops(detail.stops);
             break;
           }
@@ -614,6 +623,8 @@ export default function PreviewScreen() {
       </ScrollView>
 
       {/* ── CTA ── */}
+      {/* TRACE: log which CTA variant is shown every render */ }
+      {(() => { console.log('[TRACE][preview.render] CTA state — saving:', saving, '| savedStops:', savedStops !== null ? savedStops!.length + ' stops' : 'null', '| token:', !!token, '| returningUser:', data.returningUser); return null; })()}
       <View style={[s.cta, { paddingBottom: insets.bottom + 24 }]}>
         {saving ? (
           <View style={{ alignItems: 'center', padding: 20 }}>
@@ -626,16 +637,17 @@ export default function PreviewScreen() {
           <Pressable
             style={({ pressed }) => [s.ctaBtn, { opacity: pressed ? 0.88 : 1 }]}
             onPress={() => {
+              const tier = user?.subscriptionTier;
+              console.log('[TRACE][preview."View full plan"] tapped — tier:', tier, '| createdTripId:', data.createdTripId);
               if (user?.subscriptionTier && user.subscriptionTier !== "free") {
+                console.log('[TRACE][preview."View full plan"] BRANCH: paid tier → review-stops with fromGeneration=1');
                 completeOnboarding();
-                // Route new trips through review-stops before the finished trip.
-                // data.createdTripId is set by handleSave before savedStops is populated,
-                // so it is always non-null when this button is visible.
                 router.replace({
                   pathname: '/trip/review-stops' as any,
                   params: { tripId: data.createdTripId!, fromGeneration: '1' },
                 });
               } else {
+                console.log('[TRACE][preview."View full plan"] BRANCH: free tier → push /onboarding/upgrade');
                 router.push("/onboarding/upgrade");
               }
             }}

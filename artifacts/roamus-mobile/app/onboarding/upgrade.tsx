@@ -67,6 +67,7 @@ export default function UpgradeScreen() {
   // Belt-and-suspenders: returning paid users (or bypass mode) should never see this screen
   useEffect(() => {
     if (BYPASS_PAYWALL || (data.returningUser && user?.subscriptionTier && user.subscriptionTier !== "free")) {
+      console.log('[TRACE][upgrade.useEffect] bypass/paid → leaving upgrade — createdTripId:', data.createdTripId);
       completeOnboarding();
       router.replace("/(tabs)/today");
     }
@@ -124,7 +125,15 @@ export default function UpgradeScreen() {
       } catch {}
     }
     completeOnboarding();
-    router.replace("/(tabs)/today");
+    console.log('[TRACE][upgrade.handleContinue] NAVIGATION — createdTripId:', data.createdTripId, '| going to:', data.createdTripId ? 'review-stops (fromGeneration=1)' : '/(tabs)/today');
+    if (data.createdTripId) {
+      router.replace({
+        pathname: '/trip/review-stops' as any,
+        params: { tripId: data.createdTripId, fromGeneration: '1' },
+      });
+    } else {
+      router.replace("/(tabs)/today");
+    }
   }
 
   const plan = PLANS.find(p => p.id === selected) ?? PLANS[1];
