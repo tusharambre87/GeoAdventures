@@ -559,7 +559,7 @@ function SwipeDoneView({ count, onViewList }: { count: number; onViewList: () =>
       <Text style={sw.doneSub}>
         {count} stop{count !== 1 ? 's' : ''} selected.{'\n'}Review your picks or confirm.
       </Text>
-      <Pressable style={[s.ctaBtn, { marginTop: 24 }]} onPress={onViewList}>
+      <Pressable style={[s.ctaBtn, { marginTop: 24, paddingHorizontal: 40 }]} onPress={onViewList}>
         <Text style={s.ctaBtnTxt}>Review picks in list</Text>
       </Pressable>
     </View>
@@ -740,6 +740,7 @@ export default function ReviewStopsScreen() {
   const [unplacedResult, setUnplacedResult] = useState<ApplyResult['unplacedStops']>([]);
   const [showResult, setShowResult]         = useState(false);
   const [previewEntry, setPreviewEntry]     = useState<PoolEntry | null>(null);
+  const listRef = useRef<FlatList>(null);
 
   const poolByName = useMemo(() => {
     const m = new Map<string, PoolEntry>();
@@ -825,6 +826,7 @@ export default function ReviewStopsScreen() {
       if (!navigateAlways && (data.unplacedStops?.length ?? 0) > 0) {
         setUnplacedResult(data.unplacedStops);
         setShowResult(true);
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
         return;
       }
 
@@ -872,25 +874,35 @@ export default function ReviewStopsScreen() {
 
   if (fromGeneration && !modeChosen && !loading) {
     return (
-      <View style={[s.root, s.center, { backgroundColor: G.bg, paddingHorizontal: 24 }]}>
-        <Text style={[s.title, { textAlign: 'center', marginBottom: 8 }]}>
-          {'Let\u2019s pick your stops'}
-        </Text>
-        <Text style={[s.sub, { textAlign: 'center', marginBottom: 32 }]}>
-          {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
-        </Text>
-        <Pressable
-          style={[s.ctaBtn, { width: '100%', marginBottom: 12 }]}
-          onPress={() => { setMode('swipe'); setModeChosen(true); }}
-        >
-          <Text style={s.ctaBtnTxt}>Swipe through them</Text>
-        </Pressable>
-        <Pressable
-          style={[s.ctaBtn, { width: '100%', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
-          onPress={() => { setMode('list'); setModeChosen(true); }}
-        >
-          <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Browse a list</Text>
-        </Pressable>
+      <View style={[s.root, { backgroundColor: G.bg }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8 }}>
+          <Pressable onPress={() => router.back()} hitSlop={8} style={s.backBtn}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Polyline points="15 18 9 12 15 6" stroke={G.deep} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </Pressable>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28 }}>
+          <Text style={{ fontFamily: F.serif, fontSize: 30, color: G.deep, textAlign: 'center', marginBottom: 10, lineHeight: 36 }}>
+            {'Let\u2019s pick\nyour stops'}
+          </Text>
+          <Text style={{ fontFamily: F.regular, fontSize: 15, color: G.muted, textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
+            {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
+          </Text>
+          <Pressable
+            style={[s.ctaBtn, { marginBottom: 12 }]}
+            onPress={() => { setMode('swipe'); setModeChosen(true); }}
+          >
+            <Text style={s.ctaBtnTxt}>{'\uD83D\uDD00  Swipe through them'}</Text>
+          </Pressable>
+          <Pressable
+            style={[s.ctaBtn, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange, shadowOpacity: 0 }]}
+            onPress={() => { setMode('list'); setModeChosen(true); }}
+          >
+            <Text style={[s.ctaBtnTxt, { color: G.orange }]}>{'\uD83D\uDCCB  Browse a list'}</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -957,6 +969,7 @@ export default function ReviewStopsScreen() {
       {mode === 'list' && (
         <>
           <FlatList
+            ref={listRef}
             style={{ flex: 1 }}
             data={filteredPool}
             keyExtractor={(item, i) => item.name ?? String(i)}
