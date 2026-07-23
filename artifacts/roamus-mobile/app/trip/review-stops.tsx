@@ -110,6 +110,7 @@ type PoolEntry = {
   address:           string | null;
   description:       string | null;
   imageUrl:          string | null;
+  kidsData:          Record<string, any> | null;
   selected:          boolean;
   dayIndex:          number | null;
   displayOrder:      number | null;
@@ -488,19 +489,40 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
   const heroUri = useStopImage(item.name, item.imageUrl, 500);
   const [c1] = cardGradient(item.type);
   const label = typeLabel(item.type);
+  const kidsData = item.kidsData ?? {};
+  const entry_ = (kidsData.entry ?? 'unknown') as string;
+  const bestT  = (kidsData.bestTime ?? '') as string;
 
   return (
     <View style={sw.cardInner}>
-      {/* Photo hero — Wikipedia with gradient fallback */}
+      {/* Photo hero — 70% of card height */}
       <View style={sw.cardHero}>
         {heroUri
           ? <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           : <View style={[StyleSheet.absoluteFill, { backgroundColor: c1 }]} />}
         {/* Dark scrim for legibility */}
         <View style={[StyleSheet.absoluteFillObject, sw.heroScrim]} />
-        {/* Type label overlay — bottom-left */}
+
+        {/* ── Top-left: Entry badge ── */}
+        {entry_ !== 'unknown' && (
+          <View style={[sw.heroBadge, entry_ === 'free' ? sw.heroBadgeFree : entry_ === 'paid' ? sw.heroBadgePaid : sw.heroBadgeCheck]}>
+            <Text style={sw.heroBadgeTxt}>
+              {entry_ === 'free' ? 'Free entry' : entry_ === 'paid' ? 'Ticket required' : 'Check at gate'}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Top-right: Best time badge ── */}
+        {bestT.length > 0 && bestT !== 'Anytime' && (
+          <View style={sw.heroBestTime}>
+            <Text style={sw.heroBestTimeTxt}>{bestT}</Text>
+          </View>
+        )}
+
+        {/* ── Bottom-left: Type label ── */}
         <Text style={sw.heroTypeLbl}>{label}</Text>
-        {/* Selected tag — bottom-right */}
+
+        {/* ── Bottom-right: Selected tag ── */}
         {isSelected && (
           <View style={sw.heroSelTag}>
             <Text style={sw.heroSelTxt}>Selected</Text>
@@ -508,16 +530,15 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
         )}
       </View>
 
-      {/* White body */}
+      {/* White body — 30% of card */}
       <View style={sw.cardBody}>
-        {/* Name */}
-        <Text style={sw.cardName} numberOfLines={3}>
+        <Text style={sw.cardName} numberOfLines={2}>
           {item.name ?? ''}
         </Text>
 
-        {/* Description — shown when present; silently absent when null */}
+        {/* Full description — no line cap; overflows are clipped by cardInner */}
         {item.description != null && item.description.length > 0 && (
-          <Text style={sw.cardDesc} numberOfLines={3}>{item.description}</Text>
+          <Text style={sw.cardDesc}>{item.description}</Text>
         )}
 
         <View style={sw.cardChips}>
@@ -1152,8 +1173,8 @@ const sw = StyleSheet.create({
 
   cardInner: { flex: 1, overflow: 'hidden', borderRadius: 20 },
 
-  // Photo hero (replaces flat color header)
-  cardHero:  { height: 200, position: 'relative' },
+  // Photo hero — 70% of total card height via flex ratio
+  cardHero:  { flex: 7 },
   heroScrim: { backgroundColor: 'rgba(26,31,46,0.30)' },
   heroTypeLbl: {
     position: 'absolute', bottom: 10, left: 14,
@@ -1169,7 +1190,18 @@ const sw = StyleSheet.create({
   },
   heroSelTxt: { fontFamily: F.bold, fontSize: 10, color: '#fff' },
 
-  cardBody:        { flex: 1, backgroundColor: '#fff', padding: 16 },
+  // Entry badge — top-left of hero
+  heroBadge:      { position: 'absolute', top: 10, left: 14, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  heroBadgeFree:  { backgroundColor: 'rgba(34,197,94,0.88)' },
+  heroBadgePaid:  { backgroundColor: 'rgba(239,68,68,0.88)' },
+  heroBadgeCheck: { backgroundColor: 'rgba(0,0,0,0.42)' },
+  heroBadgeTxt:   { fontFamily: F.bold, fontSize: 10, color: '#fff', letterSpacing: 0.4 },
+
+  // Best time badge — top-right of hero
+  heroBestTime:    { position: 'absolute', top: 10, right: 14, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.42)' },
+  heroBestTimeTxt: { fontFamily: F.regular, fontSize: 10, color: 'rgba(255,255,255,0.92)' },
+
+  cardBody:        { flex: 3, backgroundColor: '#fff', padding: 16 },
   cardName:        { fontFamily: F.bold, fontSize: 19, color: G.deep, letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
   cardNameWithPill:{ paddingRight: 72 },
   cardDesc:        { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 18, marginBottom: 8 },
