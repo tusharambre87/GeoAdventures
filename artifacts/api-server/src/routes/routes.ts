@@ -9033,13 +9033,13 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
           const namePlaceholders = lcNames.map(n => drizzleSql`${n}`);
           const libResult = await db.execute(
             drizzleSql`
-              SELECT name, description, gp_address_verified AS address
+              SELECT name, description, gp_address_verified AS address, image_url AS "imageUrl"
               FROM   stop_library
               WHERE  city = ${city}
                 AND  LOWER(TRIM(name)) IN (${drizzleSql.join(namePlaceholders, drizzleSql`, `)})
             `
           );
-          const libRows: Array<{ name: string; description: string | null; address: string | null }> =
+          const libRows: Array<{ name: string; description: string | null; address: string | null; imageUrl: string | null }> =
             (libResult as any).rows ?? (libResult as any) ?? [];
           const libByName = new Map(
             libRows.map(r => [String(r.name ?? '').toLowerCase().trim(), r])
@@ -9049,6 +9049,7 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
             if (!lib) continue;
             if (!entry.description && lib.description) entry.description = lib.description;
             if (!entry.address    && lib.address)      entry.address    = lib.address;
+            if (lib.imageUrl) (entry as any).imageUrl = lib.imageUrl;
           }
         }
       } catch (enrichErr) {
@@ -9091,7 +9092,7 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       if (!trip) return res.status(404).json({ message: 'Trip not found' });
       if (trip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
 
-      const { selectedStops } = req.body as { selectedStops: Array<Record<string, unknown>> };
+      const { selectedStops, forcePlace } = req.body as { selectedStops: Array<Record<string, unknown>>; forcePlace?: boolean };
       if (!Array.isArray(selectedStops)) {
         return res.status(400).json({ message: 'selectedStops must be an array of pool entry objects' });
       }
@@ -9154,6 +9155,23 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
 
       // ── Bucket ────────────────────────────────────────────────────────────────
       const bucketResult = bucketStopsTodays(fullCandidates, plannerInput);
+
+      // ── Force-place unplaced stops when user taps "Continue anyway" ────────────
+      // Distribute each unplaced stop to the least-loaded bucket so that the
+      // user's explicit selection is always persisted — never silently discarded.
+      if (forcePlace === true && bucketResult.unplacedStops.length > 0) {
+        for (const unplaced of [...bucketResult.unplacedStops]) {
+          const lightest = bucketResult.buckets.reduce(
+            (min, b) => b.actualCount < min.actualCount ? b : min,
+            bucketResult.buckets[0],
+          );
+          if (lightest) {
+            lightest.stops.push(unplaced as any);
+            lightest.actualCount += 1;
+          }
+        }
+        (bucketResult as any).unplacedStops = [];
+      }
 
       // ── Persist: replace all existing stops with the bucketed result ──────────
       // We replace unconditionally (no visited-stop guard) because this endpoint

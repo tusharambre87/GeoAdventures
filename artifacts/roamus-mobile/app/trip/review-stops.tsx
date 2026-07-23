@@ -47,7 +47,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -109,6 +109,7 @@ type PoolEntry = {
   longitude:         number | null;
   address:           string | null;
   description:       string | null;
+  imageUrl:          string | null;
   selected:          boolean;
   dayIndex:          number | null;
   displayOrder:      number | null;
@@ -131,11 +132,14 @@ type ApplyResult = {
   }>;
 };
 
-// ─── Wikipedia image fetcher (shared hook) ────────────────────────────────────
+// ─── Stop image hook ──────────────────────────────────────────────────────────
+// Prefers a stop_library imageUrl (from the pool API enrichment) over Wikipedia.
+// Wikipedia fetch is skipped entirely when imageUrl is already provided.
 
-function useWikiImage(name: string | null, size = 400): string | null {
-  const [uri, setUri] = useState<string | null>(null);
+function useStopImage(name: string | null, imageUrl: string | null, size = 400): string | null {
+  const [wikiUri, setWikiUri] = useState<string | null>(null);
   useEffect(() => {
+    if (imageUrl) return; // stop_library image available — skip Wikipedia
     if (!name) return;
     let cancelled = false;
     fetch(
@@ -144,12 +148,12 @@ function useWikiImage(name: string | null, size = 400): string | null {
       .then(r => r.json())
       .then(d => {
         const page = Object.values((d?.query?.pages ?? {}) as Record<string, any>)[0] as any;
-        if (!cancelled && page?.thumbnail?.source) setUri(page.thumbnail.source as string);
+        if (!cancelled && page?.thumbnail?.source) setWikiUri(page.thumbnail.source as string);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [name, size]);
-  return uri;
+  }, [name, imageUrl, size]);
+  return imageUrl ?? wikiUri;
 }
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
@@ -164,8 +168,8 @@ function SelectedTag({ small }: { small?: boolean }) {
 
 // ─── Stop thumbnail (list rows) ───────────────────────────────────────────────
 
-function StopThumbnail({ name, type }: { name: string | null; type: string | null }) {
-  const uri = useWikiImage(name, 200);
+function StopThumbnail({ name, type, imageUrl }: { name: string | null; type: string | null; imageUrl: string | null }) {
+  const uri = useStopImage(name, imageUrl, 200);
   const [c1] = cardGradient(type);
   return (
     <View style={tn.wrap}>
@@ -187,7 +191,7 @@ type PreviewSheetProps = {
 };
 
 function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: PreviewSheetProps) {
-  const heroUri = useWikiImage(entry.name, 600);
+  const heroUri = useStopImage(entry.name, entry.imageUrl, 600);
   const [c1] = cardGradient(entry.type);
 
   const dur = entry.durationMinutes != null
@@ -284,7 +288,14 @@ function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: Prev
               {entry_ === 'free'
                 ? <Text style={[ps.infoVal, { color: '#3DAA6E' }]}>{'Free entry'}</Text>
                 : entry_ === 'paid'
-                  ? <Text style={[ps.infoVal, { color: '#E8433A' }]}>{'Ticket required'}</Text>
+                  ? (
+                    <>
+                      <Text style={[ps.infoVal, { color: '#E8433A' }]}>{'Ticket required'}</Text>
+                      <Pressable onPress={() => Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent((entry.name ?? '') + ' tickets buy')}`).catch(() => {})}>
+                        <Text style={ps.bookLink}>{'Book tickets \u2192'}</Text>
+                      </Pressable>
+                    </>
+                  )
                   : <Text style={[ps.infoVal, { color: '#8A8FA8' }]}>{'Check at gate'}</Text>}
             </View>
             <View style={ps.infoCell}>
@@ -400,7 +411,7 @@ function StopRow({ item, isSelected, onToggle, onPreview }: RowProps) {
     >
       <View style={[lt.row, isSelected && lt.rowSel]}>
         {/* Thumbnail */}
-        <StopThumbnail name={item.name} type={item.type} />
+        <StopThumbnail name={item.name} type={item.type} imageUrl={item.imageUrl} />
 
         {/* Content */}
         <View style={lt.content}>
@@ -443,7 +454,7 @@ type CardContentProps = {
 };
 
 function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardContentProps) {
-  const heroUri = useWikiImage(item.name, 500);
+  const heroUri = useStopImage(item.name, item.imageUrl, 500);
   const [c1] = cardGradient(item.type);
   const label = typeLabel(item.type);
 
@@ -743,7 +754,7 @@ export default function ReviewStopsScreen() {
         {
           method:  'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ selectedStops }),
+          body:    JSON.stringify({ selectedStops, forcePlace: navigateAlways }),
         },
       );
       const data: ApplyResult = await res.json();
@@ -809,6 +820,7 @@ export default function ReviewStopsScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
+      <Stack.Screen options={{ headerShown: false }} />
 
       {/* ── Header ── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -1083,7 +1095,7 @@ const lt = StyleSheet.create({
 // ─── Swipe card mode styles ───────────────────────────────────────────────────
 
 const sw = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 20 },
+  root: { flex: 1, paddingHorizontal: 8 },
 
   progressRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
   progressTrack: { flex: 1, height: 4, backgroundColor: 'rgba(26,31,46,0.12)', borderRadius: 2, overflow: 'hidden' },
@@ -1106,7 +1118,7 @@ const sw = StyleSheet.create({
   cardInner: { overflow: 'hidden', borderRadius: 20 },
 
   // Photo hero (replaces flat color header)
-  cardHero:  { height: 140, position: 'relative' },
+  cardHero:  { height: 200, position: 'relative' },
   heroScrim: { backgroundColor: 'rgba(26,31,46,0.30)' },
   heroTypeLbl: {
     position: 'absolute', bottom: 10, left: 14,
@@ -1224,6 +1236,7 @@ const ps = StyleSheet.create({
   addrLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
   addrLinkTxt: { fontSize: 11, fontFamily: F.bold, color: G.orange },
 
+  bookLink:       { fontSize: 11, fontFamily: F.bold, color: G.orange, marginTop: 3 },
   footer:         { paddingHorizontal: 18, paddingTop: 10, backgroundColor: '#F5F2EE', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', flexShrink: 0 },
   footerBtn:      { backgroundColor: G.orange, borderRadius: 13, paddingVertical: 14, alignItems: 'center', shadowColor: G.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
   footerBtnRemove:   { backgroundColor: '#FEE2E2', shadowColor: 'transparent', elevation: 0 },
