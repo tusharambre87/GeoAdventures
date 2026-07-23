@@ -803,7 +803,11 @@ export default function ReviewStopsScreen() {
         return;
       }
 
-      router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
+      // Land on Today after confirming stops — "what's happening right now"
+      // is the right context after finalising a trip's itinerary.
+      // lastReviewedAt is now set server-side, so reopening the same trip
+      // from the Trips list will go straight to the trip overview.
+      router.replace('/(tabs)/today' as any);
     } catch (err: any) {
       setSubmitError(err?.message ?? 'Could not save your stop selection. Please try again.');
     } finally {

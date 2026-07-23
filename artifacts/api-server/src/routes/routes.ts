@@ -9218,6 +9218,10 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       }
 
       const placed = bucketResult.buckets.reduce((sum, b) => sum + b.actualCount, 0);
+
+      // Mark the trip as reviewed so the one-time gate does not refire on reopen.
+      await storage.updateTrip(tripId, { lastReviewedAt: new Date() });
+
       req.log?.info({ placed, unplaced: bucketResult.unplacedStops.length }, '[Travel] apply-pool-selection complete');
 
       res.json({

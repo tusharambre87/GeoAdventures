@@ -628,7 +628,13 @@ export default function PreviewScreen() {
             onPress={() => {
               if (user?.subscriptionTier && user.subscriptionTier !== "free") {
                 completeOnboarding();
-                router.replace("/(tabs)/today");
+                // Route new trips through review-stops before the finished trip.
+                // data.createdTripId is set by handleSave before savedStops is populated,
+                // so it is always non-null when this button is visible.
+                router.replace({
+                  pathname: '/trip/review-stops' as any,
+                  params: { tripId: data.createdTripId! },
+                });
               } else {
                 router.push("/onboarding/upgrade");
               }
