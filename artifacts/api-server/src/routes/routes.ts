@@ -9165,8 +9165,6 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       const bucketResult = bucketStopsTodays(fullCandidates, plannerInput);
 
       // ── Force-place unplaced stops when user taps "Continue anyway" ────────────
-      // Distribute each unplaced stop to the least-loaded bucket so that the
-      // user's explicit selection is always persisted — never silently discarded.
       if (forcePlace === true && bucketResult.unplacedStops.length > 0) {
         for (const unplaced of [...bucketResult.unplacedStops]) {
           const lightest = bucketResult.buckets.reduce(
@@ -9181,59 +9179,67 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         (bucketResult as any).unplacedStops = [];
       }
 
-      // ── Persist: replace all existing stops with the bucketed result ──────────
-      // We replace unconditionally (no visited-stop guard) because this endpoint
-      // is called from the pre-trip review screen, before the trip has started.
-      const existingStops = await storage.getStopsByTripId(tripId);
-      for (const s of existingStops) {
-        await storage.deleteStop(s.id);
-      }
+      // ── Persist only when this call is authoritative ───────────────────────────
+      // Persist when the user forced placement, or when nothing came back
+      // unplaced (nothing left for the user to decide on). Otherwise this is a
+      // preview call — the UI is about to show the "a bit far" banner and give
+      // the user a real choice — so we must NOT touch the database yet. The
+      // trip's existing stops stay exactly as they were until the user
+      // explicitly confirms (0 unplaced) or taps "Continue anyway" (forcePlace).
+      const shouldPersist = forcePlace === true || bucketResult.unplacedStops.length === 0;
+      let placed = bucketResult.buckets.reduce((sum, b) => sum + b.actualCount, 0);
 
-      const cityName = (trip as any).city ?? destination;
-      for (const bucket of bucketResult.buckets) {
-        for (let idx = 0; idx < bucket.stops.length; idx++) {
-          const stop = bucket.stops[idx];
-          await storage.createStop({
-            tripId,
-            name:              stop.name,
-            stopType:          stop.type ?? 'landmark',
-            displayOrder:      idx,
-            dayIndex:          bucket.dayNumber - 1,
-            address:           stop.address    ?? null,
-            description:       null,
-            latitude:          stop.latitude   ?? null,
-            longitude:         stop.longitude  ?? null,
-            missionType:       null,
-            missionQuestion:   null,
-            missionHint:       null,
-            missionAnswer:     null,
-            missionDifficulty: 'normal',
-            missionKeepsakeReward: false,
-            stopMissions:      null,
-            cityGroup:         cityName,
-            selectionReason:   stop.selectionReason ?? null,
-            metadata: {
-              durationMinutes:  familyDurationFloor(stop.type ?? 'landmark', stop.durationMinutes, null, cityName, stop.name),
-              sessionFit:       null,
-              durationClass:    null,
-              anchorScore:      null,
-              dropPriority:     null,
-              ticketSignal:     null,
-              familyAnchorType: stop.familyAnchorType ?? null,
-            },
-          });
+      if (shouldPersist) {
+        const existingStops = await storage.getStopsByTripId(tripId);
+        for (const s of existingStops) {
+          await storage.deleteStop(s.id);
         }
+
+        const cityName = (trip as any).city ?? destination;
+        for (const bucket of bucketResult.buckets) {
+          for (let idx = 0; idx < bucket.stops.length; idx++) {
+            const stop = bucket.stops[idx];
+            await storage.createStop({
+              tripId,
+              name:              stop.name,
+              stopType:          stop.type ?? 'landmark',
+              displayOrder:      idx,
+              dayIndex:          bucket.dayNumber - 1,
+              address:           stop.address    ?? null,
+              description:       null,
+              latitude:          stop.latitude   ?? null,
+              longitude:         stop.longitude  ?? null,
+              missionType:       null,
+              missionQuestion:   null,
+              missionHint:       null,
+              missionAnswer:     null,
+              missionDifficulty: 'normal',
+              missionKeepsakeReward: false,
+              stopMissions:      null,
+              cityGroup:         cityName,
+              selectionReason:   stop.selectionReason ?? null,
+              metadata: {
+                durationMinutes:  familyDurationFloor(stop.type ?? 'landmark', stop.durationMinutes, null, cityName, stop.name),
+                sessionFit:       null,
+                durationClass:    null,
+                anchorScore:      null,
+                dropPriority:     null,
+                ticketSignal:     null,
+                familyAnchorType: stop.familyAnchorType ?? null,
+              },
+            });
+          }
+        }
+
+        // Mark the trip as reviewed so the one-time gate does not refire on reopen.
+        await storage.updateTrip(tripId, { lastReviewedAt: new Date() });
       }
 
-      const placed = bucketResult.buckets.reduce((sum, b) => sum + b.actualCount, 0);
-
-      // Mark the trip as reviewed so the one-time gate does not refire on reopen.
-      await storage.updateTrip(tripId, { lastReviewedAt: new Date() });
-
-      req.log?.info({ placed, unplaced: bucketResult.unplacedStops.length }, '[Travel] apply-pool-selection complete');
+      req.log?.info({ placed, unplaced: bucketResult.unplacedStops.length, persisted: shouldPersist }, '[Travel] apply-pool-selection complete');
 
       res.json({
         success: true,
+        persisted: shouldPersist,
         placed,
         buckets: bucketResult.buckets.map(b => ({
           dayNumber:   b.dayNumber,
