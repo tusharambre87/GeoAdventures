@@ -479,15 +479,8 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
 
       {/* White body */}
       <View style={sw.cardBody}>
-        {/* Preview pill — absolute top-right, active card only */}
-        {showPreview && (
-          <Pressable style={sw.previewPill} onPress={onPreview} hitSlop={8}>
-            <Text style={sw.previewPillTxt}>Preview</Text>
-          </Pressable>
-        )}
-
-        {/* Name — right-padded on active card to clear pill */}
-        <Text style={[sw.cardName, showPreview && sw.cardNameWithPill]} numberOfLines={3}>
+        {/* Name */}
+        <Text style={sw.cardName} numberOfLines={3}>
           {item.name ?? ''}
         </Text>
 
@@ -565,8 +558,13 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
 
   const panResponder = useRef(
     PanResponder.create({
+      // Claim horizontal-dominant movement from children (capture phase) so
+      // inner Pressables don't block the swipe gesture.
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
+        Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove:   (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
       onPanResponderRelease: (_, g) => {
         if      (g.dx >  SWIPE_THRESHOLD) advanceRef.current('heart');
@@ -622,8 +620,8 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
           <SwipeCardContent
             item={currentItem}
             isSelected={isCurrentSel}
-            showPreview={true}
-            onPreview={() => onPreview(currentItem)}
+            showPreview={false}
+            onPreview={() => {}}
           />
         </Animated.View>
         <Animated.View style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]} pointerEvents="none">
@@ -633,6 +631,11 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
           <Text style={[sw.hintTxt, { color: '#22C55E' }]}>ADD</Text>
         </Animated.View>
       </View>
+
+      {/* Preview button — outside the panResponder Animated.View so tap always works */}
+      <Pressable style={sw.previewRow} onPress={() => onPreview(currentItem)} hitSlop={6}>
+        <Text style={sw.previewRowTxt}>{'Preview details \u2192'}</Text>
+      </Pressable>
 
       <View style={sw.actions}>
         <Pressable style={[sw.actionBtn, sw.xBtn]} onPress={() => advance('x')} hitSlop={8}>
@@ -1102,20 +1105,21 @@ const sw = StyleSheet.create({
   progressFill:  { height: 4, backgroundColor: G.orange, borderRadius: 2 },
   progressTxt:   { fontFamily: F.bold, fontSize: 12, color: G.muted, minWidth: 48, textAlign: 'right' },
 
-  stack: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  stack: { flex: 1 },
 
   bgCard: {
-    position: 'absolute', width: '100%',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     transform: [{ scale: 0.94 }, { translateY: 12 }],
-    borderRadius: 20, overflow: 'hidden',
+    borderRadius: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 12, elevation: 4,
   },
   card: {
-    width: '100%', borderRadius: 20, overflow: 'hidden', backgroundColor: '#fff',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 20, backgroundColor: '#fff',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 8,
   },
 
-  cardInner: { overflow: 'hidden', borderRadius: 20 },
+  cardInner: { flex: 1, overflow: 'hidden', borderRadius: 20 },
 
   // Photo hero (replaces flat color header)
   cardHero:  { height: 200, position: 'relative' },
@@ -1134,7 +1138,7 @@ const sw = StyleSheet.create({
   },
   heroSelTxt: { fontFamily: F.bold, fontSize: 10, color: '#fff' },
 
-  cardBody:        { backgroundColor: '#fff', padding: 16, minHeight: 110 },
+  cardBody:        { flex: 1, backgroundColor: '#fff', padding: 16 },
   cardName:        { fontFamily: F.bold, fontSize: 19, color: G.deep, letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
   cardNameWithPill:{ paddingRight: 72 },
   cardDesc:        { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 18, marginBottom: 8 },
@@ -1144,6 +1148,9 @@ const sw = StyleSheet.create({
 
   previewPill:    { position: 'absolute', top: 12, right: 14, zIndex: 1, borderWidth: 1.5, borderColor: G.orange, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: G.oLt },
   previewPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
+
+  previewRow:    { paddingVertical: 10, alignItems: 'center' },
+  previewRowTxt: { fontFamily: F.bold, fontSize: 13, color: G.orange },
 
   hintOverlay: { position: 'absolute', top: 22, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2.5 },
   hintX:       { left: 20,  borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.88)', transform: [{ rotate: '-12deg' }] },
