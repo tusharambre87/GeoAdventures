@@ -133,27 +133,58 @@ type ApplyResult = {
 };
 
 // ─── Stop image hook ──────────────────────────────────────────────────────────
-// Prefers a stop_library imageUrl (from the pool API enrichment) over Wikipedia.
-// Wikipedia fetch is skipped entirely when imageUrl is already provided.
+// Prefers a stop_library imageUrl over Wikipedia.
+// Wikipedia uses a 2-step approach: exact title lookup → search fallback.
+// Results are cached in a module-level Map so the same stop is never fetched twice.
 
-function useStopImage(name: string | null, imageUrl: string | null, size = 400): string | null {
-  const [wikiUri, setWikiUri] = useState<string | null>(null);
+const _wikiCache = new Map<string, string | null>();
+
+async function _fetchWikiImage(name: string): Promise<string | null> {
+  if (_wikiCache.has(name)) return _wikiCache.get(name) ?? null;
+
+  const SIZE = 600; // always fetch at 600 and let the Image component scale down
+  try {
+    // Step 1 — exact title lookup (fast, works for well-known stops)
+    const r1 = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${SIZE}&origin=*`
+    );
+    const d1 = await r1.json();
+    const page1 = Object.values((d1?.query?.pages ?? {}) as Record<string, any>)[0] as any;
+    if (page1?.thumbnail?.source) {
+      _wikiCache.set(name, page1.thumbnail.source as string);
+      return page1.thumbnail.source as string;
+    }
+
+    // Step 2 — search fallback (catches local parks without exact article names)
+    const r2 = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${SIZE}&gsrlimit=5&origin=*`
+    );
+    const d2 = await r2.json();
+    const pages2 = Object.values((d2?.query?.pages ?? {}) as Record<string, any>) as any[];
+    const found = pages2.find((p: any) => p?.thumbnail?.source);
+    if (found?.thumbnail?.source) {
+      _wikiCache.set(name, found.thumbnail.source as string);
+      return found.thumbnail.source as string;
+    }
+  } catch {}
+
+  _wikiCache.set(name, null);
+  return null;
+}
+
+function useStopImage(name: string | null, imageUrl: string | null, _size = 400): string | null {
+  const [uri, setUri] = useState<string | null>(imageUrl ?? null);
+
   useEffect(() => {
-    if (imageUrl) return; // stop_library image available — skip Wikipedia
+    if (imageUrl) { setUri(imageUrl); return; }
+    setUri(null);
     if (!name) return;
     let cancelled = false;
-    fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${size}&origin=*`
-    )
-      .then(r => r.json())
-      .then(d => {
-        const page = Object.values((d?.query?.pages ?? {}) as Record<string, any>)[0] as any;
-        if (!cancelled && page?.thumbnail?.source) setWikiUri(page.thumbnail.source as string);
-      })
-      .catch(() => {});
+    _fetchWikiImage(name).then(url => { if (!cancelled) setUri(url); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [name, imageUrl, size]);
-  return imageUrl ?? wikiUri;
+  }, [name, imageUrl]);
+
+  return uri;
 }
 
 // ─── Shared atoms ─────────────────────────────────────────────────────────────
