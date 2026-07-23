@@ -9166,15 +9166,43 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
 
       // ── Force-place unplaced stops when user taps "Continue anyway" ────────────
       if (forcePlace === true && bucketResult.unplacedStops.length > 0) {
+        // Local haversine — avoids exporting plannerService internals just for this.
+        const _hav = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+          const R = 6371, toRad = (d: number) => d * Math.PI / 180;
+          const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
+        const distToBucket = (stop: any, bucket: typeof bucketResult.buckets[number]): number => {
+          const lat = stop.latitude ? parseFloat(String(stop.latitude)) : null;
+          const lon = stop.longitude ? parseFloat(String(stop.longitude)) : null;
+          if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return Infinity;
+          let min = Infinity;
+          for (const s of bucket.stops) {
+            const sLat = (s as any).latitude ? parseFloat(String((s as any).latitude)) : null;
+            const sLon = (s as any).longitude ? parseFloat(String((s as any).longitude)) : null;
+            if (sLat == null || sLon == null || isNaN(sLat) || isNaN(sLon)) continue;
+            const d = _hav(lat, lon, sLat, sLon);
+            if (d < min) min = d;
+          }
+          return min;
+        };
+
         for (const unplaced of [...bucketResult.unplacedStops]) {
-          const lightest = bucketResult.buckets.reduce(
-            (min, b) => b.actualCount < min.actualCount ? b : min,
+          let target = bucketResult.buckets.reduce(
+            (best, b) => distToBucket(unplaced, b) < distToBucket(unplaced, best) ? b : best,
             bucketResult.buckets[0],
           );
-          if (lightest) {
-            lightest.stops.push(unplaced as any);
-            lightest.actualCount += 1;
+          if (!isFinite(distToBucket(unplaced, target))) {
+            // No bucket has anything with usable coords near this stop —
+            // fall back to least-loaded, same as before.
+            target = bucketResult.buckets.reduce(
+              (min, b) => b.actualCount < min.actualCount ? b : min,
+              bucketResult.buckets[0],
+            );
           }
+          target.stops.push(unplaced as any);
+          target.actualCount += 1;
         }
         (bucketResult as any).unplacedStops = [];
       }

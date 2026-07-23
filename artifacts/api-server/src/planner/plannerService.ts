@@ -3952,6 +3952,7 @@ export function bucketStopsTodays(
   // they happened to be adjacent in score order.
   const anchorsByDay = new Map<number, CachedStopCandidate[]>();
   for (let d = 0; d < input.tripDays; d++) anchorsByDay.set(d, []);
+  const usedAnchors = new Set<CachedStopCandidate>();
 
   const anchorLatLon = (a: CachedStopCandidate): [number, number] | null => {
     const lat = a.latitude ? parseFloat(String(a.latitude)) : null;
@@ -3996,6 +3997,7 @@ export function bucketStopsTodays(
     }
 
     anchorsByDay.get(chosenDay)!.push(anchor);
+    usedAnchors.add(anchor);
   }
 
   // ── Inner helpers (same logic as sequenceDayBySlot / geoSequenceDay) ──────
