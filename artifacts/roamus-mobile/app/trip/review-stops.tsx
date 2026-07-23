@@ -488,41 +488,21 @@ type CardContentProps = {
 function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardContentProps) {
   const heroUri = useStopImage(item.name, item.imageUrl, 500);
   const [c1] = cardGradient(item.type);
-  const label = typeLabel(item.type);
-  const kidsData = item.kidsData ?? {};
-  const entry_ = (kidsData.entry ?? 'unknown') as string;
-  const bestT  = (kidsData.bestTime ?? '') as string;
+  const label  = typeLabel(item.type);
+  const entry_ = entryStatus(item.type);   // derived from type — always has a value
+  const bestT  = bestTime(item.type);
 
   return (
     <View style={sw.cardInner}>
-      {/* Photo hero — 70% of card height */}
+      {/* Photo hero — fills all card space above the body band */}
       <View style={sw.cardHero}>
         {heroUri
           ? <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           : <View style={[StyleSheet.absoluteFill, { backgroundColor: c1 }]} />}
-        {/* Dark scrim for legibility */}
         <View style={[StyleSheet.absoluteFillObject, sw.heroScrim]} />
-
-        {/* ── Top-left: Entry badge ── */}
-        {entry_ !== 'unknown' && (
-          <View style={[sw.heroBadge, entry_ === 'free' ? sw.heroBadgeFree : entry_ === 'paid' ? sw.heroBadgePaid : sw.heroBadgeCheck]}>
-            <Text style={sw.heroBadgeTxt}>
-              {entry_ === 'free' ? 'Free entry' : entry_ === 'paid' ? 'Ticket required' : 'Check at gate'}
-            </Text>
-          </View>
-        )}
-
-        {/* ── Top-right: Best time badge ── */}
-        {bestT.length > 0 && bestT !== 'Anytime' && (
-          <View style={sw.heroBestTime}>
-            <Text style={sw.heroBestTimeTxt}>{bestT}</Text>
-          </View>
-        )}
-
-        {/* ── Bottom-left: Type label ── */}
+        {/* Bottom-left: type */}
         <Text style={sw.heroTypeLbl}>{label}</Text>
-
-        {/* ── Bottom-right: Selected tag ── */}
+        {/* Bottom-right: selected */}
         {isSelected && (
           <View style={sw.heroSelTag}>
             <Text style={sw.heroSelTxt}>Selected</Text>
@@ -530,26 +510,23 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
         )}
       </View>
 
-      {/* White body — 30% of card */}
+      {/* White body band — compact, natural height */}
       <View style={sw.cardBody}>
-        <Text style={sw.cardName} numberOfLines={2}>
-          {item.name ?? ''}
-        </Text>
-
-        {/* Full description — no line cap; overflows are clipped by cardInner */}
-        {item.description != null && item.description.length > 0 && (
-          <Text style={sw.cardDesc}>{item.description}</Text>
-        )}
-
-        <View style={sw.cardChips}>
+        <Text style={sw.cardName} numberOfLines={1}>{item.name ?? ''}</Text>
+        <View style={sw.cardInfoRow}>
           {item.durationMinutes != null && (
-            <View style={sw.cardChip}>
-              <Text style={sw.cardChipTxt}>{item.durationMinutes} min</Text>
+            <View style={sw.cardInfoChip}>
+              <Text style={sw.cardInfoChipTxt}>{item.durationMinutes} min</Text>
             </View>
           )}
-          {item.minAge != null && item.minAge > 0 && (
-            <View style={sw.cardChip}>
-              <Text style={sw.cardChipTxt}>Ages {item.minAge}+</Text>
+          <View style={[sw.cardInfoChip, entry_ === 'free' ? sw.chipFree : entry_ === 'paid' ? sw.chipPaid : null]}>
+            <Text style={[sw.cardInfoChipTxt, entry_ === 'free' ? sw.chipFreeTxt : entry_ === 'paid' ? sw.chipPaidTxt : null]}>
+              {entry_ === 'free' ? 'Free entry' : entry_ === 'paid' ? 'Ticket req.' : 'Check entry'}
+            </Text>
+          </View>
+          {bestT !== 'Anytime' && (
+            <View style={sw.cardInfoChip}>
+              <Text style={sw.cardInfoChipTxt}>{bestT}</Text>
             </View>
           )}
         </View>
@@ -1173,8 +1150,8 @@ const sw = StyleSheet.create({
 
   cardInner: { flex: 1, overflow: 'hidden', borderRadius: 20 },
 
-  // Photo hero — 70% of total card height via flex ratio
-  cardHero:  { flex: 7 },
+  // Photo hero — fills all card space above the white body band
+  cardHero:  { flex: 1 },
   heroScrim: { backgroundColor: 'rgba(26,31,46,0.30)' },
   heroTypeLbl: {
     position: 'absolute', bottom: 10, left: 14,
@@ -1201,13 +1178,16 @@ const sw = StyleSheet.create({
   heroBestTime:    { position: 'absolute', top: 10, right: 14, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.42)' },
   heroBestTimeTxt: { fontFamily: F.regular, fontSize: 10, color: 'rgba(255,255,255,0.92)' },
 
-  cardBody:        { flex: 3, backgroundColor: '#fff', padding: 16 },
-  cardName:        { fontFamily: F.bold, fontSize: 19, color: G.deep, letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
-  cardNameWithPill:{ paddingRight: 72 },
-  cardDesc:        { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 18, marginBottom: 8 },
-  cardChips:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  cardChip:        { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  cardChipTxt:     { fontFamily: F.regular, fontSize: 12, color: G.muted },
+  // Body band — compact, natural height (no flex — hero fills the rest)
+  cardBody:       { backgroundColor: '#fff', paddingHorizontal: 14, paddingTop: 11, paddingBottom: 14 },
+  cardName:       { fontFamily: F.bold, fontSize: 17, color: G.deep, letterSpacing: -0.2, lineHeight: 22, marginBottom: 7 },
+  cardInfoRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  cardInfoChip:   { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 },
+  chipFree:       { backgroundColor: 'rgba(34,197,94,0.13)' },
+  chipPaid:       { backgroundColor: 'rgba(239,68,68,0.10)' },
+  cardInfoChipTxt:{ fontFamily: F.medium, fontSize: 11, color: G.muted },
+  chipFreeTxt:    { color: '#16A34A' },
+  chipPaidTxt:    { color: '#DC2626' },
 
   previewPill:    { position: 'absolute', top: 12, right: 14, zIndex: 1, borderWidth: 1.5, borderColor: G.orange, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: G.oLt },
   previewPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
@@ -1241,7 +1221,7 @@ const sw = StyleSheet.create({
 const ps = StyleSheet.create({
   overlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.42)', zIndex: 100 },
   sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: '88%' as any,
+    position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '88%' as any,
     backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     flexDirection: 'column',
   },
