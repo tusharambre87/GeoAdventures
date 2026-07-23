@@ -4,23 +4,24 @@
  * Two modes, shared selected-name state:
  *
  *   LIST mode  — flat list with swipe-gesture actions (left=Remove, right=Add),
- *                inline Add/Remove buttons, and a per-row "Preview" link.
+ *                per-row 56×56 Wikipedia thumbnail, inline Add/Remove buttons,
+ *                and a per-row "Preview" link.
  *
- *   SWIPE mode — card-stack (one card at a time, active decision on every item).
- *                Color header (type-based), category tag, name, description when
- *                present, duration, X/Heart buttons, progress bar.
- *                Preview pill on the active card only → same StopPreviewSheet.
+ *   SWIPE mode — card-stack.  Photo hero (Wikipedia, gradient fallback) on each
+ *                card.  Preview pill top-right of white body, active card only.
  *
- * StopPreviewSheet — shared between both modes. Wikipedia hero image (gradient
- *   fallback), type/duration pills, address + Maps link, description ("WHY
- *   FAMILIES LOVE IT") when present, Add/Remove footer action.
+ * StopPreviewSheet — rich detail sheet matching the visual language of
+ *   AddStopDetailSheet in [tripId].tsx: photo hero, "Good time to visit"
+ *   green banner, WHY KIDS LOVE IT, ENTRY / BEST TIME info row, timing card,
+ *   address card, Add/Remove footer.
  *
  * Spec invariants:
- *   - "Selected" tag — shown wherever selected === true, no confidence language.
- *   - "Anchor" badge — only where familyAnchorType === 'anchor', real data.
+ *   - No "Anchor" tags anywhere — internal scoring detail, not user-facing.
+ *   - "Selected" tag uses real data.
  *   - NO day labels anywhere on this screen.
- *   - Submit sends full pool-entry objects, not bare IDs.
- *   - "Let us pick for you" = submit algorithm defaults with zero edits.
+ *   - Submit sends full PoolEntry objects, not bare IDs.
+ *   - handleContinueAnyway runs the real submit then navigates regardless of
+ *     unplaced status — user edits are never silently discarded.
  */
 
 import React, {
@@ -31,8 +32,8 @@ import React, {
   useState,
 } from 'react';
 import {
-  Animated,
   ActivityIndicator,
+  Animated,
   Easing,
   FlatList,
   Image,
@@ -58,36 +59,7 @@ import { F, G } from '@/lib/tokens';
 
 const SWIPE_THRESHOLD = 110;
 
-// Saturated card-header backgrounds keyed on stop-type substrings.
-// Deliberately darker than the pastel STOP_HERO_BG map so white text reads
-// at WCAG AA contrast on the 140px card header.
-const CARD_HEADER_BG: Record<string, string> = {
-  museum:    '#1565C0',
-  aquarium:  '#0277BD',
-  zoo:       '#558B2F',
-  park:      '#2E7D32',
-  nature:    '#1B5E20',
-  landmark:  '#6A1B9A',
-  shopping:  '#880E4F',
-  bridge:    '#37474F',
-  beach:     '#01579B',
-  restaurant:'#BF360C',
-  food:      '#BF360C',
-  cafe:      '#795548',
-  culture:   '#E65100',
-  theater:   '#4A148C',
-  castle:    '#4E342E',
-  palace:    '#4E342E',
-  default:   '#C0560A',
-};
-
-function cardHeaderBg(type: string | null | undefined): string {
-  const t = (type ?? '').toLowerCase();
-  const key = Object.keys(CARD_HEADER_BG).find(k => k !== 'default' && t.includes(k));
-  return key ? CARD_HEADER_BG[key] : CARD_HEADER_BG.default;
-}
-
-function previewGradient(type: string | null | undefined): [string, string] {
+function cardGradient(type: string | null | undefined): [string, string] {
   const t = (type ?? '').toLowerCase();
   if (t.includes('park') || t.includes('garden') || t.includes('nature')) return ['#2D6A4F', '#7A9E8E'];
   if (t.includes('museum') || t.includes('gallery'))    return ['#1B3A5C', '#6B4FA8'];
@@ -104,6 +76,26 @@ function typeLabel(type: string | null | undefined): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Derive ticket/entry status from stop type — best-effort, no external data needed. */
+function entryStatus(type: string | null | undefined): 'free' | 'paid' | 'check' {
+  const t = (type ?? '').toLowerCase();
+  if (t.includes('park') || t.includes('beach') || t.includes('nature') ||
+      t.includes('viewpoint') || t.includes('bridge') || t.includes('boardwalk')) return 'free';
+  if (t.includes('museum') || t.includes('aquarium') || t.includes('zoo') ||
+      t.includes('theater') || t.includes('castle') || t.includes('palace') ||
+      t.includes('science') || t.includes('indoor_attraction')) return 'paid';
+  return 'check';
+}
+
+function bestTime(type: string | null | undefined): string {
+  const t = (type ?? '').toLowerCase();
+  if (t.includes('beach')) return 'Midday';
+  if (t.includes('museum') || t.includes('indoor') || t.includes('aquarium')) return 'Anytime';
+  if (t.includes('nature') || t.includes('park') || t.includes('viewpoint')) return 'Morning';
+  if (t.includes('restaurant') || t.includes('food')) return 'Lunchtime';
+  return 'Check ahead';
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PoolEntry = {
@@ -116,7 +108,7 @@ type PoolEntry = {
   latitude:          number | null;
   longitude:         number | null;
   address:           string | null;
-  description:       string | null;   // stop_library.description — 99.7% coverage
+  description:       string | null;
   selected:          boolean;
   dayIndex:          number | null;
   displayOrder:      number | null;
@@ -139,20 +131,47 @@ type ApplyResult = {
   }>;
 };
 
-// ─── Shared atoms ─────────────────────────────────────────────────────────────
+// ─── Wikipedia image fetcher (shared hook) ────────────────────────────────────
 
-function AnchorBadge({ small }: { small?: boolean }) {
-  return (
-    <View style={[at.badge, small && at.badgeSm]}>
-      <Text style={[at.badgeTxt, small && at.badgeTxtSm]}>Anchor</Text>
-    </View>
-  );
+function useWikiImage(name: string | null, size = 400): string | null {
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => {
+    if (!name) return;
+    let cancelled = false;
+    fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${size}&origin=*`
+    )
+      .then(r => r.json())
+      .then(d => {
+        const page = Object.values((d?.query?.pages ?? {}) as Record<string, any>)[0] as any;
+        if (!cancelled && page?.thumbnail?.source) setUri(page.thumbnail.source as string);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [name, size]);
+  return uri;
 }
+
+// ─── Shared atoms ─────────────────────────────────────────────────────────────
 
 function SelectedTag({ small }: { small?: boolean }) {
   return (
     <View style={[at.selTag, small && at.selTagSm]}>
       <Text style={[at.selTxt, small && at.selTxtSm]}>Selected</Text>
+    </View>
+  );
+}
+
+// ─── Stop thumbnail (list rows) ───────────────────────────────────────────────
+
+function StopThumbnail({ name, type }: { name: string | null; type: string | null }) {
+  const uri = useWikiImage(name, 200);
+  const [c1] = cardGradient(type);
+  return (
+    <View style={tn.wrap}>
+      {uri
+        ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        : <View style={[StyleSheet.absoluteFill, { backgroundColor: c1 }]} />}
     </View>
   );
 }
@@ -168,42 +187,40 @@ type PreviewSheetProps = {
 };
 
 function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: PreviewSheetProps) {
-  const [heroUri, setHeroUri] = useState<string | null>(null);
-  const grad = previewGradient(entry.type);
+  const heroUri = useWikiImage(entry.name, 600);
+  const [c1] = cardGradient(entry.type);
+
   const dur = entry.durationMinutes != null
     ? entry.durationMinutes < 60
       ? `${entry.durationMinutes} min`
-      : `${Math.floor(entry.durationMinutes / 60)}\u2013${Math.floor(entry.durationMinutes / 60) + 1} hr`
-    : null;
+      : `${Math.floor(entry.durationMinutes / 60)}\u20132 hr`
+    : '1\u20132 hours';
+
   const mapsUrl = entry.name
     ? `https://maps.apple.com/?q=${encodeURIComponent(entry.name)}`
     : null;
 
-  useEffect(() => {
-    if (!entry.name) return;
-    let cancelled = false;
-    fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(entry.name)}&prop=pageimages&format=json&pithumbsize=600&origin=*`
-    )
-      .then(r => r.json())
-      .then(d => {
-        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
-        const page = Object.values(pages)[0] as any;
-        if (!cancelled && page?.thumbnail?.source) setHeroUri(page.thumbnail.source as string);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [entry.name]);
+  const entry_ = entryStatus(entry.type);
+  const bestT  = bestTime(entry.type);
+
+  const parkingUrl = entry.address
+    ? `https://maps.apple.com/?q=parking+near+${encodeURIComponent(entry.address)}`
+    : entry.name
+      ? `https://maps.apple.com/?q=parking+near+${encodeURIComponent(entry.name)}`
+      : null;
 
   return (
     <View style={ps.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={[ps.sheet, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[ps.sheet, { paddingBottom: 0 }]}>
         <View style={ps.handle} />
 
-        {/* Header row */}
+        {/* Header */}
         <View style={ps.hdrRow}>
-          <Text style={ps.hdrName} numberOfLines={2}>{entry.name ?? ''}</Text>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={ps.hdrName} numberOfLines={2}>{entry.name ?? ''}</Text>
+            <Text style={ps.hdrSub}>{typeLabel(entry.type)}{dur ? ` \u00B7 ${dur}` : ''}</Text>
+          </View>
           <Pressable style={ps.closeBtn} onPress={onClose} hitSlop={10}>
             <Text style={ps.closeTxt}>{'\u2715'}</Text>
           </Pressable>
@@ -214,14 +231,13 @@ function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: Prev
           contentContainerStyle={ps.body}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero */}
+          {/* Hero photo */}
           <View style={ps.hero}>
-            {heroUri ? (
-              <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: grad[0] }]} />
-            )}
-            <View style={[ps.heroOverlay, { backgroundColor: `${grad[0]}55` }]} />
+            {heroUri
+              ? <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              : <View style={[StyleSheet.absoluteFill, { backgroundColor: c1 }]} />}
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(26,31,46,0.22)' }]} />
+            <Text style={ps.heroName}>{entry.name ?? ''}</Text>
           </View>
 
           {/* Pills */}
@@ -229,60 +245,98 @@ function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: Prev
             <View style={ps.typePill}>
               <Text style={ps.typePillTxt}>{typeLabel(entry.type)}</Text>
             </View>
-            {dur != null && (
-              <View style={ps.durPill}>
-                <Text style={ps.durPillTxt}>{dur}</Text>
-              </View>
-            )}
-            {entry.familyAnchorType === 'anchor' && (
-              <View style={ps.anchorPill}>
-                <Text style={ps.anchorPillTxt}>Anchor stop</Text>
-              </View>
-            )}
-            {entry.minAge != null && entry.minAge > 0 && (
-              <View style={ps.durPill}>
-                <Text style={ps.durPillTxt}>Ages {entry.minAge}+</Text>
+            <View style={ps.durPill}>
+              <Text style={ps.durPillTxt}>{dur}</Text>
+            </View>
+            {(entry.minAge == null || entry.minAge === 0) && (
+              <View style={ps.kidPill}>
+                <Text style={ps.kidPillTxt}>{'\u2713 Kid-friendly'}</Text>
               </View>
             )}
           </View>
 
-          {/* Description — WHY KIDS LOVE IT */}
+          {/* Good time to visit — green banner */}
           {entry.description != null && entry.description.length > 0 && (
-            <View style={ps.card}>
-              <Text style={ps.cardLabel}>WHY KIDS LOVE IT</Text>
-              <Text style={ps.cardBody}>{entry.description}</Text>
+            <View style={ps.goodTimeBanner}>
+              <Text style={ps.goodTimeStar}>{'\u2605'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={ps.goodTimeTitle}>Good time to visit</Text>
+                <Text style={ps.goodTimeSub}>Great pick for families of all ages.</Text>
+              </View>
+            </View>
+          )}
+
+          {/* WHY KIDS LOVE IT */}
+          {entry.description != null && entry.description.length > 0 && (
+            <View style={ps.loveCard}>
+              <View style={ps.loveHdr}>
+                <Text style={ps.loveStar}>{'\u2605'}</Text>
+                <Text style={ps.loveLbl}>{'WHY KIDS LOVE IT'}</Text>
+              </View>
+              <Text style={ps.loveTxt}>{entry.description}</Text>
+            </View>
+          )}
+
+          {/* ENTRY / BEST TIME */}
+          <View style={ps.infoRow}>
+            <View style={ps.infoCell}>
+              <Text style={ps.infoLbl}>{'ENTRY'}</Text>
+              {entry_ === 'free'
+                ? <Text style={[ps.infoVal, { color: '#3DAA6E' }]}>{'Free entry'}</Text>
+                : entry_ === 'paid'
+                  ? <Text style={[ps.infoVal, { color: '#E8433A' }]}>{'Ticket required'}</Text>
+                  : <Text style={[ps.infoVal, { color: '#8A8FA8' }]}>{'Check at gate'}</Text>}
+            </View>
+            <View style={ps.infoCell}>
+              <Text style={ps.infoLbl}>{'BEST TIME'}</Text>
+              <Text style={ps.infoVal}>{bestT}</Text>
+            </View>
+          </View>
+
+          {/* Timing card */}
+          {(entry.durationMinutes != null || parkingUrl != null) && (
+            <View style={ps.addrCard}>
+              <Text style={ps.addrCardLabel}>{'TIMING & LOGISTICS'}</Text>
+              {entry.durationMinutes != null && (
+                <View style={ps.timingRow}>
+                  <Text style={ps.timingKey}>Recommended duration</Text>
+                  <Text style={ps.timingVal}>{entry.durationMinutes} min</Text>
+                </View>
+              )}
+              {parkingUrl != null && (
+                <Pressable onPress={() => Linking.openURL(parkingUrl!).catch(() => {})}>
+                  <Text style={ps.parkingLink}>{'Find parking nearby \u2192'}</Text>
+                </Pressable>
+              )}
             </View>
           )}
 
           {/* Address */}
-          <View style={ps.card}>
-            <Text style={ps.cardLabel}>LOCATION</Text>
-            {entry.address != null && entry.address.length > 0 ? (
-              <Text style={ps.cardBody}>{entry.address}</Text>
-            ) : (
-              <Text style={[ps.cardBody, { color: G.muted, fontStyle: 'italic' }]}>
-                Address not confirmed
-              </Text>
-            )}
+          <View style={ps.addrCard}>
+            <View style={ps.addrWarnRow}>
+              <Text style={ps.addrWarnTxt}>{'Estimated \u2014 please verify'}</Text>
+            </View>
+            <Text style={ps.addrTxt}>
+              {entry.address != null && entry.address.length > 0
+                ? entry.address
+                : 'Address not confirmed \u2014 tap to open in Maps'}
+            </Text>
             {mapsUrl != null && (
               <Pressable
-                style={ps.mapsLink}
-                onPress={() => Linking.openURL(mapsUrl).catch(() => {})}
+                style={ps.addrLinkRow}
+                onPress={() => Linking.openURL(mapsUrl!).catch(() => {})}
               >
-                <Text style={ps.mapsLinkTxt}>Open in Maps</Text>
+                <Text style={ps.addrLinkTxt}>{'Open in Maps to verify'}</Text>
               </Pressable>
             )}
           </View>
         </ScrollView>
 
-        {/* Footer action */}
-        <View style={ps.footer}>
+        {/* Footer */}
+        <View style={[ps.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable
             style={[ps.footerBtn, isSelected && ps.footerBtnRemove]}
-            onPress={() => {
-              onToggle(entry.name ?? '');
-              onClose();
-            }}
+            onPress={() => { onToggle(entry.name ?? ''); onClose(); }}
           >
             <Text style={[ps.footerBtnTxt, isSelected && ps.footerBtnTxtRemove]}>
               {isSelected ? 'Remove from trip' : 'Add to trip'}
@@ -345,10 +399,13 @@ function StopRow({ item, isSelected, onToggle, onPreview }: RowProps) {
       renderLeftActions={!isSelected  ? () => <SwipeAdd    onPress={closeAndToggle} /> : undefined}
     >
       <View style={[lt.row, isSelected && lt.rowSel]}>
+        {/* Thumbnail */}
+        <StopThumbnail name={item.name} type={item.type} />
+
+        {/* Content */}
         <View style={lt.content}>
           <Text style={lt.name} numberOfLines={2}>{name}</Text>
           <View style={lt.metaRow}>
-            {item.familyAnchorType === 'anchor' && <AnchorBadge />}
             {isSelected && <SelectedTag />}
             {item.durationMinutes != null && (
               <View style={lt.chip}>
@@ -360,6 +417,8 @@ function StopRow({ item, isSelected, onToggle, onPreview }: RowProps) {
             </Pressable>
           </View>
         </View>
+
+        {/* Toggle button */}
         <Pressable
           style={[lt.btn, isSelected ? lt.btnRemove : lt.btnAdd]}
           onPress={doToggle}
@@ -384,35 +443,44 @@ type CardContentProps = {
 };
 
 function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardContentProps) {
-  const hdrBg = cardHeaderBg(item.type);
+  const heroUri = useWikiImage(item.name, 500);
+  const [c1] = cardGradient(item.type);
   const label = typeLabel(item.type);
 
   return (
     <View style={sw.cardInner}>
-      {/* Color header */}
-      <View style={[sw.cardHeader, { backgroundColor: hdrBg }]}>
-        <Text style={sw.cardTypeLbl}>{label}</Text>
-        <View style={sw.cardBadgeRow}>
-          {item.familyAnchorType === 'anchor' && <AnchorBadge small />}
-          {isSelected && <SelectedTag small />}
-        </View>
+      {/* Photo hero — Wikipedia with gradient fallback */}
+      <View style={sw.cardHero}>
+        {heroUri
+          ? <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : <View style={[StyleSheet.absoluteFill, { backgroundColor: c1 }]} />}
+        {/* Dark scrim for legibility */}
+        <View style={[StyleSheet.absoluteFillObject, sw.heroScrim]} />
+        {/* Type label overlay — bottom-left */}
+        <Text style={sw.heroTypeLbl}>{label}</Text>
+        {/* Selected tag — bottom-right */}
+        {isSelected && (
+          <View style={sw.heroSelTag}>
+            <Text style={sw.heroSelTxt}>Selected</Text>
+          </View>
+        )}
       </View>
 
-      {/* Body */}
+      {/* White body */}
       <View style={sw.cardBody}>
-        {/* Preview pill — absolute top-right, active (front) card only */}
+        {/* Preview pill — absolute top-right, active card only */}
         {showPreview && (
           <Pressable style={sw.previewPill} onPress={onPreview} hitSlop={8}>
             <Text style={sw.previewPillTxt}>Preview</Text>
           </Pressable>
         )}
 
-        {/* Name — right-padded so it never runs under the pill */}
+        {/* Name — right-padded on active card to clear pill */}
         <Text style={[sw.cardName, showPreview && sw.cardNameWithPill]} numberOfLines={3}>
           {item.name ?? ''}
         </Text>
 
-        {/* Description — shown when present; silent when null */}
+        {/* Description — shown when present; silently absent when null */}
         {item.description != null && item.description.length > 0 && (
           <Text style={sw.cardDesc} numberOfLines={3}>{item.description}</Text>
         )}
@@ -434,13 +502,7 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
   );
 }
 
-function SwipeDoneView({
-  count,
-  onViewList,
-}: {
-  count:      number;
-  onViewList: () => void;
-}) {
+function SwipeDoneView({ count, onViewList }: { count: number; onViewList: () => void }) {
   return (
     <View style={sw.doneWrap}>
       <Text style={sw.doneEmoji}>{'\u2705'}</Text>
@@ -466,29 +528,21 @@ type SwipeModeProps = {
 function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList }: SwipeModeProps) {
   const [swipeIndex, setSwipeIndex] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
-
-  // advanceRef pattern: PanResponder is created once; calls always use latest advance.
   const advanceRef = useRef<(action: 'heart' | 'x') => void>(() => {});
 
   const advance = useCallback(
     (action: 'heart' | 'x') => {
       const item = pool[swipeIndex];
       if (!item?.name) return;
-
       const isSelected = selectedNames.has(item.name);
       if (action === 'heart' && !isSelected) onToggle(item.name);
       if (action === 'x'     &&  isSelected) onToggle(item.name);
-
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
-
-      const toX = action === 'heart' ? 700 : -700;
       Animated.timing(pan.x, {
-        toValue:         toX,
-        duration:        220,
-        easing:          Easing.out(Easing.quad),
-        useNativeDriver: true,
+        toValue: action === 'heart' ? 700 : -700,
+        duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true,
       }).start(() => {
         pan.setValue({ x: 0, y: 0 });
         setSwipeIndex(i => i + 1);
@@ -496,16 +550,15 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
     },
     [swipeIndex, pool, selectedNames, onToggle, pan],
   );
-
   advanceRef.current = advance;
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
         Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
-      onPanResponderMove:  (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
+      onPanResponderMove:   (_, g) => { pan.setValue({ x: g.dx, y: 0 }); },
       onPanResponderRelease: (_, g) => {
-        if (g.dx >  SWIPE_THRESHOLD) advanceRef.current('heart');
+        if      (g.dx >  SWIPE_THRESHOLD) advanceRef.current('heart');
         else if (g.dx < -SWIPE_THRESHOLD) advanceRef.current('x');
         else Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
       },
@@ -522,9 +575,7 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
   const progress      = pool.length > 0 ? swipeIndex / pool.length : 0;
 
   const rotate = pan.x.interpolate({
-    inputRange:  [-200, 0, 200],
-    outputRange: ['-12deg', '0deg', '12deg'],
-    extrapolate: 'clamp',
+    inputRange: [-200, 0, 200], outputRange: ['-12deg', '0deg', '12deg'], extrapolate: 'clamp',
   });
   const xOpacity = pan.x.interpolate({
     inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp',
@@ -535,7 +586,6 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
 
   return (
     <View style={sw.root}>
-      {/* Progress */}
       <View style={sw.progressRow}>
         <View style={sw.progressTrack}>
           <View style={[sw.progressFill, { width: `${progress * 100}%` as any }]} />
@@ -543,7 +593,6 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
         <Text style={sw.progressTxt}>{swipeIndex + 1} of {pool.length}</Text>
       </View>
 
-      {/* Card stack */}
       <View style={sw.stack}>
         {nextItem != null && (
           <View style={sw.bgCard} pointerEvents="none">
@@ -555,7 +604,6 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
             />
           </View>
         )}
-
         <Animated.View
           style={[sw.card, { transform: [{ translateX: pan.x }, { rotate }] }]}
           {...panResponder.panHandlers}
@@ -567,23 +615,14 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
             onPreview={() => onPreview(currentItem)}
           />
         </Animated.View>
-
-        {/* Swipe-direction stamp overlays */}
-        <Animated.View
-          style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]}
-          pointerEvents="none"
-        >
+        <Animated.View style={[sw.hintOverlay, sw.hintX, { opacity: xOpacity }]} pointerEvents="none">
           <Text style={[sw.hintTxt, { color: '#EF4444' }]}>REMOVE</Text>
         </Animated.View>
-        <Animated.View
-          style={[sw.hintOverlay, sw.hintHeart, { opacity: heartOpacity }]}
-          pointerEvents="none"
-        >
+        <Animated.View style={[sw.hintOverlay, sw.hintHeart, { opacity: heartOpacity }]} pointerEvents="none">
           <Text style={[sw.hintTxt, { color: '#22C55E' }]}>ADD</Text>
         </Animated.View>
       </View>
 
-      {/* Action buttons */}
       <View style={sw.actions}>
         <Pressable style={[sw.actionBtn, sw.xBtn]} onPress={() => advance('x')} hitSlop={8}>
           <Text style={sw.actionTxt}>{'\u2715'}</Text>
@@ -608,17 +647,13 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
   if (stops.length === 0) return null;
   return (
     <View style={ub.banner}>
-      <Text style={ub.title}>
-        {stops.length} stop{stops.length !== 1 ? 's' : ''} could not fit
-      </Text>
-      <Text style={ub.sub}>
-        Evaluated against every day but couldn{'\u2019'}t be placed — geography or
-        timing blocked it. Remove them to keep your selection clean.
-      </Text>
       {stops.map((st, i) => (
-        <Text key={i} style={ub.item}>
-          {'\u2022'} {st.name}{st.familyAnchorType === 'anchor' ? '  [Anchor]' : ''}
-        </Text>
+        <View key={i} style={i > 0 ? { marginTop: 10 } : undefined}>
+          <Text style={ub.stopName}>{st.name}</Text>
+          <Text style={ub.sub}>
+            {'A bit far from your other picks. Keep it and we\u2019ll place it if we can, or add it to a specific day later from Add a Stop.'}
+          </Text>
+        </View>
       ))}
     </View>
   );
@@ -629,9 +664,9 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
 type Mode = 'list' | 'swipe';
 
 export default function ReviewStopsScreen() {
-  const { tripId }     = useLocalSearchParams<{ tripId: string }>();
-  const { token }      = useAuth();
-  const insets         = useSafeAreaInsets();
+  const { tripId }  = useLocalSearchParams<{ tripId: string }>();
+  const { token }   = useAuth();
+  const insets      = useSafeAreaInsets();
 
   const [pool, setPool]                     = useState<PoolEntry[]>([]);
   const [selectedNames, setSelectedNames]   = useState<Set<string>>(new Set());
@@ -688,8 +723,12 @@ export default function ReviewStopsScreen() {
   }, []);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
+  //
+  // navigateAlways = true  →  "Continue anyway" path: run the real submission
+  //   (user edits are persisted) then navigate regardless of unplaced stops.
+  // navigateAlways = false →  normal path: show unplaced banner on partial fit.
 
-  const submit = useCallback(async (names: Set<string>) => {
+  const submit = useCallback(async (names: Set<string>, navigateAlways = false) => {
     if (!tripId || !token) return;
     const selectedStops = [...names]
       .map(name => poolByName.get(name))
@@ -714,7 +753,8 @@ export default function ReviewStopsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
-      if ((data.unplacedStops?.length ?? 0) > 0) {
+      // Show unplaced banner only when caller did NOT explicitly ask to navigate anyway.
+      if (!navigateAlways && (data.unplacedStops?.length ?? 0) > 0) {
         setUnplacedResult(data.unplacedStops);
         setShowResult(true);
         return;
@@ -728,12 +768,10 @@ export default function ReviewStopsScreen() {
     }
   }, [tripId, token, poolByName]);
 
-  const handleConfirm        = useCallback(() => submit(selectedNames),  [submit, selectedNames]);
-  const handleAutoPick       = useCallback(() => submit(algorithmNames), [submit, algorithmNames]);
-  const handleContinueAnyway = useCallback(() => {
-    if (!tripId) return;
-    router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
-  }, [tripId]);
+  // "Continue anyway" — runs the real submission with current edits, then navigates.
+  const handleConfirm        = useCallback(() => submit(selectedNames),        [submit, selectedNames]);
+  const handleAutoPick       = useCallback(() => submit(algorithmNames),       [submit, algorithmNames]);
+  const handleContinueAnyway = useCallback(() => submit(selectedNames, true),  [submit, selectedNames]);
 
   // ── Filtered pool (list mode) ──────────────────────────────────────────────
 
@@ -772,13 +810,12 @@ export default function ReviewStopsScreen() {
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <View style={s.headerTop}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
             <Text style={s.backTxt}>{'\u2039'} Back</Text>
           </Pressable>
-          {/* Mode toggle */}
           <View style={s.modeToggle}>
             <Pressable
               style={[s.modeBtn, mode === 'list' && s.modeBtnActive]}
@@ -822,9 +859,11 @@ export default function ReviewStopsScreen() {
               onPress={handleAutoPick}
               disabled={submitting}
             >
-              <Text style={s.autoPickTxt}>Let us pick for you</Text>
+              <Text style={s.autoPickTxt}>Skip ahead</Text>
             </Pressable>
-            <Text style={s.autoPickNote}>Accept AI selection — no changes needed</Text>
+            <Text style={s.autoPickNote}>
+              {'These are the stops families like yours pick most often.'}
+            </Text>
           </View>
 
           {/* Unplaced banner */}
@@ -838,8 +877,14 @@ export default function ReviewStopsScreen() {
                 >
                   <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Edit selection</Text>
                 </Pressable>
-                <Pressable style={[s.ctaBtn, { flex: 1 }]} onPress={handleContinueAnyway}>
-                  <Text style={s.ctaBtnTxt}>Continue anyway</Text>
+                <Pressable
+                  style={[s.ctaBtn, { flex: 1 }, submitting && { opacity: 0.55 }]}
+                  onPress={handleContinueAnyway}
+                  disabled={submitting}
+                >
+                  <Text style={s.ctaBtnTxt}>
+                    {submitting ? 'Saving...' : 'Continue anyway'}
+                  </Text>
                 </Pressable>
               </View>
             </>
@@ -916,13 +961,13 @@ export default function ReviewStopsScreen() {
         </>
       )}
 
-      {/* Preview sheet — shared between list and swipe, rendered above everything */}
+      {/* Preview sheet — shared between list and swipe */}
       {previewEntry != null && (
         <StopPreviewSheet
           entry={previewEntry}
           isSelected={selectedNames.has(previewEntry.name ?? '')}
           onClose={() => setPreviewEntry(null)}
-          onToggle={name => { toggle(name); }}
+          onToggle={toggle}
           insets={insets}
         />
       )}
@@ -939,21 +984,15 @@ const s = StyleSheet.create({
   header:    { paddingHorizontal: 16, paddingBottom: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
 
-  backBtn: {
-    backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 18,
-    paddingHorizontal: 12, paddingVertical: 7,
-  },
+  backBtn: { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7 },
   backTxt: { fontFamily: F.bold, fontSize: 13, color: G.deep },
   title:   { fontFamily: F.bold, fontSize: 24, color: G.deep, letterSpacing: -0.4 },
   sub:     { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
 
-  modeToggle: {
-    flexDirection: 'row', backgroundColor: 'rgba(26,31,46,0.07)',
-    borderRadius: 10, padding: 3, gap: 2,
-  },
-  modeBtn:        { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  modeBtnActive:  { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 1 },
-  modeBtnTxt:     { fontFamily: F.bold, fontSize: 13, color: G.muted },
+  modeToggle:       { flexDirection: 'row', backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 10, padding: 3, gap: 2 },
+  modeBtn:          { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  modeBtnActive:    { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2, elevation: 1 },
+  modeBtnTxt:       { fontFamily: F.bold, fontSize: 13, color: G.muted },
   modeBtnTxtActive: { color: G.deep },
 
   autoPick: {
@@ -962,11 +1001,11 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   autoPickBtn:  { backgroundColor: G.orange, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  autoPickTxt:  { fontFamily: F.bold,    fontSize: 13, color: '#fff' },
+  autoPickTxt:  { fontFamily: F.bold, fontSize: 13, color: '#fff' },
   autoPickNote: { fontFamily: F.regular, fontSize: 12, color: G.oDk, flex: 1, lineHeight: 17 },
 
   searchWrap: { paddingHorizontal: 16, paddingBottom: 8 },
-  searchBar: {
+  searchBar:  {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#F5F2EE', borderRadius: 12,
     paddingVertical: 10, paddingHorizontal: 13,
@@ -981,7 +1020,7 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.08)',
     paddingTop: 12, paddingHorizontal: 16,
   },
-  ctaBtn: {
+  ctaBtn:    {
     backgroundColor: G.orange, borderRadius: 13, paddingVertical: 15, alignItems: 'center',
     shadowColor: G.orange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 6, elevation: 3,
   },
@@ -997,6 +1036,12 @@ const s = StyleSheet.create({
   errorTxt:   { fontFamily: F.regular, fontSize: 14, color: G.deep, textAlign: 'center', lineHeight: 21 },
 });
 
+// ─── Thumbnail styles ─────────────────────────────────────────────────────────
+
+const tn = StyleSheet.create({
+  wrap: { width: 56, height: 56, borderRadius: 10, overflow: 'hidden', backgroundColor: '#DDD', flexShrink: 0 },
+});
+
 // ─── List mode styles ─────────────────────────────────────────────────────────
 
 const lt = StyleSheet.create({
@@ -1004,23 +1049,23 @@ const lt = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff',
     marginHorizontal: 16, marginBottom: 8,
-    borderRadius: 14, padding: 14,
-    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.07)', gap: 12,
+    borderRadius: 14, padding: 12,
+    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.07)', gap: 10,
   },
   rowSel:   { borderColor: G.orange, backgroundColor: '#FFFAF7' },
-  content:  { flex: 1, gap: 6 },
-  name:     { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 20 },
+  content:  { flex: 1, gap: 5 },
+  name:     { fontFamily: F.semibold, fontSize: 14, color: G.deep, lineHeight: 19 },
   metaRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
   chip:     { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   chipTxt:  { fontFamily: F.regular, fontSize: 11, color: G.muted },
   previewLink: { fontFamily: F.bold, fontSize: 11, color: G.orange },
 
-  btn:           { borderRadius: 9, paddingHorizontal: 13, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', minWidth: 68 },
-  btnAdd:        { backgroundColor: G.oLt },
-  btnRemove:     { backgroundColor: 'rgba(26,31,46,0.07)' },
-  btnTxt:        { fontFamily: F.bold, fontSize: 12 },
-  btnTxtAdd:     { color: G.orange },
-  btnTxtRemove:  { color: G.muted },
+  btn:          { borderRadius: 9, paddingHorizontal: 13, paddingVertical: 7, alignItems: 'center', justifyContent: 'center', minWidth: 68 },
+  btnAdd:       { backgroundColor: G.oLt },
+  btnRemove:    { backgroundColor: 'rgba(26,31,46,0.07)' },
+  btnTxt:       { fontFamily: F.bold, fontSize: 12 },
+  btnTxtAdd:    { color: G.orange },
+  btnTxtRemove: { color: G.muted },
 
   swipeRemove: {
     backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center',
@@ -1058,21 +1103,35 @@ const sw = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 8,
   },
 
-  cardInner:   { overflow: 'hidden', borderRadius: 20 },
-  cardHeader:  { height: 130, padding: 18, justifyContent: 'space-between' },
-  cardTypeLbl: { fontFamily: F.bold, fontSize: 11, color: 'rgba(255,255,255,0.85)', letterSpacing: 1, textTransform: 'uppercase' },
-  cardBadgeRow:{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  cardInner: { overflow: 'hidden', borderRadius: 20 },
 
-  cardBody:    { backgroundColor: '#fff', padding: 18, minHeight: 120 },
-  cardName:    { fontFamily: F.bold, fontSize: 20, color: G.deep, letterSpacing: -0.3, lineHeight: 26, marginBottom: 8 },
-  cardDesc:    { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 19, marginBottom: 10 },
-  cardChips:   { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  cardChip:    { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  cardChipTxt: { fontFamily: F.regular, fontSize: 12, color: G.muted },
+  // Photo hero (replaces flat color header)
+  cardHero:  { height: 140, position: 'relative' },
+  heroScrim: { backgroundColor: 'rgba(26,31,46,0.30)' },
+  heroTypeLbl: {
+    position: 'absolute', bottom: 10, left: 14,
+    fontFamily: F.bold, fontSize: 10, color: 'rgba(255,255,255,0.88)',
+    letterSpacing: 0.8, textTransform: 'uppercase',
+    backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  heroSelTag: {
+    position: 'absolute', bottom: 10, right: 14,
+    backgroundColor: 'rgba(61,170,110,0.88)', borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  heroSelTxt: { fontFamily: F.bold, fontSize: 10, color: '#fff' },
 
-  previewPill:        { position: 'absolute', top: 12, right: 14, zIndex: 1, borderWidth: 1.5, borderColor: G.orange, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: G.oLt },
-  previewPillTxt:     { fontFamily: F.bold, fontSize: 11, color: G.orange },
-  cardNameWithPill:   { paddingRight: 72 },
+  cardBody:        { backgroundColor: '#fff', padding: 16, minHeight: 110 },
+  cardName:        { fontFamily: F.bold, fontSize: 19, color: G.deep, letterSpacing: -0.3, lineHeight: 24, marginBottom: 6 },
+  cardNameWithPill:{ paddingRight: 72 },
+  cardDesc:        { fontFamily: F.regular, fontSize: 13, color: '#4A5568', lineHeight: 18, marginBottom: 8 },
+  cardChips:       { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  cardChip:        { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  cardChipTxt:     { fontFamily: F.regular, fontSize: 12, color: G.muted },
+
+  previewPill:    { position: 'absolute', top: 12, right: 14, zIndex: 1, borderWidth: 1.5, borderColor: G.orange, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: G.oLt },
+  previewPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
 
   hintOverlay: { position: 'absolute', top: 22, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2.5 },
   hintX:       { left: 20,  borderColor: '#EF4444', backgroundColor: 'rgba(254,226,226,0.88)', transform: [{ rotate: '-12deg' }] },
@@ -1095,75 +1154,86 @@ const sw = StyleSheet.create({
   doneSub:   { fontFamily: F.regular, fontSize: 15, color: G.muted, textAlign: 'center', lineHeight: 22 },
 });
 
-// ─── Preview sheet styles ─────────────────────────────────────────────────────
+// ─── Preview sheet styles (mirrors AddStopDetailSheet visual language) ─────────
 
 const ps = StyleSheet.create({
   overlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(26,31,46,0.42)', zIndex: 100 },
   sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: '86%' as any,
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: '88%' as any,
     backgroundColor: '#F5F2EE', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     flexDirection: 'column',
   },
   handle: { width: 32, height: 3, backgroundColor: '#E0DDD8', borderRadius: 2, alignSelf: 'center', marginTop: 10 },
 
-  hdrRow: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4,
-  },
-  hdrName:  { fontFamily: F.bold, fontSize: 19, color: G.deep, lineHeight: 24, flex: 1, paddingRight: 10 },
-  closeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  closeTxt: { fontSize: 12, color: G.deep, fontFamily: F.bold },
+  hdrRow:  { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14, flexShrink: 0 },
+  hdrName: { fontFamily: F.bold, fontSize: 19, color: G.deep, lineHeight: 23 },
+  hdrSub:  { fontFamily: F.medium, fontSize: 12, color: G.muted, marginTop: 2 },
+  closeBtn:{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#ECEAE6', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
+  closeTxt:{ fontSize: 12, color: G.deep, fontFamily: F.bold },
 
   body: { paddingHorizontal: 18, paddingBottom: 12 },
 
-  hero:        { height: 130, borderRadius: 14, marginTop: 12, overflow: 'hidden', backgroundColor: '#DDD' },
-  heroOverlay: { ...StyleSheet.absoluteFillObject },
+  // Hero — matches asd.heroWrap (120px, rounded 14, overflow hidden)
+  hero:     { height: 120, borderRadius: 14, marginTop: 12, overflow: 'hidden', backgroundColor: '#CCC' },
+  heroName: { position: 'absolute', bottom: 10, left: 12, fontFamily: F.bold, fontSize: 16, color: '#fff', lineHeight: 20 },
 
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
-  typePill: {
-    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
-    borderWidth: 1.5, borderColor: G.orange,
-  },
-  typePillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
-  durPill: {
-    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
-    borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.15)',
-  },
-  durPillTxt: { fontFamily: F.medium, fontSize: 11, color: G.muted },
-  anchorPill: {
-    paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20,
-    backgroundColor: '#E8692A22',
-  },
-  anchorPillTxt: { fontFamily: F.bold, fontSize: 11, color: G.orange },
+  pillRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  typePill:    { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1.5, borderColor: G.orange },
+  typePillTxt: { fontSize: 11, fontFamily: F.bold, color: G.orange },
+  durPill:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1.5, borderColor: '#E0DDD8' },
+  durPillTxt:  { fontSize: 11, fontFamily: F.medium, color: G.muted },
+  kidPill:     { paddingVertical: 4, paddingHorizontal: 11, borderRadius: 20, backgroundColor: 'rgba(61,170,110,0.10)' },
+  kidPillTxt:  { fontSize: 11, fontFamily: F.bold, color: '#3DAA6E' },
 
-  card:      { marginTop: 10, backgroundColor: '#fff', borderRadius: 14, padding: 13 },
-  cardLabel: { fontFamily: F.bold, fontSize: 9, color: G.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
-  cardBody:  { fontFamily: F.regular, fontSize: 13, color: G.deep, lineHeight: 19 },
-
-  mapsLink:    { marginTop: 7 },
-  mapsLinkTxt: { fontFamily: F.bold, fontSize: 12, color: G.orange },
-
-  footer: {
-    paddingHorizontal: 18, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: 'rgba(26,31,46,0.07)',
+  // "Good time to visit" green banner
+  goodTimeBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    marginTop: 10, backgroundColor: '#F0FDF4',
+    borderRadius: 12, borderWidth: 1, borderColor: '#86EFAC',
+    padding: 12,
   },
-  footerBtn: {
-    backgroundColor: G.orange, borderRadius: 13, paddingVertical: 14, alignItems: 'center',
-    shadowColor: G.orange, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28, shadowRadius: 6, elevation: 3,
-  },
-  footerBtnRemove:    { backgroundColor: '#FEE2E2', shadowColor: 'transparent', elevation: 0 },
-  footerBtnTxt:       { fontFamily: F.bold, fontSize: 15, color: '#fff' },
-  footerBtnTxtRemove: { color: '#B91C1C' },
+  goodTimeStar:  { fontSize: 16, color: '#3DAA6E', marginTop: 1 },
+  goodTimeTitle: { fontSize: 13, fontFamily: F.bold, color: '#15803D' },
+  goodTimeSub:   { fontSize: 12, fontFamily: F.regular, color: '#16A34A', marginTop: 2, lineHeight: 17 },
+
+  // WHY KIDS LOVE IT — matches asd.loveCard
+  loveCard: { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  loveHdr:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  loveStar: { fontSize: 15 },
+  loveLbl:  { fontSize: 10, fontFamily: F.bold, color: G.deep, letterSpacing: 0.5, textTransform: 'uppercase' },
+  loveTxt:  { fontSize: 12, fontFamily: F.medium, color: '#4A5568', lineHeight: 18 },
+
+  // ENTRY / BEST TIME — matches asd.infoRow
+  infoRow:  { flexDirection: 'row', gap: 8, marginTop: 8 },
+  infoCell: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 11 },
+  infoLbl:  { fontSize: 9, fontFamily: F.bold, color: G.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 3 },
+  infoVal:  { fontSize: 13, fontFamily: F.bold, color: G.deep },
+
+  // Timing card
+  addrCard:      { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
+  addrCardLabel: { fontSize: 9, fontFamily: F.bold, color: G.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
+  timingRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  timingKey:     { fontSize: 13, fontFamily: F.regular, color: G.muted },
+  timingVal:     { fontSize: 13, fontFamily: F.bold, color: G.deep },
+  parkingLink:   { fontSize: 11, fontFamily: F.bold, color: G.orange, marginTop: 2 },
+
+  // Address card
+  addrWarnRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  addrWarnTxt: { fontSize: 10, fontFamily: F.bold, color: '#F5A623', letterSpacing: 0.2 },
+  addrTxt:     { fontSize: 12, fontFamily: F.medium, color: G.deep, lineHeight: 17 },
+  addrLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
+  addrLinkTxt: { fontSize: 11, fontFamily: F.bold, color: G.orange },
+
+  footer:         { paddingHorizontal: 18, paddingTop: 10, backgroundColor: '#F5F2EE', borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)', flexShrink: 0 },
+  footerBtn:      { backgroundColor: G.orange, borderRadius: 13, paddingVertical: 14, alignItems: 'center', shadowColor: G.orange, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
+  footerBtnRemove:   { backgroundColor: '#FEE2E2', shadowColor: 'transparent', elevation: 0 },
+  footerBtnTxt:      { fontSize: 14, fontFamily: F.bold, color: '#fff' },
+  footerBtnTxtRemove:{ color: '#B91C1C' },
 });
 
 // ─── Atom styles ──────────────────────────────────────────────────────────────
 
 const at = StyleSheet.create({
-  badge:      { backgroundColor: '#E8692A22', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  badgeSm:    { paddingHorizontal: 5, paddingVertical: 2 },
-  badgeTxt:   { fontFamily: F.bold, fontSize: 10, color: G.orange, letterSpacing: 0.2 },
-  badgeTxtSm: { fontFamily: F.bold, fontSize: 9,  color: G.orange },
-
   selTag:   { backgroundColor: '#F0FDF4', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#86EFAC' },
   selTagSm: { paddingHorizontal: 5, paddingVertical: 2 },
   selTxt:   { fontFamily: F.bold, fontSize: 10, color: '#15803D', letterSpacing: 0.2 },
@@ -1174,10 +1244,10 @@ const at = StyleSheet.create({
 
 const ub = StyleSheet.create({
   banner: {
-    marginHorizontal: 16, marginBottom: 10, backgroundColor: '#FFFBEB',
-    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FDE68A',
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14,
+    borderWidth: 1, borderColor: '#FDE68A',
   },
-  title: { fontFamily: F.bold,    fontSize: 14, color: '#92400E', marginBottom: 4 },
-  sub:   { fontFamily: F.regular, fontSize: 12, color: '#78350F', lineHeight: 18, marginBottom: 8 },
-  item:  { fontFamily: F.regular, fontSize: 12, color: '#92400E', lineHeight: 19 },
+  stopName: { fontFamily: F.bold,    fontSize: 14, color: '#92400E', marginBottom: 4 },
+  sub:      { fontFamily: F.regular, fontSize: 13, color: '#78350F', lineHeight: 19 },
 });
