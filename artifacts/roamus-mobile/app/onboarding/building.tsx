@@ -14,7 +14,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { API_BASE } from '@/lib/authContext';
+import { API_BASE, useAuth } from '@/lib/authContext';
 import { CITY_COUNTRY, STYLE_MAP, PACE_MAP, CITY_IMGS } from '@/lib/tokens';
 import { useOnboarding } from '@/lib/onboardingContext';
 
@@ -57,6 +57,7 @@ function PulseDot({ delay }: { delay: number }) {
 export default function BuildingScreen() {
   const insets = useSafeAreaInsets();
   const { data, set } = useOnboarding();
+  const { token } = useAuth();
   const params = useLocalSearchParams<{ cityDatesParam?: string; citiesParam?: string; cityMode?: string }>();
 
   // Hydrate context from nav params when coming from the Discover/customize path.
@@ -147,6 +148,82 @@ export default function BuildingScreen() {
     return () => clearTimeout(t);
   }, []);
 
+  // ─ Already-signed-in user: create the real trip here, skip preview ────────
+  // Preview exists to sell RoamUs to a brand-new signup. An existing user
+  // creating another trip already knows the product — sending them through
+  // the teaser again just adds a screen between them and picking their stops.
+  async function createTripAndGoToReviewStops() {
+    try {
+      const isMultiCity = data.cityMode === 'multi' && data.cities.length > 1;
+      const tripName = isMultiCity
+        ? `${data.cities.slice(0, -1).join(', ')} & ${data.cities[data.cities.length - 1]} Family Trip`
+        : `${city ?? 'Chicago'} Family Trip`;
+      const players = data.travelers.map(t => ({
+        name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
+      }));
+
+      const res = await fetch(`${API_BASE}/api/travel/trips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: tripName,
+          destination: isMultiCity ? data.cities.join(', ') : city,
+          city, country,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          travelers: players,
+          adventureStyle: STYLE_MAP[data.tripStyle ?? ''] ?? 'family_explorer',
+          pace: PACE_MAP[data.pace ?? ''] ?? 'balanced',
+          adventureContext: 'travel',
+          autoGenerateStops: true,
+          templateSlug: data.templateSlug || undefined,
+          tripDays: data.tripDays || undefined,
+          ...(data.cityDates && Object.keys(data.cityDates).length > 0 ? {
+            cityDates: Object.fromEntries(
+              Object.entries(data.cityDates).map(([c, dates]) => [
+                c,
+                {
+                  startDate: (dates as any).startDate ?? (dates as any).arrive,
+                  endDate:   (dates as any).endDate   ?? (dates as any).leave,
+                },
+              ])
+            ),
+          } : {}),
+          tailoring: {
+            transport: data.transport,
+            stroller: data.stroller,
+            interests: data.interests,
+            indoorOutdoor: data.indoorOutdoor ?? 'both',
+            budgetSensitivity: data.budgetLevel ?? 'moderate',
+            kidEnergyLevel: data.kidEnergyLevel ?? 'mixed',
+            arrivalMethod: data.arrivalMethod ?? null,
+            arrivalTime: data.arrivalTime ?? null,
+            lastDay: data.lastDay ?? 'full',
+            cityTransitions: data.cityTransitions ?? {},
+          },
+        }),
+      });
+      if (!res.ok) throw new Error('Trip creation failed');
+      const trip = await res.json();
+      set({ createdTripId: trip.id });
+      set({ templateSlug: null, isTemplate: false, tripDays: null });
+
+      fetch(`${API_BASE}/api/travel/trips/${trip.id}/preload-stories`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+
+      router.replace({
+        pathname: '/trip/review-stops' as any,
+        params: { tripId: trip.id, fromGeneration: '1' },
+      });
+    } catch {
+      // Don't strand the user on the building screen — fall back to the
+      // normal preview flow if trip creation fails here for any reason.
+      router.replace('/onboarding/preview');
+    }
+  }
+
   // ─ Navigate when both gates clear ─
   useEffect(() => {
     if (animDone && apiDone && !navigated.current) {
@@ -156,10 +233,16 @@ export default function BuildingScreen() {
         setShowFinish(true);
         finishOpacity.value = withTiming(1, { duration: 400 });
       }, 300);
-      setTimeout(() => router.replace('/onboarding/preview'), 1800);
+      setTimeout(() => {
+        if (token) {
+          createTripAndGoToReviewStops();
+        } else {
+          router.replace('/onboarding/preview');
+        }
+      }, 1800);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animDone, apiDone]);
+  }, [animDone, apiDone, token]);
 
   // ─ Helper: resolve image URL from a spot ─
   function getImgUrl(spot: PreviewSpot): string | null {
