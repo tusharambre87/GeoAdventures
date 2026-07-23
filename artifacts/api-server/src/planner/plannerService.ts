@@ -4120,16 +4120,31 @@ export function bucketStopsTodays(
       for (const c of remainingNonAnchors) {
         let score = c.scoreClassicFinal ?? 0;
 
-        // Geo-cluster bonus/penalty (same shape as selectStopsFromPool)
+        // Geo-cluster bonus/penalty — applies from the FIRST filler pick
+        // onward. The previous version only penalized distance once a day
+        // already had 2+ clusters, so the first filler stop for any day got a
+        // free pass on geography regardless of distance from the anchor —
+        // that's why NY Aquarium (Coney Island) landed next to Empire State
+        // (Midtown) instead of next to Coney Island itself, and Wave Hill
+        // (Bronx) landed next to Times Square instead of Bronx Zoo. Penalty
+        // now scales with distance past the cluster radius, so genuinely far
+        // candidates lose decisively instead of by a flat, easily-outscored
+        // amount.
         if (geoClusters.length > 0) {
           const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
           const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
           if (cLat && cLon) {
-            const nearCluster = geoClusters.some(
-              ([kLat, kLon]) => haversineKm(kLat, kLon, cLat, cLon) <= GEO_CLUSTER_RADIUS_KM,
-            );
-            if (nearCluster) score += 10;
-            else if (geoClusters.length >= 2) score -= 15;
+            let nearestClusterKm = Infinity;
+            for (const [kLat, kLon] of geoClusters) {
+              const d = haversineKm(kLat, kLon, cLat, cLon);
+              if (d < nearestClusterKm) nearestClusterKm = d;
+            }
+            if (nearestClusterKm <= GEO_CLUSTER_RADIUS_KM) {
+              score += 10;
+            } else {
+              const overshoot = nearestClusterKm / GEO_CLUSTER_RADIUS_KM;
+              score -= Math.min(15 * overshoot, 60);
+            }
           }
         }
 
