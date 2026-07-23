@@ -732,6 +732,7 @@ export default function ReviewStopsScreen() {
   const [algorithmNames, setAlgorithmNames] = useState<Set<string>>(new Set());
   const [search, setSearch]                 = useState('');
   const [mode, setMode]                     = useState<Mode>('list');
+  const [modeChosen, setModeChosen]         = useState(!fromGeneration); // returning/Edit users skip the choice
   const [loading, setLoading]               = useState(true);
   const [fetchError, setFetchError]         = useState<string | null>(null);
   const [submitting, setSubmitting]         = useState(false);
@@ -749,7 +750,11 @@ export default function ReviewStopsScreen() {
   // ── Load pool ──────────────────────────────────────────────────────────────
 
   const loadPool = useCallback(() => {
-    if (!tripId || !token) return;
+    if (!tripId || !token) {
+      console.log('[TRACE][review-stops.loadPool] SKIPPED — tripId:', tripId, '| token present:', !!token);
+      return;
+    }
+    console.log('[TRACE][review-stops.loadPool] fetching stop-pool for tripId:', tripId);
     setLoading(true);
     setFetchError(null);
     fetch(`${API_BASE}/api/travel/trips/${tripId}/stop-pool`, {
@@ -758,12 +763,16 @@ export default function ReviewStopsScreen() {
       .then(r => r.json())
       .then((data: { pool?: PoolEntry[] }) => {
         const p = data.pool ?? [];
+        console.log('[TRACE][review-stops.loadPool] pool size:', p.length, '| selected count:', p.filter(e => e.selected).length);
         setPool(p);
         const algo = new Set(p.filter(e => e.selected && e.name).map(e => e.name!));
         setAlgorithmNames(algo);
         setSelectedNames(new Set(algo));
       })
-      .catch(() => setFetchError('Failed to load stops. Please try again.'))
+      .catch((err) => {
+        console.log('[TRACE][review-stops.loadPool] FETCH FAILED:', err);
+        setFetchError('Failed to load stops. Please try again.');
+      })
       .finally(() => setLoading(false));
   }, [tripId, token]);
 
@@ -857,6 +866,31 @@ export default function ReviewStopsScreen() {
       <View style={[s.root, s.center, { backgroundColor: G.bg }]}>
         <ActivityIndicator color={G.orange} size="large" />
         <Text style={s.loadingTxt}>Loading stops...</Text>
+      </View>
+    );
+  }
+
+  if (fromGeneration && !modeChosen && !loading) {
+    return (
+      <View style={[s.root, s.center, { backgroundColor: G.bg, paddingHorizontal: 24 }]}>
+        <Text style={[s.title, { textAlign: 'center', marginBottom: 8 }]}>
+          {'Let\u2019s pick your stops'}
+        </Text>
+        <Text style={[s.sub, { textAlign: 'center', marginBottom: 32 }]}>
+          {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
+        </Text>
+        <Pressable
+          style={[s.ctaBtn, { width: '100%', marginBottom: 12 }]}
+          onPress={() => { setMode('swipe'); setModeChosen(true); }}
+        >
+          <Text style={s.ctaBtnTxt}>Swipe through them</Text>
+        </Pressable>
+        <Pressable
+          style={[s.ctaBtn, { width: '100%', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
+          onPress={() => { setMode('list'); setModeChosen(true); }}
+        >
+          <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Browse a list</Text>
+        </Pressable>
       </View>
     );
   }

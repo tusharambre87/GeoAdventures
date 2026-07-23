@@ -71,6 +71,7 @@ export default function AccountScreen() {
       setLoading(false);
       if (tripId) {
         router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
+        console.log('[TRACE][account] navigated to review-stops with tripId:', tripId, '| fromGeneration: 1');
       } else {
         router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
       }
@@ -246,6 +247,7 @@ export default function AccountScreen() {
     setLoading(false);
     if (tripId) {
       router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
+      console.log('[TRACE][account] navigated to review-stops with tripId:', tripId, '| fromGeneration: 1');
     } else {
       router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
     }
