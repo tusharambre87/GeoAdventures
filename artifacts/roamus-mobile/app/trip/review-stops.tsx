@@ -922,74 +922,8 @@ export default function ReviewStopsScreen() {
       {/* ── LIST mode ── */}
       {mode === 'list' && (
         <>
-          {/* Auto-pick */}
-          <View style={s.autoPick}>
-            <Pressable
-              style={[s.autoPickBtn, submitting && { opacity: 0.55 }]}
-              onPress={handleAutoPick}
-              disabled={submitting}
-            >
-              <Text style={s.autoPickTxt}>Skip ahead</Text>
-            </Pressable>
-            <Text style={s.autoPickNote}>
-              {'These are the stops families like yours pick most often.'}
-            </Text>
-          </View>
-
-          {/* Unplaced banner */}
-          {showResult && (
-            <>
-              <UnplacedBanner stops={unplacedResult} />
-              <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', gap: 10 }}>
-                <Pressable
-                  style={[s.ctaBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
-                  onPress={() => setShowResult(false)}
-                >
-                  <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Edit selection</Text>
-                </Pressable>
-                <Pressable
-                  style={[s.ctaBtn, { flex: 1 }, submitting && { opacity: 0.55 }]}
-                  onPress={handleContinueAnyway}
-                  disabled={submitting}
-                >
-                  <Text style={s.ctaBtnTxt}>
-                    {submitting ? 'Saving...' : 'Continue anyway'}
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-
-          {/* Submit error */}
-          {submitError != null && (
-            <View style={s.submitErr}>
-              <Text style={s.submitErrTxt}>{submitError}</Text>
-            </View>
-          )}
-
-          {/* Search */}
-          <View style={s.searchWrap}>
-            <View style={s.searchBar}>
-              <Text style={s.searchIcon}>{'\uD83D\uDD0D'}</Text>
-              <TextInput
-                style={s.searchInput}
-                placeholder="Search stops..."
-                placeholderTextColor="#B0B5C4"
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-                autoCorrect={false}
-              />
-              {search.length > 0 && (
-                <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                  <Text style={{ fontSize: 13, color: '#8A8FA8' }}>{'\u2715'}</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {/* Pool list */}
           <FlatList
+            style={{ flex: 1 }}
             data={filteredPool}
             keyExtractor={(item, i) => item.name ?? String(i)}
             renderItem={({ item }) => (
@@ -1003,6 +937,75 @@ export default function ReviewStopsScreen() {
             contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              <>
+                {/* Auto-pick */}
+                <View style={s.autoPick}>
+                  <Pressable
+                    style={[s.autoPickBtn, submitting && { opacity: 0.55 }]}
+                    onPress={handleAutoPick}
+                    disabled={submitting}
+                  >
+                    <Text style={s.autoPickTxt}>Skip ahead</Text>
+                  </Pressable>
+                  <Text style={s.autoPickNote}>
+                    {'These are the stops families like yours pick most often.'}
+                  </Text>
+                </View>
+
+                {/* Unplaced banner */}
+                {showResult && (
+                  <>
+                    <UnplacedBanner stops={unplacedResult} />
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: 'row', gap: 10 }}>
+                      <Pressable
+                        style={[s.ctaBtn, { flex: 1, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange }]}
+                        onPress={() => setShowResult(false)}
+                      >
+                        <Text style={[s.ctaBtnTxt, { color: G.orange }]}>Edit selection</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[s.ctaBtn, { flex: 1 }, submitting && { opacity: 0.55 }]}
+                        onPress={handleContinueAnyway}
+                        disabled={submitting}
+                      >
+                        <Text style={s.ctaBtnTxt}>
+                          {submitting ? 'Saving...' : 'Continue anyway'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+
+                {/* Submit error */}
+                {submitError != null && (
+                  <View style={s.submitErr}>
+                    <Text style={s.submitErrTxt}>{submitError}</Text>
+                  </View>
+                )}
+
+                {/* Search */}
+                <View style={s.searchWrap}>
+                  <View style={s.searchBar}>
+                    <Text style={s.searchIcon}>{'\uD83D\uDD0D'}</Text>
+                    <TextInput
+                      style={s.searchInput}
+                      placeholder="Search stops..."
+                      placeholderTextColor="#B0B5C4"
+                      value={search}
+                      onChangeText={setSearch}
+                      returnKeyType="search"
+                      autoCorrect={false}
+                    />
+                    {search.length > 0 && (
+                      <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                        <Text style={{ fontSize: 13, color: '#8A8FA8' }}>{'\u2715'}</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              </>
+            }
             ListEmptyComponent={
               <View style={s.empty}>
                 <Text style={s.emptyTxt}>
