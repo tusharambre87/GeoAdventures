@@ -31,6 +31,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Svg, Polyline } from 'react-native-svg';
 import {
   ActivityIndicator,
   Animated,
@@ -861,8 +862,10 @@ export default function ReviewStopsScreen() {
       {/* ── Header ── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <View style={s.headerTop}>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={s.backBtn}>
-            <Text style={s.backTxt}>{'\u2039'} Back</Text>
+          <Pressable onPress={() => router.back()} hitSlop={8} style={s.backBtn}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Polyline points="15 18 9 12 15 6" stroke={G.deep} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
           </Pressable>
           <View style={s.modeToggle}>
             <Pressable
@@ -1032,8 +1035,7 @@ const s = StyleSheet.create({
   header:    { paddingHorizontal: 16, paddingBottom: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
 
-  backBtn: { backgroundColor: 'rgba(26,31,46,0.07)', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7 },
-  backTxt: { fontFamily: F.bold, fontSize: 13, color: G.deep },
+  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: G.bg, borderWidth: 1, borderColor: '#E0DDD8', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   title:   { fontFamily: F.bold, fontSize: 24, color: G.deep, letterSpacing: -0.4 },
   sub:     { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
 
