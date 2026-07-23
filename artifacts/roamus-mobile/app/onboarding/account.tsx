@@ -42,7 +42,7 @@ function getPasswordStrength(password: string): {
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { register, token } = useAuth();
-  const { data, set } = useOnboarding();
+  const { data, set, completeOnboarding } = useOnboarding();
 
   const [name,            setName]            = useState("");
   const [email,           setEmail]           = useState("");
@@ -66,18 +66,19 @@ export default function AccountScreen() {
     set({ onboardingInProgress: true });
     setLoading(true);
     const jwt = token;
-    createTripWithJwt(jwt).then(() => {
+    createTripWithJwt(jwt).then((tripId) => {
+      completeOnboarding();
       setLoading(false);
-      router.replace(
-        data.createdTripId
-          ? { pathname: "/trip/review-stops" as any, params: { tripId: data.createdTripId, fromGeneration: "1" } }
-          : (BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade")
-      );
+      if (tripId) {
+        router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
+      } else {
+        router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function createTripWithJwt(jwt: string) {
+  async function createTripWithJwt(jwt: string): Promise<string | null> {
     try {
       const city = data.cities[0] ?? "Chicago";
       const country = deriveCountry(city);
@@ -162,9 +163,11 @@ export default function AccountScreen() {
             }).catch(() => {});
           }
         }
+        return trip.id;
       }
+      return null;
     } catch {
-      // Trip creation is best-effort here; user is already registered
+      return null;
     }
   }
 
@@ -237,14 +240,15 @@ export default function AccountScreen() {
 
     const jwt = await import("@react-native-async-storage/async-storage")
       .then(m => m.default.getItem("auth_token"));
-    if (jwt) await createTripWithJwt(jwt);
+    const tripId = jwt ? await createTripWithJwt(jwt) : null;
 
+    completeOnboarding();
     setLoading(false);
-    router.replace(
-      data.createdTripId
-        ? { pathname: "/trip/review-stops" as any, params: { tripId: data.createdTripId, fromGeneration: "1" } }
-        : (BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade")
-    );
+    if (tripId) {
+      router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
+    } else {
+      router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
+    }
   }
 
   // ─── Derived ────────────────────────────────────────────────────────────────
