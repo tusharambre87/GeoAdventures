@@ -62,19 +62,17 @@ export default function AccountScreen() {
 
   // If already logged in, skip registration — just create the trip and advance
   useEffect(() => {
-    console.log('[TRACE][account.useEffect] mounted — token present:', !!token);
-    if (!token) {
-      console.log('[TRACE][account.useEffect] no token → waiting for manual registration');
-      return;
-    }
-    console.log('[TRACE][account.useEffect] BRANCH: already authenticated → createTripWithJwt → replace', BYPASS_PAYWALL ? '/(tabs)/today' : '/onboarding/upgrade');
+    if (!token) return;
     set({ onboardingInProgress: true });
     setLoading(true);
     const jwt = token;
     createTripWithJwt(jwt).then(() => {
       setLoading(false);
-      console.log('[TRACE][account.useEffect] createTripWithJwt done → router.replace', BYPASS_PAYWALL ? '/(tabs)/today' : '/onboarding/upgrade');
-      router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
+      router.replace(
+        data.createdTripId
+          ? { pathname: "/trip/review-stops" as any, params: { tripId: data.createdTripId, fromGeneration: "1" } }
+          : (BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade")
+      );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -228,9 +226,7 @@ export default function AccountScreen() {
       ? rawPlayers
       : [{ name: name.trim() || "Traveler", isParent: true, age: "35" }];
 
-    console.log('[TRACE][account.handleCreate] calling register()');
     const result = await register(name.trim(), email.trim().toLowerCase(), pw, players);
-    console.log('[TRACE][account.handleCreate] register() result success:', result.success);
 
     if (!result.success) {
       set({ onboardingInProgress: false });
@@ -241,16 +237,14 @@ export default function AccountScreen() {
 
     const jwt = await import("@react-native-async-storage/async-storage")
       .then(m => m.default.getItem("auth_token"));
-    console.log('[TRACE][account.handleCreate] jwt from AsyncStorage present:', !!jwt);
-    if (jwt) {
-      console.log('[TRACE][account.handleCreate] calling createTripWithJwt');
-      await createTripWithJwt(jwt);
-      console.log('[TRACE][account.handleCreate] createTripWithJwt done — data.createdTripId will be set');
-    }
+    if (jwt) await createTripWithJwt(jwt);
 
     setLoading(false);
-    console.log('[TRACE][account.handleCreate] NAVIGATION → router.replace(', BYPASS_PAYWALL ? '/(tabs)/today' : '/onboarding/upgrade', ') — preview.savedStops is NEVER set');
-    router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
+    router.replace(
+      data.createdTripId
+        ? { pathname: "/trip/review-stops" as any, params: { tripId: data.createdTripId, fromGeneration: "1" } }
+        : (BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade")
+    );
   }
 
   // ─── Derived ────────────────────────────────────────────────────────────────
