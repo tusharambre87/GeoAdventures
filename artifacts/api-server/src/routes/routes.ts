@@ -9044,12 +9044,20 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
           const libByName = new Map(
             libRows.map(r => [String(r.name ?? '').toLowerCase().trim(), r])
           );
+          const baseUrl = process.env.REPLIT_DOMAINS
+            ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+            : `${req.protocol}://${req.get('host')}`;
           for (const entry of pool) {
             const lib = libByName.get((entry.name ?? '').toLowerCase().trim());
             if (!lib) continue;
             if (!entry.description && lib.description) entry.description = lib.description;
             if (!entry.address    && lib.address)      entry.address    = lib.address;
-            if (lib.imageUrl) (entry as any).imageUrl = lib.imageUrl;
+            if (lib.imageUrl) {
+              // Convert relative object-storage paths to full API URLs the mobile client can load
+              (entry as any).imageUrl = lib.imageUrl.startsWith('stop-images/')
+                ? `${baseUrl}/api/travel/stop-library-image?path=${encodeURIComponent(lib.imageUrl)}`
+                : lib.imageUrl;
+            }
           }
         }
       } catch (enrichErr) {
@@ -11975,6 +11983,26 @@ Return ONLY valid JSON in this exact format:
     } catch (err) {
       console.error("[StoryPreload] Error starting on-demand preload:", err);
       res.status(500).json({ message: "Failed to start preload" });
+    }
+  });
+
+  // Proxy route: serve stop_library images from object storage by relative path.
+  // Called by the mobile stop-pool swipe card when imageUrl is a stop-images/ path.
+  app.get('/api/travel/stop-library-image', async (req: any, res) => {
+    try {
+      const path = String(req.query.path ?? '');
+      if (!path.startsWith('stop-images/')) return res.status(400).end();
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return res.status(500).end();
+      const bucket = objectStorageClient.bucket(bucketId);
+      const file = bucket.file(path);
+      const [exists] = await file.exists();
+      if (!exists) return res.status(404).end();
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      file.createReadStream().pipe(res);
+    } catch (err) {
+      res.status(500).end();
     }
   });
 

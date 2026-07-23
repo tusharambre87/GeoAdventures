@@ -145,6 +145,10 @@ async function _fetchWikiImage(name: string): Promise<string | null> {
   if (_wikiCache.has(name)) return _wikiCache.get(name) ?? null;
 
   const SIZE = 600; // always fetch at 600 and let the Image component scale down
+  // Significant words used to validate Step 2 results — must appear in the page title
+  const NOISE = new Set(['the','and','for','from','with','this','that','into','over','under','near','area','park','lake','river','state','national','city','main','saint','louis']);
+  const sigWords = name.toLowerCase().split(/\W+/).filter(w => w.length >= 4 && !NOISE.has(w));
+
   try {
     // Step 1 — exact title lookup (fast, works for well-known stops)
     const r1 = await fetch(
@@ -157,13 +161,19 @@ async function _fetchWikiImage(name: string): Promise<string | null> {
       return page1.thumbnail.source as string;
     }
 
-    // Step 2 — search fallback (catches local parks without exact article names)
+    // Step 2 — search fallback (catches stops without an exact Wikipedia article).
+    // Only accepts a result if the page title shares a significant word with the stop
+    // name — prevents returning unrelated person/place photos for location searches.
     const r2 = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${SIZE}&gsrlimit=5&origin=*`
+      `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=${SIZE}&gsrlimit=8&origin=*`
     );
     const d2 = await r2.json();
     const pages2 = Object.values((d2?.query?.pages ?? {}) as Record<string, any>) as any[];
-    const found = pages2.find((p: any) => p?.thumbnail?.source);
+    const found = pages2.find((p: any) => {
+      if (!p?.thumbnail?.source) return false;
+      const title = (p.title ?? '').toLowerCase();
+      return sigWords.length === 0 || sigWords.some(w => title.includes(w));
+    });
     if (found?.thumbnail?.source) {
       _wikiCache.set(name, found.thumbnail.source as string);
       return found.thumbnail.source as string;
@@ -175,16 +185,21 @@ async function _fetchWikiImage(name: string): Promise<string | null> {
 }
 
 function useStopImage(name: string | null, imageUrl: string | null, _size = 400): string | null {
-  const [uri, setUri] = useState<string | null>(imageUrl ?? null);
+  // Relative object-storage paths (stop-images/…) must be served through the API proxy
+  const resolvedUrl = imageUrl?.startsWith('stop-images/')
+    ? `${API_BASE}/api/travel/stop-library-image?path=${encodeURIComponent(imageUrl)}`
+    : (imageUrl ?? null);
+
+  const [uri, setUri] = useState<string | null>(resolvedUrl);
 
   useEffect(() => {
-    if (imageUrl) { setUri(imageUrl); return; }
+    if (resolvedUrl) { setUri(resolvedUrl); return; }
     setUri(null);
     if (!name) return;
     let cancelled = false;
     _fetchWikiImage(name).then(url => { if (!cancelled) setUri(url); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [name, imageUrl]);
+  }, [name, resolvedUrl]);
 
   return uri;
 }
