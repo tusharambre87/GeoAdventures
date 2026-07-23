@@ -633,7 +633,7 @@ export default function PreviewScreen() {
                 // so it is always non-null when this button is visible.
                 router.replace({
                   pathname: '/trip/review-stops' as any,
-                  params: { tripId: data.createdTripId! },
+                  params: { tripId: data.createdTripId!, fromGeneration: '1' },
                 });
               } else {
                 router.push("/onboarding/upgrade");

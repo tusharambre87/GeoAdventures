@@ -708,7 +708,7 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
 type Mode = 'list' | 'swipe';
 
 export default function ReviewStopsScreen() {
-  const { tripId }  = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, fromGeneration } = useLocalSearchParams<{ tripId: string; fromGeneration?: string }>();
   const { token }   = useAuth();
   const insets      = useSafeAreaInsets();
 
@@ -804,11 +804,15 @@ export default function ReviewStopsScreen() {
         return;
       }
 
-      // Land on Today after confirming stops — "what's happening right now"
-      // is the right context after finalising a trip's itinerary.
-      // lastReviewedAt is now set server-side, so reopening the same trip
-      // from the Trips list will go straight to the trip overview.
-      router.replace('/(tabs)/today' as any);
+      // fromGeneration is set only by preview.tsx (new trip onboarding flow).
+      // Landing on Today is right there — "what's happening right now."
+      // The Edit button in [tripId].tsx sends no fromGeneration, so it
+      // routes back to the trip overview the user was already viewing.
+      if (fromGeneration) {
+        router.replace('/(tabs)/today' as any);
+      } else {
+        router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
+      }
     } catch (err: any) {
       setSubmitError(err?.message ?? 'Could not save your stop selection. Please try again.');
     } finally {
