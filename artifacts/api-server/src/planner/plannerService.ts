@@ -3943,23 +3943,59 @@ export function bucketStopsTodays(
     .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0));
   const nonAnchors = candidates.filter(c => c.familyAnchorType !== 'anchor');
 
-  // ── Pass 1: Distribute anchors round-robin to days ────────────────────────
-  // Best-scoring anchor → Day 0, next → Day 1, etc. — matching selectStopsFromPool Pass 1.
+  // ── Pass 1: Distribute anchors to days — geography-aware ──────────────────
+  // Best-scoring anchor first, still one round-robin pass to seed every day
+  // with at least one anchor (so no day starves). After every day has one,
+  // each subsequent anchor goes to the OPEN day whose anchors are
+  // geographically closest to it — not the next day in rotation. This stops
+  // e.g. Bronx Zoo and Times Square landing on the same day just because
+  // they happened to be adjacent in score order.
   const anchorsByDay = new Map<number, CachedStopCandidate[]>();
   for (let d = 0; d < input.tripDays; d++) anchorsByDay.set(d, []);
 
-  const usedAnchors = new Set<CachedStopCandidate>();
-  let anchorDayIndex = 0;
-  for (const anchor of anchors) {
-    if (usedAnchors.size >= anchors.length) break;
-    const dayIdx = anchorDayIndex % input.tripDays;
-    const dayAnchors = anchorsByDay.get(dayIdx)!;
-    if (dayAnchors.length < anchorsForDayArr[dayIdx]) {
-      dayAnchors.push(anchor);
-      usedAnchors.add(anchor);
+  const anchorLatLon = (a: CachedStopCandidate): [number, number] | null => {
+    const lat = a.latitude ? parseFloat(String(a.latitude)) : null;
+    const lon = a.longitude ? parseFloat(String(a.longitude)) : null;
+    return (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) ? [lat, lon] : null;
+  };
+
+  const distanceToDay = (anchor: CachedStopCandidate, day: CachedStopCandidate[]): number => {
+    const pos = anchorLatLon(anchor);
+    if (!pos) return Infinity; // no coords — geography can't inform this, treat as neutral/last resort
+    let minDist = Infinity;
+    for (const s of day) {
+      const sPos = anchorLatLon(s);
+      if (!sPos) continue;
+      const d = haversineKm(pos[0], pos[1], sPos[0], sPos[1]);
+      if (d < minDist) minDist = d;
     }
-    anchorDayIndex++;
-    if (anchorDayIndex >= Math.max(anchors.length * 2, input.tripDays * 2)) break;
+    return minDist;
+  };
+
+  let roundRobinIdx = 0;
+  for (const anchor of anchors) {
+    const openDays: number[] = [];
+    for (let d = 0; d < input.tripDays; d++) {
+      if (anchorsByDay.get(d)!.length < anchorsForDayArr[d]) openDays.push(d);
+    }
+    if (openDays.length === 0) break;
+
+    const seededOpenDays = openDays.filter(d => anchorsByDay.get(d)!.length > 0);
+
+    let chosenDay: number;
+    if (seededOpenDays.length > 0) {
+      // Every open day already has ≥1 anchor — pick the geographically closest.
+      chosenDay = seededOpenDays.reduce((best, d) =>
+        distanceToDay(anchor, anchorsByDay.get(d)!) < distanceToDay(anchor, anchorsByDay.get(best)!) ? d : best,
+        seededOpenDays[0],
+      );
+    } else {
+      // No open day has an anchor yet — seed round-robin so every day gets a start.
+      chosenDay = openDays[roundRobinIdx % openDays.length];
+      roundRobinIdx++;
+    }
+
+    anchorsByDay.get(chosenDay)!.push(anchor);
   }
 
   // ── Inner helpers (same logic as sequenceDayBySlot / geoSequenceDay) ──────
