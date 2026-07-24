@@ -551,17 +551,39 @@ function SwipeCardContent({ item, isSelected, showPreview, onPreview }: CardCont
   );
 }
 
-function SwipeDoneView({ count, onViewList }: { count: number; onViewList: () => void }) {
+function SwipeDoneScreen({
+  count, imageUrl, onConfirm, onViewList, submitting,
+}: { count: number; imageUrl: string | null; onConfirm: () => void; onViewList: () => void; submitting: boolean }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={sw.doneWrap}>
-      <Text style={sw.doneEmoji}>{'\u2705'}</Text>
-      <Text style={sw.doneTitle}>All done!</Text>
-      <Text style={sw.doneSub}>
-        {count} stop{count !== 1 ? 's' : ''} selected.{'\n'}Review your picks or confirm.
-      </Text>
-      <Pressable style={[s.ctaBtn, { marginTop: 24, paddingHorizontal: 40 }]} onPress={onViewList}>
-        <Text style={s.ctaBtnTxt}>Review picks in list</Text>
-      </Pressable>
+    <View style={[s.root, { backgroundColor: G.deep }]}>
+      {imageUrl && (
+        <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.72)' }]} />
+      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingBottom: insets.bottom + 24 }}>
+        <Text style={{ fontSize: 44, textAlign: 'center', marginBottom: 12 }}>{'\u2705'}</Text>
+        <Text style={{ fontFamily: F.serif, fontSize: 32, color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+          {'You\u2019re all set'}
+        </Text>
+        <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
+          {count} stop{count !== 1 ? 's' : ''} selected. Ready to lock these in?
+        </Text>
+        <Pressable
+          style={[s.ctaBtn, submitting && { opacity: 0.55 }]}
+          onPress={onConfirm}
+          disabled={submitting}
+        >
+          <Text style={s.ctaBtnTxt}>
+            {submitting ? 'Saving...' : `Confirm ${count} stop${count !== 1 ? 's' : ''}`}
+          </Text>
+        </Pressable>
+        <Pressable onPress={onViewList} style={{ marginTop: 16, padding: 8, alignSelf: 'center' }}>
+          <Text style={{ fontFamily: F.semibold, fontSize: 14, color: 'rgba(255,255,255,0.85)', textDecorationLine: 'underline' }}>
+            Review in list first
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -572,10 +594,18 @@ type SwipeModeProps = {
   onToggle:      (name: string) => void;
   onPreview:     (entry: PoolEntry) => void;
   onSwitchList:  () => void;
+  onConfirm:     () => void;
+  submitting:    boolean;
+  onDoneChange:  (done: boolean) => void;
 };
 
-function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList }: SwipeModeProps) {
+function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList, onConfirm, submitting, onDoneChange }: SwipeModeProps) {
   const [swipeIndex, setSwipeIndex] = useState(0);
+
+  useEffect(() => {
+    onDoneChange(swipeIndex >= pool.length);
+  }, [swipeIndex, pool.length, onDoneChange]);
+
   const pan = useRef(new Animated.ValueXY()).current;
   const advanceRef = useRef<(action: 'heart' | 'x') => void>(() => {});
 
@@ -619,9 +649,7 @@ function SwipeModeView({ pool, selectedNames, onToggle, onPreview, onSwitchList 
     }),
   ).current;
 
-  if (swipeIndex >= pool.length) {
-    return <SwipeDoneView count={selectedNames.size} onViewList={onSwitchList} />;
-  }
+  if (swipeIndex >= pool.length) return null; // parent renders the full-screen done state
 
   const currentItem   = pool[swipeIndex];
   const nextItem      = pool[swipeIndex + 1];
@@ -706,14 +734,19 @@ function UnplacedBanner({ stops }: { stops: ApplyResult['unplacedStops'] }) {
   if (stops.length === 0) return null;
   return (
     <View style={ub.banner}>
-      {stops.map((st, i) => (
-        <View key={i} style={i > 0 ? { marginTop: 10 } : undefined}>
-          <Text style={ub.stopName}>{st.name}</Text>
-          <Text style={ub.sub}>
-            {'A bit far from your other picks. Keep it and we\u2019ll place it if we can, or add it to a specific day later from Add a Stop.'}
-          </Text>
-        </View>
-      ))}
+      <Text style={ub.headline}>
+        {stops.length} stop{stops.length !== 1 ? 's are' : ' is'} a bit far from your other picks
+      </Text>
+      <Text style={ub.sub}>
+        {`We\u2019ll try our best to fit ${stops.length !== 1 ? 'them' : 'it'} into your days. If we can\u2019t, you can always add ${stops.length !== 1 ? 'them' : 'it'} to a specific day later from Add a Stop.`}
+      </Text>
+      <View style={ub.chipWrap}>
+        {stops.map((st, i) => (
+          <View key={i} style={ub.chip}>
+            <Text style={ub.chipTxt}>{st.name}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -740,6 +773,7 @@ export default function ReviewStopsScreen() {
   const [unplacedResult, setUnplacedResult] = useState<ApplyResult['unplacedStops']>([]);
   const [showResult, setShowResult]         = useState(false);
   const [previewEntry, setPreviewEntry]     = useState<PoolEntry | null>(null);
+  const [swipeDone, setSwipeDone]           = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const poolByName = useMemo(() => {
@@ -873,34 +907,40 @@ export default function ReviewStopsScreen() {
   }
 
   if (fromGeneration && !modeChosen && !loading) {
+    const heroUrl = pool.find(e => e.imageUrl)?.imageUrl ?? null;
     return (
-      <View style={[s.root, { backgroundColor: G.bg }]}>
+      <View style={[s.root, { backgroundColor: G.deep }]}>
         <Stack.Screen options={{ headerShown: false }} />
+        {heroUrl && (
+          <Image source={{ uri: heroUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.7)' }]} />
         <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8 }}>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={s.backBtn}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={8}
+            style={[s.backBtn, { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }]}
+          >
             <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-              <Polyline points="15 18 9 12 15 6" stroke={G.deep} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Polyline points="15 18 9 12 15 6" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </Pressable>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28 }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 30, color: G.deep, textAlign: 'center', marginBottom: 10, lineHeight: 36 }}>
+          <Text style={{ fontFamily: F.serif, fontSize: 34, color: '#fff', textAlign: 'center', marginBottom: 12, lineHeight: 40 }}>
             {'Let\u2019s pick\nyour stops'}
           </Text>
-          <Text style={{ fontFamily: F.regular, fontSize: 15, color: G.muted, textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
+          <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.78)', textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
             {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
           </Text>
-          <Pressable
-            style={[s.ctaBtn, { marginBottom: 12 }]}
-            onPress={() => { setMode('swipe'); setModeChosen(true); }}
-          >
+          <Pressable style={[s.ctaBtn, { marginBottom: 12 }]} onPress={() => { setMode('swipe'); setModeChosen(true); }}>
             <Text style={s.ctaBtnTxt}>{'\uD83D\uDD00  Swipe through them'}</Text>
           </Pressable>
           <Pressable
-            style={[s.ctaBtn, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: G.orange, shadowOpacity: 0 }]}
+            style={[s.ctaBtn, { backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', shadowOpacity: 0 }]}
             onPress={() => { setMode('list'); setModeChosen(true); }}
           >
-            <Text style={[s.ctaBtnTxt, { color: G.orange }]}>{'\uD83D\uDCCB  Browse a list'}</Text>
+            <Text style={[s.ctaBtnTxt, { color: '#fff' }]}>{'\uD83D\uDCCB  Browse a list'}</Text>
           </Pressable>
         </View>
       </View>
@@ -962,6 +1002,9 @@ export default function ReviewStopsScreen() {
           onToggle={toggle}
           onPreview={setPreviewEntry}
           onSwitchList={() => setMode('list')}
+          onConfirm={handleConfirm}
+          submitting={submitting}
+          onDoneChange={setSwipeDone}
         />
       )}
 
@@ -1079,6 +1122,18 @@ export default function ReviewStopsScreen() {
             </View>
           )}
         </>
+      )}
+
+      {mode === 'swipe' && swipeDone && (
+        <View style={StyleSheet.absoluteFill}>
+          <SwipeDoneScreen
+            count={selectedCount}
+            imageUrl={pool.find(e => e.imageUrl)?.imageUrl ?? null}
+            submitting={submitting}
+            onConfirm={handleConfirm}
+            onViewList={() => setMode('list')}
+          />
+        </View>
       )}
 
       {/* Preview sheet — shared between list and swipe */}
@@ -1386,6 +1441,9 @@ const ub = StyleSheet.create({
     backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14,
     borderWidth: 1, borderColor: '#FDE68A',
   },
-  stopName: { fontFamily: F.bold,    fontSize: 14, color: '#92400E', marginBottom: 4 },
-  sub:      { fontFamily: F.regular, fontSize: 13, color: '#78350F', lineHeight: 19 },
+  headline: { fontFamily: F.bold,    fontSize: 15, color: '#92400E', marginBottom: 4 },
+  sub:      { fontFamily: F.regular, fontSize: 13, color: '#78350F', lineHeight: 19, marginBottom: 12 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:     { backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FDE68A' },
+  chipTxt:  { fontFamily: F.semibold, fontSize: 12.5, color: '#92400E' },
 });

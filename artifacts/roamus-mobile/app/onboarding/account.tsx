@@ -67,7 +67,6 @@ export default function AccountScreen() {
     setLoading(true);
     const jwt = token;
     createTripWithJwt(jwt).then((tripId) => {
-      completeOnboarding();
       setLoading(false);
       if (tripId) {
         router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
@@ -75,6 +74,12 @@ export default function AccountScreen() {
       } else {
         router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
       }
+      // Clear onboardingInProgress AFTER navigating, not before — clearing it
+      // first opens a window where AuthGate sees (token && inOnboarding &&
+      // !onboardingInProgress) and redirects to /(tabs), racing our own
+      // router.replace above. This was the actual cause of new signups
+      // landing on the trips home screen instead of review-stops.
+      completeOnboarding();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -243,7 +248,6 @@ export default function AccountScreen() {
       .then(m => m.default.getItem("auth_token"));
     const tripId = jwt ? await createTripWithJwt(jwt) : null;
 
-    completeOnboarding();
     setLoading(false);
     if (tripId) {
       router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
@@ -251,6 +255,12 @@ export default function AccountScreen() {
     } else {
       router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
     }
+    // Clear onboardingInProgress AFTER navigating, not before — clearing it
+    // first opens a window where AuthGate sees (token && inOnboarding &&
+    // !onboardingInProgress) and redirects to /(tabs), racing our own
+    // router.replace above. This was the actual cause of new signups
+    // landing on the trips home screen instead of review-stops.
+    completeOnboarding();
   }
 
   // ─── Derived ────────────────────────────────────────────────────────────────
