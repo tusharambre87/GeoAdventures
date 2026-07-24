@@ -1393,7 +1393,17 @@ function TripOverview({
       {/* Header */}
       <View style={[ov.header, { paddingTop: insets.top + 6 }]}>
         <View style={ov.headerTop}>
-          <Pressable style={ov.iconBtn} onPress={() => router.back()} hitSlop={8}>
+          <Pressable
+            style={ov.iconBtn}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(tabs)' as any);
+              }
+            }}
+            hitSlop={8}
+          >
             <IconChevronLeft />
           </Pressable>
           <View style={ov.titleWrap}>
