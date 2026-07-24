@@ -63,7 +63,7 @@ export function OCard({
       </View>
       <View style={{ flex: 1, paddingTop: 1 }}>
         <Text style={[a.oCardLabel, { color: selected ? G.orange : G.deep }]}>{label}</Text>
-        {sub ? <Text style={a.oCardSub}>{sub}</Text> : null}
+        {sub ? <Text style={a.oCardSub} numberOfLines={1}>{sub}</Text> : null}
       </View>
       <View style={[a.oCardRadio, { borderColor: selected ? G.orange : "rgba(138,143,168,0.3)", backgroundColor: selected ? G.orange : "transparent" }]}>
         {selected && <Text style={{ fontSize: 10, fontWeight: "700", color: "#fff" }}>{'\u2713'}</Text>}
@@ -119,7 +119,7 @@ const a = StyleSheet.create({
   },
   oCardIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   oCardLabel: { fontFamily: F.bold, fontSize: 15, fontWeight: "700" },
-  oCardSub: { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
+  oCardSub: { fontFamily: F.regular, fontSize: 11, color: G.muted, marginTop: 2 },
   oCardRadio: { width: 20, height: 20, borderRadius: 10, marginTop: 4, flexShrink: 0, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   achip: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

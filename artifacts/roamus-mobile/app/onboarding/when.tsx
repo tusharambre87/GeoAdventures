@@ -196,7 +196,7 @@ function QSection({
         <View style={q.qIcon}><Text style={{fontSize:16}}>{iconEmoji}</Text></View>
         <View style={{flex:1}}>
           <Text style={q.qTitle}>{title}</Text>
-          <Text style={q.qSub}>{sub}</Text>
+          <Text style={q.qSub} numberOfLines={1}>{sub}</Text>
         </View>
       </View>
       {options.map(opt=>(
@@ -210,7 +210,7 @@ function QSection({
           </View>
           <View style={{flex:1}}>
             <Text style={[q.optLabel, selected===opt.id && {color:G.orange}]}>{opt.label}</Text>
-            <Text style={q.optSub}>{opt.sub}</Text>
+            <Text style={q.optSub} numberOfLines={1}>{opt.sub}</Text>
           </View>
           <View style={[q.radio, selected===opt.id && {backgroundColor:G.orange, borderColor:G.orange}]}>
             {selected===opt.id && <Text style={{color:"#fff",fontSize:10,fontWeight:"700"}}>{'\u2713'}</Text>}
@@ -607,12 +607,12 @@ const q = StyleSheet.create({
   lockedChange: { fontFamily:F.regular, fontSize:13, color:G.orange },
   qIcon: { width:36, height:36, borderRadius:18, backgroundColor:"rgba(26,31,46,0.08)", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:2 },
   qTitle: { fontFamily:F.bold, fontSize:16, fontWeight:"700", color:G.deep, marginBottom:3 },
-  qSub: { fontFamily:F.regular, fontSize:13, color:G.muted },
+  qSub: { fontFamily:F.regular, fontSize:11, color:G.muted },
   option: { flexDirection:"row", alignItems:"center", gap:12, backgroundColor:G.card, borderRadius:14, borderWidth:1.5, borderColor:"rgba(26,31,46,0.08)", padding:13, marginBottom:8 },
   optionSel: { borderColor:G.orange, backgroundColor:"rgba(232,105,42,0.04)" },
   optIcon: { width:44, height:44, borderRadius:12, backgroundColor:"rgba(26,31,46,0.05)", alignItems:"center", justifyContent:"center", flexShrink:0 },
   optLabel: { fontFamily:F.bold, fontSize:15, fontWeight:"700", color:G.deep },
-  optSub: { fontFamily:F.regular, fontSize:13, color:G.muted, marginTop:2 },
+  optSub: { fontFamily:F.regular, fontSize:11, color:G.muted, marginTop:2 },
   radio: { width:22, height:22, borderRadius:11, borderWidth:2, borderColor:"rgba(138,143,168,0.35)", alignItems:"center", justifyContent:"center", flexShrink:0 },
 });
 
