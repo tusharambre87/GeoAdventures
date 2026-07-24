@@ -9240,7 +9240,16 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       // the user a real choice — so we must NOT touch the database yet. The
       // trip's existing stops stay exactly as they were until the user
       // explicitly confirms (0 unplaced) or taps "Continue anyway" (forcePlace).
-      const shouldPersist = forcePlace === true || bucketResult.unplacedStops.length === 0;
+      //
+      // Hard guard: bucketStopsTodays([]) trivially reports zero unplaced stops
+      // because there is nothing in the input to fail to place. An empty
+      // selection was satisfying the old condition and deleting real stops with
+      // nothing to replace them. fullCandidates.length > 0 makes "nothing was
+      // actually selected" a hard block regardless of why the list came back empty.
+      const shouldPersist = fullCandidates.length > 0 && (forcePlace === true || bucketResult.unplacedStops.length === 0);
+      if (fullCandidates.length === 0) {
+        console.warn(`[Travel] apply-pool-selection: refused to persist — 0 resolved candidates from ${selectedStops.length} selectedStops (tripId=${tripId})`);
+      }
       let placed = bucketResult.buckets.reduce((sum, b) => sum + b.actualCount, 0);
 
       if (shouldPersist) {
