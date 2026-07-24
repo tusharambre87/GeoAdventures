@@ -563,13 +563,15 @@ function SwipeDoneScreen({
       )}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.5)' }]} />
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingBottom: insets.bottom + 24 }}>
-        <Text style={{ fontSize: 44, textAlign: 'center', marginBottom: 12 }}>{'\u2705'}</Text>
-        <Text style={{ fontFamily: F.serif, fontSize: 32, color: '#fff', textAlign: 'center', marginBottom: 10 }}>
-          {'You\u2019re all set'}
-        </Text>
-        <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
-          {count} stop{count !== 1 ? 's' : ''} selected. Ready to lock these in?
-        </Text>
+        <View style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20, marginBottom: 24 }}>
+          <Text style={{ fontSize: 44, textAlign: 'center', marginBottom: 12 }}>{'\u2705'}</Text>
+          <Text style={{ fontFamily: F.serif, fontSize: 32, color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+            {'You\u2019re all set'}
+          </Text>
+          <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 }}>
+            {count} stop{count !== 1 ? 's' : ''} selected. Ready to lock these in?
+          </Text>
+        </View>
         <Pressable
           style={[s.ctaBtn, submitting && { opacity: 0.55 }]}
           onPress={onConfirm}
@@ -946,12 +948,14 @@ export default function ReviewStopsScreen() {
           </Pressable>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28 }}>
-          <Text style={{ fontFamily: F.serif, fontSize: 34, color: '#fff', textAlign: 'center', marginBottom: 12, lineHeight: 40 }}>
-            {'Let\u2019s pick\nyour stops'}
-          </Text>
-          <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.78)', textAlign: 'center', marginBottom: 36, lineHeight: 22 }}>
-            {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
-          </Text>
+          <View style={{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20, marginBottom: 24 }}>
+            <Text style={{ fontFamily: F.serif, fontSize: 34, color: '#fff', textAlign: 'center', marginBottom: 12, lineHeight: 40 }}>
+              {'Let\u2019s pick\nyour stops'}
+            </Text>
+            <Text style={{ fontFamily: F.regular, fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 }}>
+              {`${pool.length} spots for your trip \u2014 how do you want to go through them?`}
+            </Text>
+          </View>
           <Pressable style={[s.ctaBtn, { marginBottom: 12 }]} onPress={() => { setMode('swipe'); setModeChosen(true); }}>
             <Text style={s.ctaBtnTxt}>{'\uD83D\uDD00  Swipe through them'}</Text>
           </Pressable>
