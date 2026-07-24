@@ -959,10 +959,19 @@ export default function ReviewStopsScreen() {
               <Text style={s.ctaBtnTxt}>{'\uD83D\uDD00  Swipe through them'}</Text>
             </Pressable>
             <Pressable
-              style={[s.ctaBtn, { backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', shadowOpacity: 0 }]}
+              style={[s.ctaBtn, { backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', shadowOpacity: 0, marginBottom: 20 }]}
               onPress={() => { setMode('list'); setModeChosen(true); }}
             >
               <Text style={[s.ctaBtnTxt, { color: '#fff' }]}>{'\uD83D\uDCCB  Browse a list'}</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleAutoPick}
+              disabled={submitting}
+              style={{ alignSelf: 'center', padding: 8 }}
+            >
+              <Text style={{ fontFamily: F.semibold, fontSize: 14, color: 'rgba(255,255,255,0.85)', textDecorationLine: 'underline' }}>
+                {submitting ? 'Building your trip...' : '\u26A1 Pick for me'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -1059,7 +1068,7 @@ export default function ReviewStopsScreen() {
                     onPress={handleAutoPick}
                     disabled={submitting}
                   >
-                    <Text style={s.autoPickTxt}>Skip ahead</Text>
+                    <Text style={s.autoPickTxt}>Pick for me</Text>
                   </Pressable>
                   <Text style={s.autoPickNote}>
                     {'These are the stops families like yours pick most often.'}
