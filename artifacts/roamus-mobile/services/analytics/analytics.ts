@@ -1,9 +1,13 @@
 import PostHog from 'posthog-react-native'
 
-export const posthog = new PostHog(
-  process.env.EXPO_PUBLIC_POSTHOG_KEY!,
-  { host: 'https://us.i.posthog.com' }
-)
+const key = process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '';
+
+// When no PostHog key is configured (e.g. dev / CI), disable the client
+// entirely so it makes zero network requests and never surfaces flush errors.
+export const posthog = new PostHog(key || 'disabled', {
+  host: 'https://us.i.posthog.com',
+  disabled: !key,
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Props = Record<string, any>
