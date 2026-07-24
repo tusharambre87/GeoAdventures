@@ -9095,6 +9095,7 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         selectedCount: pool.filter(p => p.selected).length,
         totalCount: pool.length,
         poolCachedAt: (cachedPool as any).updatedAt ?? (cachedPool as any).createdAt ?? null,
+        generatedStopCount: tripStops.length,
       });
     } catch (err) {
       req.log?.error({ err }, '[Travel] stop-pool error');

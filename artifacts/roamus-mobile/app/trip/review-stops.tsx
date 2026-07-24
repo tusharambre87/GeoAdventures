@@ -779,6 +779,7 @@ export default function ReviewStopsScreen() {
   const [modeChosen, setModeChosen]         = useState(!fromGeneration); // returning/Edit users skip the choice
   const [loading, setLoading]               = useState(true);
   const [fetchError, setFetchError]         = useState<string | null>(null);
+  const [generationPending, setGenerationPending] = useState(false);
   const [submitting, setSubmitting]         = useState(false);
   const [submitError, setSubmitError]       = useState<string | null>(null);
   const [unplacedResult, setUnplacedResult] = useState<ApplyResult['unplacedStops']>([]);
@@ -795,6 +796,8 @@ export default function ReviewStopsScreen() {
 
   // ── Load pool ──────────────────────────────────────────────────────────────
 
+  const pollAttemptsRef = useRef(0);
+
   const loadPool = useCallback(() => {
     if (!tripId || !token) {
       console.log('[TRACE][review-stops.loadPool] SKIPPED — tripId:', tripId, '| token present:', !!token);
@@ -807,9 +810,21 @@ export default function ReviewStopsScreen() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
-      .then((data: { pool?: PoolEntry[] }) => {
+      .then((data: { pool?: PoolEntry[]; generatedStopCount?: number }) => {
         const p = data.pool ?? [];
-        console.log('[TRACE][review-stops.loadPool] pool size:', p.length, '| selected count:', p.filter(e => e.selected).length);
+        const generated = data.generatedStopCount ?? 0;
+        console.log('[TRACE][review-stops.loadPool] pool size:', p.length, '| selected count:', p.filter(e => e.selected).length, '| generatedStopCount:', generated);
+
+        if (generated === 0 && pollAttemptsRef.current < 20) {
+          pollAttemptsRef.current += 1;
+          setGenerationPending(true);
+          setPool(p);
+          setTimeout(loadPool, 3000);
+          return;
+        }
+
+        setGenerationPending(false);
+        pollAttemptsRef.current = 0;
         setPool(p);
         const algo = new Set(p.filter(e => e.selected && e.name).map(e => e.name!));
         setAlgorithmNames(algo);
@@ -914,7 +929,9 @@ export default function ReviewStopsScreen() {
     return (
       <View style={[s.root, s.center, { backgroundColor: G.bg }]}>
         <ActivityIndicator color={G.orange} size="large" />
-        <Text style={s.loadingTxt}>Loading stops...</Text>
+        <Text style={s.loadingTxt}>
+          {generationPending ? 'Still building your trip\u2026' : 'Loading stops...'}
+        </Text>
       </View>
     );
   }
