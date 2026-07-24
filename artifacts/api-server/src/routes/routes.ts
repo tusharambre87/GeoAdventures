@@ -5827,8 +5827,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } catch (snapshotErr) {
               console.error(`[Travel] [bg] plannerInputSnapshot write failed (non-fatal):`, snapshotErr);
             }
-            const { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
+            let { stops: selectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool as any[], plannerInput, undefined, cityName);
             console.log(`[Travel] path=POOL city=${cityName}`);
+
+            // Absolute safety net: selectStopsFromPool should never return zero stops when
+            // the pool has candidates. If some combination of hard constraints (day-role
+            // caps, indoor/outdoor lean, quality profile, tailoring) still produces zero,
+            // retry once with all of that narrowing stripped down to the essentials,
+            // rather than shipping a trip with nothing in it. This never touches or
+            // overrides a normal successful selection — it only fires when the primary
+            // attempt genuinely returned nothing.
+            if (selectedStops.length === 0) {
+              console.error(`[Travel] [bg] selectStopsFromPool returned ZERO stops for ${cityName} on first attempt (tripDays=${plannerTripDays}, pace=${plannerPace}) — retrying with narrowing constraints stripped.`);
+              const fallbackInput: PlannerInput = {
+                destination: cityName,
+                tripDays: plannerTripDays,
+                childrenAges,
+                pace: plannerPace,
+                stopsPerDayOverride: effectivePerDay,
+              };
+              const fallbackResult = selectStopsFromPool(cachedPool.stopPool as any[], fallbackInput, undefined, cityName);
+              if (fallbackResult.stops.length > 0) {
+                console.warn(`[Travel] [bg] Fallback succeeded for ${cityName}: ${fallbackResult.stops.length} stops — narrowing constraints (day caps / tailoring) were the cause.`);
+                selectedStops = fallbackResult.stops;
+                poolParentSuggestions = fallbackResult.parentSuggestions;
+              } else {
+                console.error(`[Travel] [bg] Fallback ALSO returned zero for ${cityName} — NOT a narrowing-constraint issue. Candidate pool size: ${(cachedPool.stopPool as any[]).length}. Needs direct investigation.`);
+              }
+            }
             // Separate meals from activity stops BEFORE slicing so meal stops from all
             // days are captured regardless of effectiveStopCount.
             const POOL_MEAL_TYPES = new Set(['restaurant','food','cafe','meal','street_food','diner','eatery','dining','bakery','dessert','lunch']);
