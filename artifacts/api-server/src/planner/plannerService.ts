@@ -2794,7 +2794,18 @@ export function selectStopsFromPool(
   // would wipe out the entire candidate set, so we skip it in that case.
   const scoredCount = candidates.filter(c => c.scoreClassicFinal != null).length;
   if (scoredCount >= 10) {
-    candidates = candidates.filter(c => c.scoreClassicFinal != null && c.scoreClassicFinal >= 40);
+    const qualityFiltered = candidates.filter(c => c.scoreClassicFinal != null && c.scoreClassicFinal >= 40);
+    // Same defensive pattern as every other filter below — only apply the cut
+    // when enough survives to build the trip. Without this guard, a city
+    // whose PSI scores are stale or skew low (10+ scored stops, most under
+    // 40) can lose its entire candidate pool right here, before pace, ages,
+    // arrival/departure caps, or anchor selection ever run — which silently
+    // produces zero selected stops with nothing downstream able to recover.
+    if (qualityFiltered.length >= totalStopsNeeded) {
+      candidates = qualityFiltered;
+    } else {
+      console.warn(`[Planner] Quality-score floor (>=40) skipped for ${targetCity ?? input.destination} — only ${qualityFiltered.length} would remain (<${totalStopsNeeded} needed). Proceeding with ${candidates.length} unfiltered candidates.`);
+    }
   }
 
   // ── Hard constraint: stroller accessibility ──────────────────────────────
