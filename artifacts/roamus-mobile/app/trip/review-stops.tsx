@@ -561,7 +561,7 @@ function SwipeDoneScreen({
       {imageUrl && (
         <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       )}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.72)' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.5)' }]} />
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingBottom: insets.bottom + 24 }}>
         <Text style={{ fontSize: 44, textAlign: 'center', marginBottom: 12 }}>{'\u2705'}</Text>
         <Text style={{ fontFamily: F.serif, fontSize: 32, color: '#fff', textAlign: 'center', marginBottom: 10 }}>
@@ -822,6 +822,16 @@ export default function ReviewStopsScreen() {
 
   useEffect(() => { loadPool(); }, [loadPool]);
 
+  // If a confirm from swipe-mode (or anywhere) surfaces the unplaced-stops
+  // banner, make sure the person actually lands somewhere that shows it —
+  // SwipeDoneScreen has no banner UI of its own, so staying on it after
+  // showResult flips true looked like the button did nothing.
+  useEffect(() => {
+    if (showResult && mode === 'swipe') {
+      setMode('list');
+    }
+  }, [showResult, mode]);
+
   // ── Toggle ─────────────────────────────────────────────────────────────────
 
   const toggle = useCallback((name: string) => {
@@ -923,7 +933,7 @@ export default function ReviewStopsScreen() {
         {heroUrl && (
           <Image source={{ uri: heroUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         )}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.7)' }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.5)' }]} />
         <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8 }}>
           <Pressable
             onPress={() => router.back()}
@@ -1137,7 +1147,11 @@ export default function ReviewStopsScreen() {
         <View style={StyleSheet.absoluteFill}>
           <SwipeDoneScreen
             count={selectedCount}
-            imageUrl={pool.find(e => e.imageUrl)?.imageUrl ?? null}
+            imageUrl={
+              pool.filter(e => selectedNames.has(e.name ?? '') && e.imageUrl)[0]?.imageUrl
+              ?? pool.find(e => e.imageUrl)?.imageUrl
+              ?? null
+            }
             submitting={submitting}
             onConfirm={handleConfirm}
             onViewList={() => setMode('list')}
