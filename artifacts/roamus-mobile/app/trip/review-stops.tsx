@@ -823,6 +823,15 @@ export default function ReviewStopsScreen() {
           return;
         }
 
+        if (generated === 0) {
+          // Hit the retry cap with nothing — this is a genuine failure, not a
+          // slow-but-working generation. Say so; don't fall through silently.
+          setGenerationPending(false);
+          setFetchError('We had trouble building this trip. Try again, or go back and recreate it.');
+          pollAttemptsRef.current = 0;
+          return;
+        }
+
         setGenerationPending(false);
         pollAttemptsRef.current = 0;
         setPool(p);

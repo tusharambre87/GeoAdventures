@@ -6099,7 +6099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } catch { /* non-fatal */ }
 
-          const generatedStops = await generateCityStops(
+          let generatedStops = await generateCityStops(
             cityName, state || null, country, effectiveStopCount,
             adventureStyle || 'family_explorer',
             mealPreferences || undefined,
@@ -6108,6 +6108,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tripTailoring || undefined,
             tripAgeGroups.length > 0 ? tripAgeGroups : undefined
           );
+
+          // This branch previously had zero retry — a single bad/empty AI
+          // response shipped a trip with nothing in it and no error anywhere.
+          // Same defensive pattern as the pool path's safety net.
+          if (generatedStops.length === 0) {
+            console.error(`[Travel] [bg] AI_FALLBACK generatedStops returned ZERO for ${cityName} on first attempt — retrying once.`);
+            generatedStops = await generateCityStops(
+              cityName, state || null, country, effectiveStopCount,
+              adventureStyle || 'family_explorer',
+              mealPreferences || undefined,
+              tripAnchorsForGeneration,
+              tripDays || undefined,
+              tripTailoring || undefined,
+              tripAgeGroups.length > 0 ? tripAgeGroups : undefined
+            );
+            if (generatedStops.length > 0) {
+              console.warn(`[Travel] [bg] AI_FALLBACK retry succeeded for ${cityName}: ${generatedStops.length} stops.`);
+            } else {
+              console.error(`[Travel] [bg] AI_FALLBACK retry ALSO returned zero for ${cityName} — needs direct investigation.`);
+            }
+          }
           const distributedAIStops = distributeStopsToDays(
             generatedStops.slice(0, effectiveStopCount),
             tripDays || 1,
