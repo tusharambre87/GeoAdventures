@@ -2275,6 +2275,42 @@ function isParkAnchor(city: string, stopName: string): boolean {
   });
 }
 
+// Curated city landmarks that must win a Pass-1 anchor slot regardless of
+// scoreClassicFinal — bypasses the >=54 threshold so iconic stops that score
+// lower on "family fit" (Statue of Liberty, Empire State, etc.) still appear.
+// Keys are lowercase to survive city-name formatting differences.
+const CITY_MUST_SEE_ANCHORS: Record<string, string[]> = {
+  'new york': ['Statue of Liberty', 'Empire State Building', 'Times Square', 'Central Park'],
+  'new york city': ['Statue of Liberty', 'Empire State Building', 'Times Square', 'Central Park'],
+  'washington dc': ['Lincoln Memorial', 'Washington Monument', 'U.S. Capitol', 'National Mall'],
+  'washington d.c.': ['Lincoln Memorial', 'Washington Monument', 'U.S. Capitol', 'National Mall'],
+  'washington': ['Lincoln Memorial', 'Washington Monument', 'U.S. Capitol', 'National Mall'],
+  'minneapolis': ['Mall of America', 'Minnehaha Falls', 'Stone Arch Bridge'],
+  'st. louis': ['Gateway Arch', 'St. Louis Zoo'],
+  'st louis': ['Gateway Arch', 'St. Louis Zoo'],
+  'saint louis': ['Gateway Arch', 'St. Louis Zoo'],
+  'chicago': ['Millennium Park', 'Navy Pier', 'Willis Tower'],
+  'boston': ['Freedom Trail', 'Boston Common', 'New England Aquarium'],
+  'san francisco': ['Golden Gate Bridge', 'Alcatraz Island', 'Pier 39'],
+  'seattle': ['Space Needle', 'Pike Place Market'],
+  'philadelphia': ['Liberty Bell', 'Independence Hall'],
+  'los angeles': ['Griffith Observatory', 'Santa Monica Pier'],
+  // Add more as you confirm — same pattern as PARK_ANCHOR_STOPS above.
+};
+
+function isCityMustSee(city: string, stopName: string): boolean {
+  const cityKey = city.trim().toLowerCase();
+  const list = CITY_MUST_SEE_ANCHORS[cityKey];
+  if (!list) return false;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const stopNorm = norm(stopName);
+  return list.some(a => {
+    const aNorm = norm(a);
+    if (aNorm.length < 8) return aNorm === stopNorm;
+    return stopNorm.includes(aNorm) || aNorm.includes(stopNorm);
+  });
+}
+
 /**
  * Apply family duration floor: returns the larger of the stored value and the
  * family minimum for this stop type. Use when writing stops to the DB.
@@ -3166,11 +3202,22 @@ export function selectStopsFromPool(
 
   const anchorCandidates = candidates
     .filter(c =>
-      c.familyAnchorType === 'anchor' &&
-      (c.scoreClassicFinal ?? 0) >= 54 &&
-      !usedNormNames.has(normStopName(c.name))
+      !usedNormNames.has(normStopName(c.name)) &&
+      (
+        (c.familyAnchorType === 'anchor' && (c.scoreClassicFinal ?? 0) >= 54) ||
+        (targetCity && isCityMustSee(targetCity, c.name))
+      )
     )
-    .sort((a, b) => (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0));
+    .sort((a, b) => {
+      // Curated must-see stops sort first regardless of score — guarantees
+      // Statue of Liberty/Empire State/etc. win a Pass-1 slot before any
+      // score-based anchor, rather than merely tying and losing the round-robin.
+      const aMust = targetCity ? isCityMustSee(targetCity, a.name) : false;
+      const bMust = targetCity ? isCityMustSee(targetCity, b.name) : false;
+      if (aMust && !bMust) return -1;
+      if (bMust && !aMust) return 1;
+      return (b.scoreClassicFinal ?? 0) - (a.scoreClassicFinal ?? 0);
+    });
 
   const preSelectedAnchors: CachedStopCandidate[] = [];
   const anchorsByDay = new Map<number, CachedStopCandidate[]>();
