@@ -3268,110 +3268,90 @@ export function selectStopsFromPool(
       Math.floor(totalStopsNeeded * 0.4),
     );
 
-    // Find best valid candidate this step (accounting for all soft penalties/bonuses)
-    let bestCandidate: CachedStopCandidate | null = null;
-    let bestAdjustedScore = -Infinity;
+    // Find best valid candidate this step. Wrapped so we can retry once with the
+    // day-0 confidence gate relaxed if it's the only thing standing between us
+    // and zero candidates — that gate is the one unconditional, non-guarded
+    // exclusion in this loop; every other filter here has a size- or count-based
+    // fallback. Without this retry, a city whose pool skews toward lower
+    // sourceConfidence values can fail it for every candidate on the very first
+    // slot and silently produce a trip with zero stops.
+    const findBest = (applyConfidenceGate: boolean): CachedStopCandidate | null => {
+      let best: CachedStopCandidate | null = null;
+      let bestScore = -Infinity;
+      for (const c of remaining) {
+        const typeCount = usedTypes.get(c.type) || 0;
+        const isLearningHeavy = ["museum", "history", "culture"].includes(c.type);
 
-    for (const c of remaining) {
-      const typeCount = usedTypes.get(c.type) || 0;
-      const isLearningHeavy = ["museum", "history", "culture"].includes(c.type);
-
-      // Hard constraints: skip entirely
-      if (isLearningHeavy && learningHeavyCount >= learningLimit) continue;
-      if (typeCount >= 2 && remaining.size > 5) continue;
-      // Per-day stop-type diversity: max 1 stop per type per day
-      // Waived when pool is nearly exhausted to avoid deadlock
-      if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
-      // Museum hard cap: exactly 1 museum per day regardless of pool size
-      if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
-      // Global per-trip museum ceiling (e.g. 2 for a 6-day trip)
-      if (c.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
-      // Immersive cap: max 1 immersive stop per day (zoo, aquarium, activity, palace, museum)
-      const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
-      if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
-      // Anchor hard cap: exactly 1 landmark/adventure anchor per day — prevents two big-ticket
-      // non-museum stops competing. Museums, zoos, and aquariums are already gated by their
-      // own per-day caps (museumsInCurrentDay, immersivesInCurrentDay) so they are excluded here.
-      const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
-      // Anchor slots filled by Pass 1 pre-selection — skip additional anchors once the per-day cap is reached.
-      if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorsForDayArr[_currDay]) continue;
-      if (usedNormNames.has(normStopName(c.name))) continue;
-      // Meal stops are additive (not counted against the per-day activity target).
-      // They are appended per-day after the main greedy selection finishes.
-      const isMealType = ["restaurant", "meal", "food", "cafe", "market", "street_food", "diner", "eatery", "dining", "bakery", "dessert", "lunch"].includes(c.type ?? "");
-      if (isMealType) continue;
-      // Confidence gate: low-confidence stops (sourceConfidence < MIN_SOURCE_CONFIDENCE) cannot
-      // be the anchor (first) stop of the day. Bypassed for canonical trips.
-      if (!isCanonicalTripForSelection && dayPosition === 0) {
-        const sc = c.placeReferenceData?.sourceConfidence;
-        if (sc != null && sc < MIN_SOURCE_CONFIDENCE) continue;
-      }
-
-      // Duration cap: skip candidates that push today's effective total over pace ceiling.
-      // Only enforced after the first stop (we always allow at least one stop per day).
-      if (dayPosition > 0) {
-        const effDur = effectiveDuration(c.durationMinutes, minChildAge);
-        if (dailyDurationMins + effDur > paceConfig.totalStopMinutes.max) continue;
-        // Toddler nap rule: last slot of day (for balanced/busy with napActive) must be a short stop (<45 min)
-        if (napActive && input.pace !== "relaxed" && dayPosition === stopsForDay[_currDay] - 1) {
-          if (effDur >= 45) continue;
+        if (isLearningHeavy && learningHeavyCount >= learningLimit) continue;
+        if (typeCount >= 2 && remaining.size > 5) continue;
+        if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
+        if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
+        if (c.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
+        const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
+        if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
+        const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
+        if (c.familyAnchorType === 'anchor' && !isMuseumZooAquarium && anchorsInCurrentDay >= anchorsForDayArr[_currDay]) continue;
+        if (usedNormNames.has(normStopName(c.name))) continue;
+        const isMealType = ["restaurant", "meal", "food", "cafe", "market", "street_food", "diner", "eatery", "dining", "bakery", "dessert", "lunch"].includes(c.type ?? "");
+        if (isMealType) continue;
+        if (applyConfidenceGate && !isCanonicalTripForSelection && dayPosition === 0) {
+          const sc = c.placeReferenceData?.sourceConfidence;
+          if (sc != null && sc < MIN_SOURCE_CONFIDENCE) continue;
         }
-      }
 
-      let adjustedScore = baseScores.get(c) ?? 0;
-
-      // Soft penalty: -30 for creating 3-in-a-row consecutive same-type stops
-      if (dayPosition >= 2 && lastTwo.length === 2 && lastTwo.every(s => s.type === c.type)) {
-        adjustedScore -= 30;
-      }
-
-      // Coordinate-based geographic clustering bonus/penalty.
-      // Replaces the dead neighborhoodZone label scoring (zone tags are absent for all cities).
-      // Uses the same two-tier logic: +10 if candidate is near an existing cluster in today's
-      // plan (encourages same-area grouping), -15 if it would start a 3rd distinct cluster
-      // (discourages scatter across 3 sub-areas in a single day). Only fires when the
-      // candidate has coordinates and at least one stop is already placed today.
-      if (geoClustersInCurrentDay.length > 0) {
-        const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
-        const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
-        if (cLat && cLon) {
-          const nearExistingCluster = geoClustersInCurrentDay.some(
-            ([kLat, kLon]) => haversineKm(kLat, kLon, cLat, cLon) <= GEO_CLUSTER_RADIUS_KM
-          );
-          if (nearExistingCluster) {
-            adjustedScore += 10;
-          } else if (geoClustersInCurrentDay.length >= 2) {
-            adjustedScore -= 15;
+        if (dayPosition > 0) {
+          const effDur = effectiveDuration(c.durationMinutes, minChildAge);
+          if (dailyDurationMins + effDur > paceConfig.totalStopMinutes.max) continue;
+          if (napActive && input.pace !== "relaxed" && dayPosition === stopsForDay[_currDay] - 1) {
+            if (effDur >= 45) continue;
           }
         }
-      }
 
-      // Geographic scoring — applied when we have coordinates for both last stop and candidate
-      if (lastLat !== null && lastLon !== null) {
-        const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
-        const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
-        if (cLat && cLon) {
-          const distKm = haversineKm(lastLat, lastLon, cLat, cLon);
-          const legMins = estimateTravelMins(distKm, input.transportMode ?? 'driving');
+        let adjustedScore = baseScores.get(c) ?? 0;
+        if (dayPosition >= 2 && lastTwo.length === 2 && lastTwo.every(s => s.type === c.type)) {
+          adjustedScore -= 30;
+        }
+        if (geoClustersInCurrentDay.length > 0) {
+          const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+          const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+          if (cLat && cLon) {
+            const nearExistingCluster = geoClustersInCurrentDay.some(
+              ([kLat, kLon]) => haversineKm(kLat, kLon, cLat, cLon) <= GEO_CLUSTER_RADIUS_KM
+            );
+            if (nearExistingCluster) adjustedScore += 10;
+            else if (geoClustersInCurrentDay.length >= 2) adjustedScore -= 15;
+          }
+        }
+        if (lastLat !== null && lastLon !== null) {
+          const cLat = c.latitude ? parseFloat(String(c.latitude)) : null;
+          const cLon = c.longitude ? parseFloat(String(c.longitude)) : null;
+          if (cLat && cLon) {
+            const distKm = haversineKm(lastLat, lastLon, cLat, cLon);
+            const legMins = estimateTravelMins(distKm, input.transportMode ?? 'driving');
+            const legCap = input.pace === 'chill' ? 20 : input.pace === 'balanced' || input.pace === 'moderate' ? 25 : 40;
+            const dayCap = input.pace === 'chill' ? 60 : input.pace === 'packed' ? 120 : 90;
+            if (legMins > legCap) continue;
+            if (dailyTravelMins + legMins > dayCap) continue;
+            if (distKm > 25) adjustedScore -= 15;
+            else if (distKm > 10) adjustedScore -= 5;
+            else if (distKm < 5) adjustedScore += 6;
+            if (dailyTravelKm + distKm > 30) adjustedScore -= 10;
+          }
+        }
 
-          // Hard reject: single leg exceeds pace-based travel cap
-          const legCap = input.pace === 'chill' ? 20 : input.pace === 'balanced' || input.pace === 'moderate' ? 25 : 40;
-          const dayCap = input.pace === 'chill' ? 60 : input.pace === 'packed' ? 120 : 90;
-          if (legMins > legCap) continue;
-          if (dailyTravelMins + legMins > dayCap) continue;
-
-          // Soft scoring
-          if (distKm > 25) adjustedScore -= 15;
-          else if (distKm > 10) adjustedScore -= 5;
-          else if (distKm < 5) adjustedScore += 6;
-
-          if (dailyTravelKm + distKm > 30) adjustedScore -= 10;
+        if (adjustedScore > bestScore) {
+          bestScore = adjustedScore;
+          best = c;
         }
       }
+      return best;
+    };
 
-      if (adjustedScore > bestAdjustedScore) {
-        bestAdjustedScore = adjustedScore;
-        bestCandidate = c;
+    let bestCandidate = findBest(true);
+    if (!bestCandidate) {
+      bestCandidate = findBest(false);
+      if (bestCandidate) {
+        console.warn(`[Planner] Day-0 confidence gate relaxed for ${targetCity ?? input.destination} — no candidate cleared it normally; using best available instead of aborting the trip.`);
       }
     }
 
