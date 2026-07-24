@@ -885,15 +885,7 @@ export default function ReviewStopsScreen() {
         return;
       }
 
-      // fromGeneration is set only by preview.tsx (new trip onboarding flow).
-      // Landing on Today is right there — "what's happening right now."
-      // The Edit button in [tripId].tsx sends no fromGeneration, so it
-      // routes back to the trip overview the user was already viewing.
-      if (fromGeneration) {
-        router.replace('/(tabs)/today' as any);
-      } else {
-        router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
-      }
+      router.replace({ pathname: '/trip/[tripId]' as any, params: { tripId } });
     } catch (err: any) {
       setSubmitError(err?.message ?? 'Could not save your stop selection. Please try again.');
     } finally {
