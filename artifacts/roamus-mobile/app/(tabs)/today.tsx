@@ -2652,6 +2652,7 @@ export default function TodayScreen() {
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
+          onOpenSotw={() => { setShowRescue(false); void openSotwSheet(); }}
           initialOption={rescueInitialOption}
         />
       </View>
@@ -3030,6 +3031,7 @@ export default function TodayScreen() {
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
+          onOpenSotw={() => { setShowRescue(false); void openSotwSheet(); }}
         />
         <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
           <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginTop: 20, marginBottom: 4 }}>{"Changed your mind?"}</Text>
@@ -3536,6 +3538,7 @@ export default function TodayScreen() {
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
+          onOpenSotw={() => { setShowRescue(false); void openSotwSheet(); }}
         />
         <SheetModal visible={showChangedMind} onClose={() => setShowChangedMind(false)}>
           <Text style={{ fontFamily: F.bold, fontSize: 18, color: C.deep, marginTop: 20, marginBottom: 4 }}>{"Changed your mind?"}</Text>
@@ -3768,6 +3771,7 @@ export default function TodayScreen() {
           onWrapDay={handleRescueWrapDay}
           onStopsChanged={loadTrip}
           onPreviewStop={handlePreviewStop}
+          onOpenSotw={() => { setShowRescue(false); void openSotwSheet(); }}
         />
       </View>
       {previewStop && (

@@ -85,6 +85,7 @@ interface Props {
   stopName?: string;
   destination?: string;
   stopId?: string;
+  onOpenSotw?: () => void;
 }
 
 function getFoodLabel(hour: number): string {
@@ -134,6 +135,7 @@ export default function RescueSheet({
   stopName,
   destination,
   stopId,
+  onOpenSotw,
 }: Props) {
   const insets = useSafeAreaInsets();
   const isStopContext = !!(stopLat != null && stopLng != null);
@@ -568,6 +570,18 @@ export default function RescueSheet({
             headerColor="#2D6A4F"
             applyError={applyError}
           >
+            {!!onOpenSotw && (
+              <TouchableOpacity style={s.pitCard} activeOpacity={0.85} onPress={onOpenSotw}>
+                <View style={s.pitIcon}>
+                  <Text style={{ fontSize: 24 }}>{'\uD83D\uDCCD'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.pitTitle}>Need a pit stop?</Text>
+                  <Text style={s.pitSub}>{'Playgrounds, coffee \u0026 more nearby'}</Text>
+                </View>
+                <Text style={s.pitArrow}>{'\u203A'}</Text>
+              </TouchableOpacity>
+            )}
             {plan.dropStop ? (
               <>
                 <Text style={s.sectionLabel}>DROPPING THIS STOP</Text>
@@ -1702,4 +1716,11 @@ const s = StyleSheet.create({
     fontFamily: F.regular,
     lineHeight: 20,
   },
+
+  // ── Pit-stop card (shown at top of tired view) ──
+  pitCard:  { backgroundColor: '#EEF4F1', borderWidth: 1.5, borderColor: '#7A9E8E', borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  pitIcon:  { width: 50, height: 50, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#E8692A', shadowOpacity: 0.18, shadowRadius: 8, elevation: 2 },
+  pitTitle: { fontSize: 16, fontFamily: F.bold, color: '#1A1F2E' },
+  pitSub:   { fontSize: 13, color: '#b87a4e', fontFamily: F.semibold, marginTop: 2 },
+  pitArrow: { fontSize: 22, color: '#E8692A' },
 });
