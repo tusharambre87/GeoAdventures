@@ -2300,7 +2300,14 @@ const CITY_MUST_SEE_ANCHORS: Record<string, string[]> = {
 
 function isCityMustSee(city: string, stopName: string): boolean {
   const cityKey = city.trim().toLowerCase();
-  const list = CITY_MUST_SEE_ANCHORS[cityKey];
+  // Prefix match so "New York, NY" and "Washington, D.C." survive state/suffix
+  // variants without needing exhaustive key enumeration. Checks exact equality
+  // first, then "key," and "key " prefixes to avoid false-positives like
+  // "washington" matching "washington township".
+  const matchedKey = Object.keys(CITY_MUST_SEE_ANCHORS).find(
+    k => cityKey === k || cityKey.startsWith(k + ',') || cityKey.startsWith(k + ' ')
+  );
+  const list = matchedKey ? CITY_MUST_SEE_ANCHORS[matchedKey] : undefined;
   if (!list) return false;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const stopNorm = norm(stopName);
@@ -3182,6 +3189,13 @@ export function selectStopsFromPool(
   // Prevents visitor-center padding when the pool has many high-scoring museums.
   const maxMuseumsPerTrip = Math.max(1, Math.ceil(input.tripDays / 3));
   let museumsTotal = 0;
+  // Per-trip ceiling for redundant nature/animal stops (zoo, aquarium, garden, park) —
+  // mirrors the existing museum ceiling. Without this, a family can end up with two
+  // zoos and two botanical gardens crowding out landmarks like Statue of Liberty,
+  // since only museums currently have a per-trip cap.
+  const REPEATABLE_NATURE_TYPES = new Set(['zoo', 'aquarium', 'garden', 'park', 'nature']);
+  const maxNatureStopsPerTrip = Math.max(1, Math.ceil(input.tripDays / 2));
+  let natureStopsTotal = 0;
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
@@ -3233,6 +3247,7 @@ export function selectStopsFromPool(
     // allows. Skipped museums stay in `remaining` for the greedy pass (where the same cap
     // blocks them). museumsTotal is 0 here, so this counter also keeps greedy/fill-up honest.
     if (anchor.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
+    if (REPEATABLE_NATURE_TYPES.has(anchor.type ?? '') && natureStopsTotal >= maxNatureStopsPerTrip) continue;
     const _anchorDay = anchorDayIndex % input.tripDays;
     const dayAnchors = anchorsByDay.get(_anchorDay)!;
     if (dayAnchors.length < anchorsForDayArr[_anchorDay]) {
@@ -3241,6 +3256,7 @@ export function selectStopsFromPool(
       usedNormNames.add(normStopName(anchor.name));
       remaining.delete(anchor);
       if (anchor.type === 'museum') museumsTotal++;
+      if (REPEATABLE_NATURE_TYPES.has(anchor.type ?? '')) natureStopsTotal++;
     }
     anchorDayIndex++;
     if (anchorDayIndex >= totalAnchorsNeeded * 2) break;
@@ -3334,6 +3350,7 @@ export function selectStopsFromPool(
         if (typesInCurrentDay.has(c.type) && remaining.size > effectiveStopsPerDay) continue;
         if (c.type === 'museum' && museumsInCurrentDay >= 1) continue;
         if (c.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
+        if (REPEATABLE_NATURE_TYPES.has(c.type ?? '') && natureStopsTotal >= maxNatureStopsPerTrip) continue;
         const isHeavyImmersive = IMMERSIVE_TYPES.has(c.type ?? '') && (c.durationMinutes ?? 0) >= 90;
         if (isHeavyImmersive && immersivesInCurrentDay >= 1 && remaining.size > effectiveStopsPerDay) continue;
         const isMuseumZooAquarium = ['museum', 'zoo', 'aquarium'].includes(c.type ?? '');
@@ -3453,6 +3470,7 @@ export function selectStopsFromPool(
     }
     typesInCurrentDay.add(bestCandidate.type);
     if (bestCandidate.type === 'museum') { museumsInCurrentDay++; museumsTotal++; }
+    if (REPEATABLE_NATURE_TYPES.has(bestCandidate.type ?? '')) natureStopsTotal++;
     if (IMMERSIVE_TYPES.has(bestCandidate.type ?? '') && (bestCandidate.durationMinutes ?? 0) >= 90) immersivesInCurrentDay++;
     if (bestCandidate.familyAnchorType === 'anchor') anchorsInCurrentDay++;
     dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
@@ -3466,8 +3484,10 @@ export function selectStopsFromPool(
     for (const stop of remaining) {
       if (selected.length >= totalStopsNeeded) break;
       if (stop.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
+      if (REPEATABLE_NATURE_TYPES.has(stop.type ?? '') && natureStopsTotal >= maxNatureStopsPerTrip) continue;
       selected.push(stop);
       if (stop.type === 'museum') museumsTotal++;
+      if (REPEATABLE_NATURE_TYPES.has(stop.type ?? '')) natureStopsTotal++;
     }
   }
 
