@@ -936,17 +936,6 @@ export default function ReviewStopsScreen() {
           <Image source={{ uri: heroUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
         )}
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,18,28,0.5)' }]} />
-        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8 }}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            style={[s.backBtn, { backgroundColor: 'rgba(255,255,255,0.15)', borderColor: 'rgba(255,255,255,0.3)' }]}
-          >
-            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-              <Polyline points="15 18 9 12 15 6" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </Pressable>
-        </View>
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28 }}>
           <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingVertical: 24, paddingHorizontal: 20 }}>
             <Text style={{ fontFamily: F.serif, fontSize: 34, color: '#fff', textAlign: 'center', marginBottom: 12, lineHeight: 40 }}>
