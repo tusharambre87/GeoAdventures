@@ -71,15 +71,17 @@ export default function AccountScreen() {
       if (tripId) {
         router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
         console.log('[TRACE][account] navigated to review-stops with tripId:', tripId, '| fromGeneration: 1');
+        // Do NOT call completeOnboarding() here. useSegments() doesn't update
+        // synchronously with router.replace() — segments[0] can still read
+        // "onboarding" for a render or two after this call, and AuthGate
+        // fires on (token && inOnboarding && !onboardingInProgress). Clearing
+        // the flag in that window bounces the user to /(tabs) before
+        // review-stops ever mounts. review-stops.tsx clears it on its own
+        // mount instead, by which point segments is guaranteed to have moved.
       } else {
+        completeOnboarding();
         router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
       }
-      // Clear onboardingInProgress AFTER navigating, not before — clearing it
-      // first opens a window where AuthGate sees (token && inOnboarding &&
-      // !onboardingInProgress) and redirects to /(tabs), racing our own
-      // router.replace above. This was the actual cause of new signups
-      // landing on the trips home screen instead of review-stops.
-      completeOnboarding();
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -252,15 +254,17 @@ export default function AccountScreen() {
     if (tripId) {
       router.replace({ pathname: '/trip/review-stops' as any, params: { tripId, fromGeneration: '1' } });
       console.log('[TRACE][account] navigated to review-stops with tripId:', tripId, '| fromGeneration: 1');
+      // Do NOT call completeOnboarding() here. useSegments() doesn't update
+      // synchronously with router.replace() — segments[0] can still read
+      // "onboarding" for a render or two after this call, and AuthGate
+      // fires on (token && inOnboarding && !onboardingInProgress). Clearing
+      // the flag in that window bounces the user to /(tabs) before
+      // review-stops ever mounts. review-stops.tsx clears it on its own
+      // mount instead, by which point segments is guaranteed to have moved.
     } else {
+      completeOnboarding();
       router.replace(BYPASS_PAYWALL ? "/(tabs)/today" : "/onboarding/upgrade");
     }
-    // Clear onboardingInProgress AFTER navigating, not before — clearing it
-    // first opens a window where AuthGate sees (token && inOnboarding &&
-    // !onboardingInProgress) and redirects to /(tabs), racing our own
-    // router.replace above. This was the actual cause of new signups
-    // landing on the trips home screen instead of review-stops.
-    completeOnboarding();
   }
 
   // ─── Derived ────────────────────────────────────────────────────────────────

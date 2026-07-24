@@ -54,6 +54,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 
 import { API_BASE, useAuth } from '@/lib/authContext';
+import { useOnboarding } from '@/lib/onboardingContext';
 import { F, G } from '@/lib/tokens';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -759,6 +760,14 @@ export default function ReviewStopsScreen() {
   const { tripId, fromGeneration } = useLocalSearchParams<{ tripId: string; fromGeneration?: string }>();
   const { token }   = useAuth();
   const insets      = useSafeAreaInsets();
+  const { set: setOnboardingData } = useOnboarding();
+
+  useEffect(() => {
+    if (fromGeneration) {
+      setOnboardingData({ onboardingInProgress: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [pool, setPool]                     = useState<PoolEntry[]>([]);
   const [selectedNames, setSelectedNames]   = useState<Set<string>>(new Set());
