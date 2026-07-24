@@ -947,11 +947,11 @@ export default function ReviewStopsScreen() {
             </Pressable>
             <Pressable
               onPress={handleAutoPick}
-              disabled={submitting}
+              disabled={submitting || algorithmNames.size === 0}
               style={{ alignSelf: 'center', padding: 8 }}
             >
               <Text style={{ fontFamily: F.semibold, fontSize: 14, color: 'rgba(255,255,255,0.85)', textDecorationLine: 'underline' }}>
-                {submitting ? 'Building your trip...' : '\u26A1 Pick for me'}
+                {submitting ? 'Building your trip...' : algorithmNames.size === 0 ? 'Finding your picks...' : '\u26A1 Pick for me'}
               </Text>
             </Pressable>
           </View>
@@ -1045,11 +1045,11 @@ export default function ReviewStopsScreen() {
                 {/* Auto-pick */}
                 <View style={s.autoPick}>
                   <Pressable
-                    style={[s.autoPickBtn, submitting && { opacity: 0.55 }]}
+                    style={[s.autoPickBtn, (submitting || algorithmNames.size === 0) && { opacity: 0.55 }]}
                     onPress={handleAutoPick}
-                    disabled={submitting}
+                    disabled={submitting || algorithmNames.size === 0}
                   >
-                    <Text style={s.autoPickTxt}>Pick for me</Text>
+                    <Text style={s.autoPickTxt}>{algorithmNames.size === 0 ? 'Finding your picks...' : 'Pick for me'}</Text>
                   </Pressable>
                   <Text style={s.autoPickNote}>
                     {'These are the stops families like yours pick most often.'}
