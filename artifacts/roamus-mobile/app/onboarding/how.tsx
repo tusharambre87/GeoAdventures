@@ -48,7 +48,12 @@ function useFadeIn(active: boolean) {
 
 export default function HowScreen() {
   const insets = useSafeAreaInsets();
-  const { set } = useOnboarding();
+  const { data, set } = useOnboarding();
+
+  // Only ask about strollers when at least one child under 5 is on the trip.
+  const hasUnder5 = data.travelers.some(
+    t => !t.isParent && typeof t.age === 'number' && t.age < 5
+  );
 
   const [style_, setStyle_] = useState<string | null>(null);
   const [pace, setPace] = useState<string | null>(null);
@@ -76,7 +81,8 @@ export default function HowScreen() {
   function selectTransport(id: string) {
     setTransport(id);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setStep(3);
+    // Skip stroller question entirely when no child under 5 is on the trip.
+    setStep(hasUnder5 ? 3 : 4);
   }
   function selectStroller(val: boolean) {
     setStroller(val);
@@ -158,22 +164,24 @@ export default function HowScreen() {
           )}
         </Animated.View>
 
-        {/* Section 4: Stroller */}
-        <Animated.View style={{ opacity: stroller3 }}>
-          {step >= 3 && (
-            stroller !== null && step >= 4 ? (
-              <AChip num="4" icon={stroller ? "\uD83D\uDEBC" : "\uD83D\uDEAB"} label={stroller ? "Stroller-friendly stops" : "No stroller needed"} onEdit={() => { setStroller(null); setStep(3); }} />
-            ) : (
-              <>
-                <Text style={s.sectionTitle}>Stroller-friendly stops? {'\uD83D\uDEBC'}</Text>
-                <OCard icon={'\u2705'} label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
-                  selected={stroller === true} onPress={() => selectStroller(true)} />
-                <OCard icon={'\uD83D\uDEAB'} label="Not needed" sub="Full range of stops available"
-                  selected={stroller === false} onPress={() => selectStroller(false)} />
-              </>
-            )
-          )}
-        </Animated.View>
+        {/* Section 4: Stroller — only shown when at least one child under 5 */}
+        {hasUnder5 && (
+          <Animated.View style={{ opacity: stroller3 }}>
+            {step >= 3 && (
+              stroller !== null && step >= 4 ? (
+                <AChip num="4" icon={stroller ? "\uD83D\uDEBC" : "\uD83D\uDEAB"} label={stroller ? "Stroller-friendly stops" : "No stroller needed"} onEdit={() => { setStroller(null); setStep(3); }} />
+              ) : (
+                <>
+                  <Text style={s.sectionTitle}>Stroller-friendly stops? {'\uD83D\uDEBC'}</Text>
+                  <OCard icon={'\u2705'} label="Yes please" sub="We'll prioritise accessible, pram-friendly venues"
+                    selected={stroller === true} onPress={() => selectStroller(true)} />
+                  <OCard icon={'\uD83D\uDEAB'} label="Not needed" sub="Full range of stops available"
+                    selected={stroller === false} onPress={() => selectStroller(false)} />
+                </>
+              )
+            )}
+          </Animated.View>
+        )}
 
         {/* Section 5: Interests + CTA */}
         <Animated.View style={{ opacity: interests4 }}>
