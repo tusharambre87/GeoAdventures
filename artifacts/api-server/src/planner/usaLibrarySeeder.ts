@@ -15,7 +15,7 @@
  * AI stops would undo GP-fetch, dedup, and PSI-scoring already applied).
  * Processes cities sequentially with a 500 ms delay to respect rate limits.
  *
- * After seeding completes, kicks off startEnrichmentQueue("USA") to enrich all
+ * After seeding completes, kicks off startEnrichmentQueue("US") to enrich all
  * newly added stops.
  */
 
@@ -62,7 +62,7 @@ const CURATED_CITIES = new Set<string>([
 const USA_CITIES = [
   "Orlando",
   "Washington DC",
-  "New York City",
+  "New York",
   "San Diego",
   "Los Angeles",
   "Chicago",
@@ -157,7 +157,7 @@ export async function seedUSACityLibrary(): Promise<void> {
       }
       const target = targetForCity(city);
       try {
-        const existing = await storage.getStopLibraryByCity(city, "USA");
+        const existing = await storage.getStopLibraryByCity(city, "US");
         if (existing.length >= target) {
           console.log(`[USALibrarySeeder] ✓ ${city} — ${existing.length}/${target} stops already (skipping)`);
           citiesSkipped++;
@@ -167,19 +167,19 @@ export async function seedUSACityLibrary(): Promise<void> {
         const needed = target - existing.length;
         console.log(`[USALibrarySeeder] → ${city} — ${existing.length}/${target} stops, generating ${needed} more…`);
 
-        const generatedStops = await generateCityStops(city, null, "USA", needed, "family_explorer");
+        const generatedStops = await generateCityStops(city, null, "US", needed, "family_explorer");
 
         if (!generatedStops || generatedStops.length === 0) {
           console.warn(`[USALibrarySeeder] ⚠️  ${city} — generateCityStops returned no stops`);
           continue;
         }
 
-        const nk = normalizeKey(city, "USA");
+        const nk = normalizeKey(city, "US");
         const entries = generatedStops
           .filter((s) => s.name && s.name.trim().length > 0)
           .map((s) => ({
             city,
-            country: "USA",
+            country: "US",
             normalizedKey: nk,
             name: s.name.trim(),
             address: s.address ?? null,
@@ -219,7 +219,7 @@ export async function seedUSACityLibrary(): Promise<void> {
   // Kick off enrichment for newly seeded USA stops (fire-and-forget)
   import("./stopLibraryEnricher.js")
     .then(({ startEnrichmentQueue }) => {
-      startEnrichmentQueue("USA");
+      startEnrichmentQueue("US");
     })
     .catch((err: any) => {
       console.warn("[USALibrarySeeder] Could not start enrichment queue:", err.message);

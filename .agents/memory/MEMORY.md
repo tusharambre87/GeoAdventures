@@ -28,3 +28,4 @@
 - [P1 pool join punctuation bug](pool-join-punctuation-p1.md) — LOWER(TRIM()) join in pool selection silently drops stops with punctuation mismatches; affects every live trip; fix after GP scoring migration lands
 - [GP floor orphan gate](gp-orphan-gate.md) — orphan = non-overridden PSI match with score IS NULL after loop; stops with only manually_overridden PSI rows are NOT orphans; use DB EXISTS query, not in-process set
 - [unplacedStops UI contract](unplaced-stops-ui-contract.md) — BucketResult.unplacedStops must surface in the Step 3 review screen; silently discarding it defeats the redesign's core promise
+- [stop_library country+key invariant](stop-library-country-key-invariant.md) — normalized_key must equal LOWER(TRIM(city))||':'||LOWER(TRIM(country)); any UPDATE to city/country must also UPDATE normalized_key or seeders break idempotency
