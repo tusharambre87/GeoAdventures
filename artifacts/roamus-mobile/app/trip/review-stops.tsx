@@ -919,7 +919,7 @@ export default function ReviewStopsScreen() {
 
   // "Continue anyway" — runs the real submission with current edits, then navigates.
   const handleConfirm        = useCallback(() => submit(selectedNames),        [submit, selectedNames]);
-  const handleAutoPick       = useCallback(() => submit(algorithmNames),       [submit, algorithmNames]);
+  const handleAutoPick       = useCallback(() => submit(algorithmNames, true), [submit, algorithmNames]);
   const handleContinueAnyway = useCallback(() => submit(selectedNames, true),  [submit, selectedNames]);
 
   // ── Filtered pool (list mode) ──────────────────────────────────────────────
