@@ -4178,6 +4178,16 @@ export function bucketStopsTodays(
       for (const c of remainingNonAnchors) {
         let score = c.scoreClassicFinal ?? 0;
 
+        // Prefer genuine filler-tier stops for filler slots. Previously every
+        // remaining non-anchor competed on scoreClassicFinal alone, and a
+        // 90+ minute support-tier stop always beat an actual light/easy one —
+        // defeating the point of a lighter slot. This is a bonus, not a hard
+        // filter, so a pool with no labeled fillers still fills the slot
+        // instead of closing short.
+        if (c.familyAnchorType === 'filler') {
+          score += 20;
+        }
+
         // Geo-cluster bonus/penalty — applies from the FIRST filler pick
         // onward. The previous version only penalized distance once a day
         // already had 2+ clusters, so the first filler stop for any day got a
