@@ -50,12 +50,21 @@ function isHotel(s: Stop) {
   );
 }
 
+// Duplicated from app/trip/[tripId].tsx's isMealStop() — that copy is locally
+// scoped, not shared, which is why this map was the one place still plotting
+// meal stops as numbered pins instead of treating them as always-additive.
+const MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery']);
+function isMealStop(s: Stop) {
+  const t = (s.stopType || '').toLowerCase();
+  return Array.from(MEAL_TYPES).some(k => t.includes(k));
+}
+
 export default function TripMapView({ stops, totalDays, onMarkerPress }: Props) {
   const mapRef = useRef<MapView>(null);
   const mapReady = useRef(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
-  const allPinStops = useMemo(() => stops.filter(hasCoord), [stops]);
+  const allPinStops = useMemo(() => stops.filter(s => hasCoord(s) && !isMealStop(s)), [stops]);
 
   // dayIndex in the DB is 0-based; chip selectedDay is 1-based
   const pinStops = useMemo(() => {
