@@ -16549,7 +16549,7 @@ Return JSON only with max 3 suggestions:
     { city: "London", country: "United Kingdom" },
     { city: "Los Angeles", country: "United States" },
     { city: "Madrid", country: "Spain" },
-    { city: "Marrakesh", country: "Morocco" },
+    { city: "Marrakech", country: "Morocco" },
     { city: "Melbourne", country: "Australia" },
     { city: "Mexico City", country: "Mexico" },
     { city: "Moscow", country: "Russia" },
