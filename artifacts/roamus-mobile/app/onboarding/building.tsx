@@ -82,8 +82,8 @@ export default function BuildingScreen() {
 
   // Derived traveler info
   const children  = data.travelers.filter(t => !t.isParent);
-  const ageList   = children.map(c => c.age).filter((a): a is number => a != null);
-  const childAges = ageList.length > 0 ? ageList.join(' and ') : 'your kids';
+  const ageList   = children.map(c => c.age).filter((a): a is number => a != null && a < 18);
+  const childAges = ageList.length > 0 ? `ages ${ageList.join(' & ')}` : 'your crew';
   const kidsLabel = ageList.length > 0 ? `Ages ${ageList.join(' & ')}` : 'Family';
   const tripDays  = data.tripDays ?? (data.generatedTrip?.days?.length ?? 0);
 
@@ -106,7 +106,7 @@ export default function BuildingScreen() {
 
   // Messages tied to stop index
   const MESSAGES = [
-    { eyebrow: 'Scoring stops',       msg: `Matching stops for ages ${childAges}...` },
+    { eyebrow: 'Scoring stops',       msg: `Matching stops for ${childAges}...` },
     { eyebrow: 'Checking fit',        msg: 'Finding the best stops for your pace...' },
     { eyebrow: 'Adding favourites',   msg: 'Boosting stops that match your interests...' },
     { eyebrow: 'Planning your days',  msg: tripDays > 0 ? `Spreading stops across ${tripDays} days...` : 'Building your day-by-day plan...' },

@@ -159,6 +159,7 @@ export const players = pgTable("players", {
   totalXp: integer("total_xp").default(0),
   starsXpV2Done: boolean("stars_xp_v2_done").default(false),
   avatar: varchar("avatar"),
+  birthday: varchar("birthday"), // ISO date string YYYY-MM-DD; null for guests/unknown
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

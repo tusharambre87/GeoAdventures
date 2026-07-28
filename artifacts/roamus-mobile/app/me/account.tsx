@@ -32,8 +32,43 @@ type Explorer = {
   name: string;
   isParent?: boolean;
   age?: string | null;
+  birthday?: string | null;
   totalXp?: number;
 };
+
+function ageFromBirthday(birthday: string | null | undefined): number | null {
+  if (!birthday) return null;
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const mDiff = today.getMonth() - d.getMonth();
+  if (mDiff < 0 || (mDiff === 0 && today.getDate() < d.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+
+function formatBirthdayInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function birthdayToIso(mmddyyyy: string): string | null {
+  const parts = mmddyyyy.split('/');
+  if (parts.length !== 3 || parts[2].length !== 4) return null;
+  const [mm, dd, yyyy] = parts;
+  const d = new Date(`${yyyy}-${mm}-${dd}`);
+  if (isNaN(d.getTime())) return null;
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function isoToDisplay(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
 
 const EXPLORER_COLORS = ["#7C3AED", "#E8692A", "#1A1F2E", "#DC2626", "#16A34A"];
 
@@ -93,13 +128,13 @@ export default function AccountScreen() {
   // Explorer editing state
   const [editingExplorerId, setEditingExplorerId] = useState<string | null>(null);
   const [editExpName, setEditExpName] = useState("");
-  const [editExpAge, setEditExpAge] = useState("");
+  const [editExpBirthday, setEditExpBirthday] = useState("");
   const [savingExplorer, setSavingExplorer] = useState(false);
 
   // Add family member state
   const [addingMember, setAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberAge, setNewMemberAge] = useState("");
+  const [newMemberBirthday, setNewMemberBirthday] = useState("");
   const [newMemberIsParent, setNewMemberIsParent] = useState(false);
   const [savingNewMember, setSavingNewMember] = useState(false);
 
@@ -184,28 +219,28 @@ export default function AccountScreen() {
   function startEditExplorer(exp: Explorer) {
     setEditingExplorerId(exp.id);
     setEditExpName(exp.name);
-    setEditExpAge(exp.age ?? "");
+    setEditExpBirthday(isoToDisplay(exp.birthday));
     setAddingMember(false);
   }
 
   function cancelEditExplorer() {
     setEditingExplorerId(null);
     setEditExpName("");
-    setEditExpAge("");
+    setEditExpBirthday("");
   }
 
   async function saveExplorer() {
     if (!editingExplorerId || !editExpName.trim()) return;
     setSavingExplorer(true);
     try {
-      const ageValue = editExpAge.trim() || undefined;
+      const isoB = birthdayToIso(editExpBirthday);
+      const calcAge = isoB ? String(ageFromBirthday(isoB) ?? "") : undefined;
       const res = await fetch(`${API_BASE}/api/explorers/${editingExplorerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editExpName.trim(),
-          age: ageValue,
-          ageRange: ageValue,
+          ...(isoB ? { birthday: isoB, age: calcAge } : {}),
         }),
       });
       if (!res.ok) throw new Error("Update failed");
@@ -222,7 +257,7 @@ export default function AccountScreen() {
   function startAddMember() {
     setAddingMember(true);
     setNewMemberName("");
-    setNewMemberAge("");
+    setNewMemberBirthday("");
     setNewMemberIsParent(false);
     cancelEditExplorer();
   }
@@ -230,7 +265,7 @@ export default function AccountScreen() {
   function cancelAddMember() {
     setAddingMember(false);
     setNewMemberName("");
-    setNewMemberAge("");
+    setNewMemberBirthday("");
     setNewMemberIsParent(false);
   }
 
@@ -238,14 +273,17 @@ export default function AccountScreen() {
     if (!user?.id || !newMemberName.trim()) return;
     setSavingNewMember(true);
     try {
+      const isoB = birthdayToIso(newMemberBirthday);
+      const calcAge = isoB ? String(ageFromBirthday(isoB) ?? "") : undefined;
       const res = await fetch(`${API_BASE}/api/explorers/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
           name: newMemberName.trim(),
-          age: newMemberAge.trim() || "unknown",
+          age: calcAge || "unknown",
           profileType: newMemberIsParent ? "adult" : "kid",
+          ...(isoB ? { birthday: isoB } : {}),
         }),
       });
       if (!res.ok) {
@@ -425,7 +463,11 @@ export default function AccountScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.travName}>{exp.name}</Text>
                     <Text style={s.travRole}>
-                      {exp.isParent ? "Parent" : `Explorer${exp.age ? ` · Age ${exp.age}` : ""}`}
+                      {exp.isParent ? "Parent" : (() => {
+                        const bAge = ageFromBirthday(exp.birthday);
+                        const displayAge = bAge != null ? bAge : (exp.age && exp.age !== "unknown" ? exp.age : null);
+                        return `Explorer${displayAge != null ? ` · Age ${displayAge}` : ""}`;
+                      })()}
                     </Text>
                   </View>
                   <Pressable
@@ -450,14 +492,24 @@ export default function AccountScreen() {
                       placeholderTextColor={G.muted}
                       autoFocus
                     />
-                    <TextInput
-                      style={s.input}
-                      value={editExpAge}
-                      onChangeText={setEditExpAge}
-                      placeholder="Age (optional)"
-                      placeholderTextColor={G.muted}
-                      keyboardType="number-pad"
-                    />
+                    <View>
+                      <TextInput
+                        style={s.input}
+                        value={editExpBirthday}
+                        onChangeText={v => setEditExpBirthday(formatBirthdayInput(v))}
+                        placeholder="Birthday  MM/DD/YYYY"
+                        placeholderTextColor={G.muted}
+                        keyboardType="number-pad"
+                        maxLength={10}
+                      />
+                      {(() => {
+                        const iso = birthdayToIso(editExpBirthday);
+                        const a = ageFromBirthday(iso);
+                        return a != null ? (
+                          <Text style={s.ageHint}>Age {a}</Text>
+                        ) : null;
+                      })()}
+                    </View>
                     <Pressable
                       style={({ pressed }) => [
                         s.saveBtn,
@@ -497,14 +549,24 @@ export default function AccountScreen() {
                   placeholderTextColor={G.muted}
                   autoFocus
                 />
-                <TextInput
-                  style={s.input}
-                  value={newMemberAge}
-                  onChangeText={setNewMemberAge}
-                  placeholder="Age (optional)"
-                  placeholderTextColor={G.muted}
-                  keyboardType="number-pad"
-                />
+                <View>
+                  <TextInput
+                    style={s.input}
+                    value={newMemberBirthday}
+                    onChangeText={v => setNewMemberBirthday(formatBirthdayInput(v))}
+                    placeholder="Birthday  MM/DD/YYYY"
+                    placeholderTextColor={G.muted}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                  />
+                  {(() => {
+                    const iso = birthdayToIso(newMemberBirthday);
+                    const a = ageFromBirthday(iso);
+                    return a != null ? (
+                      <Text style={s.ageHint}>Age {a}</Text>
+                    ) : null;
+                  })()}
+                </View>
                 <View style={s.toggleRow}>
                   <Text style={s.toggleLabel}>Parent / adult</Text>
                   <Switch
@@ -746,6 +808,7 @@ const s = StyleSheet.create({
     borderColor: "rgba(26,31,46,0.08)",
   },
   formTitle: { fontFamily: F.bold, fontSize: 13, color: G.deep, marginBottom: 2 },
+  ageHint: { fontFamily: F.regular, fontSize: 11, color: G.orange, marginTop: 4, marginLeft: 2 },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",

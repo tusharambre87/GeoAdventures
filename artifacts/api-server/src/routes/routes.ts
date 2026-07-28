@@ -1895,7 +1895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/explorers/create', async (req, res) => {
     try {
-      const { userId, name, age, profileType, ageRange, avatarKey, difficultyLevel, email } = req.body;
+      const { userId, name, age, profileType, ageRange, avatarKey, difficultyLevel, email, birthday } = req.body;
       
       if (!name) {
         return res.status(400).json({ message: "Name is required" });
@@ -1969,6 +1969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         difficultyLevel: difficultyLevel || "medium",
         isGuest: !effectiveUserId,
         isArchived: false,
+        ...(birthday ? { birthday } : {}),
       });
 
       console.log("🧭 [Explorer] Created:", {
@@ -2087,7 +2088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/explorers/:explorerId', async (req, res) => {
     try {
       const { explorerId } = req.params;
-      const { name, age, avatarKey, difficultyLevel, ageRange } = req.body;
+      const { name, age, avatarKey, difficultyLevel, ageRange, birthday } = req.body;
 
       const explorer = await storage.updateExplorerProfile(explorerId, {
         name,
@@ -2095,6 +2096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avatarKey,
         difficultyLevel,
         ageRange,
+        ...(birthday !== undefined ? { birthday } : {}),
       });
 
       if (!explorer) {
