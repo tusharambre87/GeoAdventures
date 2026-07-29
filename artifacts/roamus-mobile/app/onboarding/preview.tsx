@@ -428,7 +428,7 @@ export default function PreviewScreen() {
     setSaving(true);
     try {
       const city = data.cities[0] ?? "Chicago";
-      const country = deriveCountry(city);
+      const country = (data as any).cityCountries?.[city] ?? deriveCountry(city);
       const isMultiCity = data.cityMode === "multi" && data.cities.length > 1;
       const tripName = isMultiCity
         ? `${data.cities.slice(0, -1).join(", ")} & ${data.cities[data.cities.length - 1]} Family Trip`

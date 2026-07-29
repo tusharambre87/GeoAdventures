@@ -77,7 +77,7 @@ export default function BuildingScreen() {
   }, []);
 
   const city    = data.cities[0] ?? null;
-  const country = city ? (CITY_COUNTRY[city] ?? 'USA') : 'USA';
+  const country = city ? ((data as any).cityCountries?.[city] ?? CITY_COUNTRY[city] ?? 'USA') : 'USA';
   const heroImg = city ? (CITY_IMGS[city] ?? null) : null;
 
   // Derived traveler info

@@ -302,6 +302,9 @@ export default function WhereScreen() {
 
   const [mode, setMode] = useState<"one" | "multi">(data.cityMode);
   const [sel, setSel] = useState<string[]>(data.cities);
+  const [selCountries, setSelCountries] = useState<Record<string, string>>(
+    (data as any).cityCountries ?? {}
+  );
   const [query, setQuery] = useState("");
   const [previews, setPreviews] = useState<Record<string, any>>({});
   const [popularCities, setPopularCities] = useState<CityEntry[]>(FALLBACK_CITIES);
@@ -363,7 +366,8 @@ export default function WhereScreen() {
     }, [sel]),
   );
 
-  function selectCity(name: string) {
+  function selectCity(name: string, country?: string) {
+    if (country) setSelCountries(prev => ({ ...prev, [name]: country }));
     if (mode === "one") {
       setSel([name]);
       setQuery("");
@@ -388,7 +392,7 @@ export default function WhereScreen() {
   }
 
   function handleContinue() {
-    set({ cities: sel, cityMode: mode });
+    set({ cities: sel, cityMode: mode, cityCountries: selCountries } as any);
     router.push("/onboarding/who");
   }
 
@@ -488,7 +492,7 @@ export default function WhereScreen() {
                 return (
                   <Pressable
                     style={({ pressed }) => [s.suggestion, pressed && { backgroundColor: G.oLt }]}
-                    onPress={() => selectCity(item.name)}
+                    onPress={() => selectCity(item.name, item.country)}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
                       <Text style={{ fontSize: 16 }}>{'\uD83D\uDCCD'}</Text>
@@ -533,7 +537,7 @@ export default function WhereScreen() {
                       return (
                         <Pressable
                           key={c.name}
-                          onPress={() => selectCity(c.name)}
+                          onPress={() => selectCity(c.name, c.country)}
                           style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}
                         >
                           <CityCardImage name={c.name} />
@@ -574,13 +578,16 @@ export default function WhereScreen() {
                           route={route}
                           selected={allSelected}
                           onSelect={() => {
-                            const toAddNames = route.cities
-                              .map(c => c.name)
-                              .filter(n => !sel.includes(n));
-                            if (toAddNames.length > 0) {
-                              const next = [...sel, ...toAddNames].slice(0, 3);
-                              toAddNames.forEach(n => fetchPreview(n));
+                            const toAdd = route.cities.filter(c => !sel.includes(c.name));
+                            if (toAdd.length > 0) {
+                              const next = [...sel, ...toAdd.map(c => c.name)].slice(0, 3);
+                              toAdd.forEach(c => fetchPreview(c.name));
                               setSel(next);
+                              setSelCountries(prev => {
+                                const updated = { ...prev };
+                                toAdd.forEach(c => { if (c.country) updated[c.name] = c.country; });
+                                return updated;
+                              });
                             }
                             setQuery("");
                           }}

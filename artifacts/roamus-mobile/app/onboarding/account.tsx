@@ -89,7 +89,7 @@ export default function AccountScreen() {
   async function createTripWithJwt(jwt: string): Promise<string | null> {
     try {
       const city = data.cities[0] ?? "Chicago";
-      const country = deriveCountry(city);
+      const country = (data as any).cityCountries?.[city] ?? deriveCountry(city);
       const players = data.travelers.map(t => ({
         name: t.name, isParent: t.isParent, age: String(t.age ?? 35),
       }));
