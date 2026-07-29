@@ -9161,7 +9161,7 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
       // name and use the full cache entry for bucketStopsTodays so that
       // candidateToGeneratedStop receives complete parentSupportData etc.
       const destination = (trip as any).city ?? trip.destination ?? '';
-      const country     = (trip as any).country ?? 'USA';
+      const country     = (trip as any).country ?? 'US';
       const cachedPool  = await storage.getCityStopPool(destination, country);
       const poolArray: any[] = (cachedPool?.stopPool as any[]) ?? [];
 

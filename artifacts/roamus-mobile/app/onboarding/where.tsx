@@ -15,12 +15,12 @@ import { useWikiPhoto } from "@/lib/useWikiPhoto";
 const STOP_TIMES = ["9:30", "11:30", "2:00", "3:30"];
 
 const FALLBACK_CITIES: CityEntry[] = [
-  { name: 'Chicago', country: 'USA', state: 'Illinois' },
-  { name: 'New York', country: 'USA', state: 'New York' },
-  { name: 'San Francisco', country: 'USA', state: 'California' },
-  { name: 'Los Angeles', country: 'USA', state: 'California' },
-  { name: 'Washington DC', country: 'USA', state: 'DC' },
-  { name: 'Boston', country: 'USA', state: 'Massachusetts' },
+  { name: 'Chicago', country: 'US', state: 'Illinois' },
+  { name: 'New York', country: 'US', state: 'New York' },
+  { name: 'San Francisco', country: 'US', state: 'California' },
+  { name: 'Los Angeles', country: 'US', state: 'California' },
+  { name: 'Washington DC', country: 'US', state: 'DC' },
+  { name: 'Boston', country: 'US', state: 'Massachusetts' },
 ];
 
 // City name → canonical name used when querying the API (handles abbreviations)
