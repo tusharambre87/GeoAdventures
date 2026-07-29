@@ -63,66 +63,66 @@ const CITIES_TO_SEED: CityEntry[] = [
 
   // ── USA — 60 cities ──────────────────────────────────────────────────────
 
-  { city: "Orlando", country: "USA" },
-  { city: "Washington DC", country: "USA" },
+  { city: "Orlando", country: "US" },
+  { city: "Washington DC", country: "US" },
   { city: "New York", country: "US" },
-  { city: "San Diego", country: "USA" },
-  { city: "Los Angeles", country: "USA" },
-  { city: "Chicago", country: "USA" },
-  { city: "Honolulu", country: "USA" },
-  { city: "San Francisco", country: "USA" },
-  { city: "Nashville", country: "USA" },
-  { city: "Denver", country: "USA" },
-  { city: "Miami", country: "USA" },
-  { city: "Boston", country: "USA" },
-  { city: "Seattle", country: "USA" },
-  { city: "New Orleans", country: "USA" },
-  { city: "Philadelphia", country: "USA" },
-  { city: "Austin", country: "USA" },
-  { city: "Las Vegas", country: "USA" },
-  { city: "Portland", country: "USA" },
-  { city: "Charleston", country: "USA" },
-  { city: "Jackson Hole", country: "USA" },
-  { city: "St. Louis", country: "USA" },           // Gateway Arch, City Museum
-  { city: "Big Island", country: "USA" },           // Hawaii: volcanoes, lava, Mauna Kea
-  { city: "Omaha", country: "USA" },                // Henry Doorly Zoo (world-class)
-  { city: "San Antonio", country: "USA" },          // River Walk, Alamo, Natural Bridge Caverns
-  { city: "Atlanta", country: "USA" },              // Georgia Aquarium, World of Coke
-  { city: "Dallas", country: "USA" },               // Perot Museum, Dallas Zoo
-  { city: "Phoenix", country: "USA" },              // Desert Botanical Garden, Zoo
-  { city: "Salt Lake City", country: "USA" },       // Great Salt Lake, Natural History Museum
-  { city: "Minneapolis", country: "USA" },          // Mall of America, Science Museum of MN
-  { city: "Kansas City", country: "USA" },          // Union Station, Science City
-  { city: "Memphis", country: "USA" },              // National Civil Rights Museum, zoo
-  { city: "Baltimore", country: "USA" },            // National Aquarium, Maryland Science Center
-  { city: "Pittsburgh", country: "USA" },           // Carnegie Museums, Phipps Conservatory
-  { city: "Indianapolis", country: "USA" },         // Children's Museum (world's largest)
-  { city: "Cincinnati", country: "USA" },           // Newport Aquarium, Cincinnati Zoo
-  { city: "Columbus", country: "USA" },             // COSI Science Center, Columbus Zoo
-  { city: "Houston", country: "USA" },              // Space Center Houston, Houston Zoo
-  { city: "Albuquerque", country: "USA" },          // Balloon Fiesta, BioPark, Old Town
-  { city: "Santa Fe", country: "USA" },             // History, pueblo architecture, museums
-  { city: "Savannah", country: "USA" },             // Historic squares, river street
-  { city: "Asheville", country: "USA" },            // Biltmore Estate, Blue Ridge Parkway
-  { city: "Williamsburg", country: "USA" },         // Colonial history, Busch Gardens
-  { city: "Yellowstone", country: "USA" },          // Geysers, wildlife, geothermal
-  { city: "Grand Canyon", country: "USA" },         // South Rim, ranger programs
-  { city: "Sedona", country: "USA" },               // Red rocks, vortex hikes, jeep tours
-  { city: "Monterey", country: "USA" },             // Aquarium, Cannery Row, Big Sur
-  { city: "Santa Barbara", country: "USA" },        // Mission, beaches, Channel Islands
-  { city: "Napa Valley", country: "USA" },          // Mud Baths, hot air balloons, train
-  { city: "Park City", country: "USA" },            // Olympic Park, Utah Olympic legacy
-  { city: "Anchorage", country: "USA" },            // Alaska wildlife, glacier treks
-  { city: "Louisville", country: "USA" },           // Louisville Slugger Museum, zoo
-  { city: "Charlotte", country: "USA" },            // Discovery Place Science, Carowinds
-  { city: "Raleigh", country: "USA" },              // NC Museum of Natural Sciences
-  { city: "Richmond", country: "USA" },             // Children's Museum of Richmond, history
-  { city: "Tucson", country: "USA" },               // Biosphere 2, Sonoran Desert Museum
-  { city: "Boise", country: "USA" },                // Discovery Center, Boise Zoo
-  { city: "Burlington", country: "USA" },           // ECHO Science Center, Vermont nature
-  { city: "Bar Harbor", country: "USA" },           // Acadia National Park, whale watch
-  { city: "Gatlinburg", country: "USA" },           // Smoky Mountains, Ripley's, Dollywood
-  { city: "Myrtle Beach", country: "USA" },         // Beaches, Family Kingdom, Myrtle Waves
+  { city: "San Diego", country: "US" },
+  { city: "Los Angeles", country: "US" },
+  { city: "Chicago", country: "US" },
+  { city: "Honolulu", country: "US" },
+  { city: "San Francisco", country: "US" },
+  { city: "Nashville", country: "US" },
+  { city: "Denver", country: "US" },
+  { city: "Miami", country: "US" },
+  { city: "Boston", country: "US" },
+  { city: "Seattle", country: "US" },
+  { city: "New Orleans", country: "US" },
+  { city: "Philadelphia", country: "US" },
+  { city: "Austin", country: "US" },
+  { city: "Las Vegas", country: "US" },
+  { city: "Portland", country: "US" },
+  { city: "Charleston", country: "US" },
+  { city: "Jackson Hole", country: "US" },
+  { city: "St. Louis", country: "US" },           // Gateway Arch, City Museum
+  { city: "Big Island", country: "US" },           // Hawaii: volcanoes, lava, Mauna Kea
+  { city: "Omaha", country: "US" },                // Henry Doorly Zoo (world-class)
+  { city: "San Antonio", country: "US" },          // River Walk, Alamo, Natural Bridge Caverns
+  { city: "Atlanta", country: "US" },              // Georgia Aquarium, World of Coke
+  { city: "Dallas", country: "US" },               // Perot Museum, Dallas Zoo
+  { city: "Phoenix", country: "US" },              // Desert Botanical Garden, Zoo
+  { city: "Salt Lake City", country: "US" },       // Great Salt Lake, Natural History Museum
+  { city: "Minneapolis", country: "US" },          // Mall of America, Science Museum of MN
+  { city: "Kansas City", country: "US" },          // Union Station, Science City
+  { city: "Memphis", country: "US" },              // National Civil Rights Museum, zoo
+  { city: "Baltimore", country: "US" },            // National Aquarium, Maryland Science Center
+  { city: "Pittsburgh", country: "US" },           // Carnegie Museums, Phipps Conservatory
+  { city: "Indianapolis", country: "US" },         // Children's Museum (world's largest)
+  { city: "Cincinnati", country: "US" },           // Newport Aquarium, Cincinnati Zoo
+  { city: "Columbus", country: "US" },             // COSI Science Center, Columbus Zoo
+  { city: "Houston", country: "US" },              // Space Center Houston, Houston Zoo
+  { city: "Albuquerque", country: "US" },          // Balloon Fiesta, BioPark, Old Town
+  { city: "Santa Fe", country: "US" },             // History, pueblo architecture, museums
+  { city: "Savannah", country: "US" },             // Historic squares, river street
+  { city: "Asheville", country: "US" },            // Biltmore Estate, Blue Ridge Parkway
+  { city: "Williamsburg", country: "US" },         // Colonial history, Busch Gardens
+  { city: "Yellowstone", country: "US" },          // Geysers, wildlife, geothermal
+  { city: "Grand Canyon", country: "US" },         // South Rim, ranger programs
+  { city: "Sedona", country: "US" },               // Red rocks, vortex hikes, jeep tours
+  { city: "Monterey", country: "US" },             // Aquarium, Cannery Row, Big Sur
+  { city: "Santa Barbara", country: "US" },        // Mission, beaches, Channel Islands
+  { city: "Napa Valley", country: "US" },          // Mud Baths, hot air balloons, train
+  { city: "Park City", country: "US" },            // Olympic Park, Utah Olympic legacy
+  { city: "Anchorage", country: "US" },            // Alaska wildlife, glacier treks
+  { city: "Louisville", country: "US" },           // Louisville Slugger Museum, zoo
+  { city: "Charlotte", country: "US" },            // Discovery Place Science, Carowinds
+  { city: "Raleigh", country: "US" },              // NC Museum of Natural Sciences
+  { city: "Richmond", country: "US" },             // Children's Museum of Richmond, history
+  { city: "Tucson", country: "US" },               // Biosphere 2, Sonoran Desert Museum
+  { city: "Boise", country: "US" },                // Discovery Center, Boise Zoo
+  { city: "Burlington", country: "US" },           // ECHO Science Center, Vermont nature
+  { city: "Bar Harbor", country: "US" },           // Acadia National Park, whale watch
+  { city: "Gatlinburg", country: "US" },           // Smoky Mountains, Ripley's, Dollywood
+  { city: "Myrtle Beach", country: "US" },         // Beaches, Family Kingdom, Myrtle Waves
 ];
 
 /**
