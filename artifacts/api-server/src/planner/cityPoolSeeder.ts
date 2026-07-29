@@ -65,7 +65,7 @@ const CITIES_TO_SEED: CityEntry[] = [
 
   { city: "Orlando", country: "USA" },
   { city: "Washington DC", country: "USA" },
-  { city: "New York City", country: "USA" },
+  { city: "New York", country: "US" },
   { city: "San Diego", country: "USA" },
   { city: "Los Angeles", country: "USA" },
   { city: "Chicago", country: "USA" },
