@@ -892,7 +892,7 @@ ${sessionAnalysis}`;
   let fullMustDoBlock = mustDoBlock;
   try {
     const _amCity = targetCity ?? input.destination.split(",")[0]?.trim();
-    const _amCountry = input.destination.split(",").pop()?.trim() ?? "USA";
+    const _amCountry = input.destination.split(",").pop()?.trim() ?? "US";
     const _amCityKey = (_amCity ?? "").toLowerCase().trim().replace(/,\s*\w+$/, "");
     const _amPool = await storage.getCityStopPool(_amCity ?? _amCityKey, _amCountry);
     if (_amPool?.stopPool?.length) {

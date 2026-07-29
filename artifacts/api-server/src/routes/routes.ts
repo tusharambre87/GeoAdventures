@@ -7617,7 +7617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           return hintMap[hint] ?? hint;
         }
-        return CITY_COUNTRY_SERVER[cityName] ?? 'USA';
+        return CITY_COUNTRY_SERVER[cityName] ?? 'US';
       };
 
       // Multi-city: generate stops for remaining cities server-side so they are reliable
