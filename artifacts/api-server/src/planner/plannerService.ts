@@ -2358,10 +2358,11 @@ function indoorOutdoorByStopType(stopType: string): "indoor" | "outdoor" | "both
 }
 
 /** Family anchor type by stop type. */
-function anchorTypeByStopType(stopType: string): CachedStopCandidate["familyAnchorType"] {
+function anchorTypeByStopType(stopType: string, reviewCount?: number): CachedStopCandidate["familyAnchorType"] {
   const t = stopType.toLowerCase();
   if (["museum", "zoo", "aquarium", "landmark", "adventure"].includes(t)) return "anchor";
-  if (["park", "garden", "nature"].includes(t)) return "support";
+  if (t === "garden") return (reviewCount ?? 0) >= 800 ? "anchor" : "filler";
+  if (["park", "nature"].includes(t)) return "support";
   if (["food", "restaurant", "cafe"].includes(t)) return "meal";
   if (["street"].includes(t)) return "filler";
   return "support";
@@ -2562,7 +2563,7 @@ export async function generateCityStopPool(
       // always derive from stop type which is the authoritative classification.
       familyAnchorType: (() => {
         const psiType = row.familyAnchorType as CachedStopCandidate["familyAnchorType"] | null;
-        return (psiType && psiType !== 'support') ? psiType : anchorTypeByStopType(stopType);
+        return (psiType && psiType !== 'support') ? psiType : anchorTypeByStopType(stopType, row.gpRatingsTotal ?? undefined);
       })(),
       minAge,
       whyNow,
