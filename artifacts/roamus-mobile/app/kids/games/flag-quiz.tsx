@@ -18,13 +18,15 @@ import {
   type FlagQuizQuestion,
 } from "@/constants/flagQuizData";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// \u2500\u2500 Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-type GamePhase = "start" | "question" | "answered_correct" | "answered_wrong" | "results";
+type GamePhase = "mode_select" | "question" | "answered_correct" | "answered_wrong" | "results";
+type Difficulty = "easy" | "hard";
 
 const TOTAL_QUESTIONS = 10;
+const HARD_MULTIPLIER = 2;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// \u2500\u2500 Helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -42,15 +44,17 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// \u2500\u2500 Main Component \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 export default function FlagQuizGame() {
   const insets = useSafeAreaInsets();
 
-  const [phase, setPhase] = useState<GamePhase>("start");
+  const [phase, setPhase] = useState<GamePhase>("mode_select");
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [questions, setQuestions] = useState<FlagQuizQuestion[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
-  const [options, setOptions] = useState<string[]>([]); // countryCode order for this question
+  // countryCode order for each question
+  const [options, setOptions] = useState<string[]>([]);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -60,7 +64,7 @@ export default function FlagQuizGame() {
   const factOpacityAnim = useRef(new Animated.Value(0)).current;
   const trophyAnim = useRef(new Animated.Value(0)).current;
 
-  // ── Timer management ───────────────────────────────────────────────────────
+  // \u2500\u2500 Timer management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -80,7 +84,7 @@ export default function FlagQuizGame() {
     return () => stopTimer();
   }, [stopTimer]);
 
-  // ── Fact panel animation ──────────────────────────────────────────────────
+  // \u2500\u2500 Fact panel animation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const animateFactIn = useCallback(() => {
     factSlideAnim.setValue(60);
@@ -91,7 +95,7 @@ export default function FlagQuizGame() {
     ]).start();
   }, [factSlideAnim, factOpacityAnim]);
 
-  // ── Trophy animation ───────────────────────────────────────────────────────
+  // \u2500\u2500 Trophy animation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   useEffect(() => {
     if (phase === "results") {
@@ -105,14 +109,14 @@ export default function FlagQuizGame() {
     }
   }, [phase, trophyAnim]);
 
-  // ── Build option order for a question ─────────────────────────────────────
+  // \u2500\u2500 Build option order for a question \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const buildOptions = useCallback((q: FlagQuizQuestion): string[] => {
     const all = [q.correct, ...q.distractors];
     return shuffle(all).map((c) => c.countryCode);
   }, []);
 
-  // ── Start / restart game ──────────────────────────────────────────────────
+  // \u2500\u2500 Start / restart game \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const startGame = useCallback(() => {
     const qs = shuffleAndPickQuestions(TOTAL_QUESTIONS);
@@ -126,7 +130,7 @@ export default function FlagQuizGame() {
     startTimer();
   }, [buildOptions, startTimer]);
 
-  // ── Handle a tap ──────────────────────────────────────────────────────────
+  // \u2500\u2500 Handle a tap \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const handleTap = useCallback((code: string) => {
     if (phase !== "question") return;
@@ -149,7 +153,7 @@ export default function FlagQuizGame() {
     stopTimer();
   }, [phase, questions, questionIndex, animateFactIn, stopTimer]);
 
-  // ── Advance to next question or results ───────────────────────────────────
+  // \u2500\u2500 Advance to next question or results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   const advance = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -167,81 +171,139 @@ export default function FlagQuizGame() {
 
   const currentQ = questions[questionIndex];
 
-  // ── START screen ──────────────────────────────────────────────────────────
+  // \u2500\u2500 MODE SELECT screen \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-  if (phase === "start") {
+  if (phase === "mode_select") {
     return (
-      <View style={[st.root, { paddingTop: insets.top }]}>
-        <View style={[st.header, { paddingTop: 16 }]}>
-          <View style={st.circle1} />
-          <View style={st.circle2} />
+      <View style={[ms.root, { paddingTop: insets.top }]}>
+        <View style={[ms.header, { paddingTop: 16 }]}>
+          <View style={ms.circle1} />
+          <View style={ms.circle2} />
           <Pressable
-            style={st.backRow}
+            style={ms.backRow}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.back();
             }}
           >
-            <Text style={st.backText}>{"\u2190"} Back</Text>
+            <Text style={ms.backText}>{"\u2190"} Back</Text>
           </Pressable>
-          <Text style={st.watermark}>{"\uD83C\uDFC1"}</Text>
-          <Text style={st.eyebrow}>GEO GAME</Text>
-          <Text style={st.title}>Flag Quiz</Text>
-          <Text style={st.sub}>Tap the correct flag for each country</Text>
+          <Text style={ms.watermark}>{"\uD83C\uDFC1"}</Text>
+          <Text style={ms.eyebrow}>GEO GAME</Text>
+          <Text style={ms.title}>Flag Quiz</Text>
+          <Text style={ms.sub}>How well do you know the world{"\u2019"}s flags?</Text>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[st.body, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[ms.body, { paddingBottom: insets.bottom + 40 }]}
         >
+          {/* Difficulty picker */}
+          <Text style={ms.sectionLabel}>CHOOSE MODE</Text>
+          <View style={ms.toggleRow}>
+            <Pressable
+              style={[ms.diffCard, ms.diffEasy, difficulty === "easy" && ms.diffEasyOn]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDifficulty("easy");
+              }}
+            >
+              <Text style={ms.diffIcon}>{"\uD83D\uDC40"}</Text>
+              <Text style={[ms.diffTitle, { color: "#065F46" }]}>Easy</Text>
+              <Text style={[ms.diffHint, { color: "#065F46" }]}>See the country name</Text>
+              <Text style={[ms.diffHint, { color: "#065F46" }]}>Pick the right flag</Text>
+              {difficulty === "easy" && (
+                <View style={[ms.diffCheck, { backgroundColor: "#16A34A" }]}>
+                  <Text style={ms.diffCheckText}>{"\u2713"}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Pressable
+              style={[ms.diffCard, ms.diffHard, difficulty === "hard" && ms.diffHardOn]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDifficulty("hard");
+              }}
+            >
+              <Text style={ms.diffIcon}>{"\uD83E\uDDE0"}</Text>
+              <Text style={[ms.diffTitle, { color: "#78350F" }]}>Hard</Text>
+              <Text style={[ms.diffHint, { color: "#92400E" }]}>See the flag only</Text>
+              <Text style={[ms.diffHint, { color: "#92400E" }]}>{HARD_MULTIPLIER}x score bonus!</Text>
+              {difficulty === "hard" && (
+                <View style={[ms.diffCheck, { backgroundColor: "#D97706" }]}>
+                  <Text style={ms.diffCheckText}>{"\u2713"}</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
           {/* How it works */}
-          <Text style={st.sectionLabel}>HOW TO PLAY</Text>
-          <View style={st.howCard}>
-            <View style={st.howRow}>
-              <View style={[st.howDot, { backgroundColor: "#059669" }]} />
-              <Text style={st.howText}>You will see a country name — tap the correct flag from 4 choices</Text>
-            </View>
-            <View style={st.howRow}>
-              <View style={[st.howDot, { backgroundColor: "#059669" }]} />
-              <Text style={st.howText}>After each answer a fun fact about that flag is revealed</Text>
-            </View>
-            <View style={st.howRow}>
-              <View style={[st.howDot, { backgroundColor: "#059669" }]} />
-              <Text style={st.howText}>10 questions total — see how many you can get right!</Text>
-            </View>
+          <Text style={[ms.sectionLabel, { marginTop: 8 }]}>HOW TO PLAY</Text>
+          <View style={ms.howCard}>
+            {difficulty === "easy" ? (
+              <>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#059669" }]} />
+                  <Text style={ms.howText}>You will see a country name \u2014 tap the correct flag from 4 choices</Text>
+                </View>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#059669" }]} />
+                  <Text style={ms.howText}>After each answer a fun fact about that flag is revealed</Text>
+                </View>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#059669" }]} />
+                  <Text style={ms.howText}>10 questions total \u2014 see how many you can get right!</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#D97706" }]} />
+                  <Text style={ms.howText}>You will see a flag \u2014 tap the correct country name from 4 choices</Text>
+                </View>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#D97706" }]} />
+                  <Text style={ms.howText}>After each answer a fun fact about that flag is revealed</Text>
+                </View>
+                <View style={ms.howRow}>
+                  <View style={[ms.howDot, { backgroundColor: "#D97706" }]} />
+                  <Text style={ms.howText}>10 questions \u2014 earn {HARD_MULTIPLIER}x bonus stars for every correct answer!</Text>
+                </View>
+              </>
+            )}
           </View>
 
           {/* Stats preview */}
-          <View style={st.statsRow}>
-            <View style={st.statBox}>
-              <Text style={st.statNum}>10</Text>
-              <Text style={st.statLabel}>Questions</Text>
+          <View style={ms.statsRow}>
+            <View style={ms.statBox}>
+              <Text style={ms.statNum}>10</Text>
+              <Text style={ms.statLabel}>Questions</Text>
             </View>
-            <View style={st.statBox}>
-              <Text style={st.statNum}>60+</Text>
-              <Text style={st.statLabel}>Countries</Text>
+            <View style={ms.statBox}>
+              <Text style={ms.statNum}>60+</Text>
+              <Text style={ms.statLabel}>Countries</Text>
             </View>
-            <View style={st.statBox}>
-              <Text style={st.statNum}>{"\u2605"}</Text>
-              <Text style={st.statLabel}>Score</Text>
+            <View style={ms.statBox}>
+              <Text style={ms.statNum}>{difficulty === "hard" ? `${HARD_MULTIPLIER}x` : "\u2605"}</Text>
+              <Text style={ms.statLabel}>{difficulty === "hard" ? "Bonus" : "Score"}</Text>
             </View>
           </View>
 
           <Pressable
-            style={({ pressed }) => [st.cta, pressed && { opacity: 0.88 }]}
+            style={({ pressed }) => [ms.cta, pressed && { opacity: 0.88 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               startGame();
             }}
           >
-            <Text style={st.ctaText}>{"\uD83C\uDFC1"} Let{"\u2019"}s Go  {"\u2192"}</Text>
+            <Text style={ms.ctaText}>{"\uD83C\uDFC1"} Let{"\u2019"}s Go  {"\u2192"}</Text>
           </Pressable>
         </ScrollView>
       </View>
     );
   }
 
-  // ── QUESTION screen ───────────────────────────────────────────────────────
+  // \u2500\u2500 QUESTION screen \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   if ((phase === "question" || phase === "answered_correct" || phase === "answered_wrong") && currentQ) {
     const allCountries = [currentQ.correct, ...currentQ.distractors];
@@ -253,14 +315,14 @@ export default function FlagQuizGame() {
 
     return (
       <View style={[q.root, { paddingTop: insets.top }]}>
-        {/* ── Header bar ── */}
+        {/* \u2500\u2500 Header bar \u2500\u2500 */}
         <View style={q.header}>
           <Pressable
             style={q.quitBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               stopTimer();
-              setPhase("start");
+              setPhase("mode_select");
             }}
           >
             <Text style={q.quitText}>{"\u2190"} Quit</Text>
@@ -271,80 +333,153 @@ export default function FlagQuizGame() {
           </View>
 
           <View style={q.scoreBadge}>
-            <Text style={q.scoreText}>{"\u2B50"} {score}</Text>
+            <Text style={q.scoreText}>{"\u2B50"} {score}{difficulty === "hard" ? ` \u00D7${HARD_MULTIPLIER}` : ""}</Text>
           </View>
         </View>
 
-        {/* ── Progress bar ── */}
+        {/* \u2500\u2500 Progress bar \u2500\u2500 */}
         <View style={q.progressTrack}>
           <View style={[q.progressFill, { width: `${filledPct}%` }]} />
         </View>
         <Text style={q.progressLabel}>Question {questionIndex + 1} of {TOTAL_QUESTIONS}</Text>
 
+        {/* \u2500\u2500 Hard mode badge \u2500\u2500 */}
+        {difficulty === "hard" && (
+          <View style={q.hardBadge}>
+            <Text style={q.hardBadgeText}>{"\uD83E\uDDE0"} HARD MODE \u2014 {HARD_MULTIPLIER}x BONUS</Text>
+          </View>
+        )}
+
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[q.scroll, { paddingBottom: insets.bottom + 24 }]}
         >
-          {/* ── Country name ── */}
-          <View style={q.countryCard}>
-            <Text style={q.countryLabel}>Which flag belongs to…</Text>
-            <Text style={q.countryName}>{currentQ.correct.name}</Text>
-          </View>
+          {difficulty === "easy" ? (
+            <>
+              {/* \u2500\u2500 EASY: country name prompt \u2500\u2500 */}
+              <View style={q.countryCard}>
+                <Text style={q.countryLabel}>Which flag belongs to\u2026</Text>
+                <Text style={q.countryName}>{currentQ.correct.name}</Text>
+              </View>
 
-          {/* ── 2×2 flag grid ── */}
-          <View style={q.flagGrid}>
-            {options.map((code) => {
-              const country = countryByCode[code];
-              if (!country) return null;
-              const isSelected = selectedCode === code;
-              const isCorrectTile = code === correctCode;
+              {/* \u2500\u2500 EASY: 2\u00D72 flag grid \u2500\u2500 */}
+              <View style={q.flagGrid}>
+                {options.map((code) => {
+                  const country = countryByCode[code];
+                  if (!country) return null;
+                  const isSelected = selectedCode === code;
+                  const isCorrectTile = code === correctCode;
 
-              let tileBg = "#ECFDF5";
-              let tileBorder = "#6EE7B7";
-              if (isAnswered) {
-                if (isCorrectTile) {
-                  tileBg = "#D1FAE5";
-                  tileBorder = "#059669";
-                } else if (isSelected && !isCorrectTile) {
-                  tileBg = "#FEE2E2";
-                  tileBorder = "#EF4444";
-                } else {
-                  tileBg = "#F8FAFC";
-                  tileBorder = "#CBD5E1";
-                }
-              }
+                  let tileBg = "#ECFDF5";
+                  let tileBorder = "#6EE7B7";
+                  if (isAnswered) {
+                    if (isCorrectTile) {
+                      tileBg = "#D1FAE5";
+                      tileBorder = "#059669";
+                    } else if (isSelected && !isCorrectTile) {
+                      tileBg = "#FEE2E2";
+                      tileBorder = "#EF4444";
+                    } else {
+                      tileBg = "#F8FAFC";
+                      tileBorder = "#CBD5E1";
+                    }
+                  }
 
-              return (
-                <Pressable
-                  key={code}
-                  disabled={isAnswered}
-                  style={({ pressed }) => [
-                    q.flagTile,
-                    { backgroundColor: tileBg, borderColor: tileBorder },
-                    !isAnswered && pressed && { opacity: 0.75, transform: [{ scale: 0.96 }] },
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    handleTap(code);
-                  }}
-                >
-                  <Text style={q.flagEmoji}>{country.flagEmoji}</Text>
-                  {isAnswered && isCorrectTile && (
-                    <View style={q.correctBadge}>
-                      <Text style={q.correctBadgeText}>{"\u2713"}</Text>
-                    </View>
-                  )}
-                  {isAnswered && isSelected && !isCorrectTile && (
-                    <View style={[q.correctBadge, { backgroundColor: "#EF4444" }]}>
-                      <Text style={q.correctBadgeText}>{"\u2717"}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+                  return (
+                    <Pressable
+                      key={code}
+                      disabled={isAnswered}
+                      style={({ pressed }) => [
+                        q.flagTile,
+                        { backgroundColor: tileBg, borderColor: tileBorder },
+                        !isAnswered && pressed && { opacity: 0.75, transform: [{ scale: 0.96 }] },
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        handleTap(code);
+                      }}
+                    >
+                      <Text style={q.flagEmoji}>{country.flagEmoji}</Text>
+                      {isAnswered && isCorrectTile && (
+                        <View style={q.correctBadge}>
+                          <Text style={q.correctBadgeText}>{"\u2713"}</Text>
+                        </View>
+                      )}
+                      {isAnswered && isSelected && !isCorrectTile && (
+                        <View style={[q.correctBadge, { backgroundColor: "#EF4444" }]}>
+                          <Text style={q.correctBadgeText}>{"\u2717"}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <>
+              {/* \u2500\u2500 HARD: big flag prompt \u2500\u2500 */}
+              <View style={q.flagHeroCard}>
+                <Text style={q.flagHeroLabel}>Which country does this flag belong to?</Text>
+                <Text style={q.flagHeroEmoji}>{currentQ.correct.flagEmoji}</Text>
+              </View>
 
-          {/* ── Fun fact panel (slides in after answer) ── */}
+              {/* \u2500\u2500 HARD: 4 country-name buttons \u2500\u2500 */}
+              <View style={q.nameList}>
+                {options.map((code) => {
+                  const country = countryByCode[code];
+                  if (!country) return null;
+                  const isSelected = selectedCode === code;
+                  const isCorrectTile = code === correctCode;
+
+                  let btnBg = "rgba(255,255,255,0.08)";
+                  let btnBorder = "rgba(255,255,255,0.15)";
+                  let nameColor = "#fff";
+
+                  if (isAnswered) {
+                    if (isCorrectTile) {
+                      btnBg = "rgba(5,150,105,0.35)";
+                      btnBorder = "#059669";
+                      nameColor = "#A7F3D0";
+                    } else if (isSelected && !isCorrectTile) {
+                      btnBg = "rgba(239,68,68,0.25)";
+                      btnBorder = "#EF4444";
+                      nameColor = "#FCA5A5";
+                    } else {
+                      btnBg = "rgba(255,255,255,0.04)";
+                      btnBorder = "rgba(255,255,255,0.08)";
+                      nameColor = "rgba(255,255,255,0.35)";
+                    }
+                  }
+
+                  return (
+                    <Pressable
+                      key={code}
+                      disabled={isAnswered}
+                      style={({ pressed }) => [
+                        q.nameBtn,
+                        { backgroundColor: btnBg, borderColor: btnBorder },
+                        !isAnswered && pressed && { opacity: 0.75, transform: [{ scale: 0.98 }] },
+                      ]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        handleTap(code);
+                      }}
+                    >
+                      {isAnswered && isCorrectTile && (
+                        <Text style={q.nameBtnIcon}>{"\u2713"} </Text>
+                      )}
+                      {isAnswered && isSelected && !isCorrectTile && (
+                        <Text style={[q.nameBtnIcon, { color: "#FCA5A5" }]}>{"\u2717"} </Text>
+                      )}
+                      <Text style={[q.nameBtnText, { color: nameColor }]}>{country.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* \u2500\u2500 Fun fact panel (slides in after answer) \u2500\u2500 */}
           {isAnswered && (
             <Animated.View
               style={[
@@ -365,7 +500,7 @@ export default function FlagQuizGame() {
 
               {phase === "answered_wrong" && (
                 <View style={q.correctAnswerRow}>
-                  <Text style={q.correctAnswerLabel}>The correct flag was: </Text>
+                  <Text style={q.correctAnswerLabel}>The correct answer was: </Text>
                   <Text style={q.correctAnswerFlag}>{currentQ.correct.flagEmoji}</Text>
                   <Text style={q.correctAnswerName}> {currentQ.correct.name}</Text>
                 </View>
@@ -373,7 +508,7 @@ export default function FlagQuizGame() {
             </Animated.View>
           )}
 
-          {/* ── Next button ── */}
+          {/* \u2500\u2500 Next button \u2500\u2500 */}
           {isAnswered && (
             <Pressable
               style={({ pressed }) => [q.nextBtn, pressed && { opacity: 0.88 }]}
@@ -390,13 +525,17 @@ export default function FlagQuizGame() {
     );
   }
 
-  // ── RESULTS screen ────────────────────────────────────────────────────────
+  // \u2500\u2500 RESULTS screen \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
   if (phase === "results") {
+    const multiplier = difficulty === "hard" ? HARD_MULTIPLIER : 1;
+    const finalScore = score * multiplier;
+    const maxScore = TOTAL_QUESTIONS * multiplier;
     const pct = Math.round((score / TOTAL_QUESTIONS) * 100);
+
     let medal = "\uD83C\uDFC6";
     let headline = "Outstanding!";
-    let subline = "You're a flag expert!";
+    let subline = "You\u2019re a flag expert!";
     if (score <= 3) {
       medal = "\uD83C\uDF0D";
       headline = "Keep Exploring!";
@@ -443,6 +582,11 @@ export default function FlagQuizGame() {
             </Animated.View>
             <Text style={r.headline}>{headline}</Text>
             <Text style={r.subline}>{subline}</Text>
+            {difficulty === "hard" && (
+              <View style={r.hardModeBadge}>
+                <Text style={r.hardModeBadgeText}>{"\uD83E\uDDE0"} Hard Mode \u2014 {HARD_MULTIPLIER}x Multiplier</Text>
+              </View>
+            )}
           </View>
 
           {/* Score card */}
@@ -459,8 +603,8 @@ export default function FlagQuizGame() {
               </View>
               <View style={r.scoreDivider} />
               <View style={r.scoreBox}>
-                <Text style={r.scoreNum}>{pct}%</Text>
-                <Text style={r.scoreLabel}>Score</Text>
+                <Text style={r.scoreNum}>{finalScore}</Text>
+                <Text style={r.scoreLabel}>{difficulty === "hard" ? `Stars (\u00D7${multiplier})` : "Stars"}</Text>
               </View>
             </View>
 
@@ -474,16 +618,20 @@ export default function FlagQuizGame() {
 
           {/* Star display */}
           <View style={r.starsRow}>
-            {Array.from({ length: TOTAL_QUESTIONS }).map((_, i) => (
-              <Text key={i} style={[r.star, i < score && r.starFilled]}>
-                {i < score ? "\u2B50" : "\u2606"}
+            {Array.from({ length: maxScore }).map((_, i) => (
+              <Text key={i} style={[r.star, i < finalScore && r.starFilled]}>
+                {i < finalScore ? "\u2B50" : "\u2606"}
               </Text>
             ))}
           </View>
 
-          {/* XP note */}
+          {/* Mode label */}
           <View style={r.xpNote}>
-            <Text style={r.xpText}>{"\u2B50"} XP rewards coming soon</Text>
+            <Text style={r.xpText}>
+              {difficulty === "hard"
+                ? `\uD83E\uDDE0 Hard mode \u2014 ${finalScore} / ${maxScore} stars`
+                : `\u2B50 Easy mode \u2014 ${finalScore} / ${maxScore} stars`}
+            </Text>
           </View>
 
           {/* Actions */}
@@ -496,6 +644,15 @@ export default function FlagQuizGame() {
               }}
             >
               <Text style={r.btnPrimaryTxt}>{"\uD83C\uDD95"} Play Again</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [r.btnSecondary, pressed && { opacity: 0.85 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setPhase("mode_select");
+              }}
+            >
+              <Text style={r.btnSecondaryTxt}>Change Mode</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [r.btnGhost, pressed && { opacity: 0.75 }]}
@@ -515,10 +672,10 @@ export default function FlagQuizGame() {
   return null;
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────────
+// \u2500\u2500 Styles \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-// START screen
-const st = StyleSheet.create({
+// MODE SELECT screen
+const ms = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#F0FDF4" },
   header: {
     backgroundColor: "#1B4332",
@@ -554,6 +711,24 @@ const st = StyleSheet.create({
     fontFamily: F.bold, fontSize: 10, letterSpacing: 1, color: "#6B7280",
     marginTop: 20, marginBottom: 8,
   },
+  toggleRow: { flexDirection: "row", gap: 10 },
+  diffCard: {
+    flex: 1, borderRadius: 14, padding: 14, borderWidth: 2,
+    alignItems: "center", position: "relative",
+  },
+  diffEasy: { backgroundColor: "#F0FDF4", borderColor: "#6EE7B7" },
+  diffEasyOn: { backgroundColor: "#D1FAE5", borderColor: "#059669" },
+  diffHard: { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
+  diffHardOn: { backgroundColor: "#FEF3C7", borderColor: "#D97706" },
+  diffIcon: { fontSize: 28, marginBottom: 6 },
+  diffTitle: { fontFamily: F.bold, fontSize: 16, marginBottom: 4 },
+  diffHint: { fontFamily: F.medium, fontSize: 11, textAlign: "center", lineHeight: 16 },
+  diffCheck: {
+    position: "absolute", top: 8, right: 8,
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+  },
+  diffCheckText: { fontFamily: F.bold, fontSize: 11, color: "#fff" },
   howCard: {
     backgroundColor: "#fff", borderRadius: 14, padding: 16,
     borderWidth: 1, borderColor: "#D1FAE5", gap: 12,
@@ -596,6 +771,14 @@ const q = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 5,
   },
   scoreText: { fontFamily: F.bold, fontSize: 13, color: "#FDE68A" },
+  hardBadge: {
+    alignSelf: "center",
+    backgroundColor: "rgba(217,119,6,0.2)", borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 4,
+    marginBottom: 2,
+    borderWidth: 1, borderColor: "rgba(217,119,6,0.4)",
+  },
+  hardBadgeText: { fontFamily: F.bold, fontSize: 11, color: "#FDE68A", letterSpacing: 0.5 },
   progressTrack: {
     height: 5, backgroundColor: "rgba(255,255,255,0.12)",
     marginHorizontal: 16, borderRadius: 3, overflow: "hidden",
@@ -608,6 +791,7 @@ const q = StyleSheet.create({
     textAlign: "center", marginTop: 6, marginBottom: 4,
   },
   scroll: { paddingHorizontal: 16, paddingTop: 8 },
+  // Easy mode
   countryCard: {
     backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 16,
     padding: 20, alignItems: "center", marginBottom: 16,
@@ -635,6 +819,26 @@ const q = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   correctBadgeText: { fontFamily: F.bold, fontSize: 11, color: "#fff" },
+  // Hard mode
+  flagHeroCard: {
+    backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 16,
+    padding: 24, alignItems: "center", marginBottom: 16,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.1)",
+  },
+  flagHeroLabel: {
+    fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.6)",
+    marginBottom: 14, textAlign: "center",
+  },
+  flagHeroEmoji: { fontSize: 80 },
+  nameList: { gap: 10, marginBottom: 16 },
+  nameBtn: {
+    borderRadius: 14, borderWidth: 2,
+    paddingVertical: 15, paddingHorizontal: 18,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+  },
+  nameBtnIcon: { fontFamily: F.bold, fontSize: 15, color: "#A7F3D0" },
+  nameBtnText: { fontFamily: F.bold, fontSize: 16, textAlign: "center" },
+  // Shared
   factPanel: {
     borderRadius: 16, padding: 16, marginBottom: 14,
     borderWidth: 1,
@@ -680,7 +884,13 @@ const r = StyleSheet.create({
   hero: { alignItems: "center", marginBottom: 24 },
   medal: { fontSize: 72, marginBottom: 12 },
   headline: { fontFamily: F.bold, fontSize: 28, color: "#fff", marginBottom: 4 },
-  subline: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.7)" },
+  subline: { fontFamily: F.medium, fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 8 },
+  hardModeBadge: {
+    backgroundColor: "rgba(217,119,6,0.25)", borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 5,
+    borderWidth: 1, borderColor: "rgba(217,119,6,0.4)",
+  },
+  hardModeBadgeText: { fontFamily: F.bold, fontSize: 12, color: "#FDE68A" },
   scoreCard: {
     width: "100%", backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 18, padding: 20, marginBottom: 16,
@@ -703,7 +913,7 @@ const r = StyleSheet.create({
     flexDirection: "row", flexWrap: "wrap", justifyContent: "center",
     gap: 2, marginBottom: 16,
   },
-  star: { fontSize: 22 },
+  star: { fontSize: 18 },
   starFilled: { opacity: 1 },
   xpNote: {
     backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10,
@@ -716,6 +926,12 @@ const r = StyleSheet.create({
     paddingVertical: 15, alignItems: "center",
   },
   btnPrimaryTxt: { fontFamily: F.bold, fontSize: 15, color: "#065F46" },
+  btnSecondary: {
+    backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 14,
+    paddingVertical: 14, alignItems: "center",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.25)",
+  },
+  btnSecondaryTxt: { fontFamily: F.bold, fontSize: 14, color: "#fff" },
   btnGhost: {
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.3)",
     borderRadius: 14, paddingVertical: 14, alignItems: "center",
