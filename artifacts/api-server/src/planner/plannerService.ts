@@ -124,6 +124,7 @@ const CITY_MUST_DO_STOPS: Record<string, {
 // LEGOLAND 39k misses. Chicago: Millennium 92k, Navy Pier 88k clear; Bean/Lincoln Zoo ~39k miss.
 const AUTO_MUST_DO_REVIEW_THRESHOLD = 40000;
 const AUTO_MUST_DO_MAX = 3; // cap forced icons so short trips aren't overstuffed
+const MEAL_TYPES = new Set(['restaurant', 'food', 'cafe', 'market', 'meal', 'street_food', 'diner', 'eatery']);
 
 // Module-level name normalizer — used by both generateCityStopPool (dedup) and
 // selectStopsFromPool / generateDayStops (must-do enforcement).
@@ -2814,7 +2815,7 @@ export function selectStopsFromPool(
   const dayStarts: number[] = [];
   { let _c = 0; for (let _d = 0; _d < input.tripDays; _d++) { dayStarts.push(_c); _c += stopsForDay[_d]; } }
 
-  let candidates = [...pool];
+  let candidates = [...pool].filter(c => !MEAL_TYPES.has((c.stopType || '').toLowerCase()));
 
   // Geographic outlier guard (systemic, every city). Pool = all stops tagged to this
   // city with NO distance check, so a far stop (Grand Canyon Skywalk, West Rim, ~250mi
@@ -3994,6 +3995,8 @@ export function bucketStopsTodays(
     stopsForDay.push(_cap ? _cap.anchors + _cap.fillers : effectiveStopsPerDay);
     anchorsForDayArr.push(_cap ? _cap.anchors : _baseAnchorsPerDay);
   }
+
+  candidates = candidates.filter(c => !MEAL_TYPES.has((c.stopType || '').toLowerCase()));
 
   // ── Separate anchors from non-anchors ─────────────────────────────────────
   const anchors = [...candidates]
