@@ -527,8 +527,14 @@ export default function TripsScreen() {
               <View style={s.emptyIconWrap}>
                 <Ionicons name="briefcase-outline" size={32} color={G.orange} />
               </View>
-              <Text style={s.emptyTitle}>No trips yet</Text>
-              <Text style={s.emptyDesc}>Plan your family adventure and unlock quests, stories, and memories along the way.</Text>
+              <Text style={s.emptyTitle}>
+                {completedTrips.length > 0 ? "No upcoming trips" : "No trips yet"}
+              </Text>
+              <Text style={s.emptyDesc}>
+                {completedTrips.length > 0
+                  ? "Ready for your next adventure? Plan a new trip or revisit a past one below."
+                  : "Plan your family adventure and unlock quests, stories, and memories along the way."}
+              </Text>
               <Pressable
                 style={({ pressed }) => [s.planBtn, { opacity: pressed ? 0.85 : 1 }]}
                 onPress={startNewTrip}
@@ -554,6 +560,19 @@ export default function TripsScreen() {
                 <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
               </TouchableOpacity>
             </View>
+
+            {completedTrips.length > 0 && (
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <Text style={s.sectionTitle}>Past adventures</Text>
+                  <Text style={s.sectionCount}>{completedTrips.length} trip{completedTrips.length !== 1 ? "s" : ""}</Text>
+                </View>
+                <Text style={s.sectionSub}>COMPLETED</Text>
+                <View style={s.cardRow}>
+                  {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                </View>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
