@@ -23,6 +23,14 @@ import {
 } from "@/constants/guessMapsData";
 import { getCountryPath } from "@/utils/countryOutline";
 
+// ── Guess normalizer ─────────────────────────────────────────────────────────
+// Strips accents, trims, and lowercases so "Cote d'Ivoire" matches "Côte d'Ivoire".
+function normalizeGuess(s: string): string {
+  return s.trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/['']/g, "'");
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type GamePhase =
@@ -223,7 +231,7 @@ export default function GuessMapsGame() {
 
   const startGame = useCallback((diff?: Difficulty) => {
     const d = diff ?? difficulty;
-    const qs = shuffleAndPickQuestions(TOTAL_QUESTIONS);
+    const qs = shuffleAndPickQuestions(TOTAL_QUESTIONS, (id) => getCountryPath(id) !== null);
     const first = qs[0];
     setQuestions(qs);
     setQuestionIndex(0);
@@ -267,7 +275,7 @@ export default function GuessMapsGame() {
     const guess = inputText.trim();
     if (!guess) return;
 
-    const isCorrect = guess.toLowerCase() === q.correct.name.toLowerCase();
+    const isCorrect = normalizeGuess(guess) === normalizeGuess(q.correct.name);
     if (isCorrect) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setScore((p) => p + 1);
@@ -588,6 +596,7 @@ export default function GuessMapsGame() {
                     onChangeText={setInputText}
                     autoCapitalize="words"
                     autoCorrect={false}
+                    spellCheck={false}
                     returnKeyType="done"
                     onSubmitEditing={handleHardGuess}
                   />
@@ -619,7 +628,7 @@ export default function GuessMapsGame() {
                 phase === "answered_correct" ? g.factPanelCorrect : g.factPanelWrong,
               ]}
             >
-              <Text style={g.factHeader}>
+              <Text style={[g.factHeader, phase === "answered_correct" && g.factHeaderCorrect]}>
                 {phase === "answered_correct"
                   ? "\u2728 Correct! Fun Fact about " + currentQ.correct.name
                   : "\uD83D\uDCA1 Fun Fact about " + currentQ.correct.name}
@@ -945,12 +954,13 @@ const g = StyleSheet.create({
     borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1,
   },
   factPanelCorrect: {
-    backgroundColor: "rgba(120,53,15,0.5)", borderColor: "#D97706",
+    backgroundColor: "rgba(6,95,70,0.5)", borderColor: "#059669",
   },
   factPanelWrong: {
     backgroundColor: "rgba(127,29,29,0.4)", borderColor: "#DC2626",
   },
   factHeader: { fontFamily: F.bold, fontSize: 13, color: "#FDE68A", marginBottom: 8, lineHeight: 18 },
+  factHeaderCorrect: { color: "#6EE7B7" },
   factText: { fontFamily: F.medium, fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 19 },
   nextBtn: {
     backgroundColor: ROAMUS_ORANGE, borderRadius: 14,

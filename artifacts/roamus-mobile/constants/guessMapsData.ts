@@ -19,16 +19,25 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Pick `count` questions from the full pool with runtime-generated distractors. */
-export function shuffleAndPickQuestions(count: number): GuessMapsQuestion[] {
-  const shuffled = shuffle(GUESS_MAPS_COUNTRIES);
-  const selected = shuffled.slice(0, count);
+/** Pick `count` questions from the full pool with runtime-generated distractors.
+ *  Pass an optional `hasPath` predicate to exclude countries whose silhouette
+ *  cannot be rendered (e.g. missing from the 110m dataset).
+ */
+export function shuffleAndPickQuestions(
+  count: number,
+  hasPath?: (numericId: number) => boolean,
+): GuessMapsQuestion[] {
+  const pool = hasPath
+    ? GUESS_MAPS_COUNTRIES.filter((c) => hasPath(c.numericId))
+    : GUESS_MAPS_COUNTRIES;
+  const shuffled = shuffle(pool);
+  const selected = shuffled.slice(0, Math.min(count, shuffled.length));
   return selected.map((correct) => {
-    const others = GUESS_MAPS_COUNTRIES.filter((c) => c.numericId !== correct.numericId);
-    const pool = shuffle(others).slice(0, 3);
+    const others = pool.filter((c) => c.numericId !== correct.numericId);
+    const distractors = shuffle(others).slice(0, 3);
     return {
       correct,
-      distractors: [pool[0].name, pool[1].name, pool[2].name] as [string, string, string],
+      distractors: [distractors[0].name, distractors[1].name, distractors[2].name] as [string, string, string],
     };
   });
 }
