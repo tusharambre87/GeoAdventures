@@ -343,15 +343,16 @@ function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: strin
 // ─── Main carousel ────────────────────────────────────────────────────────────
 
 export default function StoryScreen() {
-  const { tripId, fromComplete, regenerated } = useLocalSearchParams<{ tripId: string; fromComplete?: string; regenerated?: string }>();
+  const { tripId, fromComplete, regenerated, initialSlide } = useLocalSearchParams<{ tripId: string; fromComplete?: string; regenerated?: string; initialSlide?: string }>();
   const insets = useSafeAreaInsets();
 
   // Slide state + cross-fade animation
-  const [slide, setSlide] = useState(0);
-  const [displaySlide, setDisplaySlide] = useState(0);
+  const _initSlide = Math.min(Math.max(parseInt(initialSlide ?? '0', 10) || 0, 0), TOTAL_SLIDES - 1);
+  const [slide, setSlide] = useState(_initSlide);
+  const [displaySlide, setDisplaySlide] = useState(_initSlide);
   const slideOpacity = useRef(new Animated.Value(1)).current;
   // Mutable ref so panResponder always reads the latest slide index (avoids stale closure)
-  const slideIndexRef = useRef(0);
+  const slideIndexRef = useRef(_initSlide);
 
   // Toast opacity refs
   const savedToastOpacity = useRef(new Animated.Value(0)).current;
