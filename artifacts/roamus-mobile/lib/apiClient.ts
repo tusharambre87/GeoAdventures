@@ -206,6 +206,7 @@ export type Moment = {
 export type DayHighlights = {
   dayIndex: number;
   stopsVisited: number;
+  city?: string;
   selectedPhotos: {
     stopId: string;
     stopName: string;

@@ -277,22 +277,33 @@ export default function DayHighlightsScreen() {
             collapsable={false}
             style={styles.hiddenCollage}
           >
-            {displayPhotos.map((slot, i) => (
-              <View key={i} style={styles.collageCell}>
-                {slot ? (
-                  <ExpoImage
-                    source={{ uri: slot.photoUrl }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                  />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: '#163830', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={{ fontSize: 32 }}>{'\uD83C\uDF89'}</Text>
-                  </View>
-                )}
-              </View>
-            ))}
+            {/* 2×2 photo grid */}
+            <View style={styles.collageGrid}>
+              {displayPhotos.map((slot, i) => (
+                <View key={i} style={styles.collageCell}>
+                  {slot ? (
+                    <ExpoImage
+                      source={{ uri: slot.photoUrl }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#163830', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ fontSize: 32 }}>{'\uD83C\uDF89'}</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {/* Branded footer strip */}
+            <View style={styles.collageFooter}>
+              <Text style={styles.collageFooterDay} numberOfLines={1}>
+                {`Day ${dayNum}${h?.city ? ` in ${h.city}` : ''}`}
+              </Text>
+              <Text style={styles.collageFooterBrand}>RoamUs</Text>
+            </View>
           </View>
         </View>
 
@@ -422,8 +433,9 @@ export default function DayHighlightsScreen() {
 
 // ── Styles ────────────────────────────────────────────────────────────────
 
-// The hidden collage is square — 800×800 gives Instagram-quality capture
+// The hidden collage is 800×900 — 800×800 photo grid + 100px branded footer
 const COLLAGE_SIZE = 800;
+const FOOTER_HEIGHT = 100;
 const COLLAGE_CELL = COLLAGE_SIZE / 2 - 2; // 2px half-gap
 
 const styles = StyleSheet.create({
@@ -485,17 +497,49 @@ const styles = StyleSheet.create({
     top: -COLLAGE_SIZE * 2, // way off-screen
     left: 0,
     width: COLLAGE_SIZE,
+    height: COLLAGE_SIZE + FOOTER_HEIGHT,
+    flexDirection: 'column',
+    backgroundColor: '#1C1410',
+  },
+  collageGrid: {
+    width: COLLAGE_SIZE,
     height: COLLAGE_SIZE,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
-    backgroundColor: '#1C1410',
   },
   collageCell: {
     width: COLLAGE_CELL,
     height: COLLAGE_CELL,
     overflow: 'hidden',
     borderRadius: 0,
+  },
+  // Branded footer for the shared collage
+  collageFooter: {
+    width: COLLAGE_SIZE,
+    height: FOOTER_HEIGHT,
+    backgroundColor: '#1C1410',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  collageFooterDay: {
+    fontFamily: F.bold,
+    fontSize: 24,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+    marginRight: 12,
+  },
+  collageFooterBrand: {
+    fontFamily: F.bold,
+    fontSize: 28,
+    color: '#E8692A',
+    letterSpacing: 1.5,
+    flexShrink: 0,
   },
 
   // Share section

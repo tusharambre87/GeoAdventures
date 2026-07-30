@@ -14621,6 +14621,8 @@ Return ONLY valid JSON in this exact format:
         .where(and(eq(tripDayMemories.tripId, tripId), eq(tripDayMemories.dayIndex, dayIndex)))
         .limit(1);
 
+      const cityRaw = (hlTrip.destination ?? (hlTrip as any).city ?? '').split(',')[0].trim();
+
       return res.json({
         dayIndex,
         stopsVisited,
@@ -14628,6 +14630,7 @@ Return ONLY valid JSON in this exact format:
         allDayPhotos,
         quote,
         summaryLines: dayMemory?.lines ?? [],
+        city: cityRaw || undefined,
       });
     } catch (error) {
       console.error('[highlights] Error:', error);
