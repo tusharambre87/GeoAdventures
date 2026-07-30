@@ -110,6 +110,20 @@ const GRID_GAMES = [
     titleColor: "#5B21B6",
     route: undefined as string | undefined,
   },
+  {
+    type: "flag-quiz",
+    icon: "\uD83C\uDFC1",
+    name: "Flag Quiz",
+    desc: "Tap the right flag for each country",
+    tag: "GEO",
+    tagBg: "#D1FAE5",
+    tagColor: "#065F46",
+    cardBg: "#ECFDF5",
+    border: "#6EE7B7",
+    titleColor: "#065F46",
+    badge: "NEW" as string | undefined,
+    route: "kids/games/flag-quiz" as string | undefined,
+  },
 ];
 
 export default function GameHub() {
