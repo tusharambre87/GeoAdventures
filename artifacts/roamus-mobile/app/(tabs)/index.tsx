@@ -506,18 +506,54 @@ export default function TripsScreen() {
                 {upcomingTrips.length > 0 && (
                   <>
                     <Text style={[s.sectionSub, { marginTop: inProgressTrips.length > 0 ? 16 : 0 }]}>UPCOMING</Text>
-                    <View style={s.cardRow}>
-                      {upcomingTrips.map(t => <TripCard key={t.id} trip={t} />)}
-                    </View>
+                    {showAllUpcoming ? (
+                      <>
+                        <View style={s.cardRow}>
+                          {upcomingTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                        </View>
+                        <Pressable onPress={() => setShowAllUpcoming(false)} style={s.showMoreBtn}>
+                          <Text style={s.showMoreLink}>Show less ↑</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+                          {upcomingTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                        </ScrollView>
+                        {upcomingTrips.length > 3 && (
+                          <Pressable onPress={() => setShowAllUpcoming(true)} style={s.showMoreBtn}>
+                            <Text style={s.showMoreLink}>Show all {upcomingTrips.length} trips \u2192</Text>
+                          </Pressable>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
 
                 {completedTrips.length > 0 && (
                   <>
                     <Text style={[s.sectionSub, { marginTop: 20 }]}>COMPLETED</Text>
-                    <View style={s.cardRow}>
-                      {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
-                    </View>
+                    {showAllCompleted ? (
+                      <>
+                        <View style={s.cardRow}>
+                          {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                        </View>
+                        <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
+                          <Text style={s.showMoreLink}>Show less ↑</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+                          {completedTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                        </ScrollView>
+                        {completedTrips.length > 3 && (
+                          <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
+                            <Text style={s.showMoreLink}>Show all {completedTrips.length} trips \u2192</Text>
+                          </Pressable>
+                        )}
+                      </>
+                    )}
                   </>
                 )}
               </View>
@@ -570,9 +606,27 @@ export default function TripsScreen() {
                   <Text style={s.sectionCount}>{completedTrips.length} trip{completedTrips.length !== 1 ? "s" : ""}</Text>
                 </View>
                 <Text style={s.sectionSub}>COMPLETED</Text>
-                <View style={s.cardRow}>
-                  {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
-                </View>
+                {showAllCompleted ? (
+                  <>
+                    <View style={s.cardRow}>
+                      {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                    </View>
+                    <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
+                      <Text style={s.showMoreLink}>Show less ↑</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+                      {completedTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                    </ScrollView>
+                    {completedTrips.length > 3 && (
+                      <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
+                        <Text style={s.showMoreLink}>Show all {completedTrips.length} trips \u2192</Text>
+                      </Pressable>
+                    )}
+                  </>
+                )}
               </View>
             )}
           </>
@@ -782,6 +836,8 @@ const s = StyleSheet.create({
   sectionCount: { fontFamily: F.semibold, fontSize: 14, fontWeight: "600", color: G.orange },
   sectionSub: { fontFamily: F.bold, fontSize: 11, fontWeight: "700", color: G.muted, letterSpacing: 0.8 },
   cardRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  showMoreBtn: { alignItems: "flex-end", paddingTop: 6 },
+  showMoreLink: { fontFamily: F.semibold, fontSize: 13, fontWeight: "600", color: G.orange },
 
   tripCard: {
     width: 160, height: 110, borderRadius: 14, overflow: "hidden",
