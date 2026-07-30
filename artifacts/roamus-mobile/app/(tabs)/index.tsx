@@ -245,6 +245,8 @@ export default function TripsScreen() {
   const [cachedTrips, setCachedTrips] = useState<Trip[] | null>(null);
   const [fromCache, setFromCache] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
+  const [showAllCompleted, setShowAllCompleted] = useState(false);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const fabAnim = useRef(new Animated.Value(0)).current;
   const fabCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
