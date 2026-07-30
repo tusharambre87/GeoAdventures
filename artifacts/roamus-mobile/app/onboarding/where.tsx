@@ -536,7 +536,7 @@ export default function WhereScreen() {
                       const selected = sel.includes(c.name);
                       return (
                         <Pressable
-                          key={c.name}
+                          key={`${c.name}-${c.country}`}
                           onPress={() => selectCity(c.name, c.country)}
                           style={[s.gridCard, { flex: 1 }, selected && s.gridCardSelected]}
                         >

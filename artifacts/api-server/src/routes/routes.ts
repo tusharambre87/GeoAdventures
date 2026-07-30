@@ -6406,11 +6406,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/travel/cities', async (req: any, res) => {
     try {
       const rows = await db.execute(drizzleSql`
-        SELECT city AS name, COUNT(*) AS stop_count, country
+        SELECT city AS name, COUNT(*) AS stop_count, 'US' AS country
         FROM stop_library
         WHERE country IN ('US', 'United States', 'USA')
           AND gp_verified_at IS NOT NULL
-        GROUP BY city, country
+        GROUP BY city
         HAVING COUNT(*) >= 15
         ORDER BY stop_count DESC
       `);
