@@ -126,7 +126,7 @@ const GRID_GAMES = [
   },
   {
     type: "guess-the-maps",
-    icon: "\uD83D\uDCCD",
+    icon: "\uD83D\uDDFA\uFE0F",
     name: "Guess The Maps",
     desc: "Name the country by its shape",
     tag: "GEO",
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
     width: "47.5%", borderRadius: 18, padding: 16, borderWidth: 2,
   },
   gridBadge: {
-    position: "absolute", top: 10, left: 10,
+    position: "absolute", top: 10, right: 10,
     backgroundColor: "#E8692A", borderRadius: 5,
     paddingHorizontal: 7, paddingVertical: 3,
   },
