@@ -207,7 +207,7 @@ function TripCard({ trip, small }: { trip: Trip; small?: boolean }) {
   function handlePress() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isCompleted) {
-      router.push(`/memories/${trip.id}` as any);
+      router.push(`/memories/${trip.id}/recap` as any);
     } else {
       router.push(`/trip/${trip.id}` as any);
     }
