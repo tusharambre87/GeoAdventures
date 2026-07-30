@@ -32,7 +32,7 @@ export function getCountryPath(numericId: number): string | null {
 
   const fc = getFeatureCollection();
   const feature = fc.features.find(
-    (f) => String(f.id) === String(numericId)
+    (f) => Number(f.id) === numericId
   ) as Feature<Geometry> | undefined;
 
   if (!feature || !feature.geometry) {

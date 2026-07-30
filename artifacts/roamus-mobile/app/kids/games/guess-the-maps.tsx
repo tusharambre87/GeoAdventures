@@ -23,12 +23,37 @@ import {
 } from "@/constants/guessMapsData";
 import { getCountryPath } from "@/utils/countryOutline";
 
-// ── Guess normalizer ─────────────────────────────────────────────────────────
+// ── Guess normalizer + fuzzy matcher ─────────────────────────────────────────
 // Strips accents, trims, and lowercases so "Cote d'Ivoire" matches "Côte d'Ivoire".
 function normalizeGuess(s: string): string {
   return s.trim().toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/['']/g, "'");
+}
+
+/** Levenshtein edit distance between two already-normalised strings. */
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Allowed edits: 1 for short names, 2 for names ≥ 6 chars, 3 for ≥ 12. */
+function fuzzyMatch(guess: string, answer: string): boolean {
+  const g = normalizeGuess(guess);
+  const a = normalizeGuess(answer);
+  if (g === a) return true;
+  const threshold = a.length >= 12 ? 3 : a.length >= 6 ? 2 : 1;
+  return editDistance(g, a) <= threshold;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -275,7 +300,7 @@ export default function GuessMapsGame() {
     const guess = inputText.trim();
     if (!guess) return;
 
-    const isCorrect = normalizeGuess(guess) === normalizeGuess(q.correct.name);
+    const isCorrect = fuzzyMatch(guess, q.correct.name);
     if (isCorrect) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setScore((p) => p + 1);
