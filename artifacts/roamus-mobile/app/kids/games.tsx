@@ -126,7 +126,7 @@ const GRID_GAMES = [
   },
   {
     type: "guess-the-maps",
-    icon: "\uD83D\uDDFA\uFE0F",
+    icon: "\uD83D\uDCCD",
     name: "Guess The Maps",
     desc: "Name the country by its shape",
     tag: "GEO",
