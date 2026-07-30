@@ -57,6 +57,8 @@ export default function DayHighlightsScreen() {
   const [localSelections, setLocalSelections] = useState<Record<number, SlotPhoto>>({});
   // Sharing in progress
   const [isSharing, setIsSharing] = useState(false);
+  // 'idle' | 'prefetching' | 'capturing'
+  const [shareStatus, setShareStatus] = useState<'idle' | 'prefetching' | 'capturing'>('idle');
   // Ref to the clean collage view for view-shot capture
   const collageRef = useRef<View>(null);
 
@@ -172,9 +174,28 @@ export default function DayHighlightsScreen() {
     }
 
     setIsSharing(true);
+    setShareStatus('prefetching');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      // Pre-fetch all remote photo URLs so the hidden collage has them in
+      // cache before captureRef takes its snapshot. Local file:// URIs
+      // (camera roll picks) are already on-device and don't need prefetching.
+      const remoteUrls = displayPhotos
+        .filter((slot): slot is SlotPhoto => slot !== null && /^https?:\/\//.test(slot.photoUrl))
+        .map(slot => slot.photoUrl);
+
+      if (remoteUrls.length > 0) {
+        const PREFETCH_TIMEOUT_MS = 5000;
+        const timeout = new Promise<void>(resolve => setTimeout(resolve, PREFETCH_TIMEOUT_MS));
+        const prefetchAll = Promise.all(
+          remoteUrls.map(url => ExpoImage.prefetch(url).catch(() => null)),
+        );
+        await Promise.race([prefetchAll, timeout]);
+      }
+
+      setShareStatus('capturing');
+
       const uri = await captureRef(collageRef, {
         format: 'jpg',
         quality: 0.92,
@@ -191,6 +212,7 @@ export default function DayHighlightsScreen() {
       Alert.alert('Could not share', 'Something went wrong capturing the collage. Try again.');
     } finally {
       setIsSharing(false);
+      setShareStatus('idle');
     }
   }
 
@@ -318,7 +340,9 @@ export default function DayHighlightsScreen() {
             {isSharing ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <ActivityIndicator size="small" color="#fff" />
-                <Text style={styles.shareBtnText}>Preparing collage…</Text>
+                <Text style={styles.shareBtnText}>
+                  {shareStatus === 'prefetching' ? 'Loading photos…' : 'Preparing collage…'}
+                </Text>
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
