@@ -599,6 +599,7 @@ export default function TodayScreen() {
   const [showMenu, setShowMenu]                 = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [kidsXp, setKidsXp]                     = useState<number | null>(null);
+  const [dcHeroPhotoUrl, setDcHeroPhotoUrl]     = useState<string | null>(null);
   const [showReflectionSheet, setShowReflectionSheet] = useState(false);
   const [reflectionSaved, setReflectionSaved]         = useState(false);
   const [rainAlert, setRainAlert]               = useState<{ chance: number } | null>(null);
@@ -878,6 +879,19 @@ export default function TodayScreen() {
       .then(prog => setKidsXp(prog.xp ?? null))
       .catch(() => {});
   }, [todayState, resolvedTripId, trip]);
+
+  // ── Eagerly fetch Day Highlights hero photo when day is complete ──
+  useEffect(() => {
+    if (todayState !== 'day_complete') return;
+    if (!resolvedTripId) return;
+    setDcHeroPhotoUrl(null);
+    memoriesAPI.getDayHighlights(resolvedTripId, resolvedDayIndex)
+      .then(h => {
+        const url = h?.selectedPhotos?.[0]?.photoUrl ?? null;
+        setDcHeroPhotoUrl(url);
+      })
+      .catch(() => {});
+  }, [todayState, resolvedTripId, resolvedDayIndex]);
 
   // ── Load trip ──
   const loadTrip = useCallback(async () => {
@@ -3846,7 +3860,14 @@ export default function TodayScreen() {
                 } as never);
               }}
             >
-              <Text style={dc.highlightsBtnEmoji}>{'\uD83C\uDF89'}</Text>
+              {dcHeroPhotoUrl ? (
+                <Image
+                  source={{ uri: dcHeroPhotoUrl }}
+                  style={dc.highlightsBtnThumb}
+                />
+              ) : (
+                <Text style={dc.highlightsBtnEmoji}>{'\uD83C\uDF89'}</Text>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={dc.highlightsBtnTitle}>Day {resolvedDayIndex + 1} Highlights</Text>
                 <Text style={dc.highlightsBtnSub}>Photos, quotes & day recap</Text>
@@ -4836,6 +4857,7 @@ const dc = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   highlightsBtnEmoji: { fontSize: 22 },
+  highlightsBtnThumb: { width: 60, height: 60, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)' },
   highlightsBtnTitle: { fontFamily: F.bold, fontSize: 15, color: '#fff', marginBottom: 2 },
   highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.55)' },
   highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.4)' },
