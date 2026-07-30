@@ -124,6 +124,20 @@ const GRID_GAMES = [
     badge: "NEW" as string | undefined,
     route: "kids/games/flag-quiz" as string | undefined,
   },
+  {
+    type: "guess-the-maps",
+    icon: "\uD83D\uDDFA\uFE0F",
+    name: "Guess The Maps",
+    desc: "Name the country by its shape",
+    tag: "GEO",
+    tagBg: "#FFEDD5",
+    tagColor: "#C2410C",
+    cardBg: "#FFF7ED",
+    border: "#FDBA74",
+    titleColor: "#C2410C",
+    badge: "NEW" as string | undefined,
+    route: "kids/games/guess-the-maps" as string | undefined,
+  },
 ];
 
 export default function GameHub() {
