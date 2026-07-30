@@ -1,12 +1,15 @@
 /**
  * Day Highlights screen
- * Shown after wrapping a day — curated photo grid, kid quote, day summary.
- * Entry point: "Day N Highlights" button on the day-complete card in today.tsx
+ * — 2×2 swappable photo grid (swap from day photos or upload from library)
+ * — Captures the collage with react-native-view-shot
+ * — Shares natively (Instagram, Facebook, Messages…) via expo-sharing
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
 
 import { memoriesAPI } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
@@ -31,15 +37,28 @@ const C = {
   border:   'rgba(255,255,255,0.12)',
   text:     '#FFFFFF',
   muted:    'rgba(255,255,255,0.55)',
-  green:    '#059669',
 } as const;
+
+type SlotPhoto = {
+  stopId: string;
+  stopName: string;
+  photoUrl: string;
+  isHeroStop: boolean;
+};
 
 export default function DayHighlightsScreen() {
   const { tripId, dayIndex: dayIndexParam } = useLocalSearchParams<{ tripId: string; dayIndex: string }>();
   const dayIndex = parseInt(dayIndexParam ?? '0', 10);
   const insets = useSafeAreaInsets();
-  const [swapTarget, setSwapTarget] = useState<number | null>(null); // index into selectedPhotos
-  const [localSelections, setLocalSelections] = useState<Record<number, { stopId: string; stopName: string; photoUrl: string; isHeroStop: boolean }>>({});
+
+  // Which slot is open in the swap picker (null = closed)
+  const [swapTarget, setSwapTarget] = useState<number | null>(null);
+  // Local overrides for each of the 4 slots
+  const [localSelections, setLocalSelections] = useState<Record<number, SlotPhoto>>({});
+  // Sharing in progress
+  const [isSharing, setIsSharing] = useState(false);
+  // Ref to the clean collage view for view-shot capture
+  const collageRef = useRef<View>(null);
 
   const { data: highlights, isLoading, isError, refetch } = useQuery({
     queryKey: ['day-highlights', tripId, dayIndex],
@@ -47,6 +66,8 @@ export default function DayHighlightsScreen() {
     enabled: !!tripId && !isNaN(dayIndex),
     staleTime: 60_000,
   });
+
+  // ── Loading / error states ──────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -65,7 +86,7 @@ export default function DayHighlightsScreen() {
         <Text style={{ fontFamily: F.bold, fontSize: 17, color: '#fff', marginBottom: 8, textAlign: 'center' }}>
           Couldn't load highlights
         </Text>
-        <Text style={{ fontFamily: F.regular, fontSize: 14, color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 24 }}>
+        <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.muted, textAlign: 'center', marginBottom: 24 }}>
           Check your connection and try again.
         </Text>
         <TouchableOpacity
@@ -75,46 +96,105 @@ export default function DayHighlightsScreen() {
           <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>Try again</Text>
         </TouchableOpacity>
         <TouchableOpacity style={{ marginTop: 16, padding: 8 }} onPress={() => router.back()}>
-          <Text style={{ fontFamily: F.medium, fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Go back</Text>
+          <Text style={{ fontFamily: F.medium, fontSize: 14, color: C.muted }}>Go back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  // ── Data helpers ────────────────────────────────────────────────────────
+
   const h = highlights;
   const dayNum = dayIndex + 1;
 
-  // Merge local slot swaps into selectedPhotos
-  const displayPhotos = h?.selectedPhotos
-    ? h.selectedPhotos.map((p, i) => localSelections[i] ?? p)
-    : [];
+  const displayPhotos: (SlotPhoto | null)[] = Array.from({ length: 4 }, (_, i) => {
+    if (localSelections[i]) return localSelections[i];
+    return h?.selectedPhotos?.[i] ?? null;
+  });
 
-  // Pad to 4 slots (null = empty placeholder)
-  const slots: (typeof displayPhotos[0] | null)[] = [
-    ...displayPhotos,
-    ...Array(Math.max(0, 4 - displayPhotos.length)).fill(null),
-  ];
+  const filledCount = displayPhotos.filter(Boolean).length;
 
-  function handleSlotPress(idx: number) {
-    if (!h?.allDayPhotos?.length) return;
+  // ── Handlers ────────────────────────────────────────────────────────────
+
+  function openSwapPicker(idx: number) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSwapTarget(idx);
   }
 
-  function handleSwapPick(photo: { stopId: string; stopName: string; photoUrl: string }) {
+  function pickFromDay(photo: { stopId: string; stopName: string; photoUrl: string }) {
     if (swapTarget === null) return;
-    const current = displayPhotos[swapTarget];
+    const cur = displayPhotos[swapTarget];
     setLocalSelections(prev => ({
       ...prev,
-      [swapTarget]: {
-        stopId: photo.stopId,
-        stopName: photo.stopName,
-        photoUrl: photo.photoUrl,
-        isHeroStop: current?.isHeroStop ?? false,
+      [swapTarget]: { ...photo, isHeroStop: cur?.isHeroStop ?? false },
+    }));
+    setSwapTarget(null);
+  }
+
+  async function pickFromLibrary() {
+    if (swapTarget === null) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow photo library access to upload your own photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    const uri = result.assets[0].uri;
+    const cur = displayPhotos[swapTarget];
+    setLocalSelections(prev => ({
+      ...prev,
+      [swapTarget!]: {
+        stopId: 'custom',
+        stopName: 'My photo',
+        photoUrl: uri,
+        isHeroStop: cur?.isHeroStop ?? false,
       },
     }));
     setSwapTarget(null);
   }
+
+  async function handleShareCollage() {
+    if (filledCount === 0) {
+      Alert.alert('No photos yet', 'Add at least one photo to the collage before sharing.');
+      return;
+    }
+
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (!isAvailable) {
+      Alert.alert('Sharing not available', 'Native sharing is not available on this device.');
+      return;
+    }
+
+    setIsSharing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const uri = await captureRef(collageRef, {
+        format: 'jpg',
+        quality: 0.92,
+        result: 'tmpfile',
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/jpeg',
+        dialogTitle: `Day ${dayNum} Highlights`,
+        UTI: 'public.jpeg', // iOS
+      });
+    } catch (err) {
+      console.error('[highlights] share failed', err);
+      Alert.alert('Could not share', 'Something went wrong capturing the collage. Try again.');
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.root}>
@@ -132,10 +212,7 @@ export default function DayHighlightsScreen() {
         >
           <Pressable
             style={styles.backBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
             hitSlop={12}
           >
             <Text style={styles.backBtnText}>{'\u2190'} Back</Text>
@@ -149,16 +226,18 @@ export default function DayHighlightsScreen() {
           )}
         </LinearGradient>
 
-        {/* 2×2 Photo grid */}
+        {/* ── 2×2 Photo grid (interactive — shows swap hints) ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>TODAY'S PHOTOS</Text>
-          <Text style={styles.sectionHint}>Tap a photo to swap it</Text>
+          <Text style={styles.sectionLabel}>YOUR COLLAGE</Text>
+          <Text style={styles.sectionHint}>Tap any slot to swap from today's photos or your library</Text>
+
+          {/* This interactive grid is what the user sees and taps */}
           <View style={styles.photoGrid}>
-            {slots.map((slot, i) => (
+            {displayPhotos.map((slot, i) => (
               <Pressable
                 key={i}
                 style={[styles.photoSlot, slot?.isHeroStop && styles.photoSlotHero]}
-                onPress={() => handleSlotPress(i)}
+                onPress={() => openSwapPicker(i)}
               >
                 {slot ? (
                   <>
@@ -183,12 +262,63 @@ export default function DayHighlightsScreen() {
                   </>
                 ) : (
                   <View style={styles.emptySlot}>
-                    <Text style={styles.emptySlotPlus}>+</Text>
+                    <Text style={styles.emptySlotIcon}>{'\uD83D\uDDBC'}</Text>
+                    <Text style={styles.emptySlotText}>Add photo</Text>
                   </View>
                 )}
               </Pressable>
             ))}
           </View>
+
+          {/* ── Hidden clean collage — captured by view-shot ── */}
+          {/* Positioned off-screen so it never flickers into view */}
+          <View
+            ref={collageRef}
+            collapsable={false}
+            style={styles.hiddenCollage}
+          >
+            {displayPhotos.map((slot, i) => (
+              <View key={i} style={styles.collageCell}>
+                {slot ? (
+                  <ExpoImage
+                    source={{ uri: slot.photoUrl }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: '#163830', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ fontSize: 32 }}>{'\uD83C\uDF89'}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* ── Share Collage button ── */}
+        <View style={styles.shareSection}>
+          <TouchableOpacity
+            style={[styles.shareBtn, isSharing && styles.shareBtnDisabled]}
+            activeOpacity={0.85}
+            disabled={isSharing}
+            onPress={handleShareCollage}
+          >
+            {isSharing ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.shareBtnText}>Preparing collage…</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 20 }}>{'\uD83D\uDCF2'}</Text>
+                <Text style={styles.shareBtnText}>Share Collage</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.shareHint}>
+            Opens your share sheet — Instagram, Facebook, Messages and more
+          </Text>
         </View>
 
         {/* Kid quote */}
@@ -224,16 +354,13 @@ export default function DayHighlightsScreen() {
         <TouchableOpacity
           style={styles.doneBtn}
           activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.back();
-          }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.back(); }}
         >
           <Text style={styles.doneBtnText}>Done {'\u2713'}</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Swap picker modal */}
+      {/* ── Swap picker modal ── */}
       <Modal
         visible={swapTarget !== null}
         transparent
@@ -244,16 +371,24 @@ export default function DayHighlightsScreen() {
           <Pressable style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]} onPress={e => e.stopPropagation()}>
             <View style={styles.modalGrip} />
             <Text style={styles.modalTitle}>Choose a photo</Text>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.pickerRow}
             >
+              {/* Upload from library — always first */}
+              <Pressable style={[styles.pickerThumb, styles.pickerUploadBtn]} onPress={pickFromLibrary}>
+                <Text style={{ fontSize: 28, marginBottom: 4 }}>{'\uD83D\uDDBC'}</Text>
+                <Text style={styles.pickerUploadText}>My{'\n'}library</Text>
+              </Pressable>
+
+              {/* Photos from the day */}
               {(h?.allDayPhotos ?? []).map((photo, i) => (
                 <Pressable
                   key={i}
                   style={styles.pickerThumb}
-                  onPress={() => handleSwapPick(photo)}
+                  onPress={() => pickFromDay(photo)}
                 >
                   <ExpoImage
                     source={{ uri: photo.photoUrl }}
@@ -264,11 +399,18 @@ export default function DayHighlightsScreen() {
                   <Text style={styles.pickerLabel} numberOfLines={1}>{photo.stopName}</Text>
                 </Pressable>
               ))}
+
+              {/* If no day photos at all */}
+              {(h?.allDayPhotos ?? []).length === 0 && (
+                <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontFamily: F.regular, fontSize: 11, color: C.muted, textAlign: 'center', padding: 8 }}>
+                    No photos from today yet
+                  </Text>
+                </View>
+              )}
             </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCancel}
-              onPress={() => setSwapTarget(null)}
-            >
+
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setSwapTarget(null)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </Pressable>
@@ -278,12 +420,16 @@ export default function DayHighlightsScreen() {
   );
 }
 
-const GRID_GAP = 8;
-const GRID_SIDE = '47.5%' as unknown as number;
+// ── Styles ────────────────────────────────────────────────────────────────
+
+// The hidden collage is square — 800×800 gives Instagram-quality capture
+const COLLAGE_SIZE = 800;
+const COLLAGE_CELL = COLLAGE_SIZE / 2 - 2; // 2px half-gap
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
+  // Hero
   hero: { paddingHorizontal: 20, paddingBottom: 28, alignItems: 'center' },
   backBtn: {
     alignSelf: 'flex-start', marginBottom: 12,
@@ -295,17 +441,16 @@ const styles = StyleSheet.create({
   heroLabel: { fontFamily: F.bold, fontSize: 24, color: C.text, letterSpacing: 0.5, marginBottom: 4 },
   heroMeta: { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.6)' },
 
+  // Section
   section: { paddingHorizontal: 16, marginTop: 24 },
-  sectionLabel: {
-    fontFamily: F.bold, fontSize: 10, letterSpacing: 1.2,
-    color: C.muted, marginBottom: 4,
-  },
+  sectionLabel: { fontFamily: F.bold, fontSize: 10, letterSpacing: 1.2, color: C.muted, marginBottom: 4 },
   sectionHint: { fontFamily: F.regular, fontSize: 11, color: C.muted, marginBottom: 12 },
 
-  // 2×2 grid
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  // Interactive 2×2 grid
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photoSlot: {
-    width: GRID_SIDE, aspectRatio: 1, borderRadius: 16,
+    width: '47.5%' as unknown as number,
+    aspectRatio: 1, borderRadius: 16,
     overflow: 'hidden', backgroundColor: C.card,
     borderWidth: 1.5, borderColor: C.border,
   },
@@ -328,10 +473,45 @@ const styles = StyleSheet.create({
   },
   swapHintText: { fontSize: 11 },
   emptySlot: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    borderRadius: 16, borderWidth: 1.5, borderColor: C.border, borderStyle: 'dashed',
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4,
+    borderRadius: 14, borderWidth: 1.5, borderColor: C.border, borderStyle: 'dashed',
   },
-  emptySlotPlus: { fontFamily: F.bold, fontSize: 28, color: C.muted },
+  emptySlotIcon: { fontSize: 22, opacity: 0.4 },
+  emptySlotText: { fontFamily: F.medium, fontSize: 11, color: C.muted },
+
+  // Hidden collage — off-screen, used only by view-shot
+  hiddenCollage: {
+    position: 'absolute',
+    top: -COLLAGE_SIZE * 2, // way off-screen
+    left: 0,
+    width: COLLAGE_SIZE,
+    height: COLLAGE_SIZE,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    backgroundColor: '#1C1410',
+  },
+  collageCell: {
+    width: COLLAGE_CELL,
+    height: COLLAGE_CELL,
+    overflow: 'hidden',
+    borderRadius: 0,
+  },
+
+  // Share section
+  shareSection: { paddingHorizontal: 16, marginTop: 20 },
+  shareBtn: {
+    backgroundColor: C.orange, borderRadius: 16,
+    paddingVertical: 18, alignItems: 'center',
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  shareBtnDisabled: { opacity: 0.6 },
+  shareBtnText: { fontFamily: F.bold, fontSize: 16, color: '#fff' },
+  shareHint: {
+    fontFamily: F.regular, fontSize: 12, color: C.muted,
+    textAlign: 'center', marginTop: 8,
+  },
 
   // Quote
   quoteCard: {
@@ -347,24 +527,18 @@ const styles = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 16, overflow: 'hidden',
     borderWidth: 1, borderColor: C.border,
   },
-  summaryRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    padding: 14,
-  },
+  summaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
   summaryRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
   summaryDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5, flexShrink: 0 },
-  summaryText: {
-    fontFamily: F.regular, fontSize: 13, color: 'rgba(255,255,255,0.8)',
-    lineHeight: 20, flex: 1,
-  },
+  summaryText: { fontFamily: F.regular, fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 20, flex: 1 },
 
-  // Done button
+  // Done
   doneBtn: {
-    marginHorizontal: 16, marginTop: 28,
-    backgroundColor: C.orange, borderRadius: 16,
-    paddingVertical: 16, alignItems: 'center',
+    marginHorizontal: 16, marginTop: 20,
+    borderRadius: 16, paddingVertical: 16, alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.border,
   },
-  doneBtnText: { fontFamily: F.bold, fontSize: 16, color: C.text },
+  doneBtnText: { fontFamily: F.bold, fontSize: 15, color: C.muted },
 
   // Swap modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
@@ -382,6 +556,12 @@ const styles = StyleSheet.create({
     width: 110, height: 110, borderRadius: 14,
     overflow: 'hidden', backgroundColor: C.card,
   },
+  pickerUploadBtn: {
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: C.orange, borderStyle: 'dashed',
+    gap: 2,
+  },
+  pickerUploadText: { fontFamily: F.bold, fontSize: 11, color: C.orange, textAlign: 'center' },
   pickerLabel: {
     position: 'absolute', bottom: 6, left: 6, right: 6,
     fontFamily: F.bold, fontSize: 10, color: C.text,
