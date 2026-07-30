@@ -3155,9 +3155,11 @@ export function selectStopsFromPool(
   let learningHeavyCount = 0;
   const remaining = new Set(candidates);
 
-  // Normalized name dedup — catches &/and, "The X"/"X", "Regional Park", punctuation variants
+  // Normalized name dedup — catches &/and, "The X"/"X", "Regional Park", punctuation variants,
+  // parenthetical qualifiers ("Venue (Sub-attraction)"), and diacritic variants (café/cafe, Hōnaunau/Honaunau)
   const normStopName = (n: string): string =>
     n.toLowerCase()
+      .replace(/\s*\([^)]*\)/g, '')
       .replace(/^the\s+/, '')
       .replace(/\bunited\s+states\b/g, 'us')
       .replace(/\bmount\b/g, 'mt')
@@ -3168,6 +3170,7 @@ export function selectStopsFromPool(
       .replace(/\s+national\s+park\b/g, '')
       .replace(/\s+county\s+park\b/g, '')
       .replace(/&/g, 'and')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9 ]/g, '')
       .replace(/\s+/g, ' ')
       .trim()
