@@ -2,7 +2,7 @@
  * Active Trip Memory Index — per-stop photo grids + capture
  * Brief: memories-replit-brief.md — Screen 2
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -60,9 +60,11 @@ function formatTime(d?: string | null): string {
 }
 
 export default function TripMemoryIndex() {
-  const { tripId, dayIndex: dayIndexParam } = useLocalSearchParams<{ tripId: string; dayIndex?: string }>();
+  const { tripId, dayIndex: dayIndexParam, stopId: focusStopId } = useLocalSearchParams<{ tripId: string; dayIndex?: string; stopId?: string }>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const stopYOffsets = useRef<Record<string, number>>({});
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [instagramSharing, setInstagramSharing] = useState(false);
@@ -73,6 +75,16 @@ export default function TripMemoryIndex() {
   // When opened from "Wrap Day", dayIndex is set — show day-level "Today's Story" view
   const focusDayIndex = dayIndexParam != null && dayIndexParam !== '' ? Number(dayIndexParam) : null;
   const isDayView = focusDayIndex != null && !isNaN(focusDayIndex);
+
+  // When opened from the journey map with a stopId, scroll to that stop
+  useEffect(() => {
+    if (!focusStopId || isDayView) return;
+    const y = stopYOffsets.current[focusStopId];
+    if (y != null) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusStopId, isDayView]);
 
   const { data: trip, isLoading: tripLoading, isError: tripError } = useQuery({
     queryKey: ['trip', tripId],
@@ -580,6 +592,7 @@ export default function TripMemoryIndex() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
       >
@@ -600,9 +613,20 @@ export default function TripMemoryIndex() {
             m.photoUrls?.length ? m.photoUrls : m.photoUrl ? [m.photoUrl] : []
           );
           const visitedAt = stop.visitedAt ?? stop.updatedAt ?? null;
+          const isFocused = focusStopId === stop.id;
 
           return (
-            <View key={stop.id}>
+            <View
+              key={stop.id}
+              onLayout={(e) => {
+                stopYOffsets.current[stop.id] = e.nativeEvent.layout.y;
+                // Scroll once layout is known if this is the focus stop
+                if (isFocused) {
+                  scrollRef.current?.scrollTo({ y: Math.max(0, e.nativeEvent.layout.y - 16), animated: true });
+                }
+              }}
+              style={isFocused ? styles.focusedStop : undefined}
+            >
               {/* Stop header row */}
               <View style={styles.stopRow}>
                 <View style={styles.stopIconWrap}>
@@ -734,6 +758,11 @@ const styles = StyleSheet.create({
   },
   stopName: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.deep },
   stopTime: { fontSize: 12, fontFamily: F.regular, color: C.muted },
+  focusedStop: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#E8692A',
+    backgroundColor: 'rgba(232,105,42,0.04)',
+  },
 
   photoGrid: {
     flexDirection: 'row',
