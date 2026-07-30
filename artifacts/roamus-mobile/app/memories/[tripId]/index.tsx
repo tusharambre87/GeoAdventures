@@ -627,6 +627,7 @@ export default function TripMemoryIndex() {
               }}
               style={isFocused ? styles.focusedStop : undefined}
             >
+              {isFocused && <View style={styles.focusedIndicator} />}
               {/* Stop header row */}
               <View style={styles.stopRow}>
                 <View style={styles.stopIconWrap}>
@@ -759,9 +760,14 @@ const styles = StyleSheet.create({
   stopName: { flex: 1, fontSize: 14, fontFamily: F.bold, color: C.deep },
   stopTime: { fontSize: 12, fontFamily: F.regular, color: C.muted },
   focusedStop: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#E8692A',
     backgroundColor: 'rgba(232,105,42,0.04)',
+  },
+  focusedIndicator: {
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0,
+    width: 3,
+    backgroundColor: '#E8692A',
+    zIndex: 1,
   },
 
   photoGrid: {
