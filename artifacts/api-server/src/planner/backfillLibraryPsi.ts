@@ -144,6 +144,8 @@ async function run(): Promise<void> {
       city: stopLibrary.city,
       country: stopLibrary.country,
       stopType: stopLibrary.stopType,
+      gpRating: stopLibrary.gpRating,
+      gpRatingsTotal: stopLibrary.gpRatingsTotal,
     })
     .from(stopLibrary)
     .where(cityFilter)
@@ -212,11 +214,12 @@ async function run(): Promise<void> {
           totalEnriched++;
 
           // Step 4 — score against all 4 canonical profiles
-          let classicScores = computeScores(enriched, CANONICAL_PROFILES[1].family);
+          const gpData = { gpRating: stop.gpRating ?? null, gpRatingsTotal: stop.gpRatingsTotal ?? null };
+          let classicScores = computeScores(enriched, CANONICAL_PROFILES[1].family, gpData);
 
           const profileUpdates: Record<string, number> = {};
           for (const { id, family } of CANONICAL_PROFILES) {
-            const scores = computeScores(enriched, { ...family, stopType: stop.stopType ?? undefined });
+            const scores = computeScores(enriched, { ...family, stopType: stop.stopType ?? undefined }, gpData);
             profileUpdates[`${id}Final`] = scores.finalScore;
             profileUpdates[`${id}KidFit`] = scores.ageAndKidFitScore;
             if (id === "classic") classicScores = scores;
