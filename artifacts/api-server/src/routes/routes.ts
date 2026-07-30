@@ -14473,6 +14473,168 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  // ── Day Highlights ─────────────────────────────────────────────────────────
+  // GET /api/travel/trips/:tripId/days/:dayIndex/highlights
+  // Returns curated photos, kid quote, and summary lines for the Day Highlights screen.
+  app.get('/api/travel/trips/:tripId/days/:dayIndex/highlights', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const { tripId, dayIndex: dayIndexParam } = req.params;
+      const dayIndex = parseInt(dayIndexParam, 10);
+      if (isNaN(dayIndex) || dayIndex < 0) {
+        return res.status(400).json({ message: 'dayIndex must be a non-negative integer' });
+      }
+
+      const userId = req.user?.claims?.sub;
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+      // Ownership check
+      const hlTrip = await storage.getTripById(tripId);
+      if (!hlTrip) return res.status(404).json({ message: 'Trip not found' });
+      if (hlTrip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
+
+      // 1. Fetch all stops for this day
+      const dayStops = await db
+        .select({
+          id: travelStops.id,
+          name: travelStops.name,
+          displayOrder: travelStops.displayOrder,
+          isVisited: travelStops.isVisited,
+        })
+        .from(travelStops)
+        .where(and(eq(travelStops.tripId, tripId), eq(travelStops.dayIndex, dayIndex)))
+        .orderBy(asc(travelStops.displayOrder));
+
+      const stopsVisited = dayStops.filter(s => s.isVisited).length;
+
+      if (dayStops.length === 0) {
+        return res.json({ dayIndex, stopsVisited: 0, selectedPhotos: [], allDayPhotos: [], quote: null, summaryLines: [] });
+      }
+
+      const stopIds = dayStops.map(s => s.id);
+
+      // 2. Fetch quality signals and build best-rank-per-stop map
+      // Ranking: standout_stop (4) > worth_it (3) > favorite (2) > worth_it_followup (1)
+      //          > no positive signal (0) > skipped (−1)
+      const SIGNAL_RANK: Record<string, number> = {
+        standout_stop: 4,
+        worth_it: 3,
+        favorite: 2,
+        worth_it_followup: 1,
+        skipped: -1,
+      };
+      const signals = await db
+        .select({ stopId: stopQualitySignals.stopId, signalType: stopQualitySignals.signalType })
+        .from(stopQualitySignals)
+        .where(and(eq(stopQualitySignals.tripId, tripId), inArray(stopQualitySignals.stopId, stopIds)));
+
+      const bestSignal = new Map<string, number>();
+      for (const sig of signals) {
+        const rank = SIGNAL_RANK[sig.signalType] ?? 0;
+        const cur = bestSignal.get(sig.stopId) ?? 0;
+        if (rank > cur) bestSignal.set(sig.stopId, rank);
+      }
+
+      // 3. Fetch moments with photos for these stops
+      const moments = await db
+        .select({
+          id: travelMoments.id,
+          stopId: travelMoments.stopId,
+          photoUrl: travelMoments.photoUrl,
+          photoUrls: travelMoments.photoUrls,
+          kidPromptResponse: travelMoments.kidPromptResponse,
+          createdAt: travelMoments.createdAt,
+        })
+        .from(travelMoments)
+        .where(and(eq(travelMoments.tripId, tripId), inArray(travelMoments.stopId, stopIds)))
+        .orderBy(asc(travelMoments.createdAt));
+
+      // Build per-stop photo arrays
+      const photosByStop = new Map<string, string[]>();
+      for (const m of moments) {
+        if (!m.stopId) continue;
+        const photos: string[] = [
+          ...((m.photoUrls as string[] | null) ?? []),
+          ...(m.photoUrl ? [m.photoUrl] : []),
+        ].filter(Boolean);
+        if (photos.length === 0) continue;
+        const existing = photosByStop.get(m.stopId) ?? [];
+        photosByStop.set(m.stopId, [...existing, ...photos]);
+      }
+
+      // 4 & 5. Select up to 4 photos: top 2 hero stops (by rank) + 2 more in visit order
+      type SelectedPhoto = { stopId: string; stopName: string; photoUrl: string; isHeroStop: boolean };
+      const selectedPhotos: SelectedPhoto[] = [];
+      const usedStopIds = new Set<string>();
+
+      // Hero pass: top 2 stops by rank with photos
+      const rankedStops = [...dayStops].sort((a, b) => {
+        const ra = bestSignal.get(a.id) ?? 0;
+        const rb = bestSignal.get(b.id) ?? 0;
+        if (rb !== ra) return rb - ra;
+        return (a.displayOrder ?? 0) - (b.displayOrder ?? 0);
+      });
+      for (const stop of rankedStops) {
+        if (selectedPhotos.length >= 2) break;
+        const photos = photosByStop.get(stop.id);
+        if (!photos || photos.length === 0) continue;
+        // Most recent photo = last in the array (ordered by createdAt asc)
+        selectedPhotos.push({ stopId: stop.id, stopName: stop.name, photoUrl: photos[photos.length - 1], isHeroStop: true });
+        usedStopIds.add(stop.id);
+      }
+
+      // Fill remaining 2 slots from other stops in visit order
+      const stopsInOrder = [...dayStops].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      for (const stop of stopsInOrder) {
+        if (selectedPhotos.length >= 4) break;
+        if (usedStopIds.has(stop.id)) continue;
+        const photos = photosByStop.get(stop.id);
+        if (!photos || photos.length === 0) continue;
+        selectedPhotos.push({ stopId: stop.id, stopName: stop.name, photoUrl: photos[photos.length - 1], isHeroStop: false });
+        usedStopIds.add(stop.id);
+      }
+
+      // 7. All photos from every stop that day (for swap picker)
+      const allDayPhotos: { stopId: string; stopName: string; photoUrl: string }[] = [];
+      for (const stop of dayStops) {
+        for (const photoUrl of (photosByStop.get(stop.id) ?? [])) {
+          allDayPhotos.push({ stopId: stop.id, stopName: stop.name, photoUrl });
+        }
+      }
+
+      // 8. Kid quote — first kidPromptResponse found that day
+      let quote: { text: string; stopName: string } | null = null;
+      for (const m of moments) {
+        if (!m.kidPromptResponse) continue;
+        const raw = m.kidPromptResponse;
+        const pipeIdx = raw.indexOf('|');
+        const text = pipeIdx > 0 ? raw.slice(pipeIdx + 1).trim() : raw.trim();
+        if (!text) continue;
+        const stop = dayStops.find(s => s.id === m.stopId);
+        quote = { text, stopName: stop?.name ?? '' };
+        break;
+      }
+
+      // 9. Day summary lines from trip_day_memories
+      const [dayMemory] = await db
+        .select({ lines: tripDayMemories.lines })
+        .from(tripDayMemories)
+        .where(and(eq(tripDayMemories.tripId, tripId), eq(tripDayMemories.dayIndex, dayIndex)))
+        .limit(1);
+
+      return res.json({
+        dayIndex,
+        stopsVisited,
+        selectedPhotos,
+        allDayPhotos,
+        quote,
+        summaryLines: dayMemory?.lines ?? [],
+      });
+    } catch (error) {
+      console.error('[highlights] Error:', error);
+      res.status(500).json({ message: 'Failed to fetch day highlights' });
+    }
+  });
+
   // Skip-day: mark all unvisited stops for a specific day as isSkipped=true (NOT isVisited).
   // This preserves the distinction between "completed" and "skipped" stops for XP/story/recap systems.
   // Called once per missed day when the user taps "Continue from Day N" on the MissedDayCard.

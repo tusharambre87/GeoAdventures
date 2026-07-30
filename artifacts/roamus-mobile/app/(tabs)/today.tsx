@@ -3833,6 +3833,28 @@ export default function TodayScreen() {
             </View>
           </LinearGradient>
 
+          {/* Day Highlights entry point */}
+          {resolvedTripId && (
+            <TouchableOpacity
+              style={dc.highlightsBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push({
+                  pathname: '/days/[tripId]/[dayIndex]/highlights' as never,
+                  params: { tripId: resolvedTripId, dayIndex: String(resolvedDayIndex) },
+                } as never);
+              }}
+            >
+              <Text style={dc.highlightsBtnEmoji}>{'\uD83C\uDF89'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={dc.highlightsBtnTitle}>Day {resolvedDayIndex + 1} Highlights</Text>
+                <Text style={dc.highlightsBtnSub}>Photos, quotes & day recap</Text>
+              </View>
+              <Text style={dc.highlightsBtnArrow}>{'\u203A'}</Text>
+            </TouchableOpacity>
+          )}
+
           {children.length > 0 && (
             <View style={dc.card}>
               <Text style={dc.cardLabel}>KID QUOTES</Text>
@@ -4806,6 +4828,17 @@ const dc = StyleSheet.create({
   },
   completeBtnTitle: { fontFamily: F.bold, fontSize: 17, color: '#fff' },
   completeBtnSub:   { fontFamily: F.medium, fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  // Day Highlights entry button
+  highlightsBtn: {
+    marginHorizontal: 20, marginTop: 14, marginBottom: 2,
+    backgroundColor: '#163830', borderRadius: 16, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  highlightsBtnEmoji: { fontSize: 22 },
+  highlightsBtnTitle: { fontFamily: F.bold, fontSize: 15, color: '#fff', marginBottom: 2 },
+  highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.55)' },
+  highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.4)' },
   kidsZoneBtn: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimary, alignItems: 'center',

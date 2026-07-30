@@ -203,6 +203,24 @@ export type Moment = {
   createdAt?: string;
 };
 
+export type DayHighlights = {
+  dayIndex: number;
+  stopsVisited: number;
+  selectedPhotos: {
+    stopId: string;
+    stopName: string;
+    photoUrl: string;
+    isHeroStop: boolean;
+  }[];
+  allDayPhotos: {
+    stopId: string;
+    stopName: string;
+    photoUrl: string;
+  }[];
+  quote: { text: string; stopName: string } | null;
+  summaryLines: string[];
+};
+
 export type TripStory = {
   id: string;
   tripId: string;
@@ -234,6 +252,8 @@ export const memoriesAPI = {
     }),
   deleteMoment: (momentId: string) =>
     apiFetch(`/api/travel/moments/${momentId}`, { method: 'DELETE' }),
+  getDayHighlights: (tripId: string, dayIndex: number) =>
+    apiFetch<DayHighlights>(`/api/travel/trips/${tripId}/days/${dayIndex}/highlights`),
   getStory: (tripId: string) =>
     apiFetch<TripStory>(`/api/travel/trips/${tripId}/story`),
   regenerateStory: (tripId: string) =>
