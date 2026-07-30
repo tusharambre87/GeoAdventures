@@ -193,7 +193,7 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
   );
 }
 
-function TripCard({ trip }: { trip: Trip }) {
+function TripCard({ trip, small }: { trip: Trip; small?: boolean }) {
   const [bgErr, setBgErr] = React.useState(false);
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
@@ -202,16 +202,20 @@ function TripCard({ trip }: { trip: Trip }) {
     ? (CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl
         ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null))
     : null;
-  const isCompleted = trip.status === "completed";
+  const isCompleted = trip.status === "completed" || trip.status === "archived";
 
   function handlePress() {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/trip/${trip.id}` as any);
+    if (isCompleted) {
+      router.push(`/memories/${trip.id}` as any);
+    } else {
+      router.push(`/trip/${trip.id}` as any);
+    }
   }
 
   return (
     <Pressable
-      style={({ pressed }) => [s.tripCard, { opacity: pressed ? 0.9 : 1 }]}
+      style={({ pressed }) => [small ? s.tripCardSm : s.tripCard, { opacity: pressed ? 0.9 : 1 }]}
       onPress={handlePress}
     >
       {bg ? (
@@ -522,7 +526,7 @@ export default function TripsScreen() {
                         </ScrollView>
                         {upcomingTrips.length > 3 && (
                           <Pressable onPress={() => setShowAllUpcoming(true)} style={s.showMoreBtn}>
-                            <Text style={s.showMoreLink}>Show all {upcomingTrips.length} trips \u2192</Text>
+                            <Text style={s.showMoreLink}>Show all {upcomingTrips.length} trips {'\u2192'}</Text>
                           </Pressable>
                         )}
                       </>
@@ -536,7 +540,7 @@ export default function TripsScreen() {
                     {showAllCompleted ? (
                       <>
                         <View style={s.cardRow}>
-                          {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                          {completedTrips.map(t => <TripCard key={t.id} trip={t} small />)}
                         </View>
                         <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
                           <Text style={s.showMoreLink}>Show less ↑</Text>
@@ -549,7 +553,7 @@ export default function TripsScreen() {
                         </ScrollView>
                         {completedTrips.length > 3 && (
                           <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
-                            <Text style={s.showMoreLink}>Show all {completedTrips.length} trips \u2192</Text>
+                            <Text style={s.showMoreLink}>Show all {completedTrips.length} trips {'\u2192'}</Text>
                           </Pressable>
                         )}
                       </>
@@ -600,7 +604,7 @@ export default function TripsScreen() {
             </View>
 
             {completedTrips.length > 0 && (
-              <View style={s.section}>
+              <View style={[s.section, { marginTop: 20 }]}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>Past adventures</Text>
                   <Text style={s.sectionCount}>{completedTrips.length} trip{completedTrips.length !== 1 ? "s" : ""}</Text>
@@ -609,7 +613,7 @@ export default function TripsScreen() {
                 {showAllCompleted ? (
                   <>
                     <View style={s.cardRow}>
-                      {completedTrips.map(t => <TripCard key={t.id} trip={t} />)}
+                      {completedTrips.map(t => <TripCard key={t.id} trip={t} small />)}
                     </View>
                     <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
                       <Text style={s.showMoreLink}>Show less ↑</Text>
@@ -622,7 +626,7 @@ export default function TripsScreen() {
                     </ScrollView>
                     {completedTrips.length > 3 && (
                       <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
-                        <Text style={s.showMoreLink}>Show all {completedTrips.length} trips \u2192</Text>
+                        <Text style={s.showMoreLink}>Show all {completedTrips.length} trips {'\u2192'}</Text>
                       </Pressable>
                     )}
                   </>
@@ -674,6 +678,7 @@ export default function TripsScreen() {
 // ─── SwitchTripSheet ──────────────────────────────────────────────────────────
 
 const SCREEN_H = Dimensions.get('window').height;
+const SCREEN_W = Dimensions.get('window').width;
 
 function SwitchTripSheet({
   visible, trips, heroTripId, insets, onSelect, onClose,
@@ -841,6 +846,11 @@ const s = StyleSheet.create({
 
   tripCard: {
     width: 160, height: 110, borderRadius: 14, overflow: "hidden",
+    justifyContent: "flex-end",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
+  },
+  tripCardSm: {
+    width: Math.floor((SCREEN_W - 40 - 20) / 3), height: 90, borderRadius: 12, overflow: "hidden",
     justifyContent: "flex-end",
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
   },
