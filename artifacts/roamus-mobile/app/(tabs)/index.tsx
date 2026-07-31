@@ -587,6 +587,11 @@ export default function TripsScreen() {
                 </ScrollView>
               </View>
             )}
+
+            {/* Inspiration — shown when family has only one active trip and nothing else */}
+            {upcomingTripsForSection.length === 0 && completedTripsSorted.length === 0 && (
+              <InspirationSection />
+            )}
           </>
         ) : (
           <>
