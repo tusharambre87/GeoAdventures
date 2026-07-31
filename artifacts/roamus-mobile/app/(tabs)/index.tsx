@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
 import { travelAPI, type Trip, API_BASE } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
+import { getDestinationImage } from "@/app/discover/index";
 import { isFreePlan } from "@/lib/subscription";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { preCacheTrip } from "@/lib/tripCache";
@@ -50,14 +51,24 @@ function parseLocalDate(s: string | null | undefined): Date | null {
 
 function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePress, onDownloadPress }: { trip: Trip; offlineReady?: boolean; isDownloading?: boolean; user?: ReturnType<typeof useAuth>['user']; onUpgradePress?: () => void; onDownloadPress?: () => void }) {
   const [bgErr, setBgErr] = React.useState(false);
+  const [wikiImage, setWikiImage] = React.useState<string | null>(null);
   const isFree = isFreePlan(user?.subscriptionTier);
   const rawCity = trip.destination ?? "";
   const city = rawCity || (trip.name ?? "").replace(/\s+(family trip|trip|adventure)$/i, "").trim();
   const firstStopId = (trip as any).stops?.[0]?.id;
+  // Prefer family-uploaded photos, then cover, then wiki city photo
+  const staticBg = trip.firstPhotoUrl ?? trip.coverImageUrl ?? CITY_IMGS[city] ?? null;
   const bg = !bgErr
-    ? (CITY_IMGS[city] ?? trip.coverImageUrl ?? trip.firstPhotoUrl
-        ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null))
-    : null;
+    ? (staticBg ?? wikiImage ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null))
+    : wikiImage ?? null;
+
+  // Fetch wiki city photo as hero-image fallback
+  React.useEffect(() => {
+    if (staticBg) return;
+    let cancelled = false;
+    getDestinationImage(city).then(url => { if (!cancelled && url) setWikiImage(url); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [city, staticBg]);
 
   // ── Active day computation ──────────────────────────────────────────────────
   const today = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
@@ -112,8 +123,17 @@ function ActiveHeroCard({ trip, offlineReady, isDownloading, user, onUpgradePres
       <LinearGradient colors={['#1A3A2A', '#0D2118']} style={StyleSheet.absoluteFill} />
       {bg && (
         <>
-          <Image source={{ uri: bg }} style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} contentFit="cover" onError={() => setBgErr(true)} />
-          <LinearGradient colors={["transparent", "rgba(8,22,14,0.94)"]} locations={[0.15, 1]} style={StyleSheet.absoluteFill} />
+          <Image
+            source={{ uri: bg }}
+            style={[StyleSheet.absoluteFill, { opacity: staticBg || wikiImage ? 1 : 0.12 }]}
+            contentFit="cover"
+            onError={() => setBgErr(true)}
+          />
+          <LinearGradient
+            colors={staticBg || wikiImage ? ["rgba(8,22,14,0.25)", "rgba(8,22,14,0.88)"] : ["transparent", "rgba(8,22,14,0.94)"]}
+            locations={[0.15, 1]}
+            style={StyleSheet.absoluteFill}
+          />
         </>
       )}
 

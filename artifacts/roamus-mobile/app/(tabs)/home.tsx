@@ -86,11 +86,23 @@ function ActiveTripCard({
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
 
+  // Fall back to Wikipedia city photo when no user/cover photo is available
+  const [wikiImage, setWikiImage] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (imageUri) return;
+    const city = trip.city ?? trip.destination ?? "";
+    if (!city) return;
+    let cancelled = false;
+    getDestinationImage(city).then(url => { if (!cancelled && url) setWikiImage(url); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [imageUri, trip.city, trip.destination]);
+  const displayImage = imageUri ?? wikiImage;
+
   return (
     <Pressable style={ac.root} onPress={onPress} android_ripple={{ color: "rgba(255,255,255,0.1)" }}>
       {/* Background image */}
-      {imageUri ? (
-        <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      {displayImage ? (
+        <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: G.deep }]} />
       )}
@@ -417,7 +429,7 @@ export default function HomeScreen() {
         title="Trip Memories"
         subtitle="Relive your family's favourite moments"
         ctaLabel="See all"
-        accentColor="#7C3AED"
+        accentColor={G.orange}
         onPress={() => router.push("/(tabs)/memories" as any)}
       />
       <TeaserStrip
@@ -425,7 +437,7 @@ export default function HomeScreen() {
         title="Kids Zone"
         subtitle="See your rewards"
         ctaLabel="Explore"
-        accentColor={G.orange}
+        accentColor="#7C3AED"
         onPress={() => router.push("/(tabs)/kidszone" as any)}
       />
     </>

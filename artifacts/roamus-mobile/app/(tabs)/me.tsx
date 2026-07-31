@@ -602,7 +602,7 @@ export default function MeScreen() {
             <Text style={s.pickerTitle}>{"Who's exploring?"}</Text>
             <Text style={s.pickerSub}>Pick the explorer for this stop</Text>
             <View style={s.pickerList}>
-              {explorers.map((exp, i) => (
+              {explorers.filter(e => !e.isParent).map((exp, i) => (
                 <TouchableOpacity
                   key={exp.id}
                   style={s.pickerRow}

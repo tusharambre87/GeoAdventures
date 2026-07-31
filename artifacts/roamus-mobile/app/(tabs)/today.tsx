@@ -3906,34 +3906,6 @@ export default function TodayScreen() {
             </View>
           </LinearGradient>
 
-          {/* Day Highlights entry point */}
-          {resolvedTripId && (
-            <TouchableOpacity
-              style={dc.highlightsBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push({
-                  pathname: '/days/[tripId]/[dayIndex]/highlights' as never,
-                  params: { tripId: resolvedTripId, dayIndex: String(resolvedDayIndex) },
-                } as never);
-              }}
-            >
-              {dcHeroPhotoUrl ? (
-                <Image
-                  source={{ uri: dcHeroPhotoUrl }}
-                  style={dc.highlightsBtnThumb}
-                />
-              ) : (
-                <Text style={dc.highlightsBtnEmoji}>{'\uD83C\uDF89'}</Text>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={dc.highlightsBtnTitle}>Day {resolvedDayIndex + 1} Highlights</Text>
-                <Text style={dc.highlightsBtnSub}>Photos, quotes & day recap</Text>
-              </View>
-              <Text style={dc.highlightsBtnArrow}>{'\u203A'}</Text>
-            </TouchableOpacity>
-          )}
 
           {children.length > 0 && (
             <View style={dc.card}>
@@ -4032,111 +4004,131 @@ export default function TodayScreen() {
             </TouchableOpacity>
           )}
 
-          {dayWrapped ? (
+          {/* ── Primary CTA: Day 1 Highlights ── */}
+          {resolvedTripId && (
             <TouchableOpacity
-              style={dc.wrapBtn} activeOpacity={0.85}
-              onPress={() => router.push({ pathname: '/memories/[tripId]' as never, params: { tripId: trip!.id, dayIndex: String(resolvedDayIndex) } } as never)}
-            >
-              <Text style={dc.wrapBtnText}>{'✓'} Story saved — view Day {resolvedDayIndex + 1} again</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-          <View style={dc.storyStrip}>
-            <Text style={dc.storyTitle}>Your Day {resolvedDayIndex + 1} story is ready</Text>
-            <Text style={dc.storySub}>Auto-written from your stops — tap below to see it</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }]} activeOpacity={0.85}
-            disabled={isWrapping}
-            onPress={async () => {
-              setIsWrapping(true);
-              try {
-                if (trip?.id) {
-                  const filledPhotos = [...wrapPhotos];
-                  const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
-
-                  // Upload each filled photo; any failure stops the wrap and alerts the user
-                  if (filledPhotos.length > 0) {
-                    let cloudPhotoUrls: string[];
-                    try {
-                      const token = await AsyncStorage.getItem('auth_token');
-                      cloudPhotoUrls = await Promise.all(
-                        filledPhotos.map(async (localUri) => {
-                          const uploadRes = await FileSystem.uploadAsync(
-                            `${API_BASE}/api/travel/upload-photo`,
-                            localUri,
-                            {
-                              httpMethod: 'POST',
-                              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-                              fieldName: 'photo',
-                              headers: token ? { Authorization: `Bearer ${token}` } : {},
-                            },
-                          );
-                          if (uploadRes.status !== 200 && uploadRes.status !== 201) {
-                            throw new Error(`Upload failed: ${uploadRes.status}`);
-                          }
-                          const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
-                          if (!body.photoUrl) throw new Error('No URL in upload response');
-                          return body.photoUrl;
-                        }),
-                      );
-                    } catch (uploadErr) {
-                      Alert.alert(
-                        'Photo upload failed',
-                        'One or more photos couldn’t be saved. Please check your connection and try again.',
-                        [{ text: 'OK' }],
-                      );
-                      setIsWrapping(false);
-                      return;
+              style={[dc.highlightsBtn, isWrapping && { opacity: 0.75 }]}
+              activeOpacity={0.85}
+              disabled={isWrapping}
+              onPress={async () => {
+                if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                if (!dayWrapped && trip?.id) {
+                  setIsWrapping(true);
+                  try {
+                    const filledPhotos = [...wrapPhotos];
+                    const filledQuotes = Object.entries(kidQuotes).filter(([, v]) => v.trim().length > 0);
+                    if (filledPhotos.length > 0) {
+                      let cloudPhotoUrls: string[];
+                      try {
+                        const token = await AsyncStorage.getItem('auth_token');
+                        cloudPhotoUrls = await Promise.all(
+                          filledPhotos.map(async (localUri) => {
+                            const uploadRes = await FileSystem.uploadAsync(
+                              `${API_BASE}/api/travel/upload-photo`,
+                              localUri,
+                              {
+                                httpMethod: 'POST',
+                                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                                fieldName: 'photo',
+                                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                              },
+                            );
+                            if (uploadRes.status !== 200 && uploadRes.status !== 201) {
+                              throw new Error(`Upload failed: ${uploadRes.status}`);
+                            }
+                            const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+                            if (!body.photoUrl) throw new Error('No URL in upload response');
+                            return body.photoUrl;
+                          }),
+                        );
+                      } catch {
+                        Alert.alert(
+                          'Photo upload failed',
+                          "One or more photos couldn't be saved. Please check your connection and try again.",
+                          [{ text: 'OK' }],
+                        );
+                        setIsWrapping(false);
+                        return;
+                      }
+                      await memoriesAPI.createMoment({ tripId: trip.id, photoUrls: cloudPhotoUrls });
                     }
-                    await memoriesAPI.createMoment({
-                      tripId: trip.id,
-                      photoUrls: cloudPhotoUrls,
-                    });
-                  }
-
-                  for (const [key, quote] of filledQuotes) {
+                    for (const [key, quote] of filledQuotes) {
+                      try {
+                        const childName = key.startsWith('dw-') ? key.slice(3) : null;
+                        await memoriesAPI.createMoment({
+                          tripId: trip.id,
+                          kidPromptResponse: childName ? `${childName}|${quote.trim()}` : quote.trim(),
+                        });
+                      } catch { /* best-effort */ }
+                    }
                     try {
-                      const childName = key.startsWith('dw-') ? key.slice(3) : null;
-                      await memoriesAPI.createMoment({
-                        tripId: trip.id,
-                        kidPromptResponse: childName
-                          ? `${childName}|${quote.trim()}`
-                          : quote.trim(),
-                      });
+                      await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
                     } catch { /* best-effort */ }
+                    setDayWrapped(true);
+                  } finally {
+                    setIsWrapping(false);
                   }
                 }
-
-                // Mark day complete only after all memories are saved successfully
-                try {
-                  await apiFetch(`/api/travel/trips/${trip?.id}/complete-day`, { method: 'POST' });
-                } catch { /* best-effort */ }
-
                 router.push({
-                  pathname: '/memories/[tripId]' as never,
-                  params: { tripId: trip!.id, dayIndex: String(resolvedDayIndex) },
+                  pathname: '/days/[tripId]/[dayIndex]/highlights' as never,
+                  params: { tripId: resolvedTripId, dayIndex: String(resolvedDayIndex) },
                 } as never);
-                setDayWrapped(true);
-              } finally {
-                setIsWrapping(false);
-              }
-            }}
-          >
-            {isWrapping ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <ActivityIndicator size="small" color="#fff" />
-                <Text style={dc.wrapBtnText}>Saving photos…</Text>
-              </View>
-            ) : (
-              <Text style={dc.wrapBtnText}>Wrap Day {resolvedDayIndex + 1} — see your story</Text>
-            )}
-          </TouchableOpacity>
-            </>
+              }}
+            >
+              {isWrapping ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={dc.highlightsBtnTitle}>Saving...</Text>
+                </View>
+              ) : (
+                <>
+                  {dcHeroPhotoUrl ? (
+                    <Image source={{ uri: dcHeroPhotoUrl }} style={dc.highlightsBtnThumb} />
+                  ) : (
+                    <Text style={dc.highlightsBtnEmoji}>{String.fromCodePoint(0x1F389)}</Text>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={dc.highlightsBtnTitle}>Day {resolvedDayIndex + 1} Highlights</Text>
+                    <Text style={dc.highlightsBtnSub}>Photos, quotes & day recap</Text>
+                  </View>
+                  <Text style={dc.highlightsBtnArrow}>{'\u203A'}</Text>
+                </>
+              )}
+            </TouchableOpacity>
           )}
 
-          {/* Tomorrow prep card with stops + ticket alerts */}
+          {/* ── Secondary CTAs ── */}
+          <View style={dc.secondaryCtaRow}>
+            {kidsXp !== null && (
+              <View style={dc.kidsXpRow}>
+                <Text style={dc.kidsXpText}>
+                  {(trip?.travelers ?? []).filter(t => !t.isParent)[0]?.name ?? 'Explorer'} earned{' '}
+                  <Text style={dc.kidsXpNum}>{kidsXp} XP</Text> today
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={dc.kidsZoneBtn} activeOpacity={0.85}
+              onPress={() => {
+                const kzStop = dayStops[currentStopIndex];
+                Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
+                handleKidsZonePress(kzStop?.id ?? '', kzStop?.name ?? '', resolvedTripId ?? '');
+              }}
+            >
+              <Text style={dc.kidsZoneBtnText}>{String.fromCodePoint(0x1F9F8)} Kids Zone</Text>
+            </TouchableOpacity>
+
+            {resolvedDayIndex + 1 < totalDays && (
+              <TouchableOpacity
+                style={dc.tomorrowBtn} activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/(tabs)/trips' as never } as never)}
+              >
+                <Text style={dc.tomorrowBtnText}>See Tomorrow's Plan</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Tomorrow preview card */}
           {resolvedDayIndex + 1 < totalDays && (() => {
             const tomorrowStops = (trip?.stops ?? [])
               .filter(s => (s.dayIndex ?? 0) === resolvedDayIndex + 1)
@@ -4148,7 +4140,7 @@ export default function TodayScreen() {
                 <Text style={dc.tomorrowLabel}>TOMORROW</Text>
                 {ticketCount > 0 && (
                   <View style={dc.ticketAlert}>
-                    <Text style={dc.ticketAlertText}>{'\uD83C\uDFAB'} {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} needed</Text>
+                    <Text style={dc.ticketAlertText}>{String.fromCodePoint(0x1F3AB)} {ticketCount} ticket{ticketCount !== 1 ? 's' : ''} needed</Text>
                   </View>
                 )}
                 {tomorrowStops.map((s, i) => (
@@ -4161,33 +4153,13 @@ export default function TodayScreen() {
             );
           })()}
 
-          {/* Kids zone CTA */}
-          {kidsXp !== null && (
-            <View style={dc.kidsXpRow}>
-              <Text style={dc.kidsXpText}>
-                {(trip?.travelers ?? []).filter(t => !t.isParent)[0]?.name ?? 'Explorer'} earned{' '}
-                <Text style={dc.kidsXpNum}>{kidsXp} XP</Text> today
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={dc.kidsZoneBtn} activeOpacity={0.85}
-            onPress={() => {
-              const kzStop = dayStops[currentStopIndex];
-              Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
-              handleKidsZonePress(kzStop?.id ?? '', kzStop?.name ?? '', resolvedTripId ?? '');
-            }}
-          >
-            <Text style={dc.kidsZoneBtnText}>{'\uD83E\uDDF8'} Kids zone →</Text>
-          </TouchableOpacity>
-
-          {/* Complete trip CTA — visible on the last day of the trip */}
+          {/* Complete trip CTA */}
           {resolvedDayIndex + 1 >= totalDays && (trip as any)?.status !== 'completed' && (
             <TouchableOpacity
               style={dc.completeBtn} activeOpacity={0.85}
               onPress={() => setTodayState('trip_complete')}
             >
-              <Text style={dc.completeBtnTitle}>{'\uD83C\uDFC6'} Your trip is complete!</Text>
+              <Text style={dc.completeBtnTitle}>{String.fromCodePoint(0x1F3C6)} Your trip is complete!</Text>
               <Text style={dc.completeBtnSub}>Tap to wrap up and view your shareable story</Text>
             </TouchableOpacity>
           )}
@@ -4920,10 +4892,16 @@ const dc = StyleSheet.create({
   highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.78)' },
   highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.6)' },
   kidsZoneBtn: {
-    marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
-    backgroundColor: C.purplePrimary, alignItems: 'center',
+    borderRadius: 12, paddingVertical: 13,
+    backgroundColor: 'transparent', borderWidth: 2, borderColor: C.purplePrimary, alignItems: 'center',
   },
-  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
+  secondaryCtaRow: { marginHorizontal: 16, marginTop: 14, gap: 10 },
+  tomorrowBtn: {
+    borderRadius: 12, paddingVertical: 13,
+    backgroundColor: 'rgba(124,58,237,0.12)', alignItems: 'center',
+  },
+  tomorrowBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
 });
 
 // TRIP_COMPLETE
