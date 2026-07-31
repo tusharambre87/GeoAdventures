@@ -12127,6 +12127,11 @@ Return ONLY valid JSON in this exact format:
         imagePath = libRow?.imageUrl ?? null;
       }
 
+      // Full HTTP URLs (e.g. from stop_library) — redirect rather than stream
+      if (imagePath && (imagePath.startsWith('http://') || imagePath.startsWith('https://'))) {
+        return res.redirect(302, imagePath);
+      }
+
       if (!imagePath || !imagePath.startsWith('stop-images/')) return res.status(404).end();
       const bucket = objectStorageClient.bucket(bucketId);
       const file = bucket.file(imagePath);

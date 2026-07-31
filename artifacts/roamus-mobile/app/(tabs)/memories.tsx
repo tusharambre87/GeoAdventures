@@ -17,6 +17,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { travelAPI, Trip, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
+import { parseLocalDate } from '@/lib/tripUtils';
 
 const C = {
   orange:   '#E8692A',
@@ -48,10 +49,20 @@ function formatDate(d?: string | null): string {
 function getDayOf(trip: Trip): { current: number; total: number } {
   const total = trip.tripDays ?? 1;
   if (!trip.startDate) return { current: 1, total };
-  const start = new Date(trip.startDate);
-  const today = new Date();
+  const start = parseLocalDate(trip.startDate)!;
+  start.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   return { current: Math.max(1, Math.min(diff + 1, total)), total };
+}
+
+/** True when today (midnight-anchored) is on or after the trip's start date. */
+function tripHasStarted(trip: Trip): boolean {
+  if (!trip.startDate) return true; // no date → treat as started
+  const start = parseLocalDate(trip.startDate)!;
+  start.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return today.getTime() >= start.getTime();
 }
 
 function stopCount(trip: Trip): number {
@@ -159,7 +170,7 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
 
 type CompactCardVariant = 'current' | 'completed';
 
-function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: number; variant: CompactCardVariant }) {
+function CompactCard({ trip, gradIndex, variant, hasStarted = true }: { trip: Trip; gradIndex: number; variant: CompactCardVariant; hasStarted?: boolean }) {
   const [thumbErr, setThumbErr] = React.useState(false);
   const total_ = stopCount(trip);
   const firstStopId = (trip as any).stops?.[0]?.id;
@@ -191,9 +202,13 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
                 {hasStory ? '\u2728 Story' : 'Generate'}
               </Text>
             </View>
-          ) : (
+          ) : hasStarted ? (
             <View style={[s.badge, s.badgeInProgress]}>
               <Text style={[s.badgeText, s.badgeTextInProgress]}>In Progress</Text>
+            </View>
+          ) : (
+            <View style={[s.badge, s.badgeMuted]}>
+              <Text style={[s.badgeText, s.badgeTextMuted]}>Upcoming</Text>
             </View>
           )}
         </View>
@@ -204,8 +219,10 @@ function CompactCard({ trip, gradIndex, variant }: { trip: Trip; gradIndex: numb
           hasStory
             ? <Text style={s.compactQuote} numberOfLines={1}>"A trip worth remembering"</Text>
             : <Text style={s.compactGenerate}>Tap to generate story</Text>
-        ) : (
+        ) : hasStarted ? (
           <Text style={s.compactInProgressHint}>Tap to add memories</Text>
+        ) : (
+          <Text style={s.compactInProgressHint}>Starts {formatDate(trip.startDate)}</Text>
         )}
       </View>
       <Text style={s.chevron}>›</Text>
@@ -292,7 +309,7 @@ export default function MemoriesScreen() {
         <>
           <Text style={s.sectionLabel}>Upcoming ({otherCurrentTrips.length})</Text>
           {otherCurrentTrips.map((trip, i) => (
-            <CompactCard key={trip.id} trip={trip} gradIndex={i} variant="current" />
+            <CompactCard key={trip.id} trip={trip} gradIndex={i} variant="current" hasStarted={tripHasStarted(trip)} />
           ))}
         </>
       )}
