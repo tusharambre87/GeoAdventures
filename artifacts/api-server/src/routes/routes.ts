@@ -11,7 +11,7 @@ import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, i
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
-import { eq, and, lte, gt, desc, asc, or, ilike, inArray, notInArray, isNotNull, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, lte, gt, desc, asc, or, ilike, inArray, notInArray, isNotNull, isNull, sql as drizzleSql } from "drizzle-orm";
 import { sendWelcomeEmail, sendGeoAdventuresWelcomeEmail, sendTripCreatedEmail, sendTripStartsTomorrowEmail, sendDayCompleteEmail, sendTripCompleteEmail, sendWeeklyProgressEmail, sendDailyReminderEmail, sendVerificationEmail, sendPasswordResetEmail, sendPlayerInviteEmail, sendReviewNotification, sendFeedbackNotification, sendNegativeReviewNotification, sendCoParentInviteEmail } from "../email";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -14560,9 +14560,32 @@ Return ONLY valid JSON in this exact format:
         .where(and(eq(travelMoments.tripId, tripId), inArray(travelMoments.stopId, stopIds)))
         .orderBy(asc(travelMoments.createdAt));
 
+      // 3b. Also fetch trip-level moments (stopId = null) — these are photos/quotes
+      //     saved from the day-wrap screen which don't have a stop association.
+      const tripLevelMoments = await db
+        .select({
+          id: travelMoments.id,
+          stopId: travelMoments.stopId,
+          photoUrl: travelMoments.photoUrl,
+          photoUrls: travelMoments.photoUrls,
+          kidPromptResponse: travelMoments.kidPromptResponse,
+          createdAt: travelMoments.createdAt,
+        })
+        .from(travelMoments)
+        .where(and(eq(travelMoments.tripId, tripId), isNull(travelMoments.stopId)))
+        .orderBy(asc(travelMoments.createdAt));
+
+      // Treat trip-level photo moments as belonging to the first visited stop of the day
+      const firstStop = dayStops.find(s => s.isVisited) ?? dayStops[0];
+      const allMoments = [
+        ...moments,
+        // Attach a synthetic stopId so the rest of the pipeline handles them uniformly
+        ...tripLevelMoments.map(m => ({ ...m, stopId: m.stopId ?? firstStop?.id ?? null })),
+      ];
+
       // Build per-stop photo arrays
       const photosByStop = new Map<string, string[]>();
-      for (const m of moments) {
+      for (const m of allMoments) {
         if (!m.stopId) continue;
         const photos: string[] = [
           ...((m.photoUrls as string[] | null) ?? []),
@@ -14671,9 +14694,9 @@ Return ONLY valid JSON in this exact format:
         }
       }
 
-      // 8. Kid quote — first kidPromptResponse found that day
+      // 8. Kid quote — first kidPromptResponse found that day (includes trip-level wrap quotes)
       let quote: { text: string; stopName: string } | null = null;
-      for (const m of moments) {
+      for (const m of allMoments) {
         if (!m.kidPromptResponse) continue;
         const raw = m.kidPromptResponse;
         const pipeIdx = raw.indexOf('|');
