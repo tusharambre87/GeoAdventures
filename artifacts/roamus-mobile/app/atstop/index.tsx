@@ -1043,9 +1043,12 @@ export default function AtStopScreen() {
               <TouchableOpacity
                 style={{ backgroundColor: C.orange, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 28 }}
                 activeOpacity={0.85}
-                onPress={() => { setCurrentStop(null); setMode('picker'); }}
+                onPress={async () => {
+                  await AsyncStorage.setItem('today_state_override', 'force_day_complete');
+                  router.replace('/(tabs)/today' as any);
+                }}
               >
-                <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>See all stops</Text>
+                <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>{"Wrap up day \u2192"}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1053,10 +1056,13 @@ export default function AtStopScreen() {
           <TouchableOpacity
             style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 24 }}
             activeOpacity={0.7}
-            onPress={() => { setCurrentStop(null); setMode('picker'); }}
+            onPress={async () => {
+              await AsyncStorage.setItem('today_state_override', 'force_day_complete');
+              router.replace('/(tabs)/today' as any);
+            }}
           >
             <Text style={{ fontFamily: F.medium, fontSize: 14, color: 'rgba(255,255,255,0.65)', textAlign: 'center' }}>
-              View all stops
+              View day summary
             </Text>
           </TouchableOpacity>
         </ScrollView>

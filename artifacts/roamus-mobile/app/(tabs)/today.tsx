@@ -916,6 +916,12 @@ export default function TodayScreen() {
         if (override === 'force_morning') {
           forceReset = true;
           executionStartedRef.current = false;
+        } else if (override === 'force_day_complete') {
+          // All stops were completed in atstop — clear locks and let the state
+          // machine re-run; it will see all stops visited and land on day_complete.
+          forceReset = true;
+          executionStartedRef.current = false;
+          await AsyncStorage.multiRemove(['atStopElapsed', 'atStopFrozen', 'atStopFrozenTripId']);
         } else if (override === 'stop_complete') {
           await AsyncStorage.removeItem('atStopElapsed');
           await AsyncStorage.removeItem('atStopFrozen');
