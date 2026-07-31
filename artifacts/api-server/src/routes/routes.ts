@@ -14305,16 +14305,23 @@ Return ONLY valid JSON in this exact format:
         // Don't fail the trip completion if stamp creation fails
       }
       
-      const { generateTripStory } = await import("../storyGenerator");
-      const story = await generateTripStory(tripId);
-      
-      // Mark story as saved when generated during completion
-      if (story) {
-        await storage.updateTrip(tripId, { storySaved: true });
-        trip.storySaved = true;
-      }
+      // Respond immediately — story generation and email are off the critical path
+      res.json({ trip });
 
-      // Send trip-complete email (fire-and-forget)
+      // Background: generate trip story then mark it saved
+      (async () => {
+        try {
+          const { generateTripStory } = await import("../storyGenerator");
+          const story = await generateTripStory(tripId);
+          if (story) {
+            await storage.updateTrip(tripId, { storySaved: true });
+          }
+        } catch (storyErr) {
+          console.error("[TripComplete] Story generation failed:", storyErr);
+        }
+      })();
+
+      // Background: send trip-complete email (fire-and-forget)
       try {
         const [completedUser, tripStops, tripMoments] = await Promise.all([
           storage.getUser(req.user.claims.sub),
@@ -14338,8 +14345,6 @@ Return ONLY valid JSON in this exact format:
       } catch (emailErr) {
         console.error("[Email] Error gathering trip-complete email data:", emailErr);
       }
-
-      res.json({ trip, story });
     } catch (error) {
       console.error("Error completing trip:", error);
       res.status(500).json({ message: "Failed to complete trip" });

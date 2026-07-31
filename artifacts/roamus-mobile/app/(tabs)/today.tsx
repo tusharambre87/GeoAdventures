@@ -725,10 +725,22 @@ export default function TodayScreen() {
     }).catch(() => {});
   }, []);
 
-  // ── Mark trip completed server-side when trip_complete is reached (fire-and-forget) ──
+  // ── Mark trip completed server-side when trip_complete is reached ──
   useEffect(() => {
     if (todayState !== 'trip_complete' || !resolvedTripId) return;
-    apiFetch(`/api/travel/trips/${resolvedTripId}/complete`, { method: 'POST' }).catch(() => {});
+    const tripId = resolvedTripId;
+    async function markTripComplete(attempt = 1): Promise<void> {
+      try {
+        await apiFetch(`/api/travel/trips/${tripId}/complete`, { method: 'POST' });
+      } catch (err) {
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, attempt * 1000));
+          return markTripComplete(attempt + 1);
+        }
+        console.error('Trip completion failed after 3 attempts', tripId, err);
+      }
+    }
+    markTripComplete();
   }, [todayState, resolvedTripId]);
 
   // ── Fetch real kid quotes when trip is complete ──
