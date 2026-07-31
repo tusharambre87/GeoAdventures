@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { travelAPI, Trip, API_BASE } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 import { parseLocalDate } from '@/lib/tripUtils';
+import { useWikiPhoto } from '@/lib/useWikiPhoto';
 
 const C = {
   orange:   '#E8692A',
@@ -105,9 +106,12 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
   const total_ = stopCount(trip);
   const remaining = Math.max(0, total_ - visited);
   const [heroErr, setHeroErr] = React.useState(false);
-  const firstStopId = (trip as any).stops?.[0]?.id;
+  const tripCity: string = (trip as any).city ?? trip.destination ?? '';
+  const wikiFallback = useWikiPhoto(tripCity, '', undefined);
+  const firstStopId = (trip as any).stops?.find((s: any) => s.heroImageUrl)?.id ?? (trip as any).stops?.[0]?.id;
   const heroPhotoUrl = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
-    ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null);
+    ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null)
+    ?? (wikiFallback || null);
 
   return (
     <Pressable
@@ -118,7 +122,9 @@ function HeroCard({ trip, isExplicitlyActive, onAddPhoto }: { trip: Trip; isExpl
       <View style={s.heroPhotoArea}>
         {heroPhotoUrl && !heroErr
           ? <ExpoImage source={{ uri: heroPhotoUrl }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setHeroErr(true)} />
-          : <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
+          : heroErr && wikiFallback
+            ? <ExpoImage source={{ uri: wikiFallback }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            : <LinearGradient colors={['#1a3a5f', '#0d1f2d']} style={StyleSheet.absoluteFill} />
         }
         <LinearGradient
           colors={['transparent', 'rgba(26,31,46,0.2)', 'rgba(26,31,46,1)']}
@@ -173,7 +179,9 @@ type CompactCardVariant = 'current' | 'completed';
 function CompactCard({ trip, gradIndex, variant, hasStarted = true }: { trip: Trip; gradIndex: number; variant: CompactCardVariant; hasStarted?: boolean }) {
   const [thumbErr, setThumbErr] = React.useState(false);
   const total_ = stopCount(trip);
-  const firstStopId = (trip as any).stops?.[0]?.id;
+  const tripCity: string = (trip as any).city ?? trip.destination ?? '';
+  const wikiFallback = useWikiPhoto(tripCity, '', undefined);
+  const firstStopId = (trip as any).stops?.find((s: any) => s.heroImageUrl)?.id ?? (trip as any).stops?.[0]?.id;
   const thumbPhotoUrl = (trip as any).firstPhotoUrl ?? (trip as any).coverImageUrl
     ?? (firstStopId ? `${API_BASE}/api/travel/stops/${firstStopId}/hero-img` : null);
   const hasStory = !!(trip as any).storySaved;
@@ -188,7 +196,11 @@ function CompactCard({ trip, gradIndex, variant, hasStarted = true }: { trip: Tr
       <View style={s.compactThumb}>
         {thumbPhotoUrl && !thumbErr
           ? <ExpoImage source={{ uri: thumbPhotoUrl }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setThumbErr(true)} />
-          : <LinearGradient colors={gradPair(gradIndex)} style={StyleSheet.absoluteFill} />
+          : thumbErr && wikiFallback
+            ? <ExpoImage source={{ uri: wikiFallback }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            : wikiFallback && !thumbPhotoUrl
+              ? <ExpoImage source={{ uri: wikiFallback }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              : <LinearGradient colors={gradPair(gradIndex)} style={StyleSheet.absoluteFill} />
         }
       </View>
 
