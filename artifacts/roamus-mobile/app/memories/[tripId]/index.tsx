@@ -401,48 +401,56 @@ export default function TripMemoryIndex() {
             );
           })()}
 
-          {/* Kids Zone button — opens stop picker */}
-          {dayStops.length > 0 && (
-            <TouchableOpacity
-              style={dayStyles.kidsZoneBtn}
-              activeOpacity={0.85}
-              onPress={() => setShowKidsStopPicker(true)}
-            >
-              <Text style={dayStyles.kidsZoneBtnText}>{'\uD83E\uDDF8'} Revisit Kids Zone</Text>
-            </TouchableOpacity>
-          )}
-
           {/* Day reflection */}
           <DayReflectionsSection
             tripId={tripId}
             dayIndex={focusDayIndex !== null ? focusDayIndex : undefined}
           />
 
-          {/* Done CTA — returns to Today and advances to next day */}
-          {isDayView && focusDayIndex !== null && (
-            <TouchableOpacity
-              style={dayStyles.doneBtn}
-              activeOpacity={0.85}
-              onPress={async () => {
-                await AsyncStorage.setItem(
-                  `roamus_day_advanced_${tripId}`,
-                  String(focusDayIndex + 1)
-                ).catch(() => {});
-                router.navigate('/(tabs)/today' as never);
-              }}
-            >
-              <Text style={dayStyles.doneBtnText}>Done — see tomorrow’s plan →</Text>
-            </TouchableOpacity>
-          )}
+          {/* Secondary CTAs: Kids Zone (outline) + See Tomorrow's Plan (light fill) */}
+          <View style={dayStyles.secondaryRow}>
+            {dayStops.length > 0 && (
+              <TouchableOpacity
+                style={dayStyles.kidsZoneBtn}
+                activeOpacity={0.85}
+                onPress={() => setShowKidsStopPicker(true)}
+              >
+                <Text style={dayStyles.kidsZoneBtnText}>{'\uD83E\uDDF8'} Revisit Kids Zone</Text>
+              </TouchableOpacity>
+            )}
 
-          {/* Share section */}
-          <View style={[styles.shareSection, { marginTop: 8 }]}>
-            {/* Native share */}
-            <TouchableOpacity style={styles.shareBtn} onPress={shareDayNative}>
-              <Text style={styles.shareBtnText}>Share Day {dayNum}</Text>
-            </TouchableOpacity>
-
+            {isDayView && focusDayIndex !== null && (
+              <TouchableOpacity
+                style={dayStyles.doneBtn}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  await AsyncStorage.setItem(
+                    `roamus_day_advanced_${tripId}`,
+                    String(focusDayIndex + 1)
+                  ).catch(() => {});
+                  router.navigate('/(tabs)/today' as never);
+                }}
+              >
+                <Text style={dayStyles.doneBtnText}>See Tomorrow's Plan</Text>
+              </TouchableOpacity>
+            )}
           </View>
+
+          {/* Primary CTA: Day Highlights (replaces Share Day) */}
+          {isDayView && focusDayIndex !== null && (
+            <View style={[styles.shareSection, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={styles.shareBtn}
+                activeOpacity={0.85}
+                onPress={() => router.push({
+                  pathname: '/days/[tripId]/[dayIndex]/highlights' as never,
+                  params: { tripId, dayIndex: String(focusDayIndex) },
+                } as never)}
+              >
+                <Text style={styles.shareBtnText}>Day {dayNum} Highlights</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
 
         {/* Instagram photo picker + share modal */}
@@ -872,22 +880,22 @@ const dayStyles = StyleSheet.create({
 
   shareHint: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', marginTop: 8, textAlign: 'center' },
 
+  secondaryRow: { marginHorizontal: 20, marginTop: 12, gap: 10 },
   doneBtn: {
-    marginHorizontal: 20, marginBottom: 12,
-    backgroundColor: '#1A1F2E', borderRadius: 16, padding: 18,
+    borderRadius: 14, paddingVertical: 13,
     alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, elevation: 4,
+    backgroundColor: 'rgba(124,58,237,0.12)',
   },
-  doneBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#fff' },
+  doneBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: '#7C3AED' },
   kidsZoneBtn: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    backgroundColor: '#7C3AED',
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
     alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
   },
-  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#7C3AED' },
 
   unassignedTitle: {
     fontFamily: F.semibold,
