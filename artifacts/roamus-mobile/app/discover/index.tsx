@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -352,13 +353,13 @@ export default function DiscoverScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* Nav */}
       <View style={s.nav}>
-        <TouchableOpacity
-          style={s.backPill}
+        <Pressable
+          style={({ pressed }) => [s.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
           onPress={() => router.back()}
-          activeOpacity={0.7}
+          hitSlop={8}
         >
-          <Text style={s.backPillTxt}>‹ Back</Text>
-        </TouchableOpacity>
+          <Ionicons name="chevron-back" size={20} color={G.deep} />
+        </Pressable>
         <Text style={s.navTitle}>Discover</Text>
       </View>
 
@@ -483,12 +484,11 @@ const s = StyleSheet.create({
     height: 54, flexDirection: "row", alignItems: "center",
     paddingHorizontal: 16, gap: 12,
   },
-  backPill: {
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(26,31,46,0.08)", borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 7,
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(26,31,46,0.07)",
+    alignItems: "center", justifyContent: "center",
   },
-  backPillTxt: { fontFamily: F.bold, fontSize: 13, color: G.deep },
   navTitle: { fontFamily: F.bold, fontSize: 17, color: G.deep },
 
   tabsWrap: {

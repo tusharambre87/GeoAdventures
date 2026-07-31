@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/authContext";
 import { API_BASE, apiFetch } from "@/lib/apiClient";
 import { F, G } from "@/lib/tokens";
@@ -267,7 +268,7 @@ const ts = StyleSheet.create({
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const firstName = user?.firstName || user?.username || null;
 
   // ── Trips (for active-trip detection) ─────────────────────────────────────
@@ -366,7 +367,7 @@ export default function HomeScreen() {
   // ── Shared header ─────────────────────────────────────────────────────────
   const header = (
     <View style={s.header}>
-      <View>
+      <View style={{ flex: 1 }}>
         <Text style={s.greeting}>
           {greeting()}{firstName ? `, ${firstName}` : ""}
         </Text>
@@ -374,13 +375,22 @@ export default function HomeScreen() {
           {activeTrip ? "You have an active trip" : "Plan your next adventure"}
         </Text>
       </View>
-      <TouchableOpacity
-        style={s.planBtn}
-        activeOpacity={0.85}
-        onPress={() => router.push("/onboarding/where" as any)}
-      >
-        <Text style={s.planBtnTxt}>Plan a trip →</Text>
-      </TouchableOpacity>
+      <View style={s.headerActions}>
+        <TouchableOpacity
+          style={s.planBtn}
+          activeOpacity={0.85}
+          onPress={() => router.push("/onboarding/where" as any)}
+        >
+          <Text style={s.planBtnTxt}>Plan a trip →</Text>
+        </TouchableOpacity>
+        <Pressable
+          style={({ pressed }) => [s.logoutBtn, { opacity: pressed ? 0.7 : 1 }]}
+          onPress={() => logout()}
+          hitSlop={8}
+        >
+          <Ionicons name="log-out-outline" size={20} color={G.muted} />
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -598,11 +608,19 @@ const s = StyleSheet.create({
   },
   greeting: { fontFamily: F.bold, fontSize: 20, color: G.deep, letterSpacing: -0.3 },
   headerSub: { fontFamily: F.regular, fontSize: 13, color: G.muted, marginTop: 2 },
+  headerActions: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+  },
   planBtn: {
     backgroundColor: G.orange, borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 9,
   },
   planBtnTxt: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
+  logoutBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "rgba(26,31,46,0.07)",
+    alignItems: "center", justifyContent: "center",
+  },
 
   // Tabs
   tabsWrap: {
