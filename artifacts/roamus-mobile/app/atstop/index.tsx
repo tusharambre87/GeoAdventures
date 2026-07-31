@@ -534,6 +534,16 @@ export default function AtStopScreen() {
       AsyncStorage.getItem('atStopFrozen').then(v => setAtStopFrozen(v === 'true'));
     }, []),
   );
+  // Dev-only: time-shift anchor — mirrors the same mechanism in Today and Home.
+  const [devDate, setDevDate] = useState<Date | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('dev_date_override').then(raw => {
+        setDevDate(raw ? new Date(raw + 'T00:00:00') : null);
+      });
+    }, []),
+  );
+
   const navigation = useNavigation();
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -560,7 +570,7 @@ export default function AtStopScreen() {
   const isUserFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const tripNotStarted = !!trip?.startDate && (() => {
     const s = parseLocalDate(trip!.startDate!)!; s.setHours(0, 0, 0, 0);
-    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const t = devDate ? new Date(devDate) : new Date(); t.setHours(0, 0, 0, 0);
     return s > t;
   })();
   const tripStartLabel = trip?.startDate
@@ -689,7 +699,11 @@ export default function AtStopScreen() {
       const data = await apiFetch<{ trips: TripData[] }>('/api/travel/trips');
       // Pick the trip furthest into its run among all whose date range includes today.
       // No status preference — status can be stale; date arithmetic is the truth.
-      const todayMs = new Date().setHours(0, 0, 0, 0);
+      // Honour dev_date_override so test accounts see the right trip without waiting
+      // for the real calendar to catch up.
+      const devRaw = await AsyncStorage.getItem('dev_date_override');
+      const effectiveToday = devRaw ? new Date(devRaw + 'T00:00:00') : new Date();
+      const todayMs = new Date(effectiveToday).setHours(0, 0, 0, 0);
       const candidates = (data.trips ?? []).filter(t => {
         if (!t.startDate || !t.endDate) return false;
         const s = parseLocalDate(t.startDate)!; s.setHours(0, 0, 0, 0);
@@ -718,7 +732,7 @@ export default function AtStopScreen() {
       );
       let di = 0;
       if (tripData.startDate) {
-        const diff = Math.floor((Date.now() - parseLocalDate(tripData.startDate)!.getTime()) / 86400000);
+        const diff = Math.floor((effectiveToday.getTime() - parseLocalDate(tripData.startDate)!.getTime()) / 86400000);
         // Cap against the highest dayIndex actually present in the stops.
         di = Math.max(0, Math.min(diff, maxDayIdx));
       }
