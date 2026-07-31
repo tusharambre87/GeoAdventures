@@ -164,8 +164,11 @@ export default function GameHub() {
           return true;
         });
         setKidPlayers(filtered);
-        // Auto-select first kid if the context has no one set yet (tab entry, no params)
-        if (filtered.length > 0 && (!kids.explorerId)) {
+        // Auto-select first real kid if:
+        //   a) no explorer is set yet, OR
+        //   b) the currently-stored explorer isn't in the kids-only list (e.g. a parent was set)
+        const currentIsKid = filtered.some(p => p.id === kids.explorerId);
+        if (filtered.length > 0 && !currentIsKid) {
           const first = filtered[0];
           kids.setKidName(first.name);
           kids.setExplorerId(first.id);
