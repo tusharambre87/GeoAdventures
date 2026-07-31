@@ -662,7 +662,7 @@ export default function TodayScreen() {
   }, null as any);
   const youngestChildName = (sotwYoungestKid?.name as string | undefined) ?? 'the kids';
   const showBreakCard     = useMemo(
-    () => todayState === 'en_route' && sotwYoungestAge !== null && sotwYoungestAge < 9,
+    () => todayState === 'en_route',
     [todayState, sotwYoungestAge]
   );
   console.log('[SOTW] sotwYoungestAge:', sotwYoungestAge, 'trip.children:', trip?.children);
@@ -2942,7 +2942,7 @@ export default function TodayScreen() {
             onClose={() => setKidPickerVisible(false)}
           />
 
-          {childrenAges.some(a => a < 9) && (
+          {true && (
             <TouchableOpacity
               style={[sotw.breakCard, { marginHorizontal: 16, marginBottom: 12, marginTop: 8 }]}
               activeOpacity={0.85}

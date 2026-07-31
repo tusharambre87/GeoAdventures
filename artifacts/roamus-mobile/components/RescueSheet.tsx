@@ -534,7 +534,7 @@ export default function RescueSheet({
           <>
             <View style={s.header}>
               <Text style={s.headerTitle}>Day not going to plan?</Text>
-              <Text style={s.headerSub}>What's going on?</Text>
+              <Text style={s.headerSub}>What do you need right now?</Text>
             </View>
             <ScrollView style={s.scroll} contentContainerStyle={s.pickerContent} showsVerticalScrollIndicator={false}>
               <View style={s.tileGrid}>
