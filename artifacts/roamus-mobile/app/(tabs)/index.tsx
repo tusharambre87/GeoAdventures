@@ -25,7 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
-import { travelAPI, apiFetch, type Trip, API_BASE } from "@/lib/apiClient";
+import { travelAPI, type Trip, API_BASE } from "@/lib/apiClient";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
 import { getDestinationImage } from "@/app/discover/index";
 import { isFreePlan } from "@/lib/subscription";
@@ -33,7 +33,6 @@ import { useOnboarding } from "@/lib/onboardingContext";
 import { preCacheTrip } from "@/lib/tripCache";
 import { selectActiveTrip } from "@/lib/tripUtils";
 import UpgradeSheet from "@/components/UpgradeSheet";
-import RescueSheet from "@/components/RescueSheet";
 
 function greeting() {
   const h = new Date().getHours();
@@ -347,7 +346,6 @@ export default function TripsScreen() {
   const [fabExpanded, setFabExpanded] = useState(false);
   const [showAllCompleted, setShowAllCompleted] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
-  const [showRescue, setShowRescue] = useState(false);
   const fabAnim = useRef(new Animated.Value(0)).current;
   const fabCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -475,50 +473,6 @@ export default function TripsScreen() {
   const heroTrip = overrideHeroId
     ? (currentTrips.find(t => t.id === overrideHeroId) ?? activeTrip ?? currentTrips[0] ?? null)
     : (activeTrip ?? currentTrips[0] ?? null);
-
-  // ── Rescue FAB: only shown when heroTrip is date-active today ───────────────
-  const isActiveToday = !!heroTrip && isTripDateActive(heroTrip) && !['completed', 'archived'].includes(heroTrip.status);
-
-  // Build the day stop list for RescueSheet from the hero trip's stops
-  const rescueDayIndex = (() => {
-    if (!heroTrip?.startDate) return 0;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const start = new Date(heroTrip.startDate); start.setHours(0, 0, 0, 0);
-    const diff = Math.floor((today.getTime() - start.getTime()) / 86_400_000);
-    return Math.max(0, diff);
-  })();
-
-  const rescueDayStops = [...(heroTrip?.stops ?? [])]
-    .filter((s: any) => s.dayIndex === rescueDayIndex)
-    .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-
-  const rescueCurrentIdx = Math.max(
-    0,
-    rescueDayStops.findIndex((s: any) => !s.isVisited && !s.visited && !s.isSkipped),
-  );
-
-  async function handleRescueDrop(stopId: string) {
-    try {
-      await apiFetch(`/api/travel/stops/${stopId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isSkipped: true }),
-      });
-    } catch { /* best-effort */ }
-    void refetch();
-  }
-
-  async function handleRescueWrapDay() {
-    if (!heroTrip) return;
-    try {
-      await apiFetch(`/api/travel/trips/${heroTrip.id}/skip-day`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dayIndex: rescueDayIndex }),
-      });
-    } catch { /* best-effort */ }
-    void refetch();
-  }
 
   // Trips shown in the upcoming section (exclude the hero to avoid duplication)
   const upcomingTripsForSection = upcomingTrips.filter((t: any) => t.id !== heroTrip?.id);
@@ -735,21 +689,6 @@ export default function TripsScreen() {
         )}
       </ScrollView>
 
-      {/* Rescue FAB — only when a trip is active today */}
-      {isActiveToday && (
-        <TouchableOpacity
-          style={[s.rescueFab, { bottom: insets.bottom + 152 }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setShowRescue(true);
-          }}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="alert-circle-outline" size={22} color="#fff" />
-          <Text style={s.rescueFabLabel}>Rescue</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Plan a trip FAB */}
       <TouchableOpacity
         style={[s.planTripFab, { bottom: insets.bottom + 90 }]}
@@ -775,23 +714,6 @@ export default function TripsScreen() {
         onClose={() => setUpgradeVisible(false)}
         context="at_stop"
       />
-
-      {/* Rescue sheet — standalone mount, powered by heroTrip's day stops */}
-      {isActiveToday && heroTrip && (
-        <RescueSheet
-          visible={showRescue}
-          onClose={() => setShowRescue(false)}
-          context="morning"
-          stops={rescueDayStops as any}
-          currentStopIndex={rescueCurrentIdx}
-          tripId={heroTrip.id}
-          dayIndex={rescueDayIndex}
-          destination={heroTrip.destination ?? heroTrip.name}
-          onDropStop={handleRescueDrop}
-          onWrapDay={handleRescueWrapDay}
-          onStopsChanged={() => void refetch()}
-        />
-      )}
 
       <SwitchTripSheet
         visible={showSwitcher}
@@ -1028,16 +950,6 @@ const s = StyleSheet.create({
   inspireBody: { padding: 10 },
   inspireTitle: { fontFamily: F.bold, fontSize: 13, color: G.deep, marginBottom: 3, lineHeight: 18 },
   inspireMeta: { fontFamily: F.regular, fontSize: 11, color: G.muted },
-  rescueFab: {
-    position: "absolute", right: 20,
-    flexDirection: "row", alignItems: "center", gap: 6,
-    height: 44, paddingHorizontal: 18, borderRadius: 22,
-    backgroundColor: "#B91C1C",
-    shadowColor: "#B91C1C", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 7,
-  },
-  rescueFabLabel: {
-    color: "#fff", fontSize: 14, fontFamily: F.bold,
-  },
   planTripFab: {
     position: "absolute", right: 20,
     shadowColor: "#E8692A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,

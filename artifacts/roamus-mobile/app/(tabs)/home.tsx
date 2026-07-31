@@ -12,9 +12,12 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,12 +25,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ExpoLocation from "expo-location";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/authContext";
 import { API_BASE, apiFetch } from "@/lib/apiClient";
+import RescueSheet from "@/components/RescueSheet";
 import { F, G } from "@/lib/tokens";
 import { selectActiveTrip, getTripStatusInfo } from "@/lib/tripUtils";
 import {
@@ -42,6 +48,21 @@ import {
   getDestinationImage,
   normalizeShare,
 } from "@/app/discover/index";
+
+// ─── SOTW types + filter list ─────────────────────────────────────────────────
+type SotwFilter = 'playground' | 'beach' | 'coffee' | 'food' | 'restrooms';
+interface SotwPlace {
+  placeId: string; name: string; vicinity: string;
+  lat: number; lng: number;
+  photoReference: string | null; detourMinutes: number; onRoute: boolean;
+}
+const SOTW_FILTERS: [SotwFilter, string, string][] = [
+  ['playground', '\uD83D\uDEDD', 'Playgrounds'],
+  ['beach',      '\uD83C\uDFD6', 'Beach'],
+  ['coffee',     '\u2615',        'Coffee'],
+  ['food',       '\uD83C\uDF55',  'Food'],
+  ['restrooms',  '\uD83D\uDEBB',  'Restrooms'],
+];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -311,6 +332,134 @@ export default function HomeScreen() {
 
   const activeTrip = selectActiveTrip(trips, devDate ?? undefined);
 
+  // ── Rescue + SOTW state ───────────────────────────────────────────────────
+  const [showRescue, setShowRescue] = useState(false);
+  const [rescueStops, setRescueStops] = useState<any[]>([]);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [sotwVisible, setSotwVisible] = useState(false);
+  const [sotwFilter, setSotwFilter] = useState<SotwFilter>('playground');
+  const [sotwPlaces, setSotwPlaces] = useState<SotwPlace[]>([]);
+  const [sotwLoading, setSotwLoading] = useState(false);
+  const sotwSlideY = useRef(new Animated.Value(900)).current;
+
+  // Is the active trip live today (date-wise)?
+  const isActiveToday = useMemo(() => {
+    if (!activeTrip?.startDate || !activeTrip?.endDate) return false;
+    if (activeTrip.status === 'completed' || activeTrip.status === 'archived') return false;
+    const ref = devDate ?? new Date();
+    const now = new Date(ref); now.setHours(0, 0, 0, 0);
+    const start = new Date(activeTrip.startDate); start.setHours(0, 0, 0, 0);
+    const end   = new Date(activeTrip.endDate);   end.setHours(23, 59, 59, 999);
+    return now >= start && now <= end;
+  }, [activeTrip, devDate]);
+
+  const rescueDayIndex = useMemo(() => {
+    if (!activeTrip?.startDate) return 0;
+    const ref = devDate ?? new Date();
+    const now = new Date(ref); now.setHours(0, 0, 0, 0);
+    const start = new Date(activeTrip.startDate); start.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000));
+  }, [activeTrip?.startDate, devDate]);
+
+  const rescueCurrentIdx = Math.max(
+    0,
+    rescueStops.findIndex((s: any) => !s.isVisited && !s.visited && !s.isSkipped),
+  );
+
+  // Fetch real day stops + location when rescue sheet opens
+  useEffect(() => {
+    if (!showRescue || !activeTrip) return;
+    // Fetch stops with full data (isVisited, durationMinutes, etc.)
+    apiFetch<{ stops: any[] }>(`/api/travel/trips/${activeTrip.id}/stops`)
+      .then(data => {
+        const day = (data.stops ?? [])
+          .filter((s: any) => s.dayIndex === rescueDayIndex)
+          .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        setRescueStops(day);
+      }).catch(() => {});
+    // Request location permission
+    (async () => {
+      try {
+        const { status } = await ExpoLocation.getForegroundPermissionsAsync();
+        let loc: { lat: number; lng: number } | null = null;
+        if (status === 'granted') {
+          const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+          if (pos) loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } else if (status !== 'denied') {
+          const { status: ns } = await ExpoLocation.requestForegroundPermissionsAsync();
+          if (ns === 'granted') {
+            const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+            if (pos) loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          }
+        }
+        if (loc) setUserLoc(loc);
+      } catch {}
+    })();
+  }, [showRescue, activeTrip?.id, rescueDayIndex]);
+
+  async function fetchRescueStops() {
+    if (!activeTrip) return;
+    apiFetch<{ stops: any[] }>(`/api/travel/trips/${activeTrip.id}/stops`)
+      .then(data => {
+        const day = (data.stops ?? [])
+          .filter((s: any) => s.dayIndex === rescueDayIndex)
+          .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        setRescueStops(day);
+      }).catch(() => {});
+  }
+
+  async function handleRescueDrop(stopId: string) {
+    try {
+      await apiFetch(`/api/travel/stops/${stopId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isSkipped: true }),
+      });
+    } catch {}
+    void fetchRescueStops();
+  }
+
+  async function handleRescueWrapDay() {
+    if (!activeTrip) return;
+    try {
+      await apiFetch(`/api/travel/trips/${activeTrip.id}/skip-day`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayIndex: rescueDayIndex }),
+      });
+    } catch {}
+  }
+
+  async function openSotwSheet() {
+    setSotwPlaces([]);
+    setSotwFilter('playground');
+    sotwSlideY.setValue(900);
+    setSotwVisible(true);
+    Animated.spring(sotwSlideY, { toValue: 0, useNativeDriver: true, damping: 28, stiffness: 300 }).start();
+    if (userLoc) void fetchSotwPlaces('playground', userLoc);
+  }
+
+  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }) {
+    const position = loc ?? userLoc;
+    if (!position) return;
+    setSotwFilter(filter);
+    setSotwLoading(true);
+    try {
+      const data = await apiFetch<{ results: SotwPlace[] }>(
+        `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${activeTrip?.id ?? ''}`
+      );
+      setSotwPlaces(data.results ?? []);
+    } catch {
+      setSotwPlaces([]);
+    } finally {
+      setSotwLoading(false);
+    }
+  }
+
+  function closeSotwSheet() {
+    Animated.timing(sotwSlideY, { toValue: 900, duration: 250, useNativeDriver: true }).start(() => setSotwVisible(false));
+  }
+
   // ── Discover feed state ───────────────────────────────────────────────────
   const [tab, setTab] = useState<"community" | "ai">("community");
   const [communityItems, setCommunityItems] = useState<DiscoverItem[]>([]);
@@ -484,7 +633,7 @@ export default function HomeScreen() {
         {header}
         <ScrollView
           style={s.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           showsVerticalScrollIndicator={false}
         >
           <ActiveTripCard
@@ -500,6 +649,101 @@ export default function HomeScreen() {
           {discoverMore}
           {teasers}
         </ScrollView>
+
+        {/* Rescue FAB — floating, only during live trip dates */}
+        {isActiveToday && (
+          <TouchableOpacity
+            style={[hs.rescueFab, { bottom: insets.bottom + 90 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowRescue(true);
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={hs.rescueFabIcon}>{'\uD83D\uDEDF'}</Text>
+            <Text style={hs.rescueFabLabel}>Rescue</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* RescueSheet — standalone, loads real stops on open */}
+        {isActiveToday && (
+          <RescueSheet
+            visible={showRescue}
+            onClose={() => setShowRescue(false)}
+            context="morning"
+            stops={rescueStops}
+            currentStopIndex={rescueCurrentIdx}
+            tripId={activeTrip.id}
+            dayIndex={rescueDayIndex}
+            destination={activeTrip.destination ?? activeTrip.city ?? activeTrip.name}
+            onDropStop={handleRescueDrop}
+            onWrapDay={handleRescueWrapDay}
+            onStopsChanged={fetchRescueStops}
+            onOpenSotw={() => { setShowRescue(false); void openSotwSheet(); }}
+          />
+        )}
+
+        {/* SOTW sheet — slides up from bottom */}
+        {sotwVisible && (
+          <Animated.View
+            style={[StyleSheet.absoluteFillObject, { transform: [{ translateY: sotwSlideY }], zIndex: 200, elevation: 200 }]}
+          >
+            <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} onPress={closeSotwSheet} />
+            <View style={[hs.sotwSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={hs.sotwHandle} />
+              <View style={hs.sotwHeader}>
+                <Text style={hs.sotwTitle}>Quick Stops Nearby</Text>
+                <TouchableOpacity onPress={closeSotwSheet} hitSlop={8}>
+                  <Text style={hs.sotwDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Filter pills */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 8 }}>
+                {SOTW_FILTERS.map(([f, emoji, label]) => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[hs.sotwPill, sotwFilter === f && hs.sotwPillOn]}
+                    onPress={() => { setSotwFilter(f); void fetchSotwPlaces(f); }}
+                  >
+                    <Text>{emoji}</Text>
+                    <Text style={[hs.sotwPillTxt, sotwFilter === f && hs.sotwPillTxtOn]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Results */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+                {sotwLoading ? (
+                  <ActivityIndicator color={G.orange} style={{ marginTop: 28 }} />
+                ) : !userLoc ? (
+                  <Text style={hs.sotwEmpty}>Enable location to find nearby stops.</Text>
+                ) : sotwPlaces.length === 0 ? (
+                  <Text style={hs.sotwEmpty}>No places found nearby — try another filter.</Text>
+                ) : (
+                  sotwPlaces.map(place => (
+                    <TouchableOpacity
+                      key={place.placeId}
+                      style={hs.sotwCard}
+                      activeOpacity={0.85}
+                      onPress={() => Linking.openURL(
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.placeId}`
+                      )}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={hs.sotwCardName} numberOfLines={1}>{place.name}</Text>
+                        <Text style={hs.sotwCardSub} numberOfLines={1}>{place.vicinity}</Text>
+                      </View>
+                      <View style={hs.sotwBadge}>
+                        <Text style={hs.sotwBadgeTxt}>{'+' + place.detourMinutes + ' min'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </Animated.View>
+        )}
       </View>
     );
   }
@@ -706,6 +950,53 @@ const s = StyleSheet.create({
     fontFamily: F.bold, fontSize: 11, color: G.muted,
     letterSpacing: 1, marginHorizontal: 16, marginBottom: 10,
   },
+});
+
+// ── Rescue FAB + SOTW sheet styles ───────────────────────────────────────────
+const hs = StyleSheet.create({
+  rescueFab: {
+    position: 'absolute', right: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 46, paddingHorizontal: 18, borderRadius: 23,
+    backgroundColor: '#B91C1C',
+    shadowColor: '#B91C1C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.42, shadowRadius: 10, elevation: 7,
+  },
+  rescueFabIcon: { fontSize: 18, lineHeight: 22 },
+  rescueFabLabel: { color: '#fff', fontSize: 14, fontFamily: F.bold },
+
+  sotwSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    maxHeight: '75%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 20,
+  },
+  sotwHandle: { width: 36, height: 4, backgroundColor: '#D1D5E0', borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  sotwHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
+  sotwTitle: { fontFamily: F.bold, fontSize: 17, color: '#1A1F2E' },
+  sotwDone: { fontFamily: F.semibold, fontSize: 14, color: G.orange },
+
+  sotwPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(26,31,46,0.1)',
+    backgroundColor: '#F5F5F7',
+  },
+  sotwPillOn: { backgroundColor: G.orange, borderColor: G.orange },
+  sotwPillTxt: { fontFamily: F.medium, fontSize: 13, color: '#1A1F2E' },
+  sotwPillTxtOn: { color: '#fff' },
+
+  sotwEmpty: { fontFamily: F.regular, fontSize: 14, color: '#8A8FA8', textAlign: 'center', marginTop: 32 },
+
+  sotwCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F9F9FB', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.07)',
+    padding: 14, marginBottom: 10, gap: 10,
+  },
+  sotwCardName: { fontFamily: F.semibold, fontSize: 15, color: '#1A1F2E', marginBottom: 2 },
+  sotwCardSub: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' },
+  sotwBadge: { backgroundColor: '#FDF0E9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  sotwBadgeTxt: { fontFamily: F.semibold, fontSize: 12, color: G.orange },
 });
 
 // ── Discover More row styles ───────────────────────────────────────────────────
