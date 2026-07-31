@@ -188,6 +188,7 @@ function RootLayoutNav() {
 export default function RootLayout() {
 
   React.useEffect(() => {
+    const timer = setTimeout(() => {}, 0);
     return () => clearTimeout(timer);
   }, []);
   const [fontsLoaded, fontError] = useFonts({

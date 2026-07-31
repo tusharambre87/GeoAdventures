@@ -239,6 +239,58 @@ function TripCard({ trip, small }: { trip: Trip; small?: boolean }) {
   );
 }
 
+
+// ─── Inspiration Section ──────────────────────────────────────────────────────
+
+const INSPIRATION_CITIES: Array<{ city: string; emoji: string; desc: string }> = [
+  { city: 'New York',       emoji: '\ud83d\uddfd', desc: 'Iconic skyline & culture' },
+  { city: 'Chicago',        emoji: '\ud83c\udfd9\ufe0f', desc: 'Architecture & deep dish' },
+  { city: 'San Francisco',  emoji: '\ud83c\udf09', desc: 'Tech hub with stunning views' },
+  { city: 'Orlando',        emoji: '\ud83c\udfa1', desc: 'Theme parks & sunshine' },
+  { city: 'Washington DC',  emoji: '\ud83c\udffb\ufe0f', desc: 'History & monuments' },
+];
+
+function InspirationSection() {
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Text style={{ fontFamily: F.bold, fontSize: 18, color: G.deep, marginBottom: 4, letterSpacing: -0.3 }}>
+        Inspiration
+      </Text>
+      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.muted, marginBottom: 14 }}>
+        Popular family destinations to get you started
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+        {INSPIRATION_CITIES.map(({ city, emoji, desc }) => (
+          <Pressable
+            key={city}
+            style={({ pressed }: { pressed: boolean }) => [s.inspireCard, { opacity: pressed ? 0.88 : 1 }]}
+            onPress={() => router.push('/discover' as any)}
+          >
+            <LinearGradient colors={['#1A3A2A', '#0D2118']} style={StyleSheet.absoluteFill} />
+            <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
+            <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#fff', marginBottom: 3 }}>{city}</Text>
+            <Text style={{ fontFamily: F.regular, fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 15 }}>{desc}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Pressable
+        style={({ pressed }: { pressed: boolean }) => [s.discoverBtn, { marginTop: 16, opacity: pressed ? 0.85 : 1 }]}
+        onPress={() => router.push('/discover' as any)}
+      >
+        <View style={s.discoverBtnIco}>
+          <Text style={{ fontSize: 18 }}>{'\ud83c\udf10'}</Text>
+        </View>
+        <View style={s.discoverBtnBody}>
+          <Text style={s.discoverBtnTitle}>Discover all trips</Text>
+          <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
+        </View>
+        <Text style={{ fontSize: 18, color: '#C4C7D4' }}>{'\u203a'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function TripsScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
@@ -380,6 +432,15 @@ export default function TripsScreen() {
     ? (currentTrips.find(t => t.id === overrideHeroId) ?? activeTrip ?? currentTrips[0] ?? null)
     : (activeTrip ?? currentTrips[0] ?? null);
 
+  // Trips shown in the upcoming section (exclude the hero to avoid duplication)
+  const upcomingTripsForSection = upcomingTrips.filter((t: any) => t.id !== heroTrip?.id);
+  // Completed trips sorted latest-first
+  const completedTripsSorted = [...completedTrips].sort((a: any, b: any) => {
+    const aDate = (a.endDate ?? a.startDate ?? '');
+    const bDate = (b.endDate ?? b.startDate ?? '');
+    return bDate.localeCompare(aDate);
+  });
+
   // Detect trips whose dates are fully in the past but not yet completed
   const isPastUnfinished = (() => {
     if (!heroTrip || !heroTrip.endDate) return false;
@@ -458,11 +519,18 @@ export default function TripsScreen() {
             {fromCache && (
               <View style={{ backgroundColor: '#1F2937', paddingVertical: 7, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <Text style={{ color: '#D1FAE5', fontSize: 12, fontFamily: F.medium, letterSpacing: 0.2 }}>
-                  {'Offline \u2014 showing your saved plan'}
+                  {'Offline — showing your saved plan'}
                 </Text>
               </View>
             )}
-            <ActiveHeroCard trip={heroTrip} offlineReady={cacheStatus === "ready"} isDownloading={downloading} user={user} onUpgradePress={() => setUpgradeVisible(true)} onDownloadPress={handleDownloadOffline} />
+            <ActiveHeroCard
+              trip={heroTrip}
+              offlineReady={cacheStatus === "ready"}
+              isDownloading={downloading}
+              user={user}
+              onUpgradePress={() => setUpgradeVisible(true)}
+              onDownloadPress={handleDownloadOffline}
+            />
             {isPastUnfinished && (
               <Pressable
                 style={s.pastBanner}
@@ -474,167 +542,102 @@ export default function TripsScreen() {
             )}
             {currentTrips.length > 1 && (
               <Pressable style={s.switchRow} onPress={() => setShowSwitcher(true)}>
-                <Text style={s.switchText}>Switch trip →</Text>
+                <Text style={s.switchText}>Switch trip {'→'}</Text>
               </Pressable>
             )}
 
-            <TouchableOpacity
-              style={s.discoverBtn}
-              onPress={() => router.push('/discover' as any)}
-              activeOpacity={0.85}
-            >
-              <View style={s.discoverBtnIco}>
-                <Text style={{ fontSize: 18 }}>🌍</Text>
-              </View>
-              <View style={s.discoverBtnBody}>
-                <Text style={s.discoverBtnTitle}>Discover trips</Text>
-                <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
-              </View>
-              <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
-            </TouchableOpacity>
-
-            {currentTrips.length > 0 && (
+            {/* Upcoming trips — excluding the hero to avoid duplication */}
+            {upcomingTripsForSection.length > 0 && (
               <View style={s.section}>
                 <View style={s.sectionHeader}>
-                  <Text style={s.sectionTitle}>Your adventures</Text>
-                  <Text style={s.sectionCount}>{trips.length} total →</Text>
+                  <Text style={s.sectionTitle}>Upcoming trips</Text>
+                  {upcomingTripsForSection.length > 3 && (
+                    <Pressable onPress={() => router.push('/trips/upcoming' as any)} hitSlop={8}>
+                      <Text style={s.sectionLink}>See all {upcomingTripsForSection.length} {'→'}</Text>
+                    </Pressable>
+                  )}
                 </View>
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  style={{ marginHorizontal: -20 }}
+                  contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}
+                >
+                  {upcomingTripsForSection.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                </ScrollView>
+              </View>
+            )}
 
-                {inProgressTrips.length > 0 && (
-                  <>
-                    <Text style={s.sectionSub}>IN PROGRESS</Text>
-                    <View style={s.cardRow}>
-                      {inProgressTrips.map(t => <TripCard key={t.id} trip={t} />)}
-                    </View>
-                  </>
-                )}
-
-                {upcomingTrips.length > 0 && (
-                  <>
-                    <Text style={[s.sectionSub, { marginTop: inProgressTrips.length > 0 ? 16 : 0 }]}>UPCOMING</Text>
-                    {showAllUpcoming ? (
-                      <>
-                        <View style={s.cardRow}>
-                          {upcomingTrips.map(t => <TripCard key={t.id} trip={t} />)}
-                        </View>
-                        <Pressable onPress={() => setShowAllUpcoming(false)} style={s.showMoreBtn}>
-                          <Text style={s.showMoreLink}>Show less ↑</Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-                          {upcomingTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
-                        </ScrollView>
-                        {upcomingTrips.length > 3 && (
-                          <Pressable onPress={() => setShowAllUpcoming(true)} style={s.showMoreBtn}>
-                            <Text style={s.showMoreLink}>Show all {upcomingTrips.length} trips {'\u2192'}</Text>
-                          </Pressable>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-
-                {completedTrips.length > 0 && (
-                  <>
-                    <Text style={[s.sectionSub, { marginTop: 20 }]}>COMPLETED</Text>
-                    {showAllCompleted ? (
-                      <>
-                        <View style={s.cardRow}>
-                          {completedTrips.map(t => <TripCard key={t.id} trip={t} small />)}
-                        </View>
-                        <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
-                          <Text style={s.showMoreLink}>Show less ↑</Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-                          {completedTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
-                        </ScrollView>
-                        {completedTrips.length > 3 && (
-                          <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
-                            <Text style={s.showMoreLink}>Show all {completedTrips.length} trips {'\u2192'}</Text>
-                          </Pressable>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
+            {/* Completed trips — latest first */}
+            {completedTripsSorted.length > 0 && (
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <Text style={s.sectionTitle}>Past adventures</Text>
+                  {completedTripsSorted.length > 3 && (
+                    <Pressable onPress={() => router.push('/trips/completed' as any)} hitSlop={8}>
+                      <Text style={s.sectionLink}>See all {completedTripsSorted.length} {'→'}</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  style={{ marginHorizontal: -20 }}
+                  contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}
+                >
+                  {completedTripsSorted.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                </ScrollView>
               </View>
             )}
           </>
         ) : (
           <>
-            <View style={s.emptyCard}>
-              <View style={s.emptyIconWrap}>
-                <Ionicons name="briefcase-outline" size={32} color={G.orange} />
+            {/* Plan a trip hero — no current or upcoming trips */}
+            <View style={s.planHero}>
+              <LinearGradient colors={['#0D2118', '#1A3A2A']} style={StyleSheet.absoluteFill} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Ionicons name="compass-outline" size={20} color="rgba(255,255,255,0.6)" />
+                <Text style={{ fontFamily: F.bold, fontSize: 11, color: 'rgba(255,255,255,0.6)', letterSpacing: 0.8 }}>
+                  {completedTripsSorted.length > 0 ? 'PLAN YOUR NEXT ADVENTURE' : 'START YOUR JOURNEY'}
+                </Text>
               </View>
-              <Text style={s.emptyTitle}>
-                {completedTrips.length > 0 ? "No upcoming trips" : "No trips yet"}
+              <Text style={{ fontFamily: F.bold, fontSize: 26, color: '#fff', letterSpacing: -0.5, marginBottom: 6 }}>
+                {completedTripsSorted.length > 0 ? 'Ready for your\nnext trip?' : 'Where will you\nroam next?'}
               </Text>
-              <Text style={s.emptyDesc}>
-                {completedTrips.length > 0
-                  ? "Ready for your next adventure? Plan a new trip or revisit a past one below."
-                  : "Plan your family adventure and unlock quests, stories, and memories along the way."}
+              <Text style={{ fontFamily: F.regular, fontSize: 14, color: 'rgba(255,255,255,0.65)', marginBottom: 20 }}>
+                {completedTripsSorted.length > 0
+                  ? 'Plan a new adventure and keep the memories coming.'
+                  : 'Build your family itinerary with AI-powered stops, quests and memories.'}
               </Text>
               <Pressable
-                style={({ pressed }) => [s.planBtn, { opacity: pressed ? 0.85 : 1 }]}
+                style={({ pressed }: { pressed: boolean }) => [s.continueBtn, { opacity: pressed ? 0.88 : 1 }]}
                 onPress={startNewTrip}
               >
-                <Ionicons name="add-circle-outline" size={18} color="#fff" />
-                <Text style={s.planBtnText}>Plan a Trip</Text>
+                <Text style={s.continueBtnText}>Plan a trip {'→'}</Text>
               </Pressable>
-
-              <View style={s.emptyDivider} />
-
-              <TouchableOpacity
-                style={s.discoverRow}
-                onPress={() => router.push('/discover' as any)}
-                activeOpacity={0.85}
-              >
-                <View style={s.discoverBtnIco}>
-                  <Text style={{ fontSize: 18 }}>🌍</Text>
-                </View>
-                <View style={s.discoverBtnBody}>
-                  <Text style={s.discoverBtnTitle}>Discover trips</Text>
-                  <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
-                </View>
-                <Text style={{ fontSize: 18, color: '#C4C7D4' }}>›</Text>
-              </TouchableOpacity>
             </View>
 
-            {completedTrips.length > 0 && (
-              <View style={[s.section, { marginTop: 20 }]}>
+            {/* Completed trips for returning users with no active/upcoming */}
+            {completedTripsSorted.length > 0 && (
+              <View style={s.section}>
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>Past adventures</Text>
-                  <Text style={s.sectionCount}>{completedTrips.length} trip{completedTrips.length !== 1 ? "s" : ""}</Text>
-                </View>
-                <Text style={s.sectionSub}>COMPLETED</Text>
-                {showAllCompleted ? (
-                  <>
-                    <View style={s.cardRow}>
-                      {completedTrips.map(t => <TripCard key={t.id} trip={t} small />)}
-                    </View>
-                    <Pressable onPress={() => setShowAllCompleted(false)} style={s.showMoreBtn}>
-                      <Text style={s.showMoreLink}>Show less ↑</Text>
+                  {completedTripsSorted.length > 3 && (
+                    <Pressable onPress={() => router.push('/trips/completed' as any)} hitSlop={8}>
+                      <Text style={s.sectionLink}>See all {completedTripsSorted.length} {'→'}</Text>
                     </Pressable>
-                  </>
-                ) : (
-                  <>
-                    <ScrollView horizontal showsHorizontalScrollIndicator style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-                      {completedTrips.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
-                    </ScrollView>
-                    {completedTrips.length > 3 && (
-                      <Pressable onPress={() => setShowAllCompleted(true)} style={s.showMoreBtn}>
-                        <Text style={s.showMoreLink}>Show all {completedTrips.length} trips {'\u2192'}</Text>
-                      </Pressable>
-                    )}
-                  </>
-                )}
+                  )}
+                </View>
+                <ScrollView
+                  horizontal showsHorizontalScrollIndicator={false}
+                  style={{ marginHorizontal: -20 }}
+                  contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}
+                >
+                  {completedTripsSorted.slice(0, 3).map(t => <TripCard key={t.id} trip={t} />)}
+                </ScrollView>
               </View>
             )}
+
+            {/* Inspiration for brand-new users with no trips at all */}
+            {completedTripsSorted.length === 0 && <InspirationSection />}
           </>
         )}
       </ScrollView>
@@ -880,6 +883,17 @@ const s = StyleSheet.create({
   retryBtn: { backgroundColor: G.orange, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10, marginTop: 4 },
   retryBtnText: { fontFamily: F.bold, fontSize: 14, fontWeight: "700", color: "#fff" },
 
+  sectionLink: { fontFamily: F.semibold, fontSize: 13, fontWeight: "600" as const, color: G.orange },
+  planHero: {
+    borderRadius: 20, overflow: "hidden" as const, marginBottom: 20,
+    padding: 24, paddingBottom: 22, minHeight: 200,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6,
+  },
+  inspireCard: {
+    width: 140, height: 160, borderRadius: 16, overflow: "hidden" as const,
+    padding: 16, justifyContent: "flex-end" as const,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
+  },
   planTripFab: {
     position: "absolute", right: 20,
     shadowColor: "#E8692A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,

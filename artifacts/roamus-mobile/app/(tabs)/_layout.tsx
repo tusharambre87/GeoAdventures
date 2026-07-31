@@ -8,13 +8,22 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { F } from "@/lib/tokens";
 
 function NativeTabLayout() {
   return (
     <NativeTabs>
+      <NativeTabs.Trigger name="home">
+        <Icon sf={{ default: "house", selected: "house.fill" }} />
+        <Label>Home</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "map", selected: "map.fill" }} />
         <Label>Trips</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="kidszone">
+        <Icon sf={{ default: "gamecontroller", selected: "gamecontroller.fill" }} />
+        <Label>Games</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
         <Icon sf={{ default: "photo.on.rectangle", selected: "photo.fill.on.rectangle.fill" }} />
@@ -23,14 +32,6 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="me">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Me</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="home">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="kidszone">
-        <Icon sf={{ default: "gamecontroller", selected: "gamecontroller.fill" }} />
-        <Label>Kids Zone</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -53,6 +54,7 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
+        tabBarLabelStyle: { fontSize: 10, fontFamily: F.medium },
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
@@ -79,6 +81,32 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, focused }) => {
+            const effectiveFocused = focused || isOnTodayRoute;
+            const effectiveColor   = effectiveFocused ? colors.primary : color;
+            return isIOS ? (
+              <SymbolView
+                name={effectiveFocused ? "house.fill" : "house"}
+                tintColor={effectiveColor}
+                size={24}
+              />
+            ) : (
+              <Ionicons
+                name={effectiveFocused ? "home" : "home-outline"}
+                size={22}
+                color={effectiveColor}
+              />
+            );
+          },
+          tabBarLabelStyle: isOnTodayRoute
+            ? { color: colors.primary, fontSize: 10, fontFamily: F.medium }
+            : { fontSize: 10, fontFamily: F.medium },
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: "Trips",
@@ -90,9 +118,18 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      {/* today.tsx stays in (tabs)/ so the /(tabs)/today route keeps working,
-          but it is no longer a visible tab — Home's CTA pushes to it instead. */}
-      <Tabs.Screen name="today" options={{ href: null }} />
+      <Tabs.Screen
+        name="kidszone"
+        options={{
+          title: "Games",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gamecontroller" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="game-controller-outline" size={22} color={color} />
+            ),
+        }}
+      />
       <Tabs.Screen
         name="memories"
         options={{
@@ -117,42 +154,9 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, focused }) => {
-            const effectiveFocused = focused || isOnTodayRoute;
-            const effectiveColor   = effectiveFocused ? colors.primary : color;
-            return isIOS ? (
-              <SymbolView
-                name={effectiveFocused ? "house.fill" : "house"}
-                tintColor={effectiveColor}
-                size={24}
-              />
-            ) : (
-              <Ionicons
-                name={effectiveFocused ? "home" : "home-outline"}
-                size={22}
-                color={effectiveColor}
-              />
-            );
-          },
-          tabBarLabelStyle: isOnTodayRoute ? { color: colors.primary } : undefined,
-        }}
-      />
-      <Tabs.Screen
-        name="kidszone"
-        options={{
-          title: "Kids Zone",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="gamecontroller" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="game-controller-outline" size={22} color={color} />
-            ),
-        }}
-      />
+      {/* today.tsx stays in (tabs)/ so the /(tabs)/today route keeps working,
+          but it is no longer a visible tab — Home's CTA pushes to it instead. */}
+      <Tabs.Screen name="today" options={{ href: null }} />
     </Tabs>
   );
 }
