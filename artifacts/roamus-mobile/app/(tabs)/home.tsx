@@ -284,7 +284,16 @@ export default function HomeScreen() {
       .finally(() => setTripsLoading(false));
   }, []);
 
-  const activeTrip = selectActiveTrip(trips);
+  // Dev-only date override — stays in sync with today.tsx's AsyncStorage key
+  const [devDate, setDevDate] = useState<Date | null>(null);
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem('dev_date_override').then(raw => {
+      if (raw) { const d = new Date(raw); if (!isNaN(d.getTime())) setDevDate(d); }
+    }).catch(() => {});
+  }, []);
+
+  const activeTrip = selectActiveTrip(trips, devDate ?? undefined);
 
   // ── Discover feed state ───────────────────────────────────────────────────
   const [tab, setTab] = useState<"community" | "ai">("community");

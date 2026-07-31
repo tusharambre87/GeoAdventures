@@ -13,6 +13,7 @@ import {
   Image,
   ImageBackground,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -524,9 +525,12 @@ export default function TodayScreen() {
       : undefined;
 
   // Dev-only date override: set AsyncStorage 'dev_date_override' = 'YYYY-MM-DD' to force
-  // today's date for testing date-gated flows (e.g. airplane-mode Today-tab verification).
-  // Clear it by tapping the purple banner, or: AsyncStorage.removeItem('dev_date_override')
+  // today's date for testing date-gated flows.
+  // Set via the floating DEV button (bottom-right, __DEV__ only).
+  // Clear by tapping the purple banner, or: AsyncStorage.removeItem('dev_date_override')
   const [devDate, setDevDate] = useState<Date | null>(null);
+  const [showDevDateModal, setShowDevDateModal] = useState(false);
+  const [devDateInput, setDevDateInput] = useState('');
   useEffect(() => {
     if (!__DEV__) return;
     AsyncStorage.getItem('dev_date_override').then(raw => {
@@ -1534,10 +1538,61 @@ export default function TodayScreen() {
           <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: F.bold }}>
             {'DEV DATE: ' + devDate.toISOString().slice(0, 10)}
           </Text>
-          <Pressable onPress={() => { AsyncStorage.removeItem('dev_date_override').catch(() => {}); setDevDate(null); }}>
-            <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Clear</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 14 }}>
+            <Pressable onPress={() => { setDevDateInput(devDate.toISOString().slice(0, 10)); setShowDevDateModal(true); }}>
+              <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Change</Text>
+            </Pressable>
+            <Pressable onPress={() => { AsyncStorage.removeItem('dev_date_override').catch(() => {}); setDevDate(null); }}>
+              <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Clear</Text>
+            </Pressable>
+          </View>
         </View>
+      )}
+      {__DEV__ && !devDate && (
+        <Pressable
+          onPress={() => { setDevDateInput(''); setShowDevDateModal(true); }}
+          style={{ backgroundColor: '#4B1D96', paddingVertical: 4, paddingHorizontal: 16, alignItems: 'flex-end' }}
+        >
+          <Text style={{ color: '#DDD6FE', fontSize: 10, fontFamily: F.bold }}>SET DEV DATE</Text>
+        </Pressable>
+      )}
+      {/* Dev date setter modal */}
+      {__DEV__ && (
+        <Modal visible={showDevDateModal} transparent animationType="fade" onRequestClose={() => setShowDevDateModal(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' }}
+            onPress={() => setShowDevDateModal(false)}>
+            <Pressable style={{ backgroundColor: '#fff', borderRadius: 18, padding: 24, width: 280 }} onPress={() => {}}>
+              <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#1C1917', marginBottom: 12 }}>Set Dev Date Override</Text>
+              <TextInput
+                style={{ borderWidth: 1.5, borderColor: '#7C3AED', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontFamily: F.regular, fontSize: 15, color: '#1C1917', marginBottom: 16 }}
+                value={devDateInput}
+                onChangeText={setDevDateInput}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                maxLength={10}
+                autoFocus
+              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable style={{ flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: '#F3F4F6', alignItems: 'center' }}
+                  onPress={() => setShowDevDateModal(false)}>
+                  <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#374151' }}>Cancel</Text>
+                </Pressable>
+                <Pressable style={{ flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: '#7C3AED', alignItems: 'center' }}
+                  onPress={() => {
+                    const d = new Date(devDateInput + 'T12:00:00');
+                    if (!isNaN(d.getTime())) {
+                      AsyncStorage.setItem('dev_date_override', devDateInput).catch(() => {});
+                      setDevDate(d);
+                      setShowDevDateModal(false);
+                    }
+                  }}>
+                  <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#fff' }}>Set</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       )}
     </>
   );

@@ -155,9 +155,14 @@ export default function GameHub() {
   useEffect(() => {
     getMyPlayers()
       .then(all => {
-        const filtered = all.filter(
-          p => !p.isParent && p.profileType !== "parent" && p.profileType !== "adult"
-        );
+        const filtered = all.filter(p => {
+          if (p.isParent) return false;
+          if (p.profileType === "parent" || p.profileType === "adult") return false;
+          // Exclude adult-aged profiles (parents registered as players)
+          const ageNum = parseInt(String(p.age ?? "0"), 10);
+          if (!isNaN(ageNum) && ageNum >= 18) return false;
+          return true;
+        });
         setKidPlayers(filtered);
         // Auto-select first kid if the context has no one set yet (tab entry, no params)
         if (filtered.length > 0 && (!kids.explorerId)) {
