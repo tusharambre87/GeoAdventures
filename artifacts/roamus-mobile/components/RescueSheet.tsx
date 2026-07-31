@@ -19,6 +19,8 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 import { F } from '@/lib/tokens';
 import { apiFetch } from '@/lib/apiClient';
+
+const TAB_BAR_H = 49; // standard iOS/Android tab bar height (excluding safe area)
 import {
   computeDoneForDay,
   computeFoodStop,
@@ -523,7 +525,7 @@ export default function RescueSheet({
       </Animated.View>
 
       <Animated.View
-        style={[s.sheet, { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetAnim }], zIndex: 301 }]}
+        style={[s.sheet, { paddingBottom: TAB_BAR_H + insets.bottom + 20, transform: [{ translateY: sheetAnim }], zIndex: 301 }]}
       >
         <View style={s.handle} />
 

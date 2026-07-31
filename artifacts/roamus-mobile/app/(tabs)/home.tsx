@@ -49,6 +49,8 @@ import {
   normalizeShare,
 } from "@/app/discover/index";
 
+const TAB_BAR_H = 49; // standard iOS/Android tab bar height (excluding safe area)
+
 // ─── SOTW types + filter list ─────────────────────────────────────────────────
 type SotwFilter = 'playground' | 'beach' | 'coffee' | 'food' | 'restrooms';
 interface SotwPlace {
@@ -436,7 +438,22 @@ export default function HomeScreen() {
     sotwSlideY.setValue(900);
     setSotwVisible(true);
     Animated.spring(sotwSlideY, { toValue: 0, useNativeDriver: true, damping: 28, stiffness: 300 }).start();
-    if (userLoc) void fetchSotwPlaces('playground', userLoc);
+
+    // Always try to resolve location when the sheet opens
+    let loc = userLoc;
+    if (!loc) {
+      try {
+        const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced }).catch(() => null);
+          if (pos) {
+            loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setUserLoc(loc);
+          }
+        }
+      } catch {}
+    }
+    if (loc) void fetchSotwPlaces('playground', loc);
   }
 
   async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }) {
@@ -689,7 +706,7 @@ export default function HomeScreen() {
             style={[StyleSheet.absoluteFillObject, { transform: [{ translateY: sotwSlideY }], zIndex: 200, elevation: 200 }]}
           >
             <Pressable style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.4)' }]} onPress={closeSotwSheet} />
-            <View style={[hs.sotwSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={[hs.sotwSheet, { paddingBottom: TAB_BAR_H + insets.bottom + 16 }]}>
               <View style={hs.sotwHandle} />
               <View style={hs.sotwHeader}>
                 <Text style={hs.sotwTitle}>Quick Stops Nearby</Text>
@@ -967,7 +984,7 @@ const hs = StyleSheet.create({
   sotwSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    maxHeight: '75%',
+    maxHeight: '88%',
     shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 20,
   },
   sotwHandle: { width: 36, height: 4, backgroundColor: '#D1D5E0', borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
