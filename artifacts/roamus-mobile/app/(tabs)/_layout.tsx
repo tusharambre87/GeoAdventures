@@ -20,10 +20,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar.badge.plus" }} />
         <Label>Today</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="atstop">
-        <Icon sf={{ default: "location", selected: "location.fill" }} />
-        <Label>At Stop</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
         <Icon sf={{ default: "photo.on.rectangle", selected: "photo.fill.on.rectangle.fill" }} />
         <Label>Memories</Label>
@@ -103,18 +99,6 @@ function ClassicTabLayout() {
               <SymbolView name="calendar" tintColor={color} size={24} />
             ) : (
               <Ionicons name="calendar-outline" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="atstop"
-        options={{
-          title: "At Stop",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="location" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="location-outline" size={22} color={color} />
             ),
         }}
       />

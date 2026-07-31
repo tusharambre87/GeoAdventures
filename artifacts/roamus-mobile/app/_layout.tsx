@@ -102,7 +102,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inLegacyLogin = segments[0] === "login";
     const inAuth = segments[0] === "auth";
     const inTabPreview =
-      __DEV__ && (segments[1] === "today" || segments[1] === "atstop");
+      __DEV__ && (segments[1] === "today" || segments[0] === "atstop");
     // Shared itinerary is public — no auth required
     const inSharedItinerary =
       segments[0] === "memories" && segments[1] === "shared";

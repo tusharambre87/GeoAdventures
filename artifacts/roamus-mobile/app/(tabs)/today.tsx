@@ -3030,7 +3030,7 @@ export default function TodayScreen() {
                     }).catch(() => {});
                   }).catch(() => {});
                 }
-                router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } });
+                router.push({ pathname: '/atstop' as never, params: { stopId: stop.id } });
               }}
             >
               <Text style={er.hereBtnText}>{"I'm here ✓"}</Text>
@@ -3412,7 +3412,7 @@ export default function TodayScreen() {
           <TouchableOpacity
             style={asf.greenBanner}
             activeOpacity={0.85}
-            onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
+            onPress={() => router.push({ pathname: '/atstop' as never, params: { stopId: stop.id } })}
           >
             <Animated.View style={[asf.greenDot, { opacity: pulseAnim }]} />
             <View style={{ flex: 1 }}>
@@ -3538,7 +3538,7 @@ export default function TodayScreen() {
             <TouchableOpacity
               style={er.hereBtn}
               activeOpacity={0.85}
-              onPress={() => router.push({ pathname: '/(tabs)/atstop' as never, params: { stopId: stop.id } })}
+              onPress={() => router.push({ pathname: '/atstop' as never, params: { stopId: stop.id } })}
             >
               <Text style={er.hereBtnText}>{'Go to stop \u203A'}</Text>
             </TouchableOpacity>
