@@ -15,6 +15,7 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Linking,
   Platform,
@@ -450,6 +451,19 @@ export default function HomeScreen() {
             loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserLoc(loc);
           }
+        } else {
+          // iOS won't re-prompt once denied — guide to Settings
+          Alert.alert(
+            'Location needed',
+            'To find stops nearby, allow location access in Settings.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => Linking.openURL(Platform.OS === 'ios' ? 'app-settings:' : 'app-settings:'),
+              },
+            ]
+          );
         }
       } catch {}
     }
