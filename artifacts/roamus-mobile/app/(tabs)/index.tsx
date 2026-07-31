@@ -30,6 +30,7 @@ import { CITY_IMGS, F, G } from "@/lib/tokens";
 import { isFreePlan } from "@/lib/subscription";
 import { useOnboarding } from "@/lib/onboardingContext";
 import { preCacheTrip } from "@/lib/tripCache";
+import { selectActiveTrip } from "@/lib/tripUtils";
 import UpgradeSheet from "@/components/UpgradeSheet";
 
 function greeting() {
@@ -302,7 +303,7 @@ export default function TripsScreen() {
 
   const trips = (isError && fromCache && cachedTrips) ? cachedTrips : (data?.trips ?? []);
 
-  // Date-aware trip status helper
+  // Date-aware trip status helper (used for inProgressTrips display categorisation only)
   function isTripDateActive(t: Trip): boolean {
     if (!t.startDate || !t.endDate) return false;
     const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -311,7 +312,8 @@ export default function TripsScreen() {
     return now >= start && now <= end;
   }
 
-  const activeTrip = trips.find(t => isTripDateActive(t) || t.status === "active" || t.status === "in_progress");
+  // Use shared 4-tier logic so Home and Today always agree on which trip is active
+  const activeTrip = selectActiveTrip(trips);
 
 
   // Write last-good trips list to cache on every successful load

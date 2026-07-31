@@ -57,6 +57,7 @@ const TODAY_STOP_EMOJI: Record<string, string> = {
 import { useAuth } from "@/lib/authContext";
 import NetInfo from "@react-native-community/netinfo";
 import { getCachedTrip } from "@/lib/tripCache";
+import { selectActiveTrip } from "@/lib/tripUtils";
 import UpgradeSheet from "@/components/UpgradeSheet";
 import EndOfDaySheet from "@/components/EndOfDaySheet";
 import { isFreePlan } from "@/lib/subscription";
@@ -942,29 +943,7 @@ export default function TodayScreen() {
             }
           }
         }
-        const sortedTrips = [...(data.trips ?? [])].sort((a, b) => {
-          if (!a.startDate) return 1;
-          if (!b.startDate) return -1;
-          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-        });
-        const todayMs = (devDate ? new Date(devDate) : new Date()).setHours(0,0,0,0);
-        const active = sortedTrips.find(t => {
-          if (t.status === 'active' || t.status === 'in_progress') return true;
-          if (!t.startDate || !t.endDate) return false;
-          const s = parseLocalDate(t.startDate)!; s.setHours(0,0,0,0);
-          const e = parseLocalDate(t.endDate)!;   e.setHours(23,59,59,999);
-          return todayMs >= s.getTime() && todayMs <= e.getTime();
-        })
-        ?? sortedTrips.find(t => {
-          if (!t.startDate || t.status === 'completed') return false;
-          const s = parseLocalDate(t.startDate);
-          if (!s) return false;
-          s.setHours(0, 0, 0, 0);
-          return s.getTime() > todayMs;
-        })
-        ?? [...sortedTrips].reverse().find(t => t.startDate)
-        ?? sortedTrips[sortedTrips.length - 1]
-        ?? sortedTrips[0];
+        const active = selectActiveTrip(data.trips ?? [], devDate);
         if (!active) {
           if (!devState) setTodayState('no_trip');
           return;
