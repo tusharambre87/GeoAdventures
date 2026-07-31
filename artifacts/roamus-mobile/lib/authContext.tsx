@@ -168,6 +168,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const u: AuthUser = data.user ?? data;
         setUser(u);
         await AsyncStorage.setItem("auth_user", JSON.stringify(u));
+        // Dev-only: propagate dev_date_override from server profile to AsyncStorage
+        if (__DEV__) {
+          const oc = (u as any).onboardingCompleted ?? (u as any).onboarding_completed;
+          const devDate: string | undefined = oc?.dev_date_override ?? oc?.devDateOverride;
+          if (devDate && typeof devDate === "string") {
+            await AsyncStorage.setItem("dev_date_override", devDate);
+          }
+        }
       }
     } catch {
       // non-fatal — context remains as-is

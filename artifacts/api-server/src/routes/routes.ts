@@ -14606,10 +14606,10 @@ Return ONLY valid JSON in this exact format:
       }
 
       // 6b. Library-image fallback: fill remaining slots when the family hasn't taken
-      //     enough photos yet.  Priority: travelStops.heroImageUrl (object-storage path)
-      //     → stop_library.imageUrl matched by name + city.  The public /hero-img proxy
-      //     already implements this same chain, so we just verify an image exists and
-      //     hand the client that URL — no extra download happens here.
+      //     enough photos yet.  Priority:
+      //       1. travelStops.heroImageUrl (object-storage path or full URL)
+      //       2. stop_library.imageUrl matched by name + city
+      //       3. In-memory hero-image cache (Wikipedia URLs populated by /hero-image endpoint)
       if (selectedPhotos.length < 4) {
         const baseUrl = process.env.REPLIT_DOMAINS
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
@@ -14620,31 +14620,43 @@ Return ONLY valid JSON in this exact format:
         for (const stop of stopsNeedingFallback) {
           if (selectedPhotos.length >= 4) break;
 
-          // Fast path: stop already has a backfilled hero image in object storage
-          if (stop.heroImageUrl?.startsWith('stop-images/')) {
-            selectedPhotos.push({
-              stopId: stop.id, stopName: stop.name,
-              photoUrl: `${baseUrl}/api/travel/stops/${stop.id}/hero-img`,
-              isHeroStop: false,
-            });
-            usedStopIds.add(stop.id);
-            continue;
+          let imgUrl: string | null = null;
+
+          // 1. Stop's own hero image (object-storage path → proxy URL, or full HTTPS URL)
+          if (stop.heroImageUrl) {
+            if (stop.heroImageUrl.startsWith('stop-images/')) {
+              imgUrl = `${baseUrl}/api/travel/stops/${stop.id}/hero-img`;
+            } else if (stop.heroImageUrl.startsWith('http')) {
+              imgUrl = stop.heroImageUrl;
+            }
           }
 
-          // Slow path: look up stop_library by name (+ optional city)
-          const libConds: any[] = [eq(stopLibrary.name, stop.name)];
-          if (stop.cityGroup) libConds.push(eq(stopLibrary.city, stop.cityGroup));
-          const [libRow] = await db
-            .select({ imageUrl: stopLibrary.imageUrl })
-            .from(stopLibrary)
-            .where(and(...libConds))
-            .limit(1);
+          // 2. stop_library image
+          if (!imgUrl) {
+            const libConds: any[] = [eq(stopLibrary.name, stop.name)];
+            if (stop.cityGroup) libConds.push(eq(stopLibrary.city, stop.cityGroup));
+            const [libRow] = await db
+              .select({ imageUrl: stopLibrary.imageUrl })
+              .from(stopLibrary)
+              .where(and(...libConds))
+              .limit(1);
 
-          if (libRow?.imageUrl?.startsWith('stop-images/')) {
+            if (libRow?.imageUrl) {
+              imgUrl = libRow.imageUrl.startsWith('stop-images/')
+                ? `${baseUrl}/api/travel/stops/${stop.id}/hero-img`
+                : libRow.imageUrl; // full HTTPS URL (Unsplash / Google Places)
+            }
+          }
+
+          // 3. In-memory cache from /hero-image endpoint (Wikipedia / GP URLs)
+          if (!imgUrl && heroImageCache[stop.id]) {
+            imgUrl = heroImageCache[stop.id];
+          }
+
+          if (imgUrl) {
             selectedPhotos.push({
               stopId: stop.id, stopName: stop.name,
-              photoUrl: `${baseUrl}/api/travel/stops/${stop.id}/hero-img`,
-              isHeroStop: false,
+              photoUrl: imgUrl, isHeroStop: false,
             });
             usedStopIds.add(stop.id);
           }

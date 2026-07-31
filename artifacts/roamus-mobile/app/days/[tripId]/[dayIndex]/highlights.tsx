@@ -66,7 +66,7 @@ export default function DayHighlightsScreen() {
     queryKey: ['day-highlights', tripId, dayIndex],
     queryFn: () => memoriesAPI.getDayHighlights(tripId, dayIndex),
     enabled: !!tripId && !isNaN(dayIndex),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // ── Loading / error states ──────────────────────────────────────────────
@@ -109,9 +109,19 @@ export default function DayHighlightsScreen() {
   const h = highlights;
   const dayNum = dayIndex + 1;
 
+  // Build the 4-slot grid, falling back to allDayPhotos for any slot the server
+  // left empty (e.g. stops with no backfilled image yet).
+  const serverPhotos = h?.selectedPhotos ?? [];
+  const allPhotos   = h?.allDayPhotos   ?? [];
+  // Track URLs used by server-selected photos so fallback doesn't duplicate
+  const usedPhotoUrls = new Set<string>(serverPhotos.map(p => p.photoUrl));
   const displayPhotos: (SlotPhoto | null)[] = Array.from({ length: 4 }, (_, i) => {
     if (localSelections[i]) return localSelections[i];
-    return h?.selectedPhotos?.[i] ?? null;
+    if (serverPhotos[i])    return serverPhotos[i];
+    // Fill from allDayPhotos — skip anything already shown in a server slot
+    const fallback = allPhotos.find(p => !usedPhotoUrls.has(p.photoUrl));
+    if (fallback) { usedPhotoUrls.add(fallback.photoUrl); return { ...fallback, isHeroStop: false }; }
+    return null;
   });
 
   const filledCount = displayPhotos.filter(Boolean).length;
@@ -292,41 +302,6 @@ export default function DayHighlightsScreen() {
             ))}
           </View>
 
-          {/* ── Hidden clean collage — captured by view-shot ── */}
-          {/* Positioned off-screen so it never flickers into view */}
-          <View
-            ref={collageRef}
-            collapsable={false}
-            style={styles.hiddenCollage}
-          >
-            {/* 2×2 photo grid */}
-            <View style={styles.collageGrid}>
-              {displayPhotos.map((slot, i) => (
-                <View key={i} style={styles.collageCell}>
-                  {slot ? (
-                    <ExpoImage
-                      source={{ uri: slot.photoUrl }}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                  ) : (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#163830', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ fontSize: 32 }}>{'\uD83C\uDF89'}</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-            </View>
-
-            {/* Branded footer strip */}
-            <View style={styles.collageFooter}>
-              <Text style={styles.collageFooterDay} numberOfLines={1}>
-                {`Day ${dayNum}${h?.city ? ` in ${h.city}` : ''}`}
-              </Text>
-              <Text style={styles.collageFooterBrand}>RoamUs</Text>
-            </View>
-          </View>
         </View>
 
         {/* ── Share Collage button ── */}
@@ -394,6 +369,41 @@ export default function DayHighlightsScreen() {
           <Text style={styles.doneBtnText}>Done {'\u2713'}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ── Hidden clean collage — lives OUTSIDE ScrollView so its 800px width
+           cannot corrupt the interactive grid's percentage-based layout.
+           Positioned off-screen so it never appears to the user. ── */}
+      <View
+        ref={collageRef}
+        collapsable={false}
+        style={styles.hiddenCollage}
+        pointerEvents="none"
+      >
+        <View style={styles.collageGrid}>
+          {displayPhotos.map((slot, i) => (
+            <View key={i} style={styles.collageCell}>
+              {slot ? (
+                <ExpoImage
+                  source={{ uri: slot.photoUrl }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#163830', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 32 }}>{'\uD83C\uDF89'}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+        <View style={styles.collageFooter}>
+          <Text style={styles.collageFooterDay} numberOfLines={1}>
+            {`Day ${dayNum}${h?.city ? ` in ${h.city}` : ''}`}
+          </Text>
+          <Text style={styles.collageFooterBrand}>RoamUs</Text>
+        </View>
+      </View>
 
       {/* ── Swap picker modal ── */}
       <Modal

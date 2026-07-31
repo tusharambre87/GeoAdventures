@@ -508,7 +508,7 @@ function parseLocalDate(s: string | null | undefined): Date | null {
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, refreshUser } = useAuth();
   const isFree = !authLoading && isFreePlan(user?.subscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
   const { speak, isSpeaking } = useSpeech();
@@ -533,11 +533,15 @@ export default function TodayScreen() {
   const [devDateInput, setDevDateInput] = useState('');
   useEffect(() => {
     if (!__DEV__) return;
-    AsyncStorage.getItem('dev_date_override').then(raw => {
+    // Call refreshUser first so server-side dev_date_override is seeded into AsyncStorage
+    (async () => {
+      try { await refreshUser(); } catch { /* ignore */ }
+      const raw = await AsyncStorage.getItem('dev_date_override');
       if (!raw) return;
       const d = new Date(raw + 'T12:00:00');
       if (!isNaN(d.getTime())) setDevDate(d);
-    }).catch(() => {});
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [todayState, setTodayState]             = useState<TodayState>(devState ?? 'no_trip');
