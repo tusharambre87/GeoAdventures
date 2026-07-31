@@ -21,7 +21,7 @@ import { CITY_IMGS, F, G } from "@/lib/tokens";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface DiscoverItem {
+export interface DiscoverItem {
   id: string;
   slug: string;
   title: string;
@@ -39,7 +39,7 @@ interface DiscoverItem {
   tripId?: string;
 }
 
-interface CommunityShare {
+export interface CommunityShare {
   id: string;
   slug: string;
   title: string;
@@ -53,7 +53,7 @@ interface CommunityShare {
 
 // ─── Static AI Picks ─────────────────────────────────────────────────────────
 
-const AI_PICKS: DiscoverItem[] = [
+export const AI_PICKS: DiscoverItem[] = [
   {
     id: "ai-dc", slug: "ai-dc", destination: "Washington DC",
     title: "Washington DC Explorer", durationDays: 3, stopCount: 8,
@@ -100,7 +100,7 @@ const AI_PICKS: DiscoverItem[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getDestinationImage(destination: string): Promise<string | null> {
+export async function getDestinationImage(destination: string): Promise<string | null> {
   try {
     const query = destination.replace(/\s+/g, '_');
     const res = await fetch(
@@ -113,7 +113,7 @@ async function getDestinationImage(destination: string): Promise<string | null> 
   }
 }
 
-const DEST_COLORS: Record<string, string> = {
+export const DEST_COLORS: Record<string, string> = {
   default: '#1A2A3A',
   chicago: '#1A2A4A',
   'new york': '#2A1A3A',
@@ -123,12 +123,12 @@ const DEST_COLORS: Record<string, string> = {
   boston: '#2A1A1A',
 };
 
-function getDestColor(destination: string): string {
+export function getDestColor(destination: string): string {
   const key = destination.toLowerCase().split(',')[0].trim();
   return DEST_COLORS[key] ?? DEST_COLORS.default;
 }
 
-function normalizeShare(s: CommunityShare): DiscoverItem {
+export function normalizeShare(s: CommunityShare): DiscoverItem {
   const stopMatch = s.description?.match(/(\d+)\s+stops?/);
   const stopCount = stopMatch ? parseInt(stopMatch[1]) : 0;
   return {
@@ -147,7 +147,7 @@ function normalizeShare(s: CommunityShare): DiscoverItem {
 
 // ─── Hero card ────────────────────────────────────────────────────────────────
 
-function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
+export function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
   item: DiscoverItem; onPress: () => void;
   isUpvoted?: boolean; onUpvote?: () => void;
 }) {
@@ -196,7 +196,7 @@ function HeroCard({ item, onPress, isUpvoted, onUpvote }: {
 
 // ─── Grid card ────────────────────────────────────────────────────────────────
 
-function GridCard({ item, onPress, isUpvoted, onUpvote, currentActiveTripId }: {
+export function GridCard({ item, onPress, isUpvoted, onUpvote, currentActiveTripId }: {
   item: DiscoverItem; onPress: () => void;
   isUpvoted?: boolean; onUpvote?: () => void;
   currentActiveTripId?: string | null;
@@ -255,12 +255,12 @@ function GridCard({ item, onPress, isUpvoted, onUpvote, currentActiveTripId }: {
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
-const CITY_FILTERS = ["All", "Chicago", "New York", "Washington DC", "Nashville", "Seattle", "San Diego"];
-const DURATION_FILTERS: { id: string; label: string }[] = [
+export const CITY_FILTERS = ["All", "Chicago", "New York", "Washington DC", "Nashville", "Seattle", "San Diego"];
+export const DURATION_FILTERS: { id: string; label: string }[] = [
   { id: "weekend", label: "Weekend" },
   { id: "3-5", label: "3-5 days" },
 ];
-const AGE_FILTERS: { id: string; label: string }[] = [
+export const AGE_FILTERS: { id: string; label: string }[] = [
   { id: "toddlers", label: "Toddlers" },
   { id: "6-10", label: "Ages 6-10" },
   { id: "teens", label: "Teens" },
