@@ -1078,6 +1078,10 @@ export default function AtStopScreen() {
     return (
       <View style={[sc.screen, { paddingTop }]}>
         <View style={sc.header}>
+          <TouchableOpacity style={sc.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color={C.muted} />
+            <Text style={sc.backBtnTxt}>Today</Text>
+          </TouchableOpacity>
           <Text style={sc.headerTitle}>At Stop</Text>
           {dayLabel ? <Text style={sc.headerSub}>{dayLabel}</Text> : null}
         </View>
@@ -2395,6 +2399,8 @@ function isMealStop(t?: string | null): boolean {
 const sc = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 20, paddingBottom: 14 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 10 },
+  backBtnTxt: { fontFamily: F.medium, fontSize: 15, color: C.muted },
   headerTitle: { fontFamily: F.bold, fontSize: 22, color: C.deep },
   headerSub: { fontFamily: F.medium, fontSize: 13, color: C.muted, marginTop: 2 },
   scroll: { flex: 1 },
