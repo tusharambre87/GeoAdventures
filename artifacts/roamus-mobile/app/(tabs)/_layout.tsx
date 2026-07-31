@@ -32,6 +32,14 @@ function NativeTabLayout() {
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Me</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="home">
+        <Icon sf={{ default: "house", selected: "house.fill" }} />
+        <Label>Home</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="kidszone">
+        <Icon sf={{ default: "gamecontroller", selected: "gamecontroller.fill" }} />
+        <Label>Kids Zone</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -131,6 +139,30 @@ function ClassicTabLayout() {
               <SymbolView name="person" tintColor={color} size={24} />
             ) : (
               <Ionicons name="person-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="house" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="home-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="kidszone"
+        options={{
+          title: "Kids Zone",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gamecontroller" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="game-controller-outline" size={22} color={color} />
             ),
         }}
       />
