@@ -16,10 +16,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "map", selected: "map.fill" }} />
         <Label>Trips</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="today">
-        <Icon sf={{ default: "calendar", selected: "calendar.badge.plus" }} />
-        <Label>Today</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="memories">
         <Icon sf={{ default: "photo.on.rectangle", selected: "photo.fill.on.rectangle.fill" }} />
         <Label>Memories</Label>
@@ -90,18 +86,9 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="today"
-        options={{
-          title: "Today",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="calendar" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="calendar-outline" size={22} color={color} />
-            ),
-        }}
-      />
+      {/* today.tsx stays in (tabs)/ so the /(tabs)/today route keeps working,
+          but it is no longer a visible tab — Home's CTA pushes to it instead. */}
+      <Tabs.Screen name="today" options={{ href: null }} />
       <Tabs.Screen
         name="memories"
         options={{

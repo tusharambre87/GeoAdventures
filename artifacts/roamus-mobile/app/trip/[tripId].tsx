@@ -5306,7 +5306,7 @@ export default function TripPlanScreen() {
 const TAB_ITEMS = [
   { name: 'Trips',    route: '/(tabs)/',         icon: 'map-outline' as const,      iconActive: 'map' as const,      active: true  },
   { name: 'Today',    route: '/(tabs)/today',    icon: 'calendar-outline' as const, iconActive: 'calendar' as const, active: false },
-  { name: 'At Stop',  route: '/(tabs)/atstop',   icon: 'location-outline' as const, iconActive: 'location' as const, active: false },
+  { name: 'At Stop',  route: '/atstop',           icon: 'location-outline' as const, iconActive: 'location' as const, active: false },
   { name: 'Memories', route: '/(tabs)/memories', icon: 'images-outline' as const,   iconActive: 'images' as const,   active: false },
   { name: 'Me',       route: '/(tabs)/me',       icon: 'person-outline' as const,   iconActive: 'person' as const,   active: false },
 ];
