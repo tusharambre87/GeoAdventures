@@ -4004,10 +4004,10 @@ export default function TodayScreen() {
             </TouchableOpacity>
           )}
 
-          {/* ── Primary CTA: Day 1 Highlights ── */}
+          {/* ── Wrap Day CTA → opens Day Story page ── */}
           {resolvedTripId && (
             <TouchableOpacity
-              style={[dc.highlightsBtn, isWrapping && { opacity: 0.75 }]}
+              style={[dc.wrapBtn, isWrapping && { opacity: 0.75 }]}
               activeOpacity={0.85}
               disabled={isWrapping}
               onPress={async () => {
@@ -4070,63 +4070,40 @@ export default function TodayScreen() {
                   }
                 }
                 router.push({
-                  pathname: '/days/[tripId]/[dayIndex]/highlights' as never,
-                  params: { tripId: resolvedTripId, dayIndex: String(resolvedDayIndex) },
+                  pathname: `/memories/${resolvedTripId}` as never,
+                  params: { dayIndex: String(resolvedDayIndex) },
                 } as never);
               }}
             >
               {isWrapping ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                  <ActivityIndicator size="small" color="#fff" />
-                  <Text style={dc.highlightsBtnTitle}>Saving...</Text>
-                </View>
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <>
-                  {dcHeroPhotoUrl ? (
-                    <Image source={{ uri: dcHeroPhotoUrl }} style={dc.highlightsBtnThumb} />
-                  ) : (
-                    <Text style={dc.highlightsBtnEmoji}>{String.fromCodePoint(0x1F389)}</Text>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={dc.highlightsBtnTitle}>Day {resolvedDayIndex + 1} Highlights</Text>
-                    <Text style={dc.highlightsBtnSub}>Photos, quotes & day recap</Text>
-                  </View>
-                  <Text style={dc.highlightsBtnArrow}>{'\u203A'}</Text>
-                </>
+                <Text style={dc.wrapBtnText}>
+                  {dayWrapped ? `View Day ${resolvedDayIndex + 1} Story →` : `Wrap up Day ${resolvedDayIndex + 1} →`}
+                </Text>
               )}
             </TouchableOpacity>
           )}
 
-          {/* ── Secondary CTAs ── */}
-          <View style={dc.secondaryCtaRow}>
-            {kidsXp !== null && (
-              <View style={dc.kidsXpRow}>
-                <Text style={dc.kidsXpText}>
-                  {(trip?.travelers ?? []).filter(t => !t.isParent)[0]?.name ?? 'Explorer'} earned{' '}
-                  <Text style={dc.kidsXpNum}>{kidsXp} XP</Text> today
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={dc.kidsZoneBtn} activeOpacity={0.85}
-              onPress={() => {
-                const kzStop = dayStops[currentStopIndex];
-                Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
-                handleKidsZonePress(kzStop?.id ?? '', kzStop?.name ?? '', resolvedTripId ?? '');
-              }}
-            >
-              <Text style={dc.kidsZoneBtnText}>{String.fromCodePoint(0x1F9F8)} Kids Zone</Text>
-            </TouchableOpacity>
-
-            {resolvedDayIndex + 1 < totalDays && (
-              <TouchableOpacity
-                style={dc.tomorrowBtn} activeOpacity={0.85}
-                onPress={() => router.push({ pathname: '/(tabs)/trips' as never } as never)}
-              >
-                <Text style={dc.tomorrowBtnText}>See Tomorrow's Plan</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* ── Kids XP + Kids Zone ── */}
+          {kidsXp !== null && (
+            <View style={dc.kidsXpRow}>
+              <Text style={dc.kidsXpText}>
+                {(trip?.travelers ?? []).filter(t => !t.isParent)[0]?.name ?? 'Explorer'} earned{' '}
+                <Text style={dc.kidsXpNum}>{kidsXp} XP</Text> today
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={dc.kidsZoneBtn} activeOpacity={0.85}
+            onPress={() => {
+              const kzStop = dayStops[currentStopIndex];
+              Analytics.track('kids_zone_opened', { trip_id: resolvedTripId ?? '', stop_id: kzStop?.id ?? '', stop_type: kzStop?.stopType ?? 'unknown' });
+              handleKidsZonePress(kzStop?.id ?? '', kzStop?.name ?? '', resolvedTripId ?? '');
+            }}
+          >
+            <Text style={dc.kidsZoneBtnText}>{String.fromCodePoint(0x1F9F8)} Kids Zone</Text>
+          </TouchableOpacity>
 
           {/* Tomorrow preview card */}
           {resolvedDayIndex + 1 < totalDays && (() => {
@@ -4892,16 +4869,11 @@ const dc = StyleSheet.create({
   highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.78)' },
   highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.6)' },
   kidsZoneBtn: {
-    borderRadius: 12, paddingVertical: 13,
-    backgroundColor: 'transparent', borderWidth: 2, borderColor: C.purplePrimary, alignItems: 'center',
+    marginHorizontal: 20, marginTop: 14,
+    backgroundColor: C.purplePrimary, borderRadius: 14,
+    paddingVertical: 14, alignItems: 'center',
   },
-  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
-  secondaryCtaRow: { marginHorizontal: 16, marginTop: 14, gap: 10 },
-  tomorrowBtn: {
-    borderRadius: 12, paddingVertical: 13,
-    backgroundColor: 'rgba(124,58,237,0.12)', alignItems: 'center',
-  },
-  tomorrowBtnText: { fontFamily: F.bold, fontSize: 15, color: C.purplePrimary },
+  kidsZoneBtnText: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
 });
 
 // TRIP_COMPLETE
