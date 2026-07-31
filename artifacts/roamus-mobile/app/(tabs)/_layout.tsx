@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
-import { Tabs } from "expo-router";
+import { Tabs, useSegments } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +42,10 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  // Highlight the Home tab when the user is on the hidden today route so
+  // the tab bar always has an active selection (Android / web / ClassicTabLayout).
+  const segments = useSegments();
+  const isOnTodayRoute = segments[0] === '(tabs)' && segments[1] === 'today';
 
   return (
     <Tabs
@@ -117,12 +121,24 @@ function ClassicTabLayout() {
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+          tabBarIcon: ({ color, focused }) => {
+            const effectiveFocused = focused || isOnTodayRoute;
+            const effectiveColor   = effectiveFocused ? colors.primary : color;
+            return isIOS ? (
+              <SymbolView
+                name={effectiveFocused ? "house.fill" : "house"}
+                tintColor={effectiveColor}
+                size={24}
+              />
             ) : (
-              <Ionicons name="home-outline" size={22} color={color} />
-            ),
+              <Ionicons
+                name={effectiveFocused ? "home" : "home-outline"}
+                size={22}
+                color={effectiveColor}
+              />
+            );
+          },
+          tabBarLabelStyle: isOnTodayRoute ? { color: colors.primary } : undefined,
         }}
       />
       <Tabs.Screen

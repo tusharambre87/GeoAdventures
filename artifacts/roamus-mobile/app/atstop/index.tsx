@@ -169,7 +169,7 @@ type TripData = {
   travelers?: Array<{ name: string; type?: string; id?: string }> | null;
 };
 
-type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail';
+type AtStopMode     = 'loading' | 'noTrip' | 'picker' | 'detail' | 'stop_done';
 type ActiveSheet    = 'none' | 'change' | 'didnt' | 'feedback' | 'rescue' | 'food' | 'break' | 'kidExtras' | 'mealFeedback';
 type RescueType     = 'behind' | 'tired' | 'skip' | 'fun';
 type FeedbackRating = 'big_hit' | 'good' | 'skip_next_time';
@@ -513,6 +513,9 @@ export default function AtStopScreen() {
   const [dayIndex, setDayIndex]       = useState(0);
   const [prevDayStops, setPrevDayStops] = useState<Stop[]>([]);
   const [prevDayFeedbackDone, setPrevDayFeedbackDone] = useState(false);
+  // stop_done mode — tracks which stop was just visited and what’s next
+  const [visitedStopName, setVisitedStopName]             = useState<string | null>(null);
+  const [nextStopAfterComplete, setNextStopAfterComplete] = useState<Stop | null>(null);
   const [pastStopsOpen, setPastStopsOpen] = useState(false);
   const [loadErr, setLoadErr]         = useState<string | null>(null);
 
@@ -831,21 +834,20 @@ export default function AtStopScreen() {
     }
     // Signal today tab that a stop was completed
     await AsyncStorage.setItem('today_state_override', 'stop_complete');
-    // Advance to the next unvisited stop if one exists; otherwise go to picker
-    // (which will show the "all done" summary). Do NOT reload from network — use
-    // the locally-updated dayStops state so the user never sees a stale stop.
-    setDayStops(prev => {
-      const updated = prev.map(s => s.id === currentStop.id ? { ...s, isVisited: true } : s);
-      const nextUnvisited = updated.find(s => !isStopVisited(s));
-      if (nextUnvisited) {
-        setCurrentStop(nextUnvisited);
-        setMode('detail');
-      } else {
-        setCurrentStop(null);
-        setMode('picker');
-      }
-      return updated;
-    });
+    // Compute next stop OUTSIDE the updater — calling setState inside a setState
+    // updater is unreliable in React 18 concurrent mode and caused the
+    // "comes back to same screen" bug on first attempt.
+    const visitedStop = currentStop;
+    const updated = dayStops.map(s => s.id === visitedStop.id ? { ...s, isVisited: true } : s);
+    const nextUnvisited = updated.find(s => !isStopVisited(s)) ?? null;
+    setDayStops(updated);
+    setVisitedStopName(visitedStop.name);
+    setNextStopAfterComplete(nextUnvisited);
+    // Pre-load the next stop so tapping "Head there" in stop_done is instant
+    if (nextUnvisited) setCurrentStop(nextUnvisited);
+    else setCurrentStop(null);
+    // Show celebration; user taps "Head there" or "View all stops" to continue
+    setMode('stop_done');
   }
 
   async function handleMealComplete() {
@@ -974,6 +976,90 @@ export default function AtStopScreen() {
             <Text style={sc.noTripBtnText}>Plan a trip →</Text>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  // ── Screen B.5 — Stop Done Celebration ──
+  if (mode === 'stop_done') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#1A6B47' }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingTop: paddingTop + 20,
+            paddingBottom: insets.bottom + 40,
+            alignItems: 'center',
+            paddingHorizontal: 24,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Text style={{ fontFamily: F.bold, fontSize: 32, color: '#fff' }}>{'\u2713'}</Text>
+          </View>
+          <Text style={{ fontFamily: F.serif, fontSize: 32, color: '#fff', textAlign: 'center', marginBottom: 6 }}>
+            Stop done!
+          </Text>
+          {visitedStopName ? (
+            <Text style={{ fontFamily: F.medium, fontSize: 17, color: 'rgba(255,255,255,0.82)', textAlign: 'center', marginBottom: 32 }}>
+              {visitedStopName}
+            </Text>
+          ) : (
+            <View style={{ marginBottom: 32 }} />
+          )}
+
+          {nextStopAfterComplete ? (
+            <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 20, width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontFamily: F.semibold, fontSize: 11, color: C.muted, letterSpacing: 0.8, marginBottom: 6 }}>
+                NEXT UP
+              </Text>
+              <Text style={{ fontFamily: F.serif, fontSize: 22, color: C.deep, marginBottom: 4 }}>
+                {nextStopAfterComplete.name}
+              </Text>
+              <Text style={{ fontFamily: F.medium, fontSize: 14, color: C.muted, marginBottom: 16 }}>
+                {nextStopAfterComplete.stopType
+                  ? nextStopAfterComplete.stopType.charAt(0).toUpperCase() + nextStopAfterComplete.stopType.slice(1)
+                  : 'Stop'}
+                {' \u00b7 ~'}{nextStopAfterComplete.metadata?.travelMinutes ?? 15}{' min away'}
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: C.orange, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                activeOpacity={0.85}
+                onPress={() => {
+                  // currentStop was pre-set to nextStopAfterComplete in the handler
+                  setMode('detail');
+                }}
+              >
+                <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Head there \u2192</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 24, width: '100%', marginBottom: 16, alignItems: 'center' }}>
+              <Text style={{ fontFamily: F.serif, fontSize: 22, color: C.deep, marginBottom: 8, textAlign: 'center' }}>
+                {"That\u2019s all for today!"}
+              </Text>
+              <Text style={{ fontFamily: F.medium, fontSize: 15, color: C.muted, textAlign: 'center', marginBottom: 16 }}>
+                Great exploring, family.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: C.orange, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 28 }}
+                activeOpacity={0.85}
+                onPress={() => { setCurrentStop(null); setMode('picker'); }}
+              >
+                <Text style={{ fontFamily: F.bold, fontSize: 15, color: '#fff' }}>See all stops</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={{ marginTop: 8, paddingVertical: 12, paddingHorizontal: 24 }}
+            activeOpacity={0.7}
+            onPress={() => { setCurrentStop(null); setMode('picker'); }}
+          >
+            <Text style={{ fontFamily: F.medium, fontSize: 14, color: 'rgba(255,255,255,0.65)', textAlign: 'center' }}>
+              View all stops
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }

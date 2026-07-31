@@ -917,14 +917,17 @@ export default function TodayScreen() {
           forceReset = true;
           executionStartedRef.current = false;
         } else if (override === 'stop_complete') {
-          const elapsed = await AsyncStorage.getItem('atStopElapsed');
-          if (elapsed) {
-            setVisitedElapsed(parseInt(elapsed, 10) || null);
-            await AsyncStorage.removeItem('atStopElapsed');
-          }
+          await AsyncStorage.removeItem('atStopElapsed');
           await AsyncStorage.removeItem('atStopFrozen');
           await AsyncStorage.removeItem('atStopFrozenTripId');
-          if (!devState) setTodayState('stop_complete');
+          if (!devState) {
+            // Redirect to Home so the Home tab is highlighted (today has
+            // href:null — no tab button, so NativeTabs shows nothing selected).
+            // The stop-done celebration already ran inside the atstop screen.
+            router.replace('/(tabs)/home');
+            return;
+          }
+          setTodayState('stop_complete');
         }
       }
 
