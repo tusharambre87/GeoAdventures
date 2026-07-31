@@ -14492,13 +14492,15 @@ Return ONLY valid JSON in this exact format:
       if (!hlTrip) return res.status(404).json({ message: 'Trip not found' });
       if (hlTrip.userId !== userId) return res.status(403).json({ message: 'Access denied' });
 
-      // 1. Fetch all stops for this day
+      // 1. Fetch all stops for this day (incl. heroImageUrl + cityGroup for collage fallbacks)
       const dayStops = await db
         .select({
           id: travelStops.id,
           name: travelStops.name,
           displayOrder: travelStops.displayOrder,
           isVisited: travelStops.isVisited,
+          heroImageUrl: travelStops.heroImageUrl,
+          cityGroup: travelStops.cityGroup,
         })
         .from(travelStops)
         .where(and(eq(travelStops.tripId, tripId), eq(travelStops.dayIndex, dayIndex)))
@@ -14591,6 +14593,52 @@ Return ONLY valid JSON in this exact format:
         if (!photos || photos.length === 0) continue;
         selectedPhotos.push({ stopId: stop.id, stopName: stop.name, photoUrl: photos[photos.length - 1], isHeroStop: false });
         usedStopIds.add(stop.id);
+      }
+
+      // 6b. Library-image fallback: fill remaining slots when the family hasn't taken
+      //     enough photos yet.  Priority: travelStops.heroImageUrl (object-storage path)
+      //     → stop_library.imageUrl matched by name + city.  The public /hero-img proxy
+      //     already implements this same chain, so we just verify an image exists and
+      //     hand the client that URL — no extra download happens here.
+      if (selectedPhotos.length < 4) {
+        const baseUrl = process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : `${req.protocol}://${req.get('host')}`;
+
+        const stopsNeedingFallback = stopsInOrder.filter(s => !usedStopIds.has(s.id));
+
+        for (const stop of stopsNeedingFallback) {
+          if (selectedPhotos.length >= 4) break;
+
+          // Fast path: stop already has a backfilled hero image in object storage
+          if (stop.heroImageUrl?.startsWith('stop-images/')) {
+            selectedPhotos.push({
+              stopId: stop.id, stopName: stop.name,
+              photoUrl: `${baseUrl}/api/travel/stops/${stop.id}/hero-img`,
+              isHeroStop: false,
+            });
+            usedStopIds.add(stop.id);
+            continue;
+          }
+
+          // Slow path: look up stop_library by name (+ optional city)
+          const libConds: any[] = [eq(stopLibrary.name, stop.name)];
+          if (stop.cityGroup) libConds.push(eq(stopLibrary.city, stop.cityGroup));
+          const [libRow] = await db
+            .select({ imageUrl: stopLibrary.imageUrl })
+            .from(stopLibrary)
+            .where(and(...libConds))
+            .limit(1);
+
+          if (libRow?.imageUrl?.startsWith('stop-images/')) {
+            selectedPhotos.push({
+              stopId: stop.id, stopName: stop.name,
+              photoUrl: `${baseUrl}/api/travel/stops/${stop.id}/hero-img`,
+              isHeroStop: false,
+            });
+            usedStopIds.add(stop.id);
+          }
+        }
       }
 
       // 7. All photos from every stop that day (for swap picker)

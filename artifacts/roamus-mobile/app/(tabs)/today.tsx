@@ -4895,15 +4895,14 @@ const dc = StyleSheet.create({
   // Day Highlights entry button
   highlightsBtn: {
     marginHorizontal: 20, marginTop: 14, marginBottom: 2,
-    backgroundColor: '#163830', borderRadius: 16, padding: 16,
+    backgroundColor: '#E8692A', borderRadius: 16, padding: 16,
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   highlightsBtnEmoji: { fontSize: 22 },
-  highlightsBtnThumb: { width: 60, height: 60, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)' },
+  highlightsBtnThumb: { width: 60, height: 60, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.18)' },
   highlightsBtnTitle: { fontFamily: F.bold, fontSize: 15, color: '#fff', marginBottom: 2 },
-  highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.55)' },
-  highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.4)' },
+  highlightsBtnSub:   { fontFamily: F.medium, fontSize: 12, color: 'rgba(255,255,255,0.78)' },
+  highlightsBtnArrow: { fontFamily: F.bold, fontSize: 22, color: 'rgba(255,255,255,0.6)' },
   kidsZoneBtn: {
     marginHorizontal: 16, marginBottom: 16, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimary, alignItems: 'center',
