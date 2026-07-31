@@ -408,6 +408,28 @@ export default function HomeScreen() {
     </>
   );
 
+  // ── Discover More strip (shown in active-trip branch only) ─────────────────
+  const discoverMore = (
+    <>
+      <View style={s.divider} />
+      <Text style={s.sectionLabel}>DISCOVER MORE</Text>
+      <TouchableOpacity
+        style={dm.row}
+        activeOpacity={0.82}
+        onPress={() => router.push("/discover" as any)}
+      >
+        <View style={dm.iconWrap}>
+          <Text style={dm.icon}>🌍</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={dm.title}>Discover trips</Text>
+          <Text style={dm.sub}>Community picks + AI ideas for your family</Text>
+        </View>
+        <Text style={dm.chevron}>{"›"}</Text>
+      </TouchableOpacity>
+    </>
+  );
+
   // ── Loading state ─────────────────────────────────────────────────────────
   if (tripsLoading) {
     return (
@@ -439,6 +461,7 @@ export default function HomeScreen() {
               })
             }
           />
+          {discoverMore}
           {teasers}
         </ScrollView>
       </View>
@@ -639,4 +662,24 @@ const s = StyleSheet.create({
     fontFamily: F.bold, fontSize: 11, color: G.muted,
     letterSpacing: 1, marginHorizontal: 16, marginBottom: 10,
   },
+});
+
+// ── Discover More row styles ───────────────────────────────────────────────────
+const dm = StyleSheet.create({
+  row: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: G.card,
+    borderRadius: 16, borderWidth: 1, borderColor: "rgba(26,31,46,0.07)",
+    padding: 14,
+  },
+  iconWrap: {
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: "rgba(26,31,46,0.06)",
+    alignItems: "center", justifyContent: "center",
+  },
+  icon: { fontSize: 22 },
+  title: { fontFamily: F.bold, fontSize: 14, color: G.deep, marginBottom: 2 },
+  sub: { fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 17 },
+  chevron: { fontFamily: F.bold, fontSize: 22, color: G.muted, marginLeft: 4 },
 });
