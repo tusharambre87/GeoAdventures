@@ -87,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(t);
     setUser(u);
     Analytics.identify(u.id, { email: u.email, created_at: (u as any).createdAt });
+
+    // Dev-only: if the user's profile carries a dev_date_override (set server-side
+    // via onboarding_completed JSONB), auto-seed AsyncStorage so the correct date
+    // is active without manual modal entry.
+    if (__DEV__) {
+      const oc = (u as any).onboardingCompleted ?? (u as any).onboarding_completed;
+      const devDate: string | undefined = oc?.dev_date_override ?? oc?.devDateOverride;
+      if (devDate && typeof devDate === "string") {
+        await AsyncStorage.setItem("dev_date_override", devDate);
+      }
+    }
   }
 
   async function login(
