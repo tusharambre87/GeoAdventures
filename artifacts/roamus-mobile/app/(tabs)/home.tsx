@@ -1,7 +1,12 @@
 /**
- * Home tab — "no active trip" discover state.
- * Reuses HeroCard, GridCard, filter chips, and data-fetching pattern from
- * app/discover/index.tsx (components exported from there, not duplicated here).
+ * Home tab.
+ *
+ * Two mutually-exclusive states:
+ *   • Active trip  — single live card + teaser strips (no discover feed)
+ *   • No trip      — discover feed (community/AI picks) + teaser strips
+ *
+ * Trip selection uses selectActiveTrip() from lib/tripUtils so this tab always
+ * agrees with the Today tab on which trip is "active".
  */
 
 import { Image } from "expo-image";
@@ -21,8 +26,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuth } from "@/lib/authContext";
-import { API_BASE } from "@/lib/apiClient";
+import { API_BASE, apiFetch } from "@/lib/apiClient";
 import { F, G } from "@/lib/tokens";
+import { selectActiveTrip, getTripStatusInfo } from "@/lib/tripUtils";
 import {
   AI_PICKS,
   AGE_FILTERS,
@@ -36,6 +42,24 @@ import {
   normalizeShare,
 } from "@/app/discover/index";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+/** Minimal trip shape fetched for the Home card. */
+type HomeTripData = {
+  id: string;
+  name: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  currentDayIndex?: number | null;
+  tripDays?: number | null;
+  plannerTripDays?: number | null;
+  coverImageUrl?: string | null;
+  firstPhotoUrl?: string | null;
+  destination?: string | null;
+  city?: string | null;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function greeting() {
@@ -44,6 +68,146 @@ function greeting() {
   if (h < 17) return "Good afternoon";
   return "Good evening";
 }
+
+// ─── Active-trip card ────────────────────────────────────────────────────────
+
+function ActiveTripCard({
+  trip,
+  onPress,
+}: {
+  trip: HomeTripData;
+  onPress: () => void;
+}) {
+  const { dayLabel, statusLine, ctaLabel } = getTripStatusInfo(trip);
+  const isLive = trip.status !== "completed" && !!trip.startDate;
+  const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
+  const tripName = trip.name || trip.destination || trip.city || "Your Trip";
+
+  return (
+    <Pressable style={ac.root} onPress={onPress} android_ripple={{ color: "rgba(255,255,255,0.1)" }}>
+      {/* Background image */}
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: G.deep }]} />
+      )}
+
+      {/* Dark gradient overlay */}
+      <LinearGradient
+        colors={["rgba(15,18,30,0.35)", "rgba(15,18,30,0.82)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Content */}
+      <View style={ac.content}>
+        {/* Live pill */}
+        <View style={ac.livePill}>
+          {isLive && <View style={ac.liveDot} />}
+          <Text style={ac.liveTxt}>{isLive ? "LIVE TRIP" : "TRIP"}</Text>
+        </View>
+
+        {/* Trip name */}
+        <Text style={ac.name} numberOfLines={2}>{tripName}</Text>
+
+        {/* Day badge + status line */}
+        <View style={ac.meta}>
+          <View style={ac.dayBadge}>
+            <Text style={ac.dayTxt}>{dayLabel}</Text>
+          </View>
+          <Text style={ac.statusLine} numberOfLines={1}>{statusLine}</Text>
+        </View>
+
+        {/* CTA */}
+        <TouchableOpacity style={ac.cta} onPress={onPress} activeOpacity={0.85}>
+          <Text style={ac.ctaTxt}>{ctaLabel}</Text>
+        </TouchableOpacity>
+      </View>
+    </Pressable>
+  );
+}
+
+const ac = StyleSheet.create({
+  root: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: "hidden",
+    height: 220,
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "flex-end",
+  },
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 10,
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4ADE80",
+  },
+  liveTxt: {
+    fontFamily: F.bold,
+    fontSize: 10,
+    color: "#fff",
+    letterSpacing: 1.2,
+  },
+  name: {
+    fontFamily: F.bold,
+    fontSize: 24,
+    color: "#fff",
+    letterSpacing: -0.4,
+    marginBottom: 10,
+    lineHeight: 30,
+  },
+  meta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+  },
+  dayBadge: {
+    backgroundColor: G.orange,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  dayTxt: {
+    fontFamily: F.bold,
+    fontSize: 12,
+    color: "#fff",
+  },
+  statusLine: {
+    fontFamily: F.regular,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.82)",
+    flex: 1,
+  },
+  cta: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  ctaTxt: {
+    fontFamily: F.bold,
+    fontSize: 14,
+    color: G.deep,
+  },
+});
 
 // ─── Teaser strip ─────────────────────────────────────────────────────────────
 
@@ -106,16 +270,34 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const firstName = user?.firstName || user?.username || null;
 
+  // ── Trips (for active-trip detection) ─────────────────────────────────────
+  const [trips, setTrips] = useState<HomeTripData[]>([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<{ trips: HomeTripData[] }>("/api/travel/trips")
+      .then(data => {
+        if (Array.isArray(data?.trips)) setTrips(data.trips);
+      })
+      .catch(() => {})
+      .finally(() => setTripsLoading(false));
+  }, []);
+
+  const activeTrip = selectActiveTrip(trips);
+
+  // ── Discover feed state ───────────────────────────────────────────────────
   const [tab, setTab] = useState<"community" | "ai">("community");
   const [communityItems, setCommunityItems] = useState<DiscoverItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [discoverLoading, setDiscoverLoading] = useState(true);
   const [quickUpvoted, setQuickUpvoted] = useState<Record<string, boolean>>({});
 
   const [activeCity, setActiveCity] = useState("All");
   const [activeDuration, setActiveDuration] = useState<string | null>(null);
   const [activeAge, setActiveAge] = useState<string | null>(null);
 
+  // Only fetch community shares when there's no active trip (saves a request)
   useEffect(() => {
+    if (activeTrip !== undefined) return; // skip if we already know there's a trip
     fetch(`${API_BASE}/api/travel/shares?limit=30`)
       .then(r => r.json())
       .then(async (data: CommunityShare[]) => {
@@ -131,8 +313,8 @@ export default function HomeScreen() {
         setCommunityItems(enriched);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setDiscoverLoading(false));
+  }, [activeTrip]);
 
   async function handleQuickUpvote(itemId: string) {
     setQuickUpvoted(prev => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -181,24 +363,92 @@ export default function HomeScreen() {
   const heroItem = filtered[0];
   const gridItems = filtered.slice(1);
 
+  // ── Shared header ─────────────────────────────────────────────────────────
+  const header = (
+    <View style={s.header}>
+      <View>
+        <Text style={s.greeting}>
+          {greeting()}{firstName ? `, ${firstName}` : ""}
+        </Text>
+        <Text style={s.headerSub}>
+          {activeTrip ? "You have an active trip" : "Plan your next adventure"}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={s.planBtn}
+        activeOpacity={0.85}
+        onPress={() => router.push("/onboarding/where" as any)}
+      >
+        <Text style={s.planBtnTxt}>Plan a trip →</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // ── Teaser strips (always shown) ───────────────────────────────────────────
+  const teasers = (
+    <>
+      <View style={s.divider} />
+      <Text style={s.sectionLabel}>YOUR ROAMUS</Text>
+      <TeaserStrip
+        emoji="📸"
+        title="Trip Memories"
+        subtitle="Relive your family's favourite moments"
+        ctaLabel="See all"
+        accentColor="#7C3AED"
+        onPress={() => router.push("/(tabs)/memories" as any)}
+      />
+      <TeaserStrip
+        emoji="🎮"
+        title="Kids Zone"
+        subtitle="See your rewards"
+        ctaLabel="Explore"
+        accentColor={G.orange}
+        onPress={() => router.push("/(tabs)/kidszone" as any)}
+      />
+    </>
+  );
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (tripsLoading) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        {header}
+        <View style={s.center}>
+          <ActivityIndicator color={G.orange} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── Active-trip branch ────────────────────────────────────────────────────
+  if (activeTrip) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        {header}
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <ActiveTripCard
+            trip={activeTrip as HomeTripData}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/today" as any,
+                params: { tripId: activeTrip.id },
+              })
+            }
+          />
+          {teasers}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── No-trip discover branch ───────────────────────────────────────────────
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={s.header}>
-        <View>
-          <Text style={s.greeting}>
-            {greeting()}{firstName ? `, ${firstName}` : ""}
-          </Text>
-          <Text style={s.headerSub}>Plan your next adventure</Text>
-        </View>
-        <TouchableOpacity
-          style={s.planBtn}
-          activeOpacity={0.85}
-          onPress={() => router.push("/onboarding/where" as any)}
-        >
-          <Text style={s.planBtnTxt}>Plan a trip →</Text>
-        </TouchableOpacity>
-      </View>
+      {header}
 
       {/* ── Community / AI tabs ─────────────────────────────────────── */}
       <View style={s.tabsWrap}>
@@ -264,7 +514,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── Loading ─────────────────────────────────────────────── */}
-        {tab === "community" && loading && (
+        {tab === "community" && discoverLoading && (
           <View style={s.center}>
             <ActivityIndicator color={G.orange} />
             <Text style={s.loadingTxt}>Finding community trips…</Text>
@@ -272,7 +522,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── Empty state ─────────────────────────────────────────── */}
-        {!loading && filtered.length === 0 && (
+        {!discoverLoading && filtered.length === 0 && (
           <View style={s.center}>
             <Text style={s.emptyTxt}>No trips match your filters.</Text>
             <TouchableOpacity onPress={() => { setActiveCity("All"); setActiveDuration(null); setActiveAge(null); }}>
@@ -306,29 +556,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Divider ─────────────────────────────────────────────── */}
-        <View style={s.divider} />
-
-        {/* ── Teaser strips ───────────────────────────────────────── */}
-        <Text style={s.sectionLabel}>YOUR ROAMUS</Text>
-
-        <TeaserStrip
-          emoji="📸"
-          title="Trip Memories"
-          subtitle="Relive your family's favourite moments"
-          ctaLabel="See all"
-          accentColor="#7C3AED"
-          onPress={() => router.push("/(tabs)/memories" as any)}
-        />
-
-        <TeaserStrip
-          emoji="🎮"
-          title="Kids Zone"
-          subtitle="See your rewards"
-          ctaLabel="Explore"
-          accentColor={G.orange}
-          onPress={() => router.push("/(tabs)/kidszone" as any)}
-        />
+        {teasers}
       </ScrollView>
     </View>
   );
@@ -391,7 +619,7 @@ const s = StyleSheet.create({
   aiBannerSub: { fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 18 },
 
   // States
-  center: { alignItems: "center", paddingVertical: 48, gap: 10 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 48, gap: 10 },
   loadingTxt: { fontFamily: F.regular, fontSize: 14, color: G.muted },
   emptyTxt: { fontFamily: F.regular, fontSize: 14, color: G.muted },
   emptyReset: { fontFamily: F.bold, fontSize: 14, color: G.orange },

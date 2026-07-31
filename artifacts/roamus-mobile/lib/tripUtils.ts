@@ -4,6 +4,76 @@
  * overrides and multi-trip edge cases.
  */
 
+/** What the Home tab needs to render the live-trip card. */
+export interface TripStatusInfo {
+  /** Short label for the day pill: "Day 2 of 4", "Tomorrow", "In 3 days", "Done" */
+  dayLabel: string;
+  /** One-line status shown below the trip name */
+  statusLine: string;
+  /** CTA button label */
+  ctaLabel: string;
+}
+
+/**
+ * Derives the three display strings for the Home tab's active-trip card.
+ * Uses only date arithmetic + trip.status — no AsyncStorage or location state.
+ */
+export function getTripStatusInfo(
+  trip: TripLike & {
+    currentDayIndex?: number | null;
+    tripDays?: number | null;
+    plannerTripDays?: number | null;
+  },
+  devDate?: Date | string | null,
+): TripStatusInfo {
+  if (trip.status === 'completed') {
+    return { dayLabel: 'Done', statusLine: 'Your adventure is wrapped up', ctaLabel: 'Memories →' };
+  }
+
+  const today = new Date(devDate ?? Date.now());
+  today.setHours(0, 0, 0, 0);
+
+  const start = parseLocalDate(trip.startDate);
+  const end   = parseLocalDate(trip.endDate);
+
+  if (start) {
+    start.setHours(0, 0, 0, 0);
+    const daysUntil = Math.round((start.getTime() - today.getTime()) / 86_400_000);
+
+    if (daysUntil > 1) {
+      const dateStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return {
+        dayLabel: `In ${daysUntil} days`,
+        statusLine: `Starts ${dateStr} — get excited!`,
+        ctaLabel: 'See plan →',
+      };
+    }
+    if (daysUntil === 1) {
+      return { dayLabel: 'Tomorrow', statusLine: 'Adventure starts tomorrow!', ctaLabel: 'See plan →' };
+    }
+
+    // Today is on or after start — check if we're still within the trip window
+    if (!end || today.getTime() <= end.getTime()) {
+      const dayIndex =
+        trip.currentDayIndex ??
+        Math.max(0, Math.round((today.getTime() - start.getTime()) / 86_400_000));
+      const total = trip.tripDays ?? trip.plannerTripDays ?? null;
+      const dayNum = dayIndex + 1;
+      return {
+        dayLabel: `Day ${dayNum}${total ? ` of ${total}` : ''}`,
+        statusLine: 'Continue exploring',
+        ctaLabel: 'Continue →',
+      };
+    }
+
+    // Past end date but not yet marked completed
+    return { dayLabel: 'Ended', statusLine: 'Trip is over — mark it complete', ctaLabel: 'Open Today →' };
+  }
+
+  // No start date — planned but not scheduled
+  return { dayLabel: 'Planned', statusLine: 'Ready when you are', ctaLabel: 'Open Today →' };
+}
+
 /** Minimum trip shape required by selectActiveTrip. */
 export interface TripLike {
   id: string;
@@ -13,7 +83,7 @@ export interface TripLike {
 }
 
 /** Parse date string as LOCAL midnight (strips UTC offset). */
-function parseLocalDate(s: string | null | undefined): Date | null {
+export function parseLocalDate(s: string | null | undefined): Date | null {
   if (!s) return null;
   const datePart = s.split('T')[0].split(' ')[0];
   const ymd = datePart.split('-').map(Number);
