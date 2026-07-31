@@ -193,6 +193,103 @@ const AI_PICKS_DETAIL: Record<string, AiPickDetail> = {
       ]},
     ],
   },
+  "ai-newyork": {
+    title: "New York City Explorer", destination: "New York",
+    durationDays: 3, ageRange: "All ages", description: "Iconic skyline, museums & culture",
+    days: [
+      { label: "Day 1 — Midtown Icons", stops: [
+        { name: "Central Park", type: "Park", isKidFriendly: true },
+        { name: "American Museum of Natural History", type: "Museum", isKidFriendly: true },
+        { name: "Times Square", type: "Landmark", isKidFriendly: true },
+        { name: "Top of the Rock", type: "Landmark", isOptional: true },
+      ]},
+      { label: "Day 2 — Downtown & Waterfront", stops: [
+        { name: "Statue of Liberty", type: "Landmark", isKidFriendly: true },
+        { name: "Ellis Island", type: "Museum", isKidFriendly: true },
+        { name: "Brooklyn Bridge", type: "Landmark", isKidFriendly: true },
+        { name: "DUMBO Brooklyn", type: "Neighborhood", isOptional: true },
+      ]},
+      { label: "Day 3 — Museums & Culture", stops: [
+        { name: "Metropolitan Museum of Art", type: "Museum", isKidFriendly: true },
+        { name: "Intrepid Sea, Air & Space Museum", type: "Museum", isKidFriendly: true },
+        { name: "High Line", type: "Park", isOptional: true },
+      ]},
+    ],
+  },
+  "ai-chicago": {
+    title: "Chicago Family Adventure", destination: "Chicago",
+    durationDays: 3, ageRange: "All ages", description: "Architecture, food & lakefront fun",
+    days: [
+      { label: "Day 1 — Lakefront & Millennium Park", stops: [
+        { name: "Millennium Park & The Bean", type: "Landmark", isKidFriendly: true },
+        { name: "Navy Pier", type: "Attraction", isKidFriendly: true },
+        { name: "Chicago Riverwalk", type: "Park", isKidFriendly: true },
+        { name: "Maggie Daley Park", type: "Park", isKidFriendly: true, isOptional: true },
+      ]},
+      { label: "Day 2 — Science & History", stops: [
+        { name: "Shedd Aquarium", type: "Aquarium", isKidFriendly: true },
+        { name: "Field Museum", type: "Museum", isKidFriendly: true },
+        { name: "Adler Planetarium", type: "Science Center", isKidFriendly: true, isOptional: true },
+      ]},
+      { label: "Day 3 — Zoo & Neighborhoods", stops: [
+        { name: "Lincoln Park Zoo", type: "Zoo", isKidFriendly: true },
+        { name: "Chicago Architecture Center", type: "Museum", isKidFriendly: true },
+        { name: "Deep Dish Pizza Experience", type: "Food", isKidFriendly: true, isOptional: true },
+      ]},
+    ],
+  },
+  "ai-sanfrancisco": {
+    title: "San Francisco Discovery", destination: "San Francisco",
+    durationDays: 4, ageRange: "All ages", description: "Bridges, science & bay adventures",
+    days: [
+      { label: "Day 1 — Iconic Landmarks", stops: [
+        { name: "Golden Gate Bridge", type: "Landmark", isKidFriendly: true },
+        { name: "Alcatraz Island", type: "Landmark", isKidFriendly: true },
+        { name: "Fisherman's Wharf", type: "Neighborhood", isKidFriendly: true },
+      ]},
+      { label: "Day 2 — Science & Exploration", stops: [
+        { name: "California Academy of Sciences", type: "Museum", isKidFriendly: true },
+        { name: "Cable Car Ride", type: "Adventure", isKidFriendly: true },
+        { name: "Exploratorium", type: "Museum", isKidFriendly: true },
+      ]},
+      { label: "Day 3 — Golden Gate Park", stops: [
+        { name: "Golden Gate Park", type: "Park", isKidFriendly: true },
+        { name: "de Young Museum", type: "Museum", isOptional: true },
+        { name: "Ocean Beach", type: "Beach", isKidFriendly: true },
+      ]},
+      { label: "Day 4 — Chinatown & Ferry Building", stops: [
+        { name: "San Francisco Chinatown", type: "Neighborhood", isKidFriendly: true },
+        { name: "Ferry Building Marketplace", type: "Market", isKidFriendly: true },
+        { name: "Twin Peaks Viewpoint", type: "Landmark", isOptional: true },
+      ]},
+    ],
+  },
+  "ai-orlando": {
+    title: "Orlando Theme Parks", destination: "Orlando",
+    durationDays: 4, ageRange: "All ages", description: "Theme parks, sunshine & family magic",
+    days: [
+      { label: "Day 1 — Magic Kingdom", stops: [
+        { name: "Magic Kingdom", type: "Theme Park", isKidFriendly: true },
+        { name: "Main Street USA", type: "Neighborhood", isKidFriendly: true },
+        { name: "Cinderella Castle", type: "Landmark", isKidFriendly: true },
+      ]},
+      { label: "Day 2 — EPCOT", stops: [
+        { name: "EPCOT Center", type: "Theme Park", isKidFriendly: true },
+        { name: "World Showcase", type: "Attraction", isKidFriendly: true },
+        { name: "Test Track", type: "Attraction", isKidFriendly: true, isOptional: true },
+      ]},
+      { label: "Day 3 — Animal Kingdom & Nature", stops: [
+        { name: "Disney's Animal Kingdom", type: "Zoo", isKidFriendly: true },
+        { name: "Pandora — World of Avatar", type: "Attraction", isKidFriendly: true },
+        { name: "Kilimanjaro Safaris", type: "Adventure", isKidFriendly: true },
+      ]},
+      { label: "Day 4 — Universal Studios", stops: [
+        { name: "Universal Studios Florida", type: "Theme Park", isKidFriendly: true },
+        { name: "Wizarding World of Harry Potter", type: "Attraction", isKidFriendly: true },
+        { name: "Islands of Adventure", type: "Theme Park", isKidFriendly: true, isOptional: true },
+      ]},
+    ],
+  },
 };
 
 // ─── Stop icon by type ────────────────────────────────────────────────────────

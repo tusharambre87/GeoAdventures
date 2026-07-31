@@ -242,12 +242,12 @@ function TripCard({ trip, small }: { trip: Trip; small?: boolean }) {
 
 // ─── Inspiration Section ──────────────────────────────────────────────────────
 
-const INSPIRATION_CITIES: Array<{ city: string; emoji: string; desc: string }> = [
-  { city: 'New York',       emoji: '\ud83d\uddfd', desc: 'Iconic skyline & culture' },
-  { city: 'Chicago',        emoji: '\ud83c\udfd9\ufe0f', desc: 'Architecture & deep dish' },
-  { city: 'San Francisco',  emoji: '\ud83c\udf09', desc: 'Tech hub with stunning views' },
-  { city: 'Orlando',        emoji: '\ud83c\udfa1', desc: 'Theme parks & sunshine' },
-  { city: 'Washington DC',  emoji: '\ud83c\udffb\ufe0f', desc: 'History & monuments' },
+const INSPIRATION_CITIES: Array<{ city: string; slug: string; title: string; desc: string; days: number }> = [
+  { city: 'New York',       slug: 'ai-newyork',      title: 'New York City Explorer',    desc: 'Iconic skyline & culture',      days: 3 },
+  { city: 'Chicago',        slug: 'ai-chicago',       title: 'Chicago Family Adventure',  desc: 'Architecture & deep dish',       days: 3 },
+  { city: 'San Francisco',  slug: 'ai-sanfrancisco',  title: 'San Francisco Discovery',   desc: 'Tech hub with stunning views',  days: 4 },
+  { city: 'Orlando',        slug: 'ai-orlando',       title: 'Orlando Theme Parks',       desc: 'Theme parks & sunshine',         days: 4 },
+  { city: 'Washington DC',  slug: 'ai-dc',            title: 'Washington DC Explorer',    desc: 'History & monuments',            days: 3 },
 ];
 
 function InspirationSection() {
@@ -261,32 +261,54 @@ function InspirationSection() {
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-        {INSPIRATION_CITIES.map(({ city, emoji, desc }) => (
-          <Pressable
-            key={city}
-            style={({ pressed }: { pressed: boolean }) => [s.inspireCard, { opacity: pressed ? 0.88 : 1 }]}
-            onPress={() => router.push('/discover' as any)}
-          >
-            <LinearGradient colors={['#1A3A2A', '#0D2118']} style={StyleSheet.absoluteFill} />
-            <Text style={{ fontSize: 28, marginBottom: 8 }}>{emoji}</Text>
-            <Text style={{ fontFamily: F.bold, fontSize: 14, color: '#fff', marginBottom: 3 }}>{city}</Text>
-            <Text style={{ fontFamily: F.regular, fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 15 }}>{desc}</Text>
-          </Pressable>
-        ))}
+        {INSPIRATION_CITIES.map(({ city, slug, title, desc, days }) => {
+          const imgUrl = CITY_IMGS[city] ?? null;
+          return (
+            <TouchableOpacity
+              key={city}
+              activeOpacity={0.88}
+              style={s.inspireCard}
+              onPress={() => router.push({
+                pathname: '/discover/[slug]',
+                params: { slug, isAiPick: 'true', heroImageUrl: imgUrl ?? '' },
+              } as any)}
+            >
+              {/* Photo area */}
+              <View style={s.inspireImg}>
+                {imgUrl ? (
+                  <Image source={{ uri: imgUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1A2A3A' }]} />
+                )}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.68)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={s.inspireCity}>{city}</Text>
+              </View>
+              {/* Body */}
+              <View style={s.inspireBody}>
+                <Text style={s.inspireTitle} numberOfLines={2}>{title}</Text>
+                <Text style={s.inspireMeta}>{days}d · AI curated</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
-      <Pressable
-        style={({ pressed }: { pressed: boolean }) => [s.discoverBtn, { marginTop: 16, opacity: pressed ? 0.85 : 1 }]}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={[s.discoverBtn, { marginTop: 16 }]}
         onPress={() => router.push('/discover' as any)}
       >
         <View style={s.discoverBtnIco}>
-          <Text style={{ fontSize: 18 }}>{'\ud83c\udf10'}</Text>
+          <Text style={{ fontSize: 18 }}>{'🌐'}</Text>
         </View>
         <View style={s.discoverBtnBody}>
           <Text style={s.discoverBtnTitle}>Discover all trips</Text>
           <Text style={s.discoverBtnSub}>Community picks + AI ideas for your family</Text>
         </View>
-        <Text style={{ fontSize: 18, color: '#C4C7D4' }}>{'\u203a'}</Text>
-      </Pressable>
+        <Text style={{ fontSize: 18, color: '#C4C7D4' }}>{'›'}</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -895,10 +917,19 @@ const s = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6,
   },
   inspireCard: {
-    width: 140, height: 160, borderRadius: 16, overflow: "hidden" as const,
-    padding: 16, justifyContent: "flex-end" as const,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
+    width: 155, backgroundColor: G.card,
+    borderRadius: 16, overflow: "hidden" as const,
+    borderWidth: 1, borderColor: "rgba(26,31,46,0.08)",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 8, elevation: 3,
   },
+  inspireImg: { height: 100, position: "relative" as const, backgroundColor: "#2A3540" },
+  inspireCity: {
+    position: "absolute" as const, bottom: 7, left: 10,
+    fontFamily: F.bold, fontSize: 12, color: "#fff",
+  },
+  inspireBody: { padding: 10 },
+  inspireTitle: { fontFamily: F.bold, fontSize: 13, color: G.deep, marginBottom: 3, lineHeight: 18 },
+  inspireMeta: { fontFamily: F.regular, fontSize: 11, color: G.muted },
   planTripFab: {
     position: "absolute", right: 20,
     shadowColor: "#E8692A", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8,
