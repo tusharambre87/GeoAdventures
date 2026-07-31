@@ -1077,7 +1077,7 @@ export default function TodayScreen() {
     } finally {
       setLoading(false);
     }
-  }, [resolvedTripId, resolvedDayIndex, devState]);
+  }, [resolvedTripId, resolvedDayIndex, devState, devDate]);
 
   // Keep viewingDay in sync with the actual current day — initialises to 0 but
   // the real day only becomes known after the trip loads. This prevents the

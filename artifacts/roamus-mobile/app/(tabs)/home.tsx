@@ -11,8 +11,8 @@
 
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -75,11 +75,13 @@ function greeting() {
 function ActiveTripCard({
   trip,
   onPress,
+  devDate,
 }: {
   trip: HomeTripData;
   onPress: () => void;
+  devDate?: Date | null;
 }) {
-  const { dayLabel, statusLine, ctaLabel } = getTripStatusInfo(trip);
+  const { dayLabel, statusLine, ctaLabel } = getTripStatusInfo(trip, devDate);
   const isLive = trip.status !== "completed" && !!trip.startDate;
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
@@ -284,14 +286,16 @@ export default function HomeScreen() {
       .finally(() => setTripsLoading(false));
   }, []);
 
-  // Dev-only date override — stays in sync with today.tsx's AsyncStorage key
+  // Dev-only date override — refreshed on every focus so navigating back
+  // from any screen picks up the latest value.
   const [devDate, setDevDate] = useState<Date | null>(null);
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!__DEV__) return;
     AsyncStorage.getItem('dev_date_override').then(raw => {
-      if (raw) { const d = new Date(raw); if (!isNaN(d.getTime())) setDevDate(d); }
+      if (raw) { const d = new Date(raw + 'T12:00:00'); if (!isNaN(d.getTime())) setDevDate(d); }
+      else setDevDate(null);
     }).catch(() => {});
-  }, []);
+  }, []));
 
   const activeTrip = selectActiveTrip(trips, devDate ?? undefined);
 
@@ -473,6 +477,7 @@ export default function HomeScreen() {
         >
           <ActiveTripCard
             trip={activeTrip as HomeTripData}
+            devDate={devDate}
             onPress={() =>
               router.push({
                 pathname: "/(tabs)/today" as any,
