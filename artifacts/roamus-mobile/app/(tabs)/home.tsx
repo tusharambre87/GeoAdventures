@@ -335,6 +335,11 @@ export default function HomeScreen() {
 
   const activeTrip = selectActiveTrip(trips, devDate ?? undefined);
 
+  // ── Scroll tracking for FAB collapse ────────────────────────────────────
+  const homeScrollY = useRef(new Animated.Value(0)).current;
+  const fabLabelOpacity = homeScrollY.interpolate({ inputRange: [120, 180], outputRange: [1, 0], extrapolate: 'clamp' });
+  const fabLabelMaxW    = homeScrollY.interpolate({ inputRange: [120, 180], outputRange: [68, 0], extrapolate: 'clamp' });
+
   // ── Rescue + SOTW state ───────────────────────────────────────────────────
   const [showRescue, setShowRescue] = useState(false);
   const [rescueStops, setRescueStops] = useState<any[]>([]);
@@ -662,10 +667,15 @@ export default function HomeScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         {header}
-        <ScrollView
+        <Animated.ScrollView
           style={s.scroll}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: homeScrollY } } }],
+            { useNativeDriver: false }
+          )}
+          scrollEventThrottle={16}
         >
           <ActiveTripCard
             trip={activeTrip as HomeTripData}
@@ -679,7 +689,7 @@ export default function HomeScreen() {
           />
           {discoverMore}
           {teasers}
-        </ScrollView>
+        </Animated.ScrollView>
 
         {/* Rescue FAB — floating, only during live trip dates */}
         {isActiveToday && (
@@ -691,8 +701,10 @@ export default function HomeScreen() {
             }}
             activeOpacity={0.85}
           >
-            <Text style={hs.rescueFabIcon}>{'\uD83D\uDEDF'}</Text>
-            <Text style={hs.rescueFabLabel}>Rescue</Text>
+            <Ionicons name="shield-checkmark-outline" size={22} color="#fff" />
+            <Animated.View style={{ overflow: 'hidden', maxWidth: fabLabelMaxW, opacity: fabLabelOpacity, marginLeft: 6 }}>
+              <Text style={hs.rescueFabLabel}>Rescue</Text>
+            </Animated.View>
           </TouchableOpacity>
         )}
 
@@ -987,12 +999,11 @@ const s = StyleSheet.create({
 const hs = StyleSheet.create({
   rescueFab: {
     position: 'absolute', right: 20,
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center',
     height: 46, paddingHorizontal: 18, borderRadius: 23,
     backgroundColor: '#B91C1C',
     shadowColor: '#B91C1C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.42, shadowRadius: 10, elevation: 7,
   },
-  rescueFabIcon: { fontSize: 18, lineHeight: 22 },
   rescueFabLabel: { color: '#fff', fontSize: 14, fontFamily: F.bold },
 
   sotwSheet: {
