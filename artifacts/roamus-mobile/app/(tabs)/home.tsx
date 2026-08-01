@@ -772,11 +772,16 @@ export default function HomeScreen() {
               </View>
 
               {/* Filter pills */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 8 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingLeft: 16, paddingRight: 24, paddingVertical: 8 }}
+                style={{ flexShrink: 0 }}
+              >
                 {SOTW_FILTERS.map(([f, emoji, label]) => (
                   <TouchableOpacity
                     key={f}
-                    style={[hs.sotwPill, sotwFilter === f && hs.sotwPillOn]}
+                    style={[hs.sotwPill, sotwFilter === f && hs.sotwPillOn, { marginRight: 8 }]}
                     onPress={() => { setSotwFilter(f); void fetchSotwPlaces(f); }}
                   >
                     <Text>{emoji}</Text>
