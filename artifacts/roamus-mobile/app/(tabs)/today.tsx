@@ -3278,10 +3278,20 @@ export default function TodayScreen() {
             { transform: [{ translateY: breakSlideY }], zIndex: 101, elevation: 101 },
           ]}
         >
-          <LinearGradient
-            colors={getBreakHeroColors(sotwFilter)}
-            style={[sotw.bcHero, { paddingTop: insets.top + 6 }]}
-          >
+          <View style={[sotw.bcHero, { paddingTop: insets.top + 6 }]}>
+            {activeBreakPlace.photoReference ? (
+              <Image
+                source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(activeBreakPlace.photoReference)}` }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            ) : null}
+            <LinearGradient
+              colors={activeBreakPlace.photoReference
+                ? ['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)']
+                : getBreakHeroColors(sotwFilter)}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={sotw.bcTopRow}>
               <TouchableOpacity style={sotw.bcClose} onPress={closeBreakCapture}>
                 <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 }}>{'\u00D7'}</Text>
@@ -3292,7 +3302,7 @@ export default function TodayScreen() {
             </View>
             <Text style={sotw.bcTitle}>{activeBreakPlace.name}</Text>
             <Text style={sotw.bcSub}>{activeBreakPlace.vicinity}</Text>
-          </LinearGradient>
+          </View>
           <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>
             <TouchableOpacity
               style={sotw.dirCard}

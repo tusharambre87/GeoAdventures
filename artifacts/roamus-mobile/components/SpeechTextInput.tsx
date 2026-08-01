@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSpeechToText } from '@/lib/useSpeechToText';
 
 interface SpeechTextInputProps extends TextInputProps {
@@ -73,8 +73,8 @@ export function SpeechTextInput({
           activeOpacity={0.7}
           style={[styles.micBtn, isListening && styles.micBtnActive]}
         >
-          <Feather
-            name="mic-off"
+          <Ionicons
+            name={isListening ? 'mic' : 'mic-off-outline'}
             size={15}
             color={isListening ? '#E8692A' : '#8A8FA8'}
           />
