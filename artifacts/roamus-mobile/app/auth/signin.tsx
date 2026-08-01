@@ -49,7 +49,7 @@ export default function SignIn() {
     const result = await login(email.trim().toLowerCase(), password);
     setLoading(false);
     if (result.success) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/home");
     } else {
       setError(true);
     }

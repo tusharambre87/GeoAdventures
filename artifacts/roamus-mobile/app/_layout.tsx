@@ -120,9 +120,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     ) {
       router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
-      if (inLegacyLogin || inAuth) router.replace("/(tabs)");
+      if (inLegacyLogin || inAuth) router.replace("/(tabs)/home");
     } else if (token && inOnboarding && !data.onboardingInProgress) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/home");
     }
   }, [token, isLoading, segments, data.onboardingInProgress]);
 
