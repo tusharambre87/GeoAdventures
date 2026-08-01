@@ -52,7 +52,7 @@ export function getOptions(
         { id: 'tired',   icon: '\uD83D\uDE34', title: 'Kids are tired',      subtitle: 'Find a break spot near this stop', zone: 'primary' },
         { id: 'late',    icon: '\u23F0',        title: 'Running late',        subtitle: 'Behind schedule',                  zone: 'primary' },
         { id: 'fun',     icon: '\uD83C\uDF89',  title: 'Something more fun',  subtitle: 'Swap this stop',                   zone: 'primary' },
-        { id: 'food',    icon: '\uD83C\uDF54',  title: 'Need food now',       subtitle: 'Find something close',             zone: 'primary' },
+        { id: 'food',    icon: '\uD83C\uDF54',  title: 'Pit stop \u2014 food', subtitle: 'Add a food break nearby',          zone: 'primary' },
       ],
       secondary: [
         { id: 'weather', icon: '\uD83C\uDF27\uFE0F', title: 'Weather changed',         subtitle: 'Find indoor options nearby', zone: 'secondary' },

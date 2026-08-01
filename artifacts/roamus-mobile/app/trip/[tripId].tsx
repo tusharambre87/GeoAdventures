@@ -3952,8 +3952,9 @@ function AddStopSheet({
         </View>
       ) : (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={as.body} showsVerticalScrollIndicator={false}>
-          {/* From other days — inside scroll so it doesn't squish the list */}
+          {/* From other days — hidden when search is active so results show clearly */}
           {(() => {
+            if (search.trim().length >= 2) return null;
             const otherDayStops = allStops.filter(s => (s.dayIndex ?? 0) !== selectedDay - 1);
             if (otherDayStops.length === 0) return null;
             return (

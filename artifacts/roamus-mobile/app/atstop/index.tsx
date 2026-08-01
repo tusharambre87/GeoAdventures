@@ -653,6 +653,8 @@ export default function AtStopScreen() {
     if (currentStop) setMealDone(isStopVisited(currentStop));
     else setMealDone(false);
     setMealFeedbackDone(false);
+    setFeedbackText('');
+    setFeedbackRating('good');
     setPrevDayFeedbackDone(false);
   }, [currentStop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

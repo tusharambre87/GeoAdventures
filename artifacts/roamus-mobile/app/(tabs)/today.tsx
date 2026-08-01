@@ -3803,7 +3803,7 @@ export default function TodayScreen() {
                   setTodayState('en_route');
                 }}
               >
-                <Text style={sc.headThereBtnText}>Head there →</Text>
+                <Text style={sc.headThereBtnText}>{'Head there \u2192'}</Text>
               </TouchableOpacity>
             </View>
           )}
