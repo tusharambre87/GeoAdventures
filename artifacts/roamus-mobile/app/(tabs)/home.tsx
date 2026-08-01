@@ -350,6 +350,7 @@ export default function HomeScreen() {
   const [sotwFilter, setSotwFilter] = useState<SotwFilter>('playground');
   const [sotwPlaces, setSotwPlaces] = useState<SotwPlace[]>([]);
   const [sotwLoading, setSotwLoading] = useState(false);
+  const [sotwGoing, setSotwGoing] = useState<string | null>(null);
   const sotwSlideY = useRef(new Animated.Value(900)).current;
 
   // Is the active trip live today (date-wise)?
@@ -496,6 +497,33 @@ export default function HomeScreen() {
 
   function closeSotwSheet() {
     Animated.timing(sotwSlideY, { toValue: 900, duration: 250, useNativeDriver: true }).start(() => setSotwVisible(false));
+  }
+
+  async function addBreakStopFromSotw(place: SotwPlace) {
+    if (!activeTrip) return;
+    setSotwGoing(place.placeId);
+    const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
+    const stopType = stopTypeMap[sotwFilter] ?? 'other';
+    try {
+      const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${activeTrip.id}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: place.name,
+          stopType,
+          latitude: place.lat,
+          longitude: place.lng,
+          address: place.vicinity,
+          durationMinutes: 30,
+        }),
+      });
+      const createdId = (stopRes as any)?.stop?.id ?? (stopRes as any)?.id ?? null;
+      if (createdId) {
+        await apiFetch(`/api/travel/stops/${createdId}/visit`, { method: 'POST' }).catch(() => {});
+      }
+    } catch { /* best-effort */ }
+    setSotwGoing(null);
+    closeSotwSheet();
+    router.push('/(tabs)/today');
   }
 
   // ── Discover feed state ───────────────────────────────────────────────────
@@ -766,24 +794,85 @@ export default function HomeScreen() {
                 ) : sotwPlaces.length === 0 ? (
                   <Text style={hs.sotwEmpty}>No places found nearby — try another filter.</Text>
                 ) : (
-                  sotwPlaces.map(place => (
-                    <TouchableOpacity
-                      key={place.placeId}
-                      style={hs.sotwCard}
-                      activeOpacity={0.85}
-                      onPress={() => Linking.openURL(
-                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.placeId}`
-                      )}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={hs.sotwCardName} numberOfLines={1}>{place.name}</Text>
-                        <Text style={hs.sotwCardSub} numberOfLines={1}>{place.vicinity}</Text>
-                      </View>
-                      <View style={hs.sotwBadge}>
-                        <Text style={hs.sotwBadgeTxt}>{'+' + place.detourMinutes + ' min'}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
+                  <>
+                    <Text style={hs.sotwCount}>{sotwPlaces.length} {sotwPlaces.length === 1 ? 'place' : 'places'} found</Text>
+                    {sotwPlaces.map((place, index) => {
+                      const photoUrl = place.photoReference
+                        ? `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}`
+                        : null;
+                      const going = sotwGoing === place.placeId;
+
+                      if (index === 0) {
+                        return (
+                          <View key={place.placeId} style={hs.sotwFeat}>
+                            {photoUrl ? (
+                              <Image source={{ uri: photoUrl }} style={hs.sotwFeatImg} contentFit="cover" />
+                            ) : (
+                              <View style={[hs.sotwFeatImg, { backgroundColor: '#D1D5E0' }]} />
+                            )}
+                            <LinearGradient
+                              colors={['transparent', 'rgba(0,0,0,0.65)']}
+                              style={hs.sotwFeatGrad}
+                            >
+                              <Text style={hs.sotwFeatName} numberOfLines={2}>{place.name}</Text>
+                            </LinearGradient>
+                            <View style={hs.sotwFeatMeta}>
+                              {place.onRoute && (
+                                <View style={hs.sotwOnRouteBadge}>
+                                  <Text style={hs.sotwOnRouteTxt}>On route</Text>
+                                </View>
+                              )}
+                              <View style={hs.sotwBadge}>
+                                <Text style={hs.sotwBadgeTxt}>{'+' + place.detourMinutes + ' min'}</Text>
+                              </View>
+                              <Text style={hs.sotwFeatAddr} numberOfLines={1}>{place.vicinity}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[hs.sotwLetsGo, going && { opacity: 0.7 }]}
+                              activeOpacity={0.85}
+                              onPress={() => { void addBreakStopFromSotw(place); }}
+                              disabled={!!sotwGoing}
+                            >
+                              {going
+                                ? <ActivityIndicator color="#fff" size="small" />
+                                : <Text style={hs.sotwLetsGoTxt}>{"Let's go"}</Text>
+                              }
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+
+                      return (
+                        <View key={place.placeId} style={hs.sotwRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={hs.sotwCardName} numberOfLines={1}>{place.name}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                              {place.onRoute && (
+                                <View style={hs.sotwOnRouteBadge}>
+                                  <Text style={hs.sotwOnRouteTxt}>On route</Text>
+                                </View>
+                              )}
+                              <View style={hs.sotwBadge}>
+                                <Text style={hs.sotwBadgeTxt}>{'+' + place.detourMinutes + ' min'}</Text>
+                              </View>
+                              <Text style={hs.sotwCardSub} numberOfLines={1}>{place.vicinity}</Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            style={[hs.sotwGoBtn, going && { opacity: 0.7 }]}
+                            activeOpacity={0.85}
+                            onPress={() => { void addBreakStopFromSotw(place); }}
+                            disabled={!!sotwGoing}
+                          >
+                            {going
+                              ? <ActivityIndicator color="#fff" size="small" />
+                              : <Text style={hs.sotwGoBtnTxt}>Go</Text>
+                            }
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                  </>
                 )}
               </ScrollView>
             </View>
@@ -1031,7 +1120,35 @@ const hs = StyleSheet.create({
 
   sotwEmpty: { fontFamily: F.regular, fontSize: 14, color: '#8A8FA8', textAlign: 'center', marginTop: 32 },
 
-  sotwCard: {
+  sotwCount: { fontFamily: F.medium, fontSize: 13, color: '#8A8FA8', marginBottom: 10, marginTop: 2 },
+
+  // Featured (first) card
+  sotwFeat: {
+    borderRadius: 16, overflow: 'hidden',
+    backgroundColor: '#E8EAF0',
+    marginBottom: 10,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.07)',
+  },
+  sotwFeatImg: { width: '100%', height: 170 },
+  sotwFeatGrad: {
+    position: 'absolute', left: 0, right: 0, top: 0, height: 170,
+    justifyContent: 'flex-end', paddingHorizontal: 14, paddingBottom: 10,
+  },
+  sotwFeatName: { fontFamily: F.bold, fontSize: 17, color: '#fff' },
+  sotwFeatMeta: {
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
+    gap: 6, paddingHorizontal: 14, paddingVertical: 10,
+  },
+  sotwFeatAddr: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8', flex: 1, minWidth: 80 },
+  sotwLetsGo: {
+    marginHorizontal: 14, marginBottom: 12,
+    backgroundColor: G.orange, borderRadius: 12, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sotwLetsGoTxt: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
+
+  // Non-featured row cards
+  sotwRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#F9F9FB', borderRadius: 14,
     borderWidth: 1, borderColor: 'rgba(26,31,46,0.07)',
@@ -1039,6 +1156,17 @@ const hs = StyleSheet.create({
   },
   sotwCardName: { fontFamily: F.semibold, fontSize: 15, color: '#1A1F2E', marginBottom: 2 },
   sotwCardSub: { fontFamily: F.regular, fontSize: 12, color: '#8A8FA8' },
+  sotwGoBtn: {
+    backgroundColor: '#1A1F2E', borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    alignItems: 'center', justifyContent: 'center', minWidth: 50,
+  },
+  sotwGoBtnTxt: { fontFamily: F.bold, fontSize: 13, color: '#fff' },
+
+  // On-route badge
+  sotwOnRouteBadge: { backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  sotwOnRouteTxt: { fontFamily: F.semibold, fontSize: 10, color: '#2E7D32' },
+
   sotwBadge: { backgroundColor: '#FDF0E9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   sotwBadgeTxt: { fontFamily: F.semibold, fontSize: 12, color: G.orange },
 });

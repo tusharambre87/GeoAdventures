@@ -9082,13 +9082,14 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
           const namePlaceholders = lcNames.map(n => drizzleSql`${n}`);
           const libResult = await db.execute(
             drizzleSql`
-              SELECT name, description, gp_address_verified AS address, image_url AS "imageUrl"
+              SELECT name, description, gp_address_verified AS address, image_url AS "imageUrl",
+                     gp_rating AS "gpRating", gp_ratings_total AS "gpRatingsTotal"
               FROM   stop_library
               WHERE  city = ${city}
                 AND  LOWER(TRIM(name)) IN (${drizzleSql.join(namePlaceholders, drizzleSql`, `)})
             `
           );
-          const libRows: Array<{ name: string; description: string | null; address: string | null; imageUrl: string | null }> =
+          const libRows: Array<{ name: string; description: string | null; address: string | null; imageUrl: string | null; gpRating: string | null; gpRatingsTotal: number | null }> =
             (libResult as any).rows ?? (libResult as any) ?? [];
           const libByName = new Map(
             libRows.map(r => [String(r.name ?? '').toLowerCase().trim(), r])
@@ -9107,6 +9108,8 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
                 ? `${baseUrl}/api/travel/stop-library-image?path=${encodeURIComponent(lib.imageUrl)}`
                 : lib.imageUrl;
             }
+            if (lib.gpRating != null)       (entry as any).gpRating       = parseFloat(String(lib.gpRating));
+            if (lib.gpRatingsTotal != null)  (entry as any).gpRatingsTotal = lib.gpRatingsTotal;
           }
         }
       } catch (enrichErr) {

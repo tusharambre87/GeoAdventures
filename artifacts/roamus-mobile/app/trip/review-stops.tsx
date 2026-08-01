@@ -116,6 +116,8 @@ type PoolEntry = {
   selected:          boolean;
   dayIndex:          number | null;
   displayOrder:      number | null;
+  gpRating?:         number | null;
+  gpRatingsTotal?:   number | null;
 };
 
 type ApplyResult = {
@@ -308,27 +310,48 @@ function StopPreviewSheet({ entry, isSelected, onClose, onToggle, insets }: Prev
             )}
           </View>
 
-          {/* Good time to visit — green banner */}
-          {entry.description != null && entry.description.length > 0 && (
-            <View style={ps.goodTimeBanner}>
-              <Text style={ps.goodTimeStar}>{'\u2605'}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={ps.goodTimeTitle}>Good time to visit</Text>
-                <Text style={ps.goodTimeSub}>Great pick for families of all ages.</Text>
-              </View>
-            </View>
-          )}
+          {/* DESCRIPTION card */}
+          <View style={ps.descCard}>
+            <Text style={ps.descLbl}>{'DESCRIPTION'}</Text>
 
-          {/* WHY KIDS LOVE IT */}
-          {entry.description != null && entry.description.length > 0 && (
-            <View style={ps.loveCard}>
-              <View style={ps.loveHdr}>
-                <Text style={ps.loveStar}>{'\u2605'}</Text>
-                <Text style={ps.loveLbl}>{'WHY KIDS LOVE IT'}</Text>
+            {entry.description != null && entry.description.length > 0 ? (
+              <Text style={ps.descTxt}>{entry.description}</Text>
+            ) : (
+              <Text style={ps.descPlaceholder}>No description available yet.</Text>
+            )}
+
+            {/* Divider */}
+            <View style={ps.descDivider} />
+
+            {/* Kid suitability row */}
+            <View style={ps.descMetaRow}>
+              <Text style={ps.descMetaIcon}>{(entry.minAge == null || entry.minAge === 0) ? '\u2705' : '\u26A0\uFE0F'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={ps.descMetaKey}>Good for kids</Text>
+                <Text style={ps.descMetaVal}>
+                  {entry.minAge == null || entry.minAge === 0
+                    ? 'All ages welcome'
+                    : `Recommended ages ${entry.minAge}+`}
+                </Text>
               </View>
-              <Text style={ps.loveTxt}>{entry.description}</Text>
             </View>
-          )}
+
+            {/* Google rating row */}
+            {(entry.gpRating != null || entry.gpRatingsTotal != null) && (
+              <View style={ps.descMetaRow}>
+                <Text style={ps.descMetaIcon}>{'\u2B50'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={ps.descMetaKey}>Google rating</Text>
+                  <Text style={ps.descMetaVal}>
+                    {entry.gpRating != null ? entry.gpRating.toFixed(1) : '—'}
+                    {entry.gpRatingsTotal != null
+                      ? `  \u00B7  ${entry.gpRatingsTotal.toLocaleString()} reviews`
+                      : ''}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
 
           {/* ENTRY / BEST TIME */}
           <View style={ps.infoRow}>
@@ -1431,12 +1454,16 @@ const ps = StyleSheet.create({
   goodTimeTitle: { fontSize: 13, fontFamily: F.bold, color: '#15803D' },
   goodTimeSub:   { fontSize: 12, fontFamily: F.regular, color: '#16A34A', marginTop: 2, lineHeight: 17 },
 
-  // WHY KIDS LOVE IT — matches asd.loveCard
-  loveCard: { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 12 },
-  loveHdr:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  loveStar: { fontSize: 15 },
-  loveLbl:  { fontSize: 10, fontFamily: F.bold, color: G.deep, letterSpacing: 0.5, textTransform: 'uppercase' },
-  loveTxt:  { fontSize: 12, fontFamily: F.medium, color: '#4A5568', lineHeight: 18 },
+  // DESCRIPTION card
+  descCard:        { marginTop: 8, backgroundColor: '#fff', borderRadius: 14, padding: 14 },
+  descLbl:         { fontSize: 9, fontFamily: F.bold, color: G.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8 },
+  descTxt:         { fontSize: 13, fontFamily: F.regular, color: '#374151', lineHeight: 20 },
+  descPlaceholder: { fontSize: 13, fontFamily: F.regular, color: G.muted, fontStyle: 'italic' },
+  descDivider:     { height: 1, backgroundColor: 'rgba(26,31,46,0.07)', marginVertical: 10 },
+  descMetaRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 6 },
+  descMetaIcon:    { fontSize: 16, lineHeight: 20 },
+  descMetaKey:     { fontSize: 10, fontFamily: F.bold, color: G.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  descMetaVal:     { fontSize: 13, fontFamily: F.semibold, color: G.deep },
 
   // ENTRY / BEST TIME — matches asd.infoRow
   infoRow:  { flexDirection: 'row', gap: 8, marginTop: 8 },
