@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Image,
   ImageBackground,
   Linking,
@@ -506,6 +507,21 @@ function parseLocalDate(s: string | null | undefined): Date | null {
   return new Date(ymd[0], ymd[1] - 1, ymd[2]);
 }
 
+// ─── Pit-stop photo persistence helpers ───────────────────────────────────────
+
+function pendingBreakPhotosKey(tripId: string): string {
+  return `break_photos_pending_${tripId}`;
+}
+function pendingBreakStopIdKey(tripId: string): string {
+  return `break_stop_pending_${tripId}`;
+}
+async function clearPendingBreakData(tripId: string): Promise<void> {
+  await Promise.all([
+    AsyncStorage.removeItem(pendingBreakPhotosKey(tripId)),
+    AsyncStorage.removeItem(pendingBreakStopIdKey(tripId)),
+  ]).catch(() => {});
+}
+
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const { user, isLoading: authLoading, refreshUser } = useAuth();
@@ -650,6 +666,101 @@ export default function TodayScreen() {
   // Guards against concurrent invocations (rapid double-tap)
   const breakDoneInFlight = useRef(false);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
+
+  // ── Persist break photos to AsyncStorage so they survive backgrounding ────────
+  useEffect(() => {
+    if (!trip?.id) return;
+    if (breakPhotos.length > 0) {
+      AsyncStorage.setItem(pendingBreakPhotosKey(trip.id), JSON.stringify(breakPhotos)).catch(() => {});
+    }
+    // Note: we intentionally do NOT remove the key here when breakPhotos is empty;
+    // clearPendingBreakData handles cleanup after a confirmed success or skip.
+  }, [breakPhotos, trip?.id]);
+
+  // ── On resume / cold-start: detect and surface any photos that survived backgrounding ──
+  const resumePendingBreakPhotos = useCallback(async (tripId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(pendingBreakPhotosKey(tripId));
+      if (!raw) return;
+      let uris: string[] = [];
+      try { uris = JSON.parse(raw) as string[]; } catch { uris = []; }
+      if (uris.length === 0) {
+        await clearPendingBreakData(tripId);
+        return;
+      }
+
+      const action = await new Promise<'retry' | 'skip'>((resolve) => {
+        Alert.alert(
+          'Unsaved pit-stop photos',
+          `You have ${uris.length} photo${uris.length !== 1 ? 's' : ''} from a pit stop that weren't saved. Upload them now?`,
+          [
+            { text: 'Upload now', onPress: () => resolve('retry') },
+            { text: 'Discard', style: 'destructive', onPress: () => resolve('skip') },
+          ],
+          { cancelable: false },
+        );
+      });
+
+      if (action === 'skip') {
+        await clearPendingBreakData(tripId);
+        return;
+      }
+
+      // Retry: upload the photos and attach them to the persisted stop (if any)
+      const stopIdRaw = await AsyncStorage.getItem(pendingBreakStopIdKey(tripId));
+      const stopId = stopIdRaw ?? null;
+      const token = await AsyncStorage.getItem('auth_token');
+      let uploadOk = false;
+      try {
+        const cloudUrls = await Promise.all(
+          uris.map(async (localUri) => {
+            const uploadRes = await FileSystem.uploadAsync(
+              `${API_BASE}/api/travel/upload-photo`,
+              localUri,
+              { httpMethod: 'POST', uploadType: FileSystem.FileSystemUploadType.MULTIPART, fieldName: 'photo', headers: token ? { Authorization: `Bearer ${token}` } : {} },
+            );
+            if (uploadRes.status < 200 || uploadRes.status >= 300) throw new Error(`Upload failed: ${uploadRes.status}`);
+            const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+            if (!body.photoUrl) throw new Error('Upload response missing photoUrl');
+            return body.photoUrl;
+          })
+        );
+        await memoriesAPI.createMoment({
+          tripId,
+          ...(stopId ? { stopId } : {}),
+          photoUrls: cloudUrls,
+        });
+        uploadOk = true;
+      } catch { /* fall through */ }
+
+      if (uploadOk) {
+        await clearPendingBreakData(tripId);
+      } else {
+        Alert.alert(
+          'Upload failed',
+          "Your photos couldn't be uploaded. They'll be available to retry next time you open the app.",
+        );
+      }
+    } catch { /* best-effort */ }
+  }, []);
+
+  // Check for pending photos on mount (covers cold-start after OS termination)
+  useEffect(() => {
+    if (!trip?.id) return;
+    void resumePendingBreakPhotos(trip.id);
+  }, [trip?.id]);
+
+  // Check for pending photos each time the app returns to the foreground
+  useEffect(() => {
+    if (!trip?.id) return;
+    const tripId = trip.id;
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void resumePendingBreakPhotos(tripId);
+      }
+    });
+    return () => sub.remove();
+  }, [trip?.id, resumePendingBreakPhotos]);
   const breakSlideY = useRef(new Animated.Value(900)).current;
   const sotwChildAges     = (trip?.travelers ?? [])
     .filter((t: any) => !t.isParent && t.age)
@@ -1515,6 +1626,8 @@ export default function TodayScreen() {
         const createdId = (stopRes as any)?.stop?.id ?? (stopRes as any)?.id ?? null;
         if (createdId) {
           breakStopIdRef.current = createdId;
+          // Persist stop ID so a resume after backgrounding can attach photos to the right stop
+          await AsyncStorage.setItem(pendingBreakStopIdKey(trip.id), createdId).catch(() => {});
           // Mark as visited so the stop appears in the day plan and memories
           await apiFetch(`/api/travel/stops/${createdId}/visit`, { method: 'POST' }).catch(() => {});
         }
@@ -1578,7 +1691,8 @@ export default function TodayScreen() {
           void handleBreakDone();
           return;
         }
-        // action === 'skip': fall through with empty cloudPhotoUrls
+        // action === 'skip': clear persisted photos and fall through with empty cloudPhotoUrls
+        await clearPendingBreakData(trip.id);
         cloudPhotoUrls = [];
       }
     }
@@ -1592,6 +1706,9 @@ export default function TodayScreen() {
         ...(cloudPhotoUrls.length > 0 ? { photoUrls: cloudPhotoUrls } : {}),
       });
     } catch { /* best-effort */ }
+
+    // Clear persisted pending data now that upload + moment creation succeeded
+    await clearPendingBreakData(trip.id);
 
     breakStopIdRef.current = null;
     breakDoneInFlight.current = false;
