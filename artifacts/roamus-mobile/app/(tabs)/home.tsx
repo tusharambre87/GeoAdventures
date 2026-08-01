@@ -669,7 +669,7 @@ export default function HomeScreen() {
         {header}
         <Animated.ScrollView
           style={s.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 84 }}
           showsVerticalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: homeScrollY } } }],
@@ -814,7 +814,7 @@ export default function HomeScreen() {
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 84 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Filter chips ────────────────────────────────────────── */}
