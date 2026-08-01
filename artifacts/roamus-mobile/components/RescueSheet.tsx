@@ -537,6 +537,18 @@ export default function RescueSheet({
               <Text style={s.headerSub}>What do you need right now?</Text>
             </View>
             <ScrollView style={s.scroll} contentContainerStyle={s.pickerContent} showsVerticalScrollIndicator={false}>
+              {!!onOpenSotw && (
+                <TouchableOpacity style={s.pitCard} activeOpacity={0.85} onPress={onOpenSotw}>
+                  <View style={s.pitIcon}>
+                    <Text style={{ fontSize: 24 }}>{'\uD83D\uDCCD'}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.pitTitle}>Need a pit stop?</Text>
+                    <Text style={s.pitSub}>{'Playgrounds, coffee \u0026 more nearby'}</Text>
+                  </View>
+                  <Text style={s.pitArrow}>{'\u203A'}</Text>
+                </TouchableOpacity>
+              )}
               <View style={s.tileGrid}>
                 {primary.map(opt => (
                   <TouchableOpacity key={opt.id} style={s.tile} activeOpacity={0.75} onPress={() => selectOption(opt.id)}>
