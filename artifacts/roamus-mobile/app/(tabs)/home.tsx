@@ -313,19 +313,21 @@ export default function HomeScreen() {
   const [trips, setTrips] = useState<HomeTripData[]>([]);
   const [tripsLoading, setTripsLoading] = useState(true);
 
-  useEffect(() => {
+  // Dev-only date override — refreshed on every focus so navigating back
+  // from any screen picks up the latest value.
+  const [devDate, setDevDate] = useState<Date | null>(null);
+
+  // Refresh trips + devDate every time Home comes into focus so a newly
+  // created (or status-changed) trip is picked up without a full app restart.
+  useFocusEffect(useCallback(() => {
+    setTripsLoading(true);
     apiFetch<{ trips: HomeTripData[] }>("/api/travel/trips")
       .then(data => {
         if (Array.isArray(data?.trips)) setTrips(data.trips);
       })
       .catch(() => {})
       .finally(() => setTripsLoading(false));
-  }, []);
 
-  // Dev-only date override — refreshed on every focus so navigating back
-  // from any screen picks up the latest value.
-  const [devDate, setDevDate] = useState<Date | null>(null);
-  useFocusEffect(useCallback(() => {
     if (!__DEV__) return;
     AsyncStorage.getItem('dev_date_override').then(raw => {
       if (raw) { const d = new Date(raw + 'T12:00:00'); if (!isNaN(d.getTime())) setDevDate(d); }
