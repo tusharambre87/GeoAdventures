@@ -848,8 +848,8 @@ export default function AtStopScreen() {
     // Pre-load the next stop so tapping "Head there" in stop_done is instant
     if (nextUnvisited) setCurrentStop(nextUnvisited);
     else setCurrentStop(null);
-    // Show celebration; user taps "Head there" or "View all stops" to continue
-    setMode('stop_done');
+    // Navigate to today tab — the rich stop_complete screen has photos + kid quotes
+    router.replace('/(tabs)/today' as any);
   }
 
   async function handleMealComplete() {
@@ -1031,7 +1031,7 @@ export default function AtStopScreen() {
                   setMode('detail');
                 }}
               >
-                <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>Head there \u2192</Text>
+                <Text style={{ fontFamily: F.bold, fontSize: 16, color: '#fff' }}>{'Head there \u2192'}</Text>
               </TouchableOpacity>
             </View>
           ) : (

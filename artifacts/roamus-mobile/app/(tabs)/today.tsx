@@ -939,16 +939,14 @@ export default function TodayScreen() {
           executionStartedRef.current = false;
           await AsyncStorage.multiRemove(['atStopElapsed', 'atStopFrozen', 'atStopFrozenTripId']);
         } else if (override === 'stop_complete') {
-          await AsyncStorage.removeItem('atStopElapsed');
-          await AsyncStorage.removeItem('atStopFrozen');
-          await AsyncStorage.removeItem('atStopFrozenTripId');
-          if (!devState) {
-            // Redirect to Home so the Home tab is highlighted (today has
-            // href:null — no tab button, so NativeTabs shows nothing selected).
-            // The stop-done celebration already ran inside the atstop screen.
-            router.replace('/(tabs)/home');
-            return;
+          // Read elapsed time written by atstop so the "X min here" pill shows
+          const elapsedStr = await AsyncStorage.getItem('atStopElapsed');
+          if (elapsedStr) {
+            const elapsed = Number(elapsedStr);
+            if (!isNaN(elapsed) && elapsed > 0) setVisitedElapsed(elapsed);
           }
+          await AsyncStorage.multiRemove(['atStopElapsed', 'atStopFrozen', 'atStopFrozenTripId']);
+          // Show the rich stop_complete screen (photos + kid quotes) regardless of how it was triggered
           setTodayState('stop_complete');
         }
       }
