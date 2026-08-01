@@ -387,7 +387,7 @@ export default function TripsScreen() {
     router.replace("/auth/splash");
   }
   const topPad = Platform.OS === "web" ? insets.top + 67 : insets.top + 24;
-  const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 84;
+  const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 120;
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["trips"],
