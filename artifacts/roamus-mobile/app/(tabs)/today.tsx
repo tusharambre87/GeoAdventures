@@ -645,6 +645,8 @@ export default function TodayScreen() {
   const [selectedPlaceId, setSelectedPlaceId]         = useState<string | null>(null);
   const [breakQuote, setBreakQuote]                   = useState('');
   const [breakPhotos, setBreakPhotos]                 = useState<string[]>([]);
+  // Persists the stop ID created in step 1 of handleBreakDone so retries don't duplicate it
+  const breakStopIdRef = useRef<string | null>(null);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
   const breakSlideY = useRef(new Animated.Value(900)).current;
   const sotwChildAges     = (trip?.travelers ?? [])
@@ -1485,35 +1487,42 @@ export default function TodayScreen() {
 
   async function handleBreakDone() {
     if (!trip?.id || !activeBreakPlace) {
-      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); closeSotwSheet(); return;
+      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); breakStopIdRef.current = null; closeSotwSheet(); return;
     }
-    const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
-    const stopType = stopTypeMap[sotwFilter] ?? 'other';
-    let newStopId: string | null = null;
-    try {
-      // 1. Add the break stop to the day plan, then mark it visited
-      const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${trip.id}/stops`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: activeBreakPlace.name,
-          stopType,
-          dayIndex: resolvedDayIndex,
-          latitude: activeBreakPlace.lat,
-          longitude: activeBreakPlace.lng,
-          address: activeBreakPlace.vicinity,
-          durationMinutes: 30,
-        }),
-      });
-      newStopId = (stopRes as any)?.stop?.id ?? (stopRes as any)?.id ?? null;
-      if (newStopId) {
-        // Mark as visited so the stop appears in the day plan and memories
-        await apiFetch(`/api/travel/stops/${newStopId}/visit`, { method: 'POST' }).catch(() => {});
-      }
-    } catch { /* best-effort — store moment even if stop insert fails */ }
 
-    // 2. Upload photos
+    // 1. Add the break stop to the day plan, then mark it visited.
+    //    Skip if we already did this on a previous attempt (retry path).
+    if (!breakStopIdRef.current) {
+      const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
+      const stopType = stopTypeMap[sotwFilter] ?? 'other';
+      try {
+        const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${trip.id}/stops`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: activeBreakPlace.name,
+            stopType,
+            dayIndex: resolvedDayIndex,
+            latitude: activeBreakPlace.lat,
+            longitude: activeBreakPlace.lng,
+            address: activeBreakPlace.vicinity,
+            durationMinutes: 30,
+          }),
+        });
+        const createdId = (stopRes as any)?.stop?.id ?? (stopRes as any)?.id ?? null;
+        if (createdId) {
+          breakStopIdRef.current = createdId;
+          // Mark as visited so the stop appears in the day plan and memories
+          await apiFetch(`/api/travel/stops/${createdId}/visit`, { method: 'POST' }).catch(() => {});
+        }
+      } catch { /* best-effort — store moment even if stop insert fails */ }
+    }
+
+    const newStopId = breakStopIdRef.current;
+
+    // 2. Upload photos — treat missing photoUrl or non-2xx status as a failure
     let cloudPhotoUrls: string[] = [];
     if (breakPhotos.length > 0) {
+      let uploadFailed = false;
       try {
         const token = await AsyncStorage.getItem('auth_token');
         cloudPhotoUrls = await Promise.all(
@@ -1523,12 +1532,51 @@ export default function TodayScreen() {
               localUri,
               { httpMethod: 'POST', uploadType: FileSystem.FileSystemUploadType.MULTIPART, fieldName: 'photo', headers: token ? { Authorization: `Bearer ${token}` } : {} },
             );
+            if (uploadRes.status < 200 || uploadRes.status >= 300) {
+              throw new Error(`Upload failed with status ${uploadRes.status}`);
+            }
             const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
-            return body.photoUrl ?? '';
+            if (!body.photoUrl) {
+              throw new Error('Upload response missing photoUrl');
+            }
+            return body.photoUrl;
           })
         );
-        cloudPhotoUrls = cloudPhotoUrls.filter(Boolean);
-      } catch { cloudPhotoUrls = []; }
+      } catch {
+        uploadFailed = true;
+      }
+
+      if (uploadFailed) {
+        // Photos failed to upload — ask user whether to retry or skip.
+        // breakPhotos remain in state and breakStopIdRef retains the stop ID so retry
+        // picks up from here without re-creating the stop.
+        const action = await new Promise<'retry' | 'skip'>((resolve) => {
+          Alert.alert(
+            'Photos not saved',
+            "Your photos couldn't be uploaded. Check your connection and try again, or skip to save the stop without photos.",
+            [
+              {
+                text: 'Retry',
+                onPress: () => resolve('retry'),
+              },
+              {
+                text: 'Skip photos',
+                style: 'destructive',
+                onPress: () => resolve('skip'),
+              },
+            ],
+            { cancelable: false },
+          );
+        });
+
+        if (action === 'retry') {
+          // Re-invoke; step 1 will be skipped because breakStopIdRef is already set
+          void handleBreakDone();
+          return;
+        }
+        // action === 'skip': fall through with empty cloudPhotoUrls
+        cloudPhotoUrls = [];
+      }
     }
 
     // 3. Save moment (quote + photos) linked to the new stop
@@ -1541,6 +1589,7 @@ export default function TodayScreen() {
       });
     } catch { /* best-effort */ }
 
+    breakStopIdRef.current = null;
     setActiveBreakPlace(null);
     setBreakQuote('');
     setBreakPhotos([]);
