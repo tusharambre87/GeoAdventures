@@ -33,7 +33,7 @@ export default function LoginScreen() {
     const result = await login(email.trim().toLowerCase(), pw);
     setLoading(false);
     if (result.success) {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/home");
     } else {
       setError(result.error ?? "Login failed. Please try again.");
     }

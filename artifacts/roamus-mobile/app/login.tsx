@@ -48,7 +48,7 @@ export default function LoginScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/home");
     } else {
       setError(result.error ?? "Login failed. Please try again.");
       if (Platform.OS !== "web") {
