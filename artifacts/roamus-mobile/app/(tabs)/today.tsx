@@ -1486,23 +1486,69 @@ export default function TodayScreen() {
   }
 
   async function handleBreakDone() {
+    if (!trip?.id || !activeBreakPlace) {
+      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); closeSotwSheet(); return;
+    }
+    const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
+    const stopType = stopTypeMap[sotwFilter] ?? 'other';
+    let newStopId: string | null = null;
     try {
-      if (trip?.id) {
-        await apiFetch(`/api/travel/trips/${trip.id}/moments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'break',
-            description: breakQuote || null,
-            metadata: JSON.stringify({ breakMoment: true, placeName: activeBreakPlace?.name, placeType: sotwFilter, photoCount: breakPhotos.length }),
-          }),
-        });
+      // 1. Add the break stop to the day plan, then mark it visited
+      const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${trip.id}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: activeBreakPlace.name,
+          stopType,
+          dayIndex: resolvedDayIndex,
+          latitude: activeBreakPlace.lat,
+          longitude: activeBreakPlace.lng,
+          address: activeBreakPlace.vicinity,
+          durationMinutes: 30,
+        }),
+      });
+      newStopId = (stopRes as any)?.stop?.id ?? (stopRes as any)?.id ?? null;
+      if (newStopId) {
+        // Mark as visited so the stop appears in the day plan and memories
+        await apiFetch(`/api/travel/stops/${newStopId}/visit`, { method: 'POST' }).catch(() => {});
       }
+    } catch { /* best-effort — store moment even if stop insert fails */ }
+
+    // 2. Upload photos
+    let cloudPhotoUrls: string[] = [];
+    if (breakPhotos.length > 0) {
+      try {
+        const token = await AsyncStorage.getItem('auth_token');
+        cloudPhotoUrls = await Promise.all(
+          breakPhotos.map(async (localUri) => {
+            const uploadRes = await FileSystem.uploadAsync(
+              `${API_BASE}/api/travel/upload-photo`,
+              localUri,
+              { httpMethod: 'POST', uploadType: FileSystem.FileSystemUploadType.MULTIPART, fieldName: 'photo', headers: token ? { Authorization: `Bearer ${token}` } : {} },
+            );
+            const body = JSON.parse(uploadRes.body) as { photoUrl?: string };
+            return body.photoUrl ?? '';
+          })
+        );
+        cloudPhotoUrls = cloudPhotoUrls.filter(Boolean);
+      } catch { cloudPhotoUrls = []; }
+    }
+
+    // 3. Save moment (quote + photos) linked to the new stop
+    try {
+      await memoriesAPI.createMoment({
+        tripId: trip.id,
+        ...(newStopId ? { stopId: newStopId } : {}),
+        ...(breakQuote ? { kidPromptResponse: breakQuote } : {}),
+        ...(cloudPhotoUrls.length > 0 ? { photoUrls: cloudPhotoUrls } : {}),
+      });
     } catch { /* best-effort */ }
+
     setActiveBreakPlace(null);
     setBreakQuote('');
     setBreakPhotos([]);
     closeSotwSheet();
+    // Reload trip data so the new break stop appears in the day plan immediately
+    void loadTrip();
   }
 
   function removePhoto(source: 'visited' | 'wrap', uri: string) {
