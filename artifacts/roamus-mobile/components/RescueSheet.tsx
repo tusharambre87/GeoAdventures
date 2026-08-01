@@ -20,7 +20,7 @@ import { router } from 'expo-router';
 import { F } from '@/lib/tokens';
 import { apiFetch } from '@/lib/apiClient';
 
-const TAB_BAR_H = 49; // standard iOS/Android tab bar height (excluding safe area)
+const TAB_BAR_H = 62; // standard iOS/Android tab bar height (excluding safe area)
 import {
   computeDoneForDay,
   computeFoodStop,

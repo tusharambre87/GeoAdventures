@@ -54,14 +54,14 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
-        tabBarLabelStyle: { fontSize: 10, fontFamily: F.medium },
+        tabBarLabelStyle: { fontSize: 12, fontFamily: F.medium },
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          ...(isWeb ? { height: 84 } : { height: 62 }),
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -91,19 +91,19 @@ function ClassicTabLayout() {
               <SymbolView
                 name={effectiveFocused ? "house.fill" : "house"}
                 tintColor={effectiveColor}
-                size={24}
+                size={26}
               />
             ) : (
               <Ionicons
                 name={effectiveFocused ? "home" : "home-outline"}
-                size={22}
+                size={24}
                 color={effectiveColor}
               />
             );
           },
           tabBarLabelStyle: isOnTodayRoute
-            ? { color: colors.primary, fontSize: 10, fontFamily: F.medium }
-            : { fontSize: 10, fontFamily: F.medium },
+            ? { color: colors.primary, fontSize: 12, fontFamily: F.medium }
+            : { fontSize: 12, fontFamily: F.medium },
         }}
       />
       <Tabs.Screen
@@ -112,9 +112,9 @@ function ClassicTabLayout() {
           title: "Trips",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="map" tintColor={color} size={24} />
+              <SymbolView name="map" tintColor={color} size={26} />
             ) : (
-              <Ionicons name="map-outline" size={22} color={color} />
+              <Ionicons name="map-outline" size={24} color={color} />
             ),
         }}
       />
@@ -124,9 +124,9 @@ function ClassicTabLayout() {
           title: "Games",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="gamecontroller" tintColor={color} size={24} />
+              <SymbolView name="gamecontroller" tintColor={color} size={26} />
             ) : (
-              <Ionicons name="game-controller-outline" size={22} color={color} />
+              <Ionicons name="game-controller-outline" size={24} color={color} />
             ),
         }}
       />
@@ -136,9 +136,9 @@ function ClassicTabLayout() {
           title: "Memories",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="photo.on.rectangle" tintColor={color} size={24} />
+              <SymbolView name="photo.on.rectangle" tintColor={color} size={26} />
             ) : (
-              <Ionicons name="images-outline" size={22} color={color} />
+              <Ionicons name="images-outline" size={24} color={color} />
             ),
         }}
       />
@@ -148,9 +148,9 @@ function ClassicTabLayout() {
           title: "Me",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="person" tintColor={color} size={24} />
+              <SymbolView name="person" tintColor={color} size={26} />
             ) : (
-              <Ionicons name="person-outline" size={22} color={color} />
+              <Ionicons name="person-outline" size={24} color={color} />
             ),
         }}
       />
