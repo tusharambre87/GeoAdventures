@@ -55,13 +55,14 @@ function ClassicTabLayout() {
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
         tabBarLabelStyle: { fontSize: 12, fontFamily: F.medium },
+        tabBarItemStyle: { paddingBottom: 8 },
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : { height: 62 }),
+          ...(isWeb ? { height: 84 } : { height: 72 }),
         },
         tabBarBackground: () =>
           isIOS ? (
