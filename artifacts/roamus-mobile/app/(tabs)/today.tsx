@@ -647,6 +647,8 @@ export default function TodayScreen() {
   const [breakPhotos, setBreakPhotos]                 = useState<string[]>([]);
   // Persists the stop ID created in step 1 of handleBreakDone so retries don't duplicate it
   const breakStopIdRef = useRef<string | null>(null);
+  // Guards against concurrent invocations (rapid double-tap)
+  const breakDoneInFlight = useRef(false);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
   const breakSlideY = useRef(new Animated.Value(900)).current;
   const sotwChildAges     = (trip?.travelers ?? [])
@@ -1486,8 +1488,10 @@ export default function TodayScreen() {
   }
 
   async function handleBreakDone() {
+    if (breakDoneInFlight.current) return; // prevent rapid double-tap
+    breakDoneInFlight.current = true;
     if (!trip?.id || !activeBreakPlace) {
-      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); breakStopIdRef.current = null; closeSotwSheet(); return;
+      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); breakStopIdRef.current = null; breakDoneInFlight.current = false; closeSotwSheet(); return;
     }
 
     // 1. Add the break stop to the day plan, then mark it visited.
@@ -1590,6 +1594,7 @@ export default function TodayScreen() {
     } catch { /* best-effort */ }
 
     breakStopIdRef.current = null;
+    breakDoneInFlight.current = false;
     setActiveBreakPlace(null);
     setBreakQuote('');
     setBreakPhotos([]);
