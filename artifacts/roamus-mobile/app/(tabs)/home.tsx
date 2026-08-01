@@ -236,7 +236,7 @@ const ac = StyleSheet.create({
   },
   cta: {
     alignSelf: "flex-start",
-    backgroundColor: "#fff",
+    backgroundColor: G.orange,
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -244,7 +244,7 @@ const ac = StyleSheet.create({
   ctaTxt: {
     fontFamily: F.bold,
     fontSize: 14,
-    color: G.deep,
+    color: "#fff",
   },
 });
 
