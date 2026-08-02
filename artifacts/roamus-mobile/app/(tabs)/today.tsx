@@ -1286,6 +1286,23 @@ export default function TodayScreen() {
 
     useFocusEffect(useCallback(() => { loadTrip(); }, [loadTrip]));
 
+  // ── Break-stop hand-off from Home tab SOTW sheet ──
+  // When the user taps "Go" on a pit stop from the Home tab's Quick Stops sheet,
+  // home.tsx saves the place to AsyncStorage then navigates here. We read it on
+  // focus and open the break-capture screen immediately.
+  useFocusEffect(useCallback(() => {
+    AsyncStorage.getItem('pending_break_place').then(raw => {
+      if (!raw) return;
+      AsyncStorage.removeItem('pending_break_place').catch(() => {});
+      try {
+        const place = JSON.parse(raw) as SotwPlace;
+        openBreakCapture(place);
+      } catch { /* ignore malformed data */ }
+    }).catch(() => {});
+  // openBreakCapture is stable (defined in render scope), no dep needed
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
+
   // ── 30-second sync polling for shared trips ──
   useEffect(() => {
     if (!(trip as any)?.isShared || !resolvedTripId) return;

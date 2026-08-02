@@ -541,6 +541,8 @@ export default function HomeScreen() {
     } catch { /* best-effort */ }
     setSotwGoing(null);
     closeSotwSheet();
+    // Stash the place so Today tab can open the break-stop capture screen
+    await AsyncStorage.setItem('pending_break_place', JSON.stringify(place)).catch(() => {});
     router.push('/(tabs)/today');
   }
 
