@@ -1241,6 +1241,16 @@ export default function TodayScreen() {
               setCurrentStopIndex(lastVisited + 1);
               executionStartedRef.current = true;
               setTodayState('en_route');
+            } else if (
+              // Day was explicitly started (currentDayIndex persisted to DB) but no stops
+              // visited yet — go straight to en_route so "Start Day N" doesn't keep
+              // re-appearing every time the user navigates back to Today.
+              typeof t.currentDayIndex === 'number' &&
+              t.currentDayIndex >= localDayIdx &&
+              stops.length > 0
+            ) {
+              executionStartedRef.current = true;
+              setTodayState('en_route');
             } else {
               setTodayState('morning');
             }
@@ -1248,14 +1258,16 @@ export default function TodayScreen() {
         }
       }
 
-      // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state
+      // Restore AT_STOP_FROZEN only for the same trip — clear stale frozen state.
+      // Also guard: if today has no unvisited stops, frozen state is stale (day changed).
       if (!forceReset && !devState && override !== 'stop_complete' && !LOCKED_STATES.includes(todayState) && !executionStartedRef.current) {
         const frozenFlag   = await AsyncStorage.getItem('atStopFrozen');
         const frozenTripId = await AsyncStorage.getItem('atStopFrozenTripId');
-        if (frozenFlag === 'true' && frozenTripId === tid) {
+        const hasUnvisited = stops.some(s => !s.isVisited && !s.visited);
+        if (frozenFlag === 'true' && frozenTripId === tid && hasUnvisited) {
           setTodayState('at_stop_frozen');
         } else if (frozenFlag === 'true') {
-          // Stale frozen state from a different trip — discard it
+          // Stale: different trip OR day changed with no unvisited stops — discard
           await AsyncStorage.multiRemove(['atStopFrozen', 'atStopFrozenTripId']);
         }
       }
@@ -2862,39 +2874,6 @@ export default function TodayScreen() {
               ? <ActivityIndicator color="#fff" />
               : <Text style={mo.startBtnText}>{'▶'}  Start Day {resolvedDayIndex + 1}</Text>}
           </Pressable>
-          {__DEV__ && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={{ alignItems: 'center', paddingVertical: 10, marginTop: 4 }}
-              onPress={async () => {
-                await AsyncStorage.removeItem('@roamus_notif_permission_asked');
-                await AsyncStorage.removeItem('@roamus_notif_prefs');
-                Alert.alert('Debug', 'Notification state cleared — tap Start Day to re-trigger permission modal.');
-              }}
-            >
-              <Text style={{ fontSize: 11, color: '#E8692A', fontFamily: F.medium }}>{'[DEV] Reset notification state'}</Text>
-            </TouchableOpacity>
-          )}
-          {__DEV__ && (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={{ alignItems: 'center', paddingVertical: 10 }}
-              onPress={async () => {
-                const { scheduleLocalNotification } = await import('@/services/notifications/notificationEngine');
-                const { NotifType: NT } = await import('@/services/notifications/notificationPrefs');
-                await scheduleLocalNotification(
-                  NT.KIDS_ZONE_ENROUTE,
-                  '18 min to Air & Space \uD83C\uDFAE',
-                  'Travel games loaded \u2014 keep the kids busy.',
-                  { type: NT.KIDS_ZONE_ENROUTE, tripId: 'test-123', dayIndex: 0 },
-                  5,
-                );
-                Alert.alert('Debug', 'Test notification scheduled — fires in 5 seconds.');
-              }}
-            >
-              <Text style={{ fontSize: 11, color: '#7C3AED', fontFamily: F.medium }}>{'[DEV] Fire test notification (5s)'}</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
         {menuOverlay}
         {showPermissionModal && (

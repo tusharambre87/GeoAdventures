@@ -4761,6 +4761,8 @@ export default function TripPlanScreen() {
 
   useEffect(() => {
     if (openAddStop === 'true') {
+      // Apply initialDay BEFORE opening the sheet so position picker shows the right day's stops
+      if (initialDay && Number(initialDay) > 0) setSelectedDay(Number(initialDay));
       const filter = (['food', 'kids', 'landmarks'].includes(addStopDefaultFilter ?? '') ? addStopDefaultFilter : 'landmarks') as 'food' | 'kids' | 'landmarks';
       setAddStopFilter(filter);
       setActiveSheet('addStop');
