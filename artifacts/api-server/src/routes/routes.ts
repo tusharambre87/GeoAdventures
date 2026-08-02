@@ -6587,6 +6587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       playground: { type: 'playground', keyword: 'playground' },
       beach:      { type: 'park',       keyword: 'beach' },
       coffee:     { type: 'cafe' },
+      dessert:    { type: 'bakery',     keyword: 'ice cream creamery dessert bakery' },
       food:       { type: 'restaurant', keyword: 'restaurant' },
       restrooms:  { type: 'park',       keyword: 'restroom' },
     };

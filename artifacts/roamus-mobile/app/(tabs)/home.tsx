@@ -54,7 +54,7 @@ import {
 const TAB_BAR_H = 72; // standard iOS/Android tab bar height (excluding safe area)
 
 // ─── SOTW types + filter list ─────────────────────────────────────────────────
-type SotwFilter = 'playground' | 'beach' | 'coffee' | 'food' | 'restrooms';
+type SotwFilter = 'playground' | 'beach' | 'coffee' | 'dessert' | 'food' | 'restrooms';
 interface SotwPlace {
   placeId: string; name: string; vicinity: string;
   lat: number; lng: number;
@@ -64,6 +64,7 @@ const SOTW_FILTERS: [SotwFilter, string, string][] = [
   ['playground', '\uD83D\uDEDD', 'Playgrounds'],
   ['beach',      '\uD83C\uDFD6', 'Beach'],
   ['coffee',     '\u2615',        'Coffee'],
+  ['dessert',    '\uD83C\uDF66',  'Desserts'],
   ['food',       '\uD83C\uDF55',  'Food'],
   ['restrooms',  '\uD83D\uDEBB',  'Restrooms'],
 ];
@@ -520,7 +521,7 @@ export default function HomeScreen() {
   async function addBreakStopFromSotw(place: SotwPlace) {
     if (!activeTrip) return;
     setSotwGoing(place.placeId);
-    const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
+    const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', dessert: 'dessert', beach: 'beach', playground: 'park' };
     const stopType = stopTypeMap[sotwFilter] ?? 'other';
     try {
       const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${activeTrip.id}/stops`, {

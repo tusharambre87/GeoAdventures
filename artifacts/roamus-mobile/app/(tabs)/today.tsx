@@ -480,7 +480,7 @@ const sm = StyleSheet.create({
   },
 });
 
-type SotwFilter = 'playground' | 'beach' | 'coffee' | 'food' | 'restrooms';
+type SotwFilter = 'playground' | 'beach' | 'coffee' | 'dessert' | 'food' | 'restrooms';
 interface SotwPlace {
   placeId: string; name: string; vicinity: string;
   lat: number; lng: number;
@@ -658,6 +658,7 @@ export default function TodayScreen() {
   const [sotwFilter, setSotwFilter]                   = useState<SotwFilter>('playground');
   const [sotwPlaces, setSotwPlaces]                   = useState<SotwPlace[]>([]);
   const [sotwLoading, setSotwLoading]                 = useState(false);
+  const [sotwQuery, setSotwQuery]                     = useState('');
   const [sotwUserLoc, setSotwUserLoc]                 = useState<{ lat: number; lng: number } | null>(null);
   const [activeBreakPlace, setActiveBreakPlace]       = useState<SotwPlace | null>(null);
   const [selectedPlaceId, setSelectedPlaceId]         = useState<string | null>(null);
@@ -1617,16 +1618,16 @@ export default function TodayScreen() {
     if (loc) void fetchSotwPlaces('playground', loc);
   }
 
-  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }) {
+  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }, overrideQuery?: string) {
     const position = loc ?? sotwUserLoc;
     if (!position) return;
+    const query = overrideQuery !== undefined ? overrideQuery : sotwQuery;
     setSotwFilter(filter);
     setSotwLoading(true);
     try {
-      console.log('[SOTW] fetch URL:', `${API_BASE}/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`);
-      const data = await apiFetch<{ results: SotwPlace[] }>(
-        `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`
-      );
+      let url = `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`;
+      if (query.trim()) url += `&query=${encodeURIComponent(query.trim())}`;
+      const data = await apiFetch<{ results: SotwPlace[] }>(url);
       const results = data.results ?? [];
       setSotwPlaces(results);
       setSelectedPlaceId(results[0]?.placeId ?? null);
@@ -1656,6 +1657,7 @@ export default function TodayScreen() {
     switch (filter) {
       case 'beach':   return ['#7fc8e8', '#4a9bc4'];
       case 'food':    return ['#d89a5a', '#a85f3a'];
+      case 'dessert': return ['#e8a0c8', '#c06090'];
       case 'coffee':  return ['#c8a45a', '#9a7a35'];
       default:        return ['#5db87a', '#3a8a55'];
     }
@@ -1689,7 +1691,7 @@ export default function TodayScreen() {
     // 1. Add the break stop to the day plan, then mark it visited.
     //    Skip if we already did this on a previous attempt (retry path).
     if (!breakStopIdRef.current) {
-      const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', beach: 'beach', playground: 'park' };
+      const stopTypeMap: Record<string, string> = { food: 'restaurant', coffee: 'cafe', dessert: 'dessert', beach: 'beach', playground: 'park' };
       const stopType = stopTypeMap[sotwFilter] ?? 'other';
       try {
         const stopRes = await apiFetch<{ stop?: { id: string }; id?: string }>(`/api/travel/trips/${trip.id}/stops`, {
@@ -3451,6 +3453,7 @@ export default function TodayScreen() {
                 ['playground', '\uD83D\uDEDD', 'Playgrounds'],
                 ['beach',      '\uD83C\uDFD6', 'Beach'],
                 ['coffee',     '\u2615',        'Coffee'],
+                ['dessert',    '\uD83C\uDF66',  'Desserts'],
                 ['food',       '\uD83C\uDF55',  'Food'],
                 ['restrooms',  '\uD83D\uDEBB',  'Restrooms'],
               ] as [SotwFilter, string, string][]).map(([f, emoji, label]) => (
@@ -4309,6 +4312,31 @@ export default function TodayScreen() {
             </TouchableOpacity>
           )}
 
+          {/* ── Pit stop / continue day ── */}
+          <TouchableOpacity
+            style={{
+              marginHorizontal: 20, marginBottom: 12,
+              backgroundColor: '#fff', borderRadius: 16,
+              padding: 16, flexDirection: 'row', alignItems: 'center',
+              borderWidth: 1.5, borderColor: '#E0D8D0',
+            }}
+            activeOpacity={0.85}
+            onPress={() => { void openSotwSheet(); }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF3E8', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <Text style={{ fontSize: 22 }}>{'\uD83D\uDCCD'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1a1a1a', fontFamily: F.bold, marginBottom: 2 }}>
+                {'Need one more stop?'}
+              </Text>
+              <Text style={{ fontSize: 13, color: '#888', fontFamily: F.regular }}>
+                {'Playgrounds, ice cream \u0026 more nearby'}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 18, color: '#E8813A' }}>{'\u203A'}</Text>
+          </TouchableOpacity>
+
           {/* ── Wrap Day CTA → opens Day Story page ── */}
           {resolvedTripId && (
             <TouchableOpacity
@@ -4464,6 +4492,218 @@ export default function TodayScreen() {
           kids={(trip?.travelers ?? []).filter((t: any) => !t.isParent).map((t: any) => ({ name: t.name, age: t.age ?? null }))}
         />
         {menuOverlay}
+
+        {/* ── SOTW sheet — also available from day_complete "Need one more stop?" ── */}
+        {activeSheet === 'stopsOnTheWay' && (
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ translateY: sotwSlideY }], zIndex: 100, elevation: 100, backgroundColor: C.bg },
+            ]}
+          >
+            {/* Simplified header (no route map since there's no active route) */}
+            <View style={{ paddingTop: insets.top + 12, paddingBottom: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F0EAE0' }}>
+              <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F0EB', alignItems: 'center', justifyContent: 'center', marginRight: 12 }} onPress={closeSotwSheet}>
+                <Text style={{ fontSize: 18, color: C.deep, fontWeight: '700', lineHeight: 22 }}>{'\u2039'}</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={sotw.resultsTitle}>Quick Stops Nearby</Text>
+                <Text style={sotw.resultsSub}>Places close to you</Text>
+              </View>
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 32 }}>
+              <View style={{ padding: 16, paddingBottom: 0 }} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sotw.pillsRow} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                {([
+                  ['playground', '\uD83D\uDEDD', 'Playgrounds'],
+                  ['beach',      '\uD83C\uDFD6', 'Beach'],
+                  ['coffee',     '\u2615',        'Coffee'],
+                  ['dessert',    '\uD83C\uDF66',  'Desserts'],
+                  ['food',       '\uD83C\uDF55',  'Food'],
+                  ['restrooms',  '\uD83D\uDEBB',  'Restrooms'],
+                ] as [SotwFilter, string, string][]).map(([f, emoji, label]) => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[sotw.pill, sotwFilter === f && sotw.pillOn]}
+                    onPress={() => { setSotwFilter(f); void fetchSotwPlaces(f); }}
+                  >
+                    <Text style={{ fontSize: 16, marginRight: 4 }}>{emoji}</Text>
+                    <Text style={[sotw.pillText, sotwFilter === f && sotw.pillTextOn]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={{ paddingHorizontal: 16, marginTop: 10, marginBottom: 8 }}>
+                <View style={sotw.searchBar}>
+                  <Text style={{ fontSize: 15, marginRight: 6, color: C.muted }}>{'\uD83D\uDD0D'}</Text>
+                  <TextInput
+                    style={sotw.searchInput}
+                    placeholder="Search a specific place..."
+                    placeholderTextColor={C.muted}
+                    value={sotwQuery}
+                    onChangeText={setSotwQuery}
+                    returnKeyType="search"
+                    onSubmitEditing={() => { void fetchSotwPlaces(sotwFilter, undefined, sotwQuery); }}
+                    onBlur={() => { void fetchSotwPlaces(sotwFilter, undefined, sotwQuery); }}
+                  />
+                </View>
+              </View>
+              <View style={{ paddingHorizontal: 16 }}>
+                {sotwLoading ? (
+                  <ActivityIndicator color={C.orange} style={{ marginTop: 24 }} />
+                ) : (
+                  <>
+                    {sotwPlaces.length > 0 && (
+                      <Text style={sotw.placeCount}>{sotwPlaces.length}{' place'}{sotwPlaces.length !== 1 ? 's' : ''}{' found'}</Text>
+                    )}
+                    {sotwPlaces.map((place) => {
+                      const isSelected = place.placeId === selectedPlaceId;
+                      if (isSelected) {
+                        return (
+                          <TouchableOpacity key={place.placeId} style={[sotw.richCard, { borderColor: '#E8692A' }]} onPress={() => openBreakCapture(place)} activeOpacity={0.92}>
+                            <View style={sotw.richImg}>
+                              {place.photoReference ? (
+                                <Image
+                                  source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }}
+                                  style={StyleSheet.absoluteFill}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>
+                                  <Text style={{ fontSize: 36 }}>{'\uD83D\uDCCD'}</Text>
+                                </View>
+                              )}
+                              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
+                              <Text style={sotw.richName}>{place.name}</Text>
+                            </View>
+                            <View style={sotw.richBody}>
+                              <View style={sotw.pcMeta}>
+                                {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
+                                <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                                <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
+                              </View>
+                              <TouchableOpacity style={[sotw.goBtn, { marginTop: 8, alignSelf: 'stretch', borderRadius: 13, backgroundColor: '#E8692A' }]} onPress={() => openBreakCapture(place)}>
+                                <Text style={[sotw.goBtnText, { textAlign: 'center' }]}>{'Let\u2019s go'}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      }
+                      return (
+                        <TouchableOpacity key={place.placeId} style={[sotw.richCard, { paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center' }]} onPress={() => setSelectedPlaceId(place.placeId)} activeOpacity={0.85}>
+                          <View style={{ flex: 1, gap: 4 }}>
+                            <Text style={{ fontSize: 15, fontFamily: F.bold, color: C.deep }} numberOfLines={1}>{place.name}</Text>
+                            <View style={sotw.pcMeta}>
+                              <View style={sotw.tagDetour}><Text style={sotw.tagDetourText}>{'+' + place.detourMinutes + ' min'}</Text></View>
+                              {place.onRoute && <View style={sotw.tagRoute}><Text style={sotw.tagRouteText}>On route</Text></View>}
+                              <Text style={sotw.pcAmen} numberOfLines={1}>{place.vicinity}</Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity style={[sotw.goBtn, { marginLeft: 10, width: 72, alignItems: 'center' }]} onPress={() => openBreakCapture(place)}>
+                            <Text style={sotw.goBtnText}>Go</Text>
+                          </TouchableOpacity>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+              </View>
+            </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* ── Break capture overlay — also shown from day_complete via home SOTW or "Need one more stop?" ── */}
+        {activeBreakPlace && (
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ translateY: breakSlideY }], zIndex: 101, elevation: 101 },
+            ]}
+          >
+            <View style={[sotw.bcHero, { paddingTop: insets.top + 6 }]}>
+              {activeBreakPlace.photoReference ? (
+                <Image
+                  source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(activeBreakPlace.photoReference)}` }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                />
+              ) : null}
+              <LinearGradient
+                colors={activeBreakPlace.photoReference
+                  ? ['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)']
+                  : getBreakHeroColors(sotwFilter)}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={sotw.bcTopRow}>
+                <TouchableOpacity style={sotw.bcClose} onPress={closeBreakCapture}>
+                  <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 }}>{'\u00D7'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={sotw.bcBadge}>
+                <Text style={sotw.bcBadgeText}>BREAK STOP</Text>
+              </View>
+              <Text style={sotw.bcTitle}>{activeBreakPlace.name}</Text>
+              <Text style={sotw.bcSub}>{activeBreakPlace.vicinity}</Text>
+            </View>
+            <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>
+              <TouchableOpacity
+                style={sotw.dirCard}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  const native = 'comgooglemaps://';
+                  const canUseNative = await Linking.canOpenURL(native);
+                  const url = canUseNative
+                    ? `comgooglemaps://?daddr=${activeBreakPlace.lat},${activeBreakPlace.lng}&directionsmode=driving`
+                    : `https://www.google.com/maps/dir/?api=1&destination=${activeBreakPlace.lat},${activeBreakPlace.lng}`;
+                  void Linking.openURL(url);
+                }}
+              >
+                <Text style={sotw.dirCardText}>{'Get Directions \u2192'}</Text>
+              </TouchableOpacity>
+              <View style={sotw.quoteCard}>
+                <Text style={sotw.quoteLabel}>KID QUOTE</Text>
+                <SpeechTextInput
+                  placeholder={'What did ' + youngestChildName + ' say?'}
+                  value={breakQuote}
+                  onChangeText={setBreakQuote}
+                  style={sotw.quoteInput}
+                  multiline
+                />
+              </View>
+              <View style={sotw.snapCard}>
+                <Text style={sotw.quoteLabel}>QUICK SNAP</Text>
+                <TouchableOpacity style={sotw.snapBtn} activeOpacity={0.8} onPress={() => { void handleBreakAddPhotos(); }}>
+                  <Text style={{ fontSize: 22 }}>{'\uD83D\uDCF7'}</Text>
+                  <Text style={sotw.snapBtnText}>{breakPhotos.length > 0 ? `${breakPhotos.length} photo${breakPhotos.length !== 1 ? 's' : ''} added` : 'Add a photo'}</Text>
+                </TouchableOpacity>
+                {breakPhotos.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                    {breakPhotos.map((uri, i) => (
+                      <Image key={i} source={{ uri }} style={{ width: 72, height: 72, borderRadius: 10, marginRight: 8 }} />
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[sotw.doneBtn, breakUploading && { opacity: 0.5 }]}
+                activeOpacity={0.88}
+                disabled={breakUploading}
+                onPress={() => { void handleBreakDone(); }}
+              >
+                <Text style={sotw.doneBtnText}>{'Done with break \u2192'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+            {breakUploading && (
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', zIndex: 200 }}>
+                <View style={{ backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 32, paddingVertical: 28, alignItems: 'center', gap: 14, maxWidth: 280 }}>
+                  <ActivityIndicator size="large" color="#E8813A" />
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>{'Uploading your memories\nto Roamus!'}</Text>
+                  <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>{'Hang tight while your\nphotos are being saved\u2026'}</Text>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        )}
+
       </View>
       </KeyboardAvoidingView>
     );
