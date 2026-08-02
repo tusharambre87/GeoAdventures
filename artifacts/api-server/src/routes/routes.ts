@@ -6579,7 +6579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Stops on the way — nearby Google Places search, no auth required
   app.get('/api/travel/stops-on-the-way', async (req: any, res) => {
-    const { lat, lng, type } = req.query as Record<string, string>;
+    const { lat, lng, type, radius, query } = req.query as Record<string, string>;
     if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) return res.status(503).json({ error: 'Places API not configured' });
@@ -6590,15 +6590,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       food:       { type: 'restaurant', keyword: 'restaurant' },
       restrooms:  { type: 'park',       keyword: 'restroom' },
     };
-    const mapped = typeMap[type ?? 'playground'] ?? { type: 'park' };
-    const lat_n  = parseFloat(lat);
-    const lng_n  = parseFloat(lng);
-    let url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat_n},${lng_n}&radius=5000&type=${mapped.type}&key=${apiKey}`;
-    if (mapped.keyword) url += `&keyword=${encodeURIComponent(mapped.keyword)}`;
+    const mapped   = typeMap[type ?? 'playground'] ?? { type: 'park' };
+    const lat_n    = parseFloat(lat);
+    const lng_n    = parseFloat(lng);
+    const radiusM  = Math.min(Math.max(parseInt(radius ?? '5000') || 5000, 1000), 20000);
+    let url: string;
+    if (query && query.trim()) {
+      // Text search for a specific place name near the user
+      url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query.trim())}&location=${lat_n},${lng_n}&radius=${radiusM}&key=${apiKey}`;
+    } else {
+      url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat_n},${lng_n}&radius=${radiusM}&type=${mapped.type}&key=${apiKey}`;
+      if (mapped.keyword) url += `&keyword=${encodeURIComponent(mapped.keyword)}`;
+    }
     try {
       const upstream = await fetch(url);
       const data     = await upstream.json() as { results?: any[]; status?: string };
-      const results  = (data.results ?? []).slice(0, 5).map((p: any) => {
+      const results  = (data.results ?? []).slice(0, 10).map((p: any) => {
         const pLat = (p.geometry?.location?.lat ?? lat_n) as number;
         const pLng = (p.geometry?.location?.lng ?? lng_n) as number;
         const dx = (pLat - lat_n) * 111000;
@@ -10080,11 +10087,20 @@ Return valid JSON only. No markdown.`;
       // Deterministic per-day rotation: day N starts at the Nth most-popular pick.
       // Stable across refreshes, distinct per day, wraps gracefully when pool < days.
       const dayIdx = Number.isInteger(req.body.dayIndex) ? req.body.dayIndex : 0;
-      const offset = geoPool.length
+      const dayOffset = geoPool.length
         ? (((dayIdx % geoPool.length) + geoPool.length) % geoPool.length)
         : 0;
-      const rotated = [...geoPool.slice(offset), ...geoPool.slice(0, offset)];
-      let rows: typeof geoPool = rotated.slice(0, 5);
+      const rotated = [...geoPool.slice(dayOffset), ...geoPool.slice(0, dayOffset)];
+
+      // Support text search and pagination
+      const searchQuery = req.body.query ? String(req.body.query).trim().toLowerCase() : '';
+      const pageOffset  = Number.isInteger(req.body.offset) && req.body.offset > 0 ? req.body.offset : 0;
+      const PAGE_SIZE   = 5;
+      let pool2 = searchQuery
+        ? rotated.filter((r: any) => (r.name ?? '').toLowerCase().includes(searchQuery))
+        : rotated;
+      const hasMore = pool2.length > pageOffset + PAGE_SIZE;
+      let rows: typeof geoPool = pool2.slice(pageOffset, pageOffset + PAGE_SIZE);
 
       // AI fallback when library has no food stops for this city
       if (rows.length === 0) {
@@ -10131,7 +10147,7 @@ Return valid JSON only. No markdown.`;
         }
       }
 
-      return res.json({ options: rows, city: cityRaw });
+      return res.json({ options: rows, city: cityRaw, hasMore });
     } catch (error) {
       req.log?.error({ error }, '[Rescue] food-options error');
       return res.status(500).json({ message: 'Failed to load food options' });

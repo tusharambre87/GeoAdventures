@@ -23,6 +23,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -351,6 +352,8 @@ export default function HomeScreen() {
   const [sotwPlaces, setSotwPlaces] = useState<SotwPlace[]>([]);
   const [sotwLoading, setSotwLoading] = useState(false);
   const [sotwGoing, setSotwGoing] = useState<string | null>(null);
+  const [sotwQuery, setSotwQuery] = useState('');
+  const [sotwRadius, setSotwRadius] = useState(5000);
   const sotwSlideY = useRef(new Animated.Value(900)).current;
 
   // Is the active trip live today (date-wise)?
@@ -444,6 +447,8 @@ export default function HomeScreen() {
   async function openSotwSheet() {
     setSotwPlaces([]);
     setSotwFilter('playground');
+    setSotwQuery('');
+    setSotwRadius(5000);
     sotwSlideY.setValue(900);
     setSotwVisible(true);
     Animated.spring(sotwSlideY, { toValue: 0, useNativeDriver: true, damping: 28, stiffness: 300 }).start();
@@ -478,15 +483,17 @@ export default function HomeScreen() {
     if (loc) void fetchSotwPlaces('playground', loc);
   }
 
-  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }) {
+  async function fetchSotwPlaces(filter: SotwFilter, loc?: { lat: number; lng: number }, overrideRadius?: number, overrideQuery?: string) {
     const position = loc ?? userLoc;
     if (!position) return;
+    const radius = overrideRadius ?? sotwRadius;
+    const query  = overrideQuery  ?? sotwQuery;
     setSotwFilter(filter);
     setSotwLoading(true);
     try {
-      const data = await apiFetch<{ results: SotwPlace[] }>(
-        `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${activeTrip?.id ?? ''}`
-      );
+      let url = `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${activeTrip?.id ?? ''}&radius=${radius}`;
+      if (query.trim()) url += `&query=${encodeURIComponent(query.trim())}`;
+      const data = await apiFetch<{ results: SotwPlace[] }>(url);
       setSotwPlaces(data.results ?? []);
     } catch {
       setSotwPlaces([]);
@@ -790,8 +797,23 @@ export default function HomeScreen() {
                 ))}
               </ScrollView>
 
+              {/* Search bar */}
+              <View style={hs.sotwSearchRow}>
+                <Text style={hs.sotwSearchIcon}>{'\uD83D\uDD0D'}</Text>
+                <TextInput
+                  style={hs.sotwSearchInput}
+                  placeholder="Search a specific place…"
+                  placeholderTextColor="#B0ADA8"
+                  value={sotwQuery}
+                  onChangeText={setSotwQuery}
+                  onSubmitEditing={() => { void fetchSotwPlaces(sotwFilter, undefined, sotwRadius, sotwQuery); }}
+                  returnKeyType="search"
+                  clearButtonMode="while-editing"
+                />
+              </View>
+
               {/* Results */}
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}>
                 {sotwLoading ? (
                   <ActivityIndicator color={G.orange} style={{ marginTop: 28 }} />
                 ) : !userLoc ? (
@@ -877,6 +899,22 @@ export default function HomeScreen() {
                         </View>
                       );
                     })}
+                    {/* Load more — expands radius by 5 km */}
+                    <TouchableOpacity
+                      style={hs.sotwLoadMore}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        const newRadius = sotwRadius + 5000;
+                        setSotwRadius(newRadius);
+                        void fetchSotwPlaces(sotwFilter, undefined, newRadius, sotwQuery);
+                      }}
+                    >
+                      <Text style={hs.sotwLoadMoreTxt}>
+                        {sotwRadius > 5000
+                          ? `Expand further (\u00B1${Math.round(sotwRadius / 1000)} km radius)`
+                          : 'Load more'}
+                      </Text>
+                    </TouchableOpacity>
                   </>
                 )}
               </ScrollView>
@@ -1174,6 +1212,25 @@ const hs = StyleSheet.create({
 
   sotwBadge: { backgroundColor: '#FDF0E9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   sotwBadgeTxt: { fontFamily: F.semibold, fontSize: 12, color: G.orange },
+
+  // Search bar
+  sotwSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: '#F5F5F7', borderRadius: 12,
+    paddingHorizontal: 12, height: 40,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)',
+  },
+  sotwSearchIcon: { fontSize: 14 },
+  sotwSearchInput: { flex: 1, fontFamily: F.regular, fontSize: 14, color: '#1A1F2E', paddingVertical: 0 },
+
+  // Load more
+  sotwLoadMore: {
+    marginTop: 10, borderRadius: 12, borderWidth: 1.5,
+    borderColor: 'rgba(26,31,46,0.14)', paddingVertical: 12,
+    alignItems: 'center', backgroundColor: '#F9F9FB',
+  },
+  sotwLoadMoreTxt: { fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' },
 });
 
 // ── Discover More row styles ───────────────────────────────────────────────────

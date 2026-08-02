@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -167,6 +168,33 @@ export default function RescueSheet({
   const [foodLoading, setFoodLoading] = useState(false);
   const [foodError, setFoodError]     = useState<string | null>(null);
   const [foodCity, setFoodCity]       = useState('');
+  const [foodSearch, setFoodSearch]   = useState('');
+  const [foodOffset, setFoodOffset]   = useState(0);
+  const [foodHasMore, setFoodHasMore] = useState(false);
+
+  async function fetchFoodOptions(query: string, offset: number) {
+    if (!tripId || isStopContext) return;
+    setFoodLoading(true);
+    setFoodError(null);
+    try {
+      const r = await apiFetch<{ options: LibraryStop[]; city: string; hasMore: boolean }>('/api/travel/rescue/food-options', {
+        method: 'POST',
+        body: JSON.stringify({ tripId, query, offset }),
+      });
+      if (offset === 0) {
+        setFoodOptions(r.options ?? []);
+      } else {
+        setFoodOptions(prev => [...prev, ...(r.options ?? [])]);
+      }
+      setFoodCity(r.city ?? '');
+      setFoodHasMore(r.hasMore ?? false);
+    } catch {
+      setOfflineFallback(true);
+      setFoodError('Could not load food options. Check your connection.');
+    } finally {
+      setFoodLoading(false);
+    }
+  }
 
   // Weather indoor
   const [weatherOptions, setWeatherOptions] = useState<LibraryStop[]>([]);
@@ -273,18 +301,10 @@ export default function RescueSheet({
   // Load food options when food view opens (skipped in stop context)
   useEffect(() => {
     if (view !== 'food' || !tripId || isStopContext) return;
-    setFoodLoading(true);
-    setFoodError(null);
-    apiFetch<{ options: LibraryStop[]; city: string }>('/api/travel/rescue/food-options', {
-      method: 'POST',
-      body: JSON.stringify({ tripId }),
-    }).then(r => {
-      setFoodOptions(r.options ?? []);
-      setFoodCity(r.city ?? '');
-    }).catch(() => {
-      setOfflineFallback(true);
-      setFoodError('Could not load food options. Check your connection.');
-    }).finally(() => setFoodLoading(false));
+    setFoodSearch('');
+    setFoodOffset(0);
+    setFoodHasMore(false);
+    void fetchFoodOptions('', 0);
   }, [view]);
 
   // Load indoor alternatives when weather view opens (skipped in stop context)
@@ -932,6 +952,21 @@ export default function RescueSheet({
               </View>
             ) : (
               <>
+                {/* Search bar */}
+                <View style={s.foodSearchRow}>
+                  <Text style={s.foodSearchIcon}>{'\uD83D\uDD0D'}</Text>
+                  <TextInput
+                    style={s.foodSearchInput}
+                    placeholder="Search e.g. Pizza Luce\u2026"
+                    placeholderTextColor="#B0ADA8"
+                    value={foodSearch}
+                    onChangeText={setFoodSearch}
+                    onSubmitEditing={() => { setFoodOffset(0); void fetchFoodOptions(foodSearch, 0); }}
+                    returnKeyType="search"
+                    clearButtonMode="while-editing"
+                  />
+                </View>
+
                 {foodOptions.length > 0 && (
                   <>
                     <Text style={s.sectionLabel}>NEARBY OPTIONS</Text>
@@ -980,6 +1015,23 @@ export default function RescueSheet({
                         </View>
                       );
                     })}
+                    {/* Load more */}
+                    {foodHasMore && !foodLoading && (
+                      <TouchableOpacity
+                        style={s.foodLoadMore}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          const nextOffset = foodOffset + 5;
+                          setFoodOffset(nextOffset);
+                          void fetchFoodOptions(foodSearch, nextOffset);
+                        }}
+                      >
+                        <Text style={s.foodLoadMoreTxt}>Load more options</Text>
+                      </TouchableOpacity>
+                    )}
+                    {foodLoading && foodOffset > 0 && (
+                      <ActivityIndicator color="#E8692A" style={{ marginVertical: 12 }} />
+                    )}
                   </>
                 )}
                 {foodOptions.length === 0 && !foodLoading && (
@@ -1531,6 +1583,22 @@ const s = StyleSheet.create({
   foodCardAddBtnSelected: { backgroundColor: '#3DAA6E' },
   foodCardAddText: { fontSize: 13, fontFamily: F.bold, color: '#1A1F2E' },
   foodCardAddTextSelected: { color: '#fff' },
+
+  // ── Food search + load more ──
+  foodSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F5F5F7', borderRadius: 12,
+    paddingHorizontal: 12, height: 42, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)',
+  },
+  foodSearchIcon: { fontSize: 14 },
+  foodSearchInput: { flex: 1, fontFamily: F.regular, fontSize: 14, color: '#1A1F2E', paddingVertical: 0 },
+  foodLoadMore: {
+    marginTop: 8, borderRadius: 12, borderWidth: 1.5,
+    borderColor: 'rgba(26,31,46,0.14)', paddingVertical: 12,
+    alignItems: 'center', backgroundColor: '#F9F9FB',
+  },
+  foodLoadMoreTxt: { fontFamily: F.semibold, fontSize: 13, color: '#1A1F2E' },
 
   // ── Weather swap rows ──
   swapRow: {
