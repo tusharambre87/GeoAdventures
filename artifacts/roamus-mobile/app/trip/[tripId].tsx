@@ -3817,8 +3817,28 @@ function AddStopSheet({
   async function handleInsertAt(opt: StopOption, afterStopId: string) {
     setAdding(true);
     const isTimeSlot = afterStopId === '__MORNING__' || afterStopId === '__AFTERNOON__' || afterStopId === '__EVENING__';
+    const isFirstSentinel = afterStopId === '__FIRST__';
     try {
-      if (isTimeSlot) {
+      if (isFirstSentinel) {
+        // Insert BEFORE the first stop of the day by sending its displayOrder as insertAtOrder.
+        // The server shifts all stops with displayOrder >= insertAtOrder up by one.
+        const targetDay = selectedDay - 1;
+        const targetDayStops = [...allStops]
+          .filter(s => (s.dayIndex ?? 0) === targetDay)
+          .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+        const firstDisplayOrder = targetDayStops[0]?.displayOrder ?? 0;
+        await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: opt.name,
+            stopType: opt.stopType ?? categoryToType(category),
+            address: opt.address ?? `${opt.name}, ${city}`,
+            durationMinutes: parseDurationMins(opt, category),
+            dayIndex: targetDay,
+            insertAtOrder: firstDisplayOrder,
+          }),
+        });
+      } else if (isTimeSlot) {
         await apiFetch(
           `/api/travel/trips/${tripId}/stops`,
           {
@@ -4587,13 +4607,15 @@ function PositionPickerSheet({
   type PosRow = { stopId: string; label: string };
   const rows: PosRow[] = [];
 
-  dayStops.forEach((s, i) => {
-    const isFirst = i === 0;
-    const isEnd = i === dayStops.length - 1;
+  // First slot: insert BEFORE the first stop (makes new stop position 1)
+  rows.push({ stopId: '__FIRST__', label: 'First stop of the day' });
 
+  // One slot per existing stop: insert AFTER it
+  dayStops.forEach((s, i) => {
+    const isLast = i === dayStops.length - 1;
     rows.push({
       stopId: s.id,
-      label: isEnd ? 'Last stop of the day' : isFirst ? 'First stop of the day' : `After ${s.name}`,
+      label: isLast ? 'Last stop of the day' : `After ${s.name}`,
     });
   });
 
@@ -4618,11 +4640,11 @@ function PositionPickerSheet({
       <ScrollView style={{ flex: 1 }} contentContainerStyle={pps.list} showsVerticalScrollIndicator={false}>
         {rows.map((row, i) => (
           <View key={row.stopId}>
-            {i > 0 && (
+            {i > 0 && dayStops[i - 1] && (
               <View style={pps.divider}>
                 <View style={pps.divLine} />
                 <View style={pps.divPill}>
-                  <Text style={pps.divPillText} numberOfLines={1}>{dayStops[i].name}</Text>
+                  <Text style={pps.divPillText} numberOfLines={1}>{dayStops[i - 1].name}</Text>
                 </View>
                 <View style={pps.divLine} />
               </View>
