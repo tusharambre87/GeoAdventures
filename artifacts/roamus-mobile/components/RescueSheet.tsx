@@ -172,6 +172,31 @@ export default function RescueSheet({
   const [foodOffset, setFoodOffset]   = useState(0);
   const [foodHasMore, setFoodHasMore] = useState(false);
 
+  async function applyFoodStop() {
+    const chosen = foodOptions.find(o => o.id === selectedFoodId);
+    if (!chosen || !tripId) return;
+    setAddingFood(true);
+    setFoodAddError(null);
+    try {
+      const isLibraryStop = !chosen.id.startsWith('ai-') && !chosen.id.startsWith('gp-');
+      await apiFetch(`/api/travel/trips/${tripId}/stops`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: chosen.name,
+          stopType: chosen.stopType ?? 'restaurant',
+          durationMinutes: 60,
+          ...(isLibraryStop ? { addStopLibraryId: chosen.id } : {}),
+        }),
+      });
+      onStopsChanged?.();
+      setView('applied');
+    } catch {
+      setFoodAddError('Could not add stop — please try again.');
+    } finally {
+      setAddingFood(false);
+    }
+  }
+
   async function fetchFoodOptions(query: string, offset: number) {
     if (!tripId || isStopContext) return;
     setFoodLoading(true);
@@ -207,6 +232,8 @@ export default function RescueSheet({
 
   // Food selection
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
+  const [addingFood, setAddingFood]         = useState(false);
+  const [foodAddError, setFoodAddError]     = useState<string | null>(null);
   const mealLabel = getFoodLabel(new Date().getHours());
 
   // Need-recs state (stop context: food/fun/weather)
@@ -932,12 +959,15 @@ export default function RescueSheet({
           <ResultView
             plan={plan}
             onBack={() => setView('picker')}
-            onApply={() => setView('applied')}
-            ctaLabel={selectedFoodId
-              ? `Add ${mealLabel} stop → ${foodOptions.find(o => o.id === selectedFoodId)?.name ?? ''}`
-              : `Select a spot above`}
+            onApply={() => { void applyFoodStop(); }}
+            ctaLabel={addingFood
+              ? 'Adding stop\u2026'
+              : selectedFoodId
+                ? `Add ${mealLabel} stop \u2192 ${foodOptions.find(o => o.id === selectedFoodId)?.name ?? ''}`
+                : 'Select a spot above'}
             ctaColor={selectedFoodId ? '#E8692A' : '#C4C8D8'}
-            ctaDisabled={!selectedFoodId}
+            ctaDisabled={!selectedFoodId || addingFood}
+            applyError={foodAddError ?? undefined}
           >
             {showOfflineTips ? (
               <OfflineTipsBanner category="food" />
@@ -957,7 +987,7 @@ export default function RescueSheet({
                   <Text style={s.foodSearchIcon}>{'\uD83D\uDD0D'}</Text>
                   <TextInput
                     style={s.foodSearchInput}
-                    placeholder="Search e.g. Pizza Luce\u2026"
+                    placeholder={"Search e.g. Pizza Luce\u2026"}
                     placeholderTextColor="#B0ADA8"
                     value={foodSearch}
                     onChangeText={setFoodSearch}

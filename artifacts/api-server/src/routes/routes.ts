@@ -10102,51 +10102,61 @@ Return valid JSON only. No markdown.`;
       const hasMore = pool2.length > pageOffset + PAGE_SIZE;
       let rows: typeof geoPool = pool2.slice(pageOffset, pageOffset + PAGE_SIZE);
 
-      // AI fallback when library has no food stops for this city (or no matches for the query)
+      // Fallback when library has no matches
       if (rows.length === 0) {
-        const queryContext = searchQuery ? ` matching "${searchQuery}"` : '';
-        console.log('[Rescue food-options] library empty for', cityRaw, queryContext, '— trying AI fallback');
-        try {
-          const openai = getOpenAI();
-          const aiResp = await openai.chat.completions.create({
-            model: 'gpt-5-mini',
-            messages: [
-              {
-                role: 'system',
-                content: 'Return ONLY a JSON object with a "results" array of 3–5 real, family-friendly restaurants or cafes. Each item: name (real place name), stopType (restaurant/food/cafe/market), description (kid appeal, 1 sentence). No markdown.',
-              },
-              {
-                role: 'user',
-                content: searchQuery
-                  ? `List 3–5 real, family-friendly restaurants or cafes near ${cityRaw} that match the search "${searchQuery}". Prioritise places whose name or cuisine type contains "${searchQuery}". Return well-known, operating places only.`
-                  : `List 3–5 real, family-friendly restaurants near ${cityRaw}. Return well-known, operating places only.`,
-              },
-            ],
-            response_format: { type: 'json_object' },
-            max_completion_tokens: 400,
-          });
-          const raw = aiResp.choices[0].message.content ?? '';
-          console.log('[Rescue food-options] AI raw response', raw.slice(0, 300));
-          const m = raw.match(/\{[\s\S]*\}/);
-          if (m) {
-            const parsed = JSON.parse(m[0]);
-            const aiResults: any[] = Array.isArray(parsed.results) ? parsed.results : [];
-            for (const r of aiResults.slice(0, 3)) {
-              if (r.name && !usedNames.has((r.name ?? '').toLowerCase())) {
+        const gpKey = process.env.GOOGLE_PLACES_API_KEY;
+        if (searchQuery && gpKey) {
+          // Specific query → Google Places Text Search (reliable, real place names)
+          console.log('[Rescue food-options] GP text search for', searchQuery, 'near', cityRaw);
+          try {
+            const gpUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery + ' restaurant near ' + cityRaw)}&key=${gpKey}`;
+            const gpResp = await fetch(gpUrl);
+            const gpData = await gpResp.json() as { results?: any[] };
+            for (const p of (gpData.results ?? []).slice(0, 5)) {
+              if (p.name && !usedNames.has((p.name ?? '').toLowerCase())) {
                 rows.push({
-                  id: `ai-${Date.now()}-${rows.length}`,
-                  name: r.name,
-                  stopType: r.stopType || 'restaurant',
-                  address: null,
-                  description: r.description || null,
+                  id: `gp-${p.place_id ?? Date.now()}`,
+                  name: p.name,
+                  stopType: 'restaurant',
+                  address: p.formatted_address ?? p.vicinity ?? null,
+                  description: null,
                   city: cityRaw,
+                  latitude: p.geometry?.location?.lat ?? null,
+                  longitude: p.geometry?.location?.lng ?? null,
                 });
               }
             }
+            console.log('[Rescue food-options] GP returned', rows.length, 'results');
+          } catch (gpErr) {
+            console.log('[Rescue food-options] GP error', gpErr);
           }
-        } catch (aiErr) {
-          console.log('[Rescue food-options] AI fallback error', aiErr);
-          req.log?.warn({ error: aiErr }, '[Rescue] food-options AI fallback failed');
+        } else if (!searchQuery) {
+          // No query → AI generic suggestions for the city
+          console.log('[Rescue food-options] AI generic fallback for', cityRaw);
+          try {
+            const openai = getOpenAI();
+            const aiResp = await openai.chat.completions.create({
+              model: 'gpt-5-mini',
+              messages: [
+                { role: 'system', content: 'Return ONLY a JSON object with a "results" array of 3–5 real, family-friendly restaurants or cafes. Each item: name (real place name), stopType (restaurant/food/cafe/market), description (kid appeal, 1 sentence). No markdown.' },
+                { role: 'user', content: `List 3–5 real, family-friendly restaurants near ${cityRaw}. Return well-known, operating places only.` },
+              ],
+              response_format: { type: 'json_object' },
+              max_completion_tokens: 400,
+            });
+            const raw = aiResp.choices[0].message.content ?? '';
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (m) {
+              const parsed = JSON.parse(m[0]);
+              for (const r of (Array.isArray(parsed.results) ? parsed.results : []).slice(0, 3)) {
+                if (r.name && !usedNames.has((r.name ?? '').toLowerCase())) {
+                  rows.push({ id: `ai-${Date.now()}-${rows.length}`, name: r.name, stopType: r.stopType || 'restaurant', address: null, description: r.description || null, city: cityRaw, latitude: null, longitude: null });
+                }
+              }
+            }
+          } catch (aiErr) {
+            req.log?.warn({ error: aiErr }, '[Rescue] food-options AI fallback failed');
+          }
         }
       }
 
