@@ -621,6 +621,7 @@ export default function TodayScreen() {
   const [wrapPhotos, setWrapPhotos]             = useState<string[]>([]);
   const [isWrapping, setIsWrapping]             = useState(false);
   const [historyDayIndex, setHistoryDayIndex]   = useState<number>(0);
+  const [dhPhotos, setDhPhotos]                 = useState<Record<string, string[]>>({});
   const [previousState, setPreviousState]       = useState<TodayState | null>(null);
   const [showMenu, setShowMenu]                 = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -1047,6 +1048,23 @@ export default function TodayScreen() {
       if (Object.keys(pre).length > 0) setKidQuotes(prev => ({ ...prev, ...pre }));
     }).catch(() => {});
   }, [todayState, resolvedTripId, resolvedDayIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Fetch per-stop photos when viewing day history ──
+  useEffect(() => {
+    if (todayState !== 'day_history' && todayState !== 'day_history_empty') return;
+    if (!resolvedTripId) return;
+    setDhPhotos({});
+    memoriesAPI.getDayHighlights(resolvedTripId, historyDayIndex)
+      .then(h => {
+        const byStop: Record<string, string[]> = {};
+        for (const p of (h?.allDayPhotos ?? [])) {
+          if (!byStop[p.stopId]) byStop[p.stopId] = [];
+          byStop[p.stopId].push(p.photoUrl);
+        }
+        setDhPhotos(byStop);
+      })
+      .catch(() => {});
+  }, [todayState, resolvedTripId, historyDayIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Eagerly fetch Day Highlights hero photo when day is complete ──
   useEffect(() => {
@@ -1805,29 +1823,7 @@ export default function TodayScreen() {
           </Text>
         </View>
       )}
-      {__DEV__ && devDate && (
-        <View style={{ backgroundColor: '#7C3AED', paddingVertical: 5, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 11, fontFamily: F.bold }}>
-            {'DEV DATE: ' + devDate.toISOString().slice(0, 10)}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <Pressable onPress={() => { setDevDateInput(devDate.toISOString().slice(0, 10)); setShowDevDateModal(true); }}>
-              <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Change</Text>
-            </Pressable>
-            <Pressable onPress={() => { AsyncStorage.removeItem('dev_date_override').catch(() => {}); setDevDate(null); }}>
-              <Text style={{ color: '#DDD6FE', fontSize: 11, fontFamily: F.bold }}>Clear</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-      {__DEV__ && !devDate && (
-        <Pressable
-          onPress={() => { setDevDateInput(''); setShowDevDateModal(true); }}
-          style={{ backgroundColor: '#4B1D96', paddingVertical: 4, paddingHorizontal: 16, alignItems: 'flex-end' }}
-        >
-          <Text style={{ color: '#DDD6FE', fontSize: 10, fontFamily: F.bold }}>SET DEV DATE</Text>
-        </Pressable>
-      )}
+      {/* Dev date tools hidden from live UI — trigger via AsyncStorage if needed */}
       {/* Dev date setter modal */}
       {__DEV__ && (
         <Modal visible={showDevDateModal} transparent animationType="fade" onRequestClose={() => setShowDevDateModal(false)}>
@@ -2583,6 +2579,21 @@ export default function TodayScreen() {
             <View style={mo.metaPill}><Text style={mo.metaText}>{'\uD83D\uDD50'}{' '}{estimateTotalTime(dayStops, selectedPace, childrenAges)}</Text></View>
           </View>
 
+          {/* Day history hint — only when there are completed past days */}
+          {resolvedDayIndex > 0 && (
+            <Pressable
+              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 9,
+                backgroundColor: '#F9F6F2', borderBottomWidth: 1, borderBottomColor: C.border }}
+              onPress={() => setTodayState('day_history')}
+            >
+              <Text style={{ fontSize: 14, marginRight: 6 }}>{'\uD83D\uDCC5'}</Text>
+              <Text style={{ fontFamily: F.medium, fontSize: 13, color: C.muted, flex: 1 }}>
+                {'Day 1\u2013'}
+                {resolvedDayIndex > 1 ? `${resolvedDayIndex} recap` : ' recap available'}
+              </Text>
+              <Text style={{ fontFamily: F.semibold, fontSize: 12, color: C.orange }}>{'View \u203A'}</Text>
+            </Pressable>
+          )}
           {offlineBannerEl}
           <View style={mo.paceSection}>
             <Text style={mo.paceLabel}>TODAY'S PACE</Text>
@@ -4595,28 +4606,27 @@ export default function TodayScreen() {
                     <Text style={dh.stopName} numberOfLines={1}>{stop.name}</Text>
                     <Text style={dh.stopDur}>{getStopDuration(stop)} min</Text>
                   </View>
-                  {/* Photo row — placeholder slots (read-only) */}
+                  {/* Photo row — shows uploaded moments photos, falls back to placeholder */}
                   <View style={dh.photoRow}>
-                    {[0, 1, 2].map(slot => (
-                      <View key={slot} style={dh.photoSlot}>
-                        <Text style={dh.photoSlotIcon}>{'\uD83D\uDCF7'}</Text>
-                      </View>
-                    ))}
+                    {[0, 1, 2].map(slot => {
+                      const photoUri = (dhPhotos[stop.id] ?? [])[slot];
+                      return (
+                        <View key={slot} style={[dh.photoSlot, { overflow: 'hidden' }]}>
+                          {photoUri ? (
+                            <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                          ) : (
+                            <Text style={dh.photoSlotIcon}>{'\uD83D\uDCF7'}</Text>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                   {/* Kid quote strip (if available) */}
                   {(stop as { kidQuote?: string }).kidQuote ? (
                     <View style={dh.kidQuoteRow}>
-                      <Text style={dh.kidQuoteText}>“{(stop as { kidQuote?: string }).kidQuote}”</Text>
+                      <Text style={dh.kidQuoteText}>"{(stop as { kidQuote?: string }).kidQuote}"</Text>
                     </View>
                   ) : null}
-                  {/* Story playback button — read-only tap target */}
-                  <TouchableOpacity style={dh.playRow} activeOpacity={0.7}
-                    onPress={() => trip ? router.push({ pathname: '/memories/[tripId]/recap' as never, params: { tripId: trip.id } } as never) : undefined}>
-                    <View style={dh.playBtn}>
-                      <Text style={dh.playBtnIcon}>▶{'\uFE0F'}</Text>
-                    </View>
-                    <Text style={dh.playLabel}>Play story</Text>
-                  </TouchableOpacity>
                 </View>
               ))}
               <Pressable style={dh.linkBtn} onPress={() => {
@@ -4625,6 +4635,17 @@ export default function TodayScreen() {
               }}>
                 <Text style={dh.linkBtnText}>View full recap →</Text>
               </Pressable>
+              {/* Secondary: play the trip story */}
+              <TouchableOpacity
+                style={[dh.playRow, { justifyContent: 'center', paddingVertical: 10 }]}
+                activeOpacity={0.7}
+                onPress={() => trip ? router.push({ pathname: '/memories/[tripId]/recap' as never, params: { tripId: trip.id } } as never) : undefined}
+              >
+                <View style={dh.playBtn}>
+                  <Text style={dh.playBtnIcon}>{'\u25B6\uFE0F'}</Text>
+                </View>
+                <Text style={dh.playLabel}>Play Day {historyDayIndex + 1} story</Text>
+              </TouchableOpacity>
             </View>
           )}
 
