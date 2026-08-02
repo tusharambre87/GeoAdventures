@@ -4783,12 +4783,17 @@ export default function TripPlanScreen() {
 
   useEffect(() => {
     if (openAddStop === 'true') {
-      // Apply initialDay BEFORE opening the sheet so position picker shows the right day's stops
-      if (initialDay && Number(initialDay) > 0) setSelectedDay(Number(initialDay));
+      // Apply initialDay BEFORE opening the sheet so position picker shows the right day's stops.
+      // Fall back to activeTripDay so we never default to Day 1 on an active trip.
+      const targetDay = (initialDay && Number(initialDay) > 0)
+        ? Number(initialDay)
+        : activeTripDay;
+      setSelectedDay(targetDay);
       const filter = (['food', 'kids', 'landmarks'].includes(addStopDefaultFilter ?? '') ? addStopDefaultFilter : 'landmarks') as 'food' | 'kids' | 'landmarks';
       setAddStopFilter(filter);
       setActiveSheet('addStop');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When opened from "See Tomorrow's Plan" after a day wrap, jump to the right day
@@ -5088,7 +5093,7 @@ export default function TripPlanScreen() {
           onRunDay={() => openRunDay()}
           onOpenOptions={() => setActiveSheet('options')}
           onDelete={deleteStop}
-          onAddStop={(filter) => { setAddStopFilter(filter ?? 'food'); setActiveSheet('addStop'); }}
+          onAddStop={(filter) => { setAddStopFilter(filter ?? 'food'); setSelectedDay(activeTripDay); setActiveSheet('addStop'); }}
           isFree={isFree}
           onShowUpgrade={() => { setUpgradeContext('locked_day'); setUpgradeVisible(true); }}
           onPmalAddRequest={(suggestion, dayStops, dayIndex, onAdded) => {
