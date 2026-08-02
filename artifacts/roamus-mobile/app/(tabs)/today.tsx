@@ -4619,7 +4619,10 @@ export default function TodayScreen() {
                   </TouchableOpacity>
                 </View>
               ))}
-              <Pressable style={dh.linkBtn} onPress={() => trip && router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id, } })}>
+              <Pressable style={dh.linkBtn} onPress={() => {
+                setDayIndexOverride(historyDayIndex);
+                setTodayState('day_complete');
+              }}>
                 <Text style={dh.linkBtnText}>View full recap →</Text>
               </Pressable>
             </View>
