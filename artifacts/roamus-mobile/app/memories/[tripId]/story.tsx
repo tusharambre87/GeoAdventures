@@ -16,6 +16,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   Dimensions,
@@ -200,30 +201,78 @@ function Slide2Map({ trip }: { trip: any }) {
     </View>
   );
 }
-function Slide3Collage({ collagePhotos, trip, onAddPhoto }: {
+function Slide3Collage({ collagePhotos, trip, onAddPhoto, initialQuote }: {
   collagePhotos: (string | null)[];
   trip?: any;
   onAddPhoto?: () => void;
+  initialQuote?: string;
 }) {
   const [failedIdx, setFailedIdx] = React.useState<Set<number>>(new Set());
+  const [eyebrow, setEyebrow] = React.useState('The Moments That Mattered');
+  const [headline, setHeadline] = React.useState("A few things we won't forget");
+  const [quote, setQuote] = React.useState(initialQuote ?? '');
+  const [editingField, setEditingField] = React.useState<'eyebrow' | 'headline' | 'quote' | null>(null);
+  // Sync quote when data arrives after mount
+  React.useEffect(() => { if (initialQuote && !quote) setQuote(initialQuote); }, [initialQuote]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cells = [0, 1, 2, 3];
-  // Distinct warm/cool gradients so each cell reads as a different place
   const gradients: [string, string][] = [
     ['#1d3a2a', '#2e5c42'],
     ['#1a2d4a', '#2d4472'],
     ['#3a1e0a', '#6b3420'],
     ['#2a1a3a', '#4a2d6b'],
   ];
-  // First 4 stops as fallback content when no image loads
   const fallbackStops: any[] = (trip?.stops ?? []).slice(0, 4);
 
   return (
     <View style={styles.slide}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: C.deep }]} />
+
+      {/* ── Editable header ── */}
       <View style={styles.collageHeader}>
-        <Text style={styles.eyebrow}>The Moments That Mattered</Text>
-        <Text style={styles.collageTitle}>A few things we won't forget</Text>
+        {/* Eyebrow */}
+        <TouchableOpacity onPress={() => setEditingField('eyebrow')} disabled={editingField === 'eyebrow'} activeOpacity={0.7}>
+          {editingField === 'eyebrow' ? (
+            <TextInput
+              value={eyebrow}
+              onChangeText={setEyebrow}
+              onBlur={() => setEditingField(null)}
+              autoFocus
+              style={s3q.eyebrowInput}
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholder="Add a heading..."
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.eyebrow}>{eyebrow || 'Tap to add'}</Text>
+              <Text style={s3q.editHint}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Headline */}
+        <TouchableOpacity onPress={() => setEditingField('headline')} disabled={editingField === 'headline'} activeOpacity={0.7}>
+          {editingField === 'headline' ? (
+            <TextInput
+              value={headline}
+              onChangeText={setHeadline}
+              onBlur={() => setEditingField(null)}
+              autoFocus
+              multiline
+              style={s3q.headlineInput}
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholder="Add a title..."
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Text style={[styles.collageTitle, { flex: 1 }]}>{headline || 'Tap to add title'}</Text>
+              <Text style={[s3q.editHint, { fontSize: 14, marginTop: 4 }]}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* ── 2×2 Photo grid ── */}
       <View style={styles.collageGrid}>
         {cells.map(i => {
           const url = collagePhotos[i];
@@ -258,6 +307,39 @@ function Slide3Collage({ collagePhotos, trip, onAddPhoto }: {
           );
         })}
       </View>
+
+      {/* ── Editable kid quote — fills the space below the grid ── */}
+      <TouchableOpacity
+        style={s3q.quoteSection}
+        onPress={() => setEditingField('quote')}
+        disabled={editingField === 'quote'}
+        activeOpacity={0.7}
+      >
+        {editingField === 'quote' ? (
+          <TextInput
+            value={quote}
+            onChangeText={setQuote}
+            onBlur={() => setEditingField(null)}
+            autoFocus
+            multiline
+            style={s3q.quoteInput}
+            placeholderTextColor="rgba(255,255,255,0.28)"
+            placeholder="Add a kid's quote..."
+          />
+        ) : quote ? (
+          <View style={s3q.quoteDisplay}>
+            <Text style={s3q.quoteMark}>{'\u201C'}</Text>
+            <Text style={s3q.quoteText}>{quote}</Text>
+            <Text style={[s3q.editHint, { marginTop: 6 }]}>{'\u270E'} tap to edit</Text>
+          </View>
+        ) : (
+          <View style={s3q.quoteEmpty}>
+            <Text style={s3q.quoteEmptyIcon}>{'\u270E'}</Text>
+            <Text style={s3q.quoteEmptyText}>Add a kid's quote</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
       <Wordmark opacity={0.3} />
     </View>
   );
@@ -708,7 +790,7 @@ export default function StoryScreen() {
   const slideContent = [
     <Slide1Cover key="1" trip={trip} heroPhoto={finalHero} />,
     <Slide2Map key="2" trip={trip} />,
-    <Slide3Collage key="3" collagePhotos={finalCollage} trip={trip} onAddPhoto={handleAddPhoto} />,
+    <Slide3Collage key="3" collagePhotos={finalCollage} trip={trip} onAddPhoto={handleAddPhoto} initialQuote={highlights[0]} />,
     <Slide4Quotes key="4" highlights={highlights} generating={generating} onAddQuote={handleAddQuote} />,
     <Slide5Closing key="5" trip={trip} closingPhoto={finalClosing} />,
   ];
@@ -1058,6 +1140,51 @@ const styles = StyleSheet.create({
 });
 
 // Slide 3 collage stop-name fallback card styles
+// ── Slide 3 editable-text styles ──────────────────────────────────────────────
+const s3q = StyleSheet.create({
+  eyebrowInput: {
+    fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 2, marginBottom: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    paddingBottom: 3, minWidth: 120,
+  },
+  headlineInput: {
+    fontFamily: 'Georgia', fontSize: 26, fontWeight: '800', color: '#fff',
+    lineHeight: 32, minHeight: 64,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingBottom: 4,
+  },
+  editHint: {
+    fontSize: 10, color: 'rgba(255,255,255,0.32)', fontFamily: F.regular,
+  },
+  quoteSection: {
+    flex: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 120,
+    justifyContent: 'center',
+  },
+  quoteDisplay: { gap: 4 },
+  quoteMark: {
+    fontSize: 32, color: C.orange, fontFamily: 'Georgia', lineHeight: 28, opacity: 0.8,
+  },
+  quoteText: {
+    fontSize: 16, fontFamily: 'Georgia', fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.88)', lineHeight: 24,
+  },
+  quoteInput: {
+    fontSize: 16, fontFamily: 'Georgia', fontStyle: 'italic',
+    color: '#fff', lineHeight: 24, minHeight: 72,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    paddingBottom: 4,
+  },
+  quoteEmpty: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    opacity: 0.38,
+  },
+  quoteEmptyIcon: { fontSize: 14, color: '#fff' },
+  quoteEmptyText: {
+    fontSize: 13, fontFamily: F.medium, color: '#fff', fontStyle: 'italic',
+  },
+});
+
 const s3m = StyleSheet.create({
   card: {
     flex: 1,
