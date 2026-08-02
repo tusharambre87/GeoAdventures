@@ -189,7 +189,8 @@ export default function RescueSheet({
         }),
       });
       onStopsChanged?.();
-      setView('applied');
+      handleClose();
+      setTimeout(() => router.push('/(tabs)/today' as never), 300);
     } catch {
       setFoodAddError('Could not add stop — please try again.');
     } finally {
