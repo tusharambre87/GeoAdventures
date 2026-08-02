@@ -53,6 +53,9 @@ export default function ConfirmPhotoScreen() {
   const { user, token } = useAuth();
   const [captions, setCaptions] = useState<string[]>(() => uris.map(() => ''));
   const [saving, setSaving] = useState(false);
+  const [saved, setSavedCount] = useState(0);
+  const [done, setDone] = useState(false);
+  const [failedCount, setFailedCount] = useState(0);
 
   const updateCaption = (index: number, text: string) => {
     setCaptions((prev) => {
@@ -78,15 +81,16 @@ export default function ConfirmPhotoScreen() {
   const savePhotos = async () => {
     if (!tripId || uris.length === 0) return;
     setSaving(true);
-    let saved = 0;
-    let failed = 0;
+    setSavedCount(0);
+    setFailedCount(0);
+    let savedN = 0;
+    let failedN = 0;
     try {
       const net = await NetInfo.fetch();
       const isOffline = !(net.isConnected ?? true);
       const isPaid = user?.subscriptionTier !== 'free';
 
       if (isOffline && isPaid) {
-        // Offline queue — all or nothing is acceptable for queuing
         await Promise.all(
           uris.map((uri, i) =>
             queuePhoto({
@@ -97,9 +101,8 @@ export default function ConfirmPhotoScreen() {
             })
           )
         );
-        saved = uris.length;
+        savedN = uris.length;
       } else {
-        // Upload sequentially so one failure doesn't block the rest
         for (let i = 0; i < uris.length; i++) {
           try {
             const photoUrl = await uploadPhoto(uris[i]);
@@ -109,23 +112,18 @@ export default function ConfirmPhotoScreen() {
               photoUrls: [photoUrl],
               parentPromptResponse: captions[i] || null,
             });
-            saved++;
+            savedN++;
+            setSavedCount(savedN);
           } catch {
-            failed++;
+            failedN++;
           }
         }
       }
 
       await queryClient.invalidateQueries({ queryKey: ['moments', tripId] });
-
-      const title = failed === 0 ? 'Photos saved!' : 'Partially saved';
-      const msg = failed === 0
-        ? `${saved} photo${saved !== 1 ? 's' : ''} saved \u2014 find them in the Memories tab.`
-        : `${saved} of ${uris.length} photos saved. ${failed} could not upload \u2014 try the rest again.`;
-
-      Alert.alert(title, msg, [
-        { text: 'Got it', onPress: () => router.dismissAll() },
-      ]);
+      setSavedCount(savedN);
+      setFailedCount(failedN);
+      setDone(true);
     } catch (err: any) {
       console.error('Save photos failed:', err);
       const msg = err?.message ?? 'Something went wrong. Please try again.';
@@ -134,6 +132,35 @@ export default function ConfirmPhotoScreen() {
       setSaving(false);
     }
   };
+
+  const decodedStopName = stopName ? decodeURIComponent(stopName as string) : 'this stop';
+
+  // ── Success screen ───────────────────────────────────────────────────────
+  if (done) {
+    const allGood = failedCount === 0;
+    return (
+      <View style={[cf.screen, cf.successScreen, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+        <Text style={cf.successEmoji}>{allGood ? '\uD83C\uDF04' : '\u26A0\uFE0F'}</Text>
+        <Text style={cf.successTitle}>
+          {allGood
+            ? 'Memories saved!'
+            : `${saved} of ${uris.length} saved`}
+        </Text>
+        <Text style={cf.successSub}>
+          {allGood
+            ? `Successfully uploaded your memories of ${decodedStopName}`
+            : `${failedCount} photo${failedCount !== 1 ? 's' : ''} could not upload — try again later`}
+        </Text>
+        <TouchableOpacity
+          style={[cf.saveBtn, { marginTop: 32, paddingHorizontal: 32 }]}
+          onPress={() => router.dismissAll()}
+          activeOpacity={0.85}
+        >
+          <Text style={cf.saveBtnText}>{'Done \u2192'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const TaggedRow = ({ compact }: { compact?: boolean }) => (
     <TouchableOpacity
@@ -145,6 +172,20 @@ export default function ConfirmPhotoScreen() {
       <Text style={cf.taggedName} numberOfLines={1}>{stopName ?? 'General trip photo'}</Text>
       <Text style={cf.taggedChange}>Change {'\u2192'}</Text>
     </TouchableOpacity>
+  );
+
+  // ── Uploading overlay (shown on top of either layout) ────────────────────
+  const UploadingOverlay = () => (
+    <View style={cf.overlay} pointerEvents="box-none">
+      <View style={cf.overlayCard}>
+        <ActivityIndicator color={C.orange} size="large" style={{ marginBottom: 14 }} />
+        <Text style={cf.overlayTitle}>Adding your memories…</Text>
+        {isMulti && (
+          <Text style={cf.overlaySub}>{saved} of {uris.length} photos uploaded</Text>
+        )}
+        <Text style={cf.overlaySub} numberOfLines={1}>{decodedStopName}</Text>
+      </View>
+    </View>
   );
 
   // ── Single photo layout ──────────────────────────────────────────────────
@@ -193,13 +234,11 @@ export default function ConfirmPhotoScreen() {
             onPress={savePhotos}
             disabled={saving}
           >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={cf.saveBtnText}>Save to memories {'\u2192'}</Text>
-            )}
+            <Text style={cf.saveBtnText}>Save to memories {'\u2192'}</Text>
           </TouchableOpacity>
         </View>
+
+        {saving && <UploadingOverlay />}
       </KeyboardAvoidingView>
     );
   }
@@ -252,15 +291,13 @@ export default function ConfirmPhotoScreen() {
           onPress={savePhotos}
           disabled={saving}
         >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={cf.saveBtnText}>
-              Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'\u2192'}
-            </Text>
-          )}
+          <Text style={cf.saveBtnText}>
+            Save {uris.length} photo{uris.length !== 1 ? 's' : ''} to memories {'\u2192'}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {saving && <UploadingOverlay />}
     </View>
   );
 }
@@ -318,4 +355,49 @@ const cf = StyleSheet.create({
     color: C.deep, height: 50, textAlignVertical: 'top',
   },
   footer:      { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: C.border, padding: 12 },
+
+  // ── Uploading overlay ──
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(26,31,46,0.55)',
+    zIndex: 100,
+  },
+  overlayCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    width: SW - 64,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  overlayTitle: {
+    fontSize: 17, fontFamily: F.bold, color: C.deep,
+    marginBottom: 6, textAlign: 'center',
+  },
+  overlaySub: {
+    fontSize: 13, fontFamily: F.regular, color: C.muted,
+    marginTop: 4, textAlign: 'center',
+  },
+
+  // ── Success screen ──
+  successScreen: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  successEmoji: { fontSize: 64, marginBottom: 20 },
+  successTitle: {
+    fontSize: 26, fontFamily: F.bold, color: C.deep,
+    textAlign: 'center', marginBottom: 10,
+  },
+  successSub: {
+    fontSize: 15, fontFamily: F.regular, color: C.muted,
+    textAlign: 'center', lineHeight: 22,
+  },
 });

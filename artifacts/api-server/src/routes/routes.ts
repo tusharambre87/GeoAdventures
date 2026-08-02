@@ -9778,7 +9778,7 @@ Example structure:
         .orderBy(drizzleSql`RANDOM()`)
         .limit(8);
 
-      if (libRows.length >= 2) {
+      if (libRows.length >= 1) {
         // Deduplicate by normalized name (strips &, and, punctuation, extra spaces)
         const normalize = (s: string) =>
           s.toLowerCase().replace(/[&]/g, 'and').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
