@@ -663,6 +663,7 @@ export default function TodayScreen() {
   const [selectedPlaceId, setSelectedPlaceId]         = useState<string | null>(null);
   const [breakQuote, setBreakQuote]                   = useState('');
   const [breakPhotos, setBreakPhotos]                 = useState<string[]>([]);
+  const [breakUploading, setBreakUploading]           = useState(false);
   // Persists the stop ID created in step 1 of handleBreakDone so retries don't duplicate it
   const breakStopIdRef = useRef<string | null>(null);
   // Guards against concurrent invocations (rapid double-tap)
@@ -1682,7 +1683,7 @@ export default function TodayScreen() {
     if (breakDoneInFlight.current) return; // prevent rapid double-tap
     breakDoneInFlight.current = true;
     if (!trip?.id || !activeBreakPlace) {
-      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); breakStopIdRef.current = null; breakDoneInFlight.current = false; closeSotwSheet(); return;
+      setActiveBreakPlace(null); setBreakQuote(''); setBreakPhotos([]); setBreakUploading(false); breakStopIdRef.current = null; breakDoneInFlight.current = false; closeSotwSheet(); return;
     }
 
     // 1. Add the break stop to the day plan, then mark it visited.
@@ -1719,6 +1720,7 @@ export default function TodayScreen() {
     // 2. Upload photos — treat missing photoUrl or non-2xx status as a failure
     let cloudPhotoUrls: string[] = [];
     if (breakPhotos.length > 0) {
+      setBreakUploading(true);
       let uploadFailed = false;
       try {
         const token = await AsyncStorage.getItem('auth_token');
@@ -1742,6 +1744,7 @@ export default function TodayScreen() {
       } catch {
         uploadFailed = true;
       }
+      setBreakUploading(false);
 
       if (uploadFailed) {
         // Photos failed to upload — ask user whether to retry or skip.
@@ -1768,6 +1771,7 @@ export default function TodayScreen() {
 
         if (action === 'retry') {
           // Re-invoke; step 1 will be skipped because breakStopIdRef is already set
+          breakDoneInFlight.current = false;
           void handleBreakDone();
           return;
         }
@@ -1792,6 +1796,7 @@ export default function TodayScreen() {
 
     breakStopIdRef.current = null;
     breakDoneInFlight.current = false;
+    setBreakUploading(false);
     setActiveBreakPlace(null);
     setBreakQuote('');
     setBreakPhotos([]);
@@ -3598,10 +3603,44 @@ export default function TodayScreen() {
                 </ScrollView>
               )}
             </View>
-            <TouchableOpacity style={sotw.doneBtn} activeOpacity={0.88} onPress={() => { void handleBreakDone(); }}>
+            <TouchableOpacity
+              style={[sotw.doneBtn, breakUploading && { opacity: 0.5 }]}
+              activeOpacity={0.88}
+              disabled={breakUploading}
+              onPress={() => { void handleBreakDone(); }}
+            >
               <Text style={sotw.doneBtnText}>{'Done with break \u2192'}</Text>
             </TouchableOpacity>
           </ScrollView>
+
+          {/* Uploading overlay — shown while photos are being saved */}
+          {breakUploading && (
+            <View style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 200,
+            }}>
+              <View style={{
+                backgroundColor: '#fff',
+                borderRadius: 20,
+                paddingHorizontal: 32,
+                paddingVertical: 28,
+                alignItems: 'center',
+                gap: 14,
+                maxWidth: 280,
+              }}>
+                <ActivityIndicator size="large" color="#E8813A" />
+                <Text style={{ fontSize: 17, fontWeight: '700', color: '#1a1a1a', textAlign: 'center' }}>
+                  {'Uploading your memories\nto Roamus!'}
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+                  {'Hang tight while your\nphotos are being saved\u2026'}
+                </Text>
+              </View>
+            </View>
+          )}
         </Animated.View>
       )}
 
