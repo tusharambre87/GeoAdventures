@@ -4345,7 +4345,10 @@ export default function TodayScreen() {
               }}
             >
               {isWrapping ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' }}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={[dc.wrapBtnText, { opacity: 0.92 }]}>Adding your memories to RoamUs…</Text>
+                </View>
               ) : (
                 <Text style={dc.wrapBtnText}>
                   {dayWrapped ? `View Day ${resolvedDayIndex + 1} Story →` : `Wrap up Day ${resolvedDayIndex + 1} →`}

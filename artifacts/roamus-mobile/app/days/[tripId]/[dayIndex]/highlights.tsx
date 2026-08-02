@@ -277,6 +277,8 @@ export default function DayHighlightsScreen() {
                       source={{ uri: slot.photoUrl }}
                       style={StyleSheet.absoluteFill}
                       contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={250}
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.55)']}
@@ -556,21 +558,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
+    // 160px keeps text clear of Instagram Stories' side-crop zone (~147px on 800px-wide collage)
+    paddingHorizontal: 160,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
   collageFooterDay: {
     fontFamily: F.bold,
-    fontSize: 24,
+    fontSize: 20,
     color: 'rgba(255,255,255,0.85)',
     letterSpacing: 0.2,
     flexShrink: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   collageFooterBrand: {
     fontFamily: F.bold,
-    fontSize: 28,
+    fontSize: 22,
     color: '#E8692A',
     letterSpacing: 1.5,
     flexShrink: 0,
