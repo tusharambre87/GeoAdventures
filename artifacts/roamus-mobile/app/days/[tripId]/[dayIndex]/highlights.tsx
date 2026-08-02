@@ -4,7 +4,7 @@
  * — Captures the collage with react-native-view-shot
  * — Shares natively (Instagram, Facebook, Messages…) via expo-sharing
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { memoriesAPI } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
@@ -57,6 +58,25 @@ export default function DayHighlightsScreen() {
   const [localSelections, setLocalSelections] = useState<Record<number, SlotPhoto>>({});
   // Sharing in progress
   const [isSharing, setIsSharing] = useState(false);
+
+  const storageKey = `highlights_selections_${tripId}_${dayIndex}`;
+
+  // Load persisted photo selections on mount
+  useEffect(() => {
+    AsyncStorage.getItem(storageKey).then(raw => {
+      if (!raw) return;
+      try {
+        const saved = JSON.parse(raw) as Record<number, SlotPhoto>;
+        if (saved && typeof saved === 'object') setLocalSelections(saved);
+      } catch { /* ignore corrupt data */ }
+    }).catch(() => {});
+  }, [storageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist photo selections whenever they change
+  useEffect(() => {
+    if (Object.keys(localSelections).length === 0) return;
+    AsyncStorage.setItem(storageKey, JSON.stringify(localSelections)).catch(() => {});
+  }, [localSelections, storageKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // 'idle' | 'prefetching' | 'capturing'
   const [shareStatus, setShareStatus] = useState<'idle' | 'prefetching' | 'capturing'>('idle');
   // Ref to the clean collage view for view-shot capture
