@@ -13,6 +13,7 @@ import {
   AppState,
   Image,
   ImageBackground,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -1015,6 +1016,37 @@ export default function TodayScreen() {
       .then(prog => setKidsXp(prog.xp ?? null))
       .catch(() => {});
   }, [todayState, resolvedTripId, trip]);
+
+  // ── Pre-populate kid quotes from today's voice moments when day is complete ──
+  useEffect(() => {
+    if (todayState !== 'day_complete') return;
+    if (!resolvedTripId) return;
+    const children = (trip?.travelers ?? []).filter((t: any) => !t.isParent);
+    if (children.length === 0) return;
+    apiFetch<{ moments: Array<{ kidPromptResponse?: string | null; explorerName?: string | null; dayIndex?: number | null }> }>(
+      `/api/travel/trips/${resolvedTripId}/moments`
+    ).then((data) => {
+      const todayMoments = (data.moments ?? []).filter(
+        (m: any) => m.kidPromptResponse?.trim() && (m.dayIndex == null || m.dayIndex === resolvedDayIndex)
+      );
+      const pre: Record<string, string> = {};
+      for (const kid of children) {
+        const key = `dw-${kid.name}`;
+        // Don't overwrite if parent already typed something
+        if (kidQuotes[key]?.trim()) continue;
+        const match = todayMoments.find((m: any) => {
+          const raw = m.kidPromptResponse!;
+          const name = raw.includes('|') ? raw.split('|')[0].trim() : (m.explorerName ?? '');
+          return name.toLowerCase() === kid.name.toLowerCase();
+        });
+        if (match) {
+          const raw = match.kidPromptResponse!;
+          pre[key] = raw.includes('|') ? raw.split('|').slice(1).join('|').trim() : raw;
+        }
+      }
+      if (Object.keys(pre).length > 0) setKidQuotes(prev => ({ ...prev, ...pre }));
+    }).catch(() => {});
+  }, [todayState, resolvedTripId, resolvedDayIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Eagerly fetch Day Highlights hero photo when day is complete ──
   useEffect(() => {
@@ -4104,6 +4136,7 @@ export default function TodayScreen() {
     ];
 
     return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <LinearGradient
@@ -4146,10 +4179,10 @@ export default function TodayScreen() {
                       style={dc.quoteInput}
                       value={kidQuotes[key] ?? ''}
                       onChangeText={text => setKidQuotes(prev => ({ ...prev, [key]: text }))}
-                      placeholder={`"Something memorable…"`}
+                      placeholder={`"Something memorable\u2026"`}
                       placeholderTextColor={C.muted}
-                      multiline numberOfLines={2}
-                      returnKeyType="done" blurOnSubmit
+                      multiline
+                      blurOnSubmit={false}
                     />
                   </View>
                 );
@@ -4382,6 +4415,7 @@ export default function TodayScreen() {
         />
         {menuOverlay}
       </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -5043,7 +5077,7 @@ const dc = StyleSheet.create({
   quoteBlock:   { marginBottom: 14 },
   quoteWho:     { fontFamily: F.bold, fontSize: 10, color: C.muted, letterSpacing: 0.8, marginBottom: 6 },
   quoteInput:   { fontFamily: F.regular, fontSize: 14, color: C.deep, backgroundColor: C.bg,
-    borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, minHeight: 56, textAlignVertical: 'top' },
+    borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, paddingRight: 44, minHeight: 56, textAlignVertical: 'top' },
   ratingRow:        { flexDirection: 'row', gap: 8 },
   ratingBtn:        { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
     borderColor: C.border, backgroundColor: C.bg, alignItems: 'center' },
