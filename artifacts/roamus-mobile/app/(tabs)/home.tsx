@@ -807,6 +807,7 @@ export default function HomeScreen() {
                   value={sotwQuery}
                   onChangeText={setSotwQuery}
                   onSubmitEditing={() => { void fetchSotwPlaces(sotwFilter, undefined, sotwRadius, sotwQuery); }}
+                  onBlur={() => { void fetchSotwPlaces(sotwFilter, undefined, sotwRadius, sotwQuery); }}
                   returnKeyType="search"
                   clearButtonMode="while-editing"
                 />

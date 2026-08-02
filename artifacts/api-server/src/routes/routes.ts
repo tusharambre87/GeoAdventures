@@ -10102,9 +10102,10 @@ Return valid JSON only. No markdown.`;
       const hasMore = pool2.length > pageOffset + PAGE_SIZE;
       let rows: typeof geoPool = pool2.slice(pageOffset, pageOffset + PAGE_SIZE);
 
-      // AI fallback when library has no food stops for this city
+      // AI fallback when library has no food stops for this city (or no matches for the query)
       if (rows.length === 0) {
-        console.log('[Rescue food-options] library empty for', cityRaw, '— trying AI fallback');
+        const queryContext = searchQuery ? ` matching "${searchQuery}"` : '';
+        console.log('[Rescue food-options] library empty for', cityRaw, queryContext, '— trying AI fallback');
         try {
           const openai = getOpenAI();
           const aiResp = await openai.chat.completions.create({
@@ -10116,7 +10117,9 @@ Return valid JSON only. No markdown.`;
               },
               {
                 role: 'user',
-                content: `List 3–5 real, family-friendly restaurants near ${cityRaw}. Return well-known, operating places only.`,
+                content: searchQuery
+                  ? `List 3–5 real, family-friendly restaurants or cafes near ${cityRaw} that match the search "${searchQuery}". Prioritise places whose name or cuisine type contains "${searchQuery}". Return well-known, operating places only.`
+                  : `List 3–5 real, family-friendly restaurants near ${cityRaw}. Return well-known, operating places only.`,
               },
             ],
             response_format: { type: 'json_object' },

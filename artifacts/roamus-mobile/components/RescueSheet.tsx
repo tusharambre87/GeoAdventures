@@ -962,6 +962,7 @@ export default function RescueSheet({
                     value={foodSearch}
                     onChangeText={setFoodSearch}
                     onSubmitEditing={() => { setFoodOffset(0); void fetchFoodOptions(foodSearch, 0); }}
+                    onBlur={() => { setFoodOffset(0); void fetchFoodOptions(foodSearch, 0); }}
                     returnKeyType="search"
                     clearButtonMode="while-editing"
                   />
