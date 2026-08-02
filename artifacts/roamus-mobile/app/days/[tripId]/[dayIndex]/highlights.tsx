@@ -271,14 +271,19 @@ export default function DayHighlightsScreen() {
                 style={[styles.photoSlot, slot?.isHeroStop && styles.photoSlotHero]}
                 onPress={() => openSwapPicker(i)}
               >
+                {/* Visible background so cell never appears black while loading */}
+                <LinearGradient
+                  colors={['#2a1f1a', '#1c1410']}
+                  style={StyleSheet.absoluteFill}
+                />
                 {slot ? (
                   <>
                     <ExpoImage
                       source={{ uri: slot.photoUrl }}
-                      style={StyleSheet.absoluteFill}
+                      style={{ width: '100%', height: '100%' }}
                       contentFit="cover"
                       cachePolicy="memory-disk"
-                      transition={250}
+                      transition={300}
                     />
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.55)']}
