@@ -80,6 +80,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { token, isLoading, user } = useAuth();
   const { data } = useOnboarding();
   const segments = useSegments();
+  // Tracks whether we've already done the initial "authenticated cold-start → Home" redirect.
+  // Stored in a ref so intentional Trips-tab taps later in the session are unaffected,
+  // but resets to false whenever the root layout re-mounts (i.e. app restart / re-login).
+  const homeRedirectDone = React.useRef(false);
 
   // Drain photo queue when app returns to foreground (paid users only)
   useEffect(() => {
@@ -120,7 +124,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     ) {
       router.replace("/auth/splash");
     } else if (token && !inOnboarding) {
-      if (inLegacyLogin || inAuth) router.replace("/(tabs)/home");
+      if (inLegacyLogin || inAuth) {
+        // Came from a login/auth screen — go to Home
+        homeRedirectDone.current = true;
+        router.replace("/(tabs)/home");
+      } else if (
+        !homeRedirectDone.current &&
+        segments[0] === "(tabs)" &&
+        (segments[1] === "index" || segments[1] === undefined)
+      ) {
+        // Cold-start: Expo Router defaulted to (tabs)/index (Trips).
+        // Redirect authenticated users to Home instead.
+        homeRedirectDone.current = true;
+        router.replace("/(tabs)/home");
+      }
     } else if (token && inOnboarding && !data.onboardingInProgress) {
       router.replace("/(tabs)/home");
     }
