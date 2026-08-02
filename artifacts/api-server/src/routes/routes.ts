@@ -9532,8 +9532,8 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
         const cityFirst = (destination as string).split(',')[0].trim();
         const cityWord  = cityFirst.split(' ')[0];
         const libTypes = isFunContext
-          ? ['playground', 'park', 'zoo', 'aquarium', 'adventure', 'kid_attraction', 'nature', 'anchor', 'support', 'other', 'attraction']
-          : ['landmark', 'museum', 'park', 'zoo', 'aquarium', 'nature', 'anchor', 'historic', 'attraction', 'art', 'support', 'other'];
+          ? ['playground', 'park', 'beach', 'waterfall', 'zoo', 'aquarium', 'adventure', 'kid_attraction', 'nature', 'anchor', 'support', 'other', 'attraction']
+          : ['landmark', 'museum', 'park', 'beach', 'waterfall', 'zoo', 'aquarium', 'nature', 'anchor', 'historic', 'attraction', 'art', 'support', 'other'];
 
         type LibRow = { id: string; name: string; stopType: string | null; address: string | null; description: string | null; city: string | null };
         const libSelect = {
