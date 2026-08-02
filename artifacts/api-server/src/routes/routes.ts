@@ -14615,12 +14615,22 @@ Return ONLY valid JSON in this exact format:
         ...tripLevelMoments.map(m => ({ ...m, stopId: m.stopId ?? firstStop?.id ?? null })),
       ];
 
+      // Parse photoUrls — DB may store as JSONB array or JSON string
+      const parseHlUrls = (raw: any): string[] => {
+        if (Array.isArray(raw)) return (raw as any[]).filter((u: any) => typeof u === 'string' && u);
+        if (typeof raw === 'string' && raw) {
+          try { const p = JSON.parse(raw); return Array.isArray(p) ? p.filter((u: any) => typeof u === 'string' && u) : []; }
+          catch { return []; }
+        }
+        return [];
+      };
+
       // Build per-stop photo arrays
       const photosByStop = new Map<string, string[]>();
       for (const m of allMoments) {
         if (!m.stopId) continue;
         const photos: string[] = [
-          ...((m.photoUrls as string[] | null) ?? []),
+          ...parseHlUrls(m.photoUrls),
           ...(m.photoUrl ? [m.photoUrl] : []),
         ].filter(Boolean);
         if (photos.length === 0) continue;
