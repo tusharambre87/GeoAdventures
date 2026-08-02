@@ -356,23 +356,34 @@ export default function HomeScreen() {
   const [sotwRadius, setSotwRadius] = useState(5000);
   const sotwSlideY = useRef(new Animated.Value(900)).current;
 
+  // Compare dates by local calendar day (YYYY-MM-DD) to avoid UTC/timezone mismatch.
+  // e.g. end_date stored as "2026-08-02T00:00:00Z" parses to Aug 1 local in CDT,
+  // so timestamp comparison breaks — local string comparison is always correct.
+  const toLocalYMD = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
   // Is the active trip live today (date-wise)?
   const isActiveToday = useMemo(() => {
     if (!activeTrip?.startDate || !activeTrip?.endDate) return false;
     if (activeTrip.status === 'completed' || activeTrip.status === 'archived') return false;
-    const ref = devDate ?? new Date();
-    const now = new Date(ref); now.setHours(0, 0, 0, 0);
-    const start = new Date(activeTrip.startDate); start.setHours(0, 0, 0, 0);
-    const end   = new Date(activeTrip.endDate);   end.setHours(23, 59, 59, 999);
-    return now >= start && now <= end;
+    const ref   = devDate ?? new Date();
+    const nowYMD   = toLocalYMD(new Date(ref));
+    const startYMD = toLocalYMD(new Date(activeTrip.startDate));
+    const endYMD   = toLocalYMD(new Date(activeTrip.endDate));
+    return nowYMD >= startYMD && nowYMD <= endYMD;
   }, [activeTrip, devDate]);
 
   const rescueDayIndex = useMemo(() => {
     if (!activeTrip?.startDate) return 0;
-    const ref = devDate ?? new Date();
-    const now = new Date(ref); now.setHours(0, 0, 0, 0);
-    const start = new Date(activeTrip.startDate); start.setHours(0, 0, 0, 0);
-    return Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000));
+    const ref   = devDate ?? new Date();
+    const nowYMD   = toLocalYMD(new Date(ref));
+    const startYMD = toLocalYMD(new Date(activeTrip.startDate));
+    // Count calendar days between start and now
+    const msPerDay = 86_400_000;
+    const startMidnight = new Date(activeTrip.startDate); startMidnight.setHours(0, 0, 0, 0);
+    const nowMidnight   = new Date(ref);                  nowMidnight.setHours(0, 0, 0, 0);
+    void nowYMD; void startYMD; // used above for isActiveToday
+    return Math.max(0, Math.floor((nowMidnight.getTime() - startMidnight.getTime()) / msPerDay));
   }, [activeTrip?.startDate, devDate]);
 
   const rescueCurrentIdx = Math.max(
