@@ -35,6 +35,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/authContext";
 import { API_BASE, apiFetch } from "@/lib/apiClient";
+import { useOnboarding } from "@/lib/onboardingContext";
 import RescueSheet from "@/components/RescueSheet";
 import { F, G } from "@/lib/tokens";
 import { selectActiveTrip, getTripStatusInfo, parseLocalDate } from "@/lib/tripUtils";
@@ -332,7 +333,10 @@ function FullBleedHero({
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
 
-  // Wikipedia city photo fallback
+  // Wikipedia city photo fallback — boost thumbnail from 330px → 1200px for crisper hero
+  const hiRes = (url: string | null) =>
+    url ? url.replace(/\/\d+px-/, '/1200px-') : null;
+
   const [wikiImage, setWikiImage] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (imageUri) return;
@@ -340,11 +344,11 @@ function FullBleedHero({
     if (!city) return;
     let cancelled = false;
     getDestinationImage(city)
-      .then(url => { if (!cancelled && url) setWikiImage(url); })
+      .then(url => { if (!cancelled && url) setWikiImage(hiRes(url)); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [imageUri, trip.city, trip.destination]);
-  const displayImage = imageUri ?? wikiImage;
+  const displayImage = hiRes(imageUri) ?? wikiImage;
 
   // Eyebrow
   const isCompleted = variant === "completed";
@@ -399,7 +403,7 @@ function FullBleedHero({
       <View
         style={[
           fbh.content,
-          { paddingTop: insetTop + 8, paddingBottom: insetBottom + 28 },
+          { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 20 },
         ]}
       >
         {/* Header row: greeting + Plan FAB */}
@@ -509,6 +513,15 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const firstName = user?.firstName || user?.username || null;
+  const { set: setOnboarding } = useOnboarding();
+
+  // Navigate to the trip-planning wizard.
+  // Must set onboardingInProgress=true first or AuthGate bounces authenticated
+  // users back out of /onboarding/* routes.
+  function handlePlanTrip() {
+    setOnboarding({ onboardingInProgress: true });
+    router.push("/onboarding/where" as any);
+  }
 
   // ── Trips (for active-trip detection) ─────────────────────────────────────
   const [trips, setTrips] = useState<HomeTripData[]>([]);
@@ -916,7 +929,7 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={s.planBtn}
           activeOpacity={0.85}
-          onPress={() => router.push("/onboarding/where" as any)}
+          onPress={handlePlanTrip}
         >
           <Text style={s.planBtnTxt}>Plan a trip →</Text>
         </TouchableOpacity>
@@ -1002,7 +1015,7 @@ export default function HomeScreen() {
           insetTop={insets.top}
           insetBottom={insets.bottom}
           onPress={() => router.push(`/memories/${trip.id}/recap` as any)}
-          onPlanTrip={() => router.push('/onboarding/where' as any)}
+          onPlanTrip={handlePlanTrip}
         />
       </View>
     );
@@ -1021,7 +1034,7 @@ export default function HomeScreen() {
           insetTop={insets.top}
           insetBottom={insets.bottom}
           onPress={() => router.push(`/trip/${trip.id}` as any)}
-          onPlanTrip={() => router.push('/onboarding/where' as any)}
+          onPlanTrip={handlePlanTrip}
         />
       </View>
     );
@@ -1040,7 +1053,7 @@ export default function HomeScreen() {
           insetTop={insets.top}
           insetBottom={insets.bottom}
           onPress={() => router.push(`/trip/${trip.id}` as any)}
-          onPlanTrip={() => router.push('/onboarding/where' as any)}
+          onPlanTrip={handlePlanTrip}
         />
       </View>
     );
