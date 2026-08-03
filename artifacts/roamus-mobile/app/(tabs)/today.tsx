@@ -800,7 +800,12 @@ export default function TodayScreen() {
   }, [trip?.id, resolvedDayIndex]);
   const [feedbackStop, setFeedbackStop]          = useState<Stop | null>(null);
   const [userDistMi, setUserDistMi]             = useState<number | null>(null);
-  const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ quote: string; name: string }[]>([]);
+  const [tcMomentQuotes, setTcMomentQuotes]     = useState<{ id: string; quote: string; name: string }[]>([]);
+  const [editingQuoteId, setEditingQuoteId]     = useState<string | null>(null);
+  const [editingQuoteText, setEditingQuoteText] = useState('');
+  const [addingQuote, setAddingQuote]           = useState(false);
+  const [newQuoteText, setNewQuoteText]         = useState('');
+  const [savingQuote, setSavingQuote]           = useState(false);
 
   // Track visited stop name for stop_complete display
   const visitedStopNameRef = useRef<string>('');
@@ -873,22 +878,70 @@ export default function TodayScreen() {
   // ── Fetch real kid quotes when trip is complete ──
   useEffect(() => {
     if (todayState !== 'trip_complete' || !resolvedTripId) return;
-    apiFetch<{ moments: Array<{ kidPromptResponse?: string | null; explorerName?: string | null }> }>(`/api/travel/trips/${resolvedTripId}/moments`)
+    apiFetch<{ moments: Array<{ id: string; kidPromptResponse?: string | null; explorerName?: string | null }> }>(`/api/travel/trips/${resolvedTripId}/moments`)
       .then((data) => {
+        // Deduplicate by normalised quote body so duplicate entries from back-to-back
+        // moment writes don't show the same text twice.
+        const seen = new Set<string>();
         const quotes = (data.moments ?? [])
           .filter((m) => m.kidPromptResponse?.trim())
-          .slice(0, 3)
-          .map((m) => {
+          .reduce<{ id: string; quote: string; name: string }[]>((acc, m) => {
             const raw = m.kidPromptResponse!;
             const hasPipe = raw.includes('|');
             const name = hasPipe ? raw.split('|')[0].trim() : (m.explorerName ?? 'Explorer');
             const quote = hasPipe ? raw.split('|').slice(1).join('|').trim() : raw;
-            return { quote, name };
-          });
+            const key = quote.toLowerCase().replace(/\s+/g, ' ');
+            if (!seen.has(key)) { seen.add(key); acc.push({ id: m.id, quote, name }); }
+            return acc;
+          }, []);
         setTcMomentQuotes(quotes);
       })
       .catch(() => {});
   }, [todayState, resolvedTripId]);
+
+  // ── Edit / add kid quotes on the trip_complete screen ──
+  async function handleSaveEditedQuote() {
+    if (!editingQuoteId || !editingQuoteText.trim()) return;
+    setSavingQuote(true);
+    const q = tcMomentQuotes.find(m => m.id === editingQuoteId);
+    const newRaw = (q?.name && q.name !== 'Explorer')
+      ? `${q.name}|${editingQuoteText.trim()}`
+      : editingQuoteText.trim();
+    try {
+      await apiFetch(`/api/travel/moments/${editingQuoteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ kidPromptResponse: newRaw }),
+      });
+      setTcMomentQuotes(prev =>
+        prev.map(m => m.id === editingQuoteId ? { ...m, quote: editingQuoteText.trim() } : m)
+      );
+      setEditingQuoteId(null);
+      setEditingQuoteText('');
+    } catch {
+      Alert.alert('Error', 'Could not save quote. Please try again.');
+    }
+    setSavingQuote(false);
+  }
+
+  async function handleAddQuote() {
+    if (!newQuoteText.trim() || !resolvedTripId) return;
+    setSavingQuote(true);
+    try {
+      const resp = await apiFetch<{ id: string }>('/api/travel/moments', {
+        method: 'POST',
+        body: JSON.stringify({ tripId: resolvedTripId, kidPromptResponse: newQuoteText.trim() }),
+      });
+      setTcMomentQuotes(prev => [
+        ...prev,
+        { id: resp.id, quote: newQuoteText.trim(), name: 'Explorer' },
+      ]);
+      setNewQuoteText('');
+      setAddingQuote(false);
+    } catch {
+      Alert.alert('Error', 'Could not add quote. Please try again.');
+    }
+    setSavingQuote(false);
+  }
 
   // ── Open-Meteo weather fetch for EN_ROUTE rain alert ──
   useEffect(() => {
@@ -4812,18 +4865,91 @@ export default function TodayScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* WHAT THE KIDS SAID — real quotes from moments, hidden if none */}
-          {tcMomentQuotes.length > 0 && (
-            <View style={tc.kidSection}>
-              <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
-              {tcMomentQuotes.map((q, i) => (
-                <View key={i} style={tc.kidCard}>
-                  <Text style={tc.kidQuote}>"{q.quote}"</Text>
-                  <Text style={tc.kidName}>{q.name}</Text>
+          {/* WHAT THE KIDS SAID — always shown on trip_complete so family can add quotes */}
+          <View style={tc.kidSection}>
+            <Text style={tc.kidSectionLabel}>WHAT THE KIDS SAID</Text>
+            {tcMomentQuotes.map((q) => (
+              <View key={q.id} style={tc.kidCard}>
+                {editingQuoteId === q.id ? (
+                  /* ── inline edit mode ── */
+                  <>
+                    <TextInput
+                      style={tc.kidEditInput}
+                      value={editingQuoteText}
+                      onChangeText={setEditingQuoteText}
+                      multiline
+                      autoFocus
+                      placeholder="What did they say?"
+                      placeholderTextColor="rgba(90,60,130,0.4)"
+                    />
+                    <View style={tc.kidEditRow}>
+                      <TouchableOpacity
+                        style={tc.kidEditCancel}
+                        onPress={() => { setEditingQuoteId(null); setEditingQuoteText(''); }}
+                      >
+                        <Text style={tc.kidEditCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[tc.kidEditSave, (!editingQuoteText.trim() || savingQuote) && { opacity: 0.5 }]}
+                        onPress={handleSaveEditedQuote}
+                        disabled={!editingQuoteText.trim() || savingQuote}
+                      >
+                        <Text style={tc.kidEditSaveText}>{savingQuote ? 'Saving…' : 'Save'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  /* ── display mode ── */
+                  <>
+                    <Text style={tc.kidQuote}>"{q.quote}"</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                      <Text style={tc.kidName}>{q.name}</Text>
+                      <TouchableOpacity
+                        hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+                        onPress={() => { setEditingQuoteId(q.id); setEditingQuoteText(q.quote); }}
+                      >
+                        <Text style={tc.kidEditBtn}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
+            ))}
+
+            {/* ── add-quote row ── */}
+            {addingQuote ? (
+              <View style={tc.kidCard}>
+                <TextInput
+                  style={tc.kidEditInput}
+                  value={newQuoteText}
+                  onChangeText={setNewQuoteText}
+                  multiline
+                  autoFocus
+                  placeholder="What did they say?"
+                  placeholderTextColor="rgba(90,60,130,0.4)"
+                />
+                <View style={tc.kidEditRow}>
+                  <TouchableOpacity
+                    style={tc.kidEditCancel}
+                    onPress={() => { setAddingQuote(false); setNewQuoteText(''); }}
+                  >
+                    <Text style={tc.kidEditCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[tc.kidEditSave, (!newQuoteText.trim() || savingQuote) && { opacity: 0.5 }]}
+                    onPress={handleAddQuote}
+                    disabled={!newQuoteText.trim() || savingQuote}
+                  >
+                    <Text style={tc.kidEditSaveText}>{savingQuote ? 'Saving…' : 'Add'}</Text>
+                  </TouchableOpacity>
                 </View>
-              ))}
-            </View>
-          )}
+              </View>
+            ) : (
+              <TouchableOpacity style={tc.addQuoteBtn} onPress={() => setAddingQuote(true)} activeOpacity={0.7}>
+                <Text style={tc.addQuoteBtnText}>+ Add what they said</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={tc.bottomBtnRow}>
             <TouchableOpacity
@@ -5521,7 +5647,25 @@ const tc = StyleSheet.create({
   },
   kidQuote: { fontFamily: F.medium, fontSize: 14, color: C.purplePrimary, fontStyle: 'italic', marginBottom: 4 },
   kidName:  { fontFamily: F.medium, fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2, textAlign: 'right' },
-  kidAttrib: { fontFamily: F.bold, fontSize: 12, color: C.muted },
+  kidAttrib:    { fontFamily: F.bold, fontSize: 12, color: C.muted },
+  kidEditBtn:   { fontFamily: F.semibold, fontSize: 12, color: C.purplePrimary },
+  kidEditInput: {
+    fontFamily: F.medium, fontSize: 14, color: C.purplePrimary, fontStyle: 'italic',
+    backgroundColor: 'rgba(255,255,255,0.35)', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8, marginBottom: 4,
+    minHeight: 48,
+  },
+  kidEditRow:       { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
+  kidEditCancel:    { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(90,60,130,0.3)' },
+  kidEditCancelText:{ fontFamily: F.semibold, fontSize: 13, color: C.muted },
+  kidEditSave:      { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8,
+    backgroundColor: C.purplePrimary },
+  kidEditSaveText:  { fontFamily: F.semibold, fontSize: 13, color: '#fff' },
+  addQuoteBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
+    borderColor: C.purplePrimary, borderStyle: 'dashed', marginTop: 2 },
+  addQuoteBtnText:  { fontFamily: F.semibold, fontSize: 14, color: C.purplePrimary },
   gamesBtn: {
     marginHorizontal: 0, marginBottom: 0, borderRadius: 12, paddingVertical: 14,
     backgroundColor: C.purplePrimaryLt, alignItems: 'center',

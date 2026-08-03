@@ -618,10 +618,18 @@ export default function StoryScreen() {
     const stopPhotos = (trip?.stops ?? [] as any[])
       .map((s: any) => s.id ? `${API_BASE}/api/travel/stops/${s.id}/hero-img` : null)
       .filter(Boolean) as string[];
-    // Kid quotes from in-app entries; fall back to AI highlights
+    // Kid quotes from in-app entries; fall back to AI highlights.
+    // Deduplicate by normalised quote body so duplicate moment writes don't repeat the same text.
+    const _seenQuotes = new Set<string>();
     const kidQuotes = (moments as Moment[])
       .filter(m => m.kidPromptResponse?.trim())
-      .map(m => m.kidPromptResponse!.trim());
+      .reduce<string[]>((acc, m) => {
+        const raw = m.kidPromptResponse!.trim();
+        const body = raw.includes('|') ? raw.split('|').slice(1).join('|').trim() : raw;
+        const key = body.toLowerCase().replace(/\s+/g, ' ');
+        if (!_seenQuotes.has(key)) { _seenQuotes.add(key); acc.push(raw); }
+        return acc;
+      }, []);
     return {
       heroPhoto: photos[0] ?? stopPhotos[0] ?? null,
       collagePhotos: ([0, 1, 2, 3].map(i => photos[i] ?? stopPhotos[i] ?? null)) as (string | null)[],
