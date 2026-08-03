@@ -673,6 +673,7 @@ export default function TodayScreen() {
   // currentStopIndex to (breakStopPosition + 1), making stop_complete show the
   // break stop as visitedStop with the correct next planned stop as NEXT UP.
   const breakCompletedIdRef = useRef<string | null>(null);
+  const tcScrollRef = useRef<ScrollView>(null);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
 
   // ── Persist break photos to AsyncStorage so they survive backgrounding ────────
@@ -883,6 +884,11 @@ export default function TodayScreen() {
         // Deduplicate by normalised quote body so duplicate entries from back-to-back
         // moment writes don't show the same text twice.
         const seen = new Set<string>();
+        const parentNames = new Set(
+          (trip?.travelers ?? [])
+            .filter((t: any) => t.isParent)
+            .map((t: any) => (t.name ?? '').trim().toLowerCase())
+        );
         const quotes = (data.moments ?? [])
           .filter((m) => m.kidPromptResponse?.trim())
           .reduce<{ id: string; quote: string; name: string }[]>((acc, m) => {
@@ -890,6 +896,8 @@ export default function TodayScreen() {
             const hasPipe = raw.includes('|');
             const name = hasPipe ? raw.split('|')[0].trim() : (m.explorerName ?? 'Explorer');
             const quote = hasPipe ? raw.split('|').slice(1).join('|').trim() : raw;
+            // skip quotes from parents or unnamed explorers
+            if (name === 'Explorer' || parentNames.has(name.toLowerCase())) return acc;
             const key = quote.toLowerCase().replace(/\s+/g, ' ');
             if (!seen.has(key)) { seen.add(key); acc.push({ id: m.id, quote, name }); }
             return acc;
@@ -4826,7 +4834,7 @@ export default function TodayScreen() {
     const tripDays = totalDays;
     return (
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
+        <ScrollView ref={tcScrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
           <LinearGradient
             colors={['#2D1B69', '#1E1145', '#150D33']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -4906,7 +4914,7 @@ export default function TodayScreen() {
                       <Text style={tc.kidName}>{q.name}</Text>
                       <TouchableOpacity
                         hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
-                        onPress={() => { setEditingQuoteId(q.id); setEditingQuoteText(q.quote); }}
+                        onPress={() => { setEditingQuoteId(q.id); setEditingQuoteText(q.quote); setTimeout(() => tcScrollRef.current?.scrollToEnd({ animated: true }), 200); }}
                       >
                         <Text style={tc.kidEditBtn}>Edit</Text>
                       </TouchableOpacity>
@@ -4945,7 +4953,7 @@ export default function TodayScreen() {
                 </View>
               </View>
             ) : (
-              <TouchableOpacity style={tc.addQuoteBtn} onPress={() => setAddingQuote(true)} activeOpacity={0.7}>
+              <TouchableOpacity style={tc.addQuoteBtn} onPress={() => { setAddingQuote(true); setTimeout(() => tcScrollRef.current?.scrollToEnd({ animated: true }), 200); }} activeOpacity={0.7}>
                 <Text style={tc.addQuoteBtnText}>+ Add what they said</Text>
               </TouchableOpacity>
             )}
@@ -5646,7 +5654,7 @@ const tc = StyleSheet.create({
     padding: 14, marginBottom: 8,
   },
   kidQuote: { fontFamily: F.medium, fontSize: 14, color: C.purplePrimary, fontStyle: 'italic', marginBottom: 4 },
-  kidName:  { fontFamily: F.medium, fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2, textAlign: 'right' },
+  kidName:  { fontFamily: F.medium, fontSize: 11, color: '#333', marginTop: 2, textAlign: 'right' },
   kidAttrib:    { fontFamily: F.bold, fontSize: 12, color: C.muted },
   kidEditBtn:   { fontFamily: F.semibold, fontSize: 12, color: C.purplePrimary },
   kidEditInput: {
