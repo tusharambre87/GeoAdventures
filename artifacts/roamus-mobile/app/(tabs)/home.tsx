@@ -460,7 +460,7 @@ function FullBleedHero({
   // Plan FAB: shown on all non-active variants, OR on the last day of an active trip
   const isLastDay = variant === 'active' && dayNum != null && totalDays != null && dayNum >= totalDays;
   const showPlanFab    = variant !== 'active' || isLastDay;
-  const showRescueFab  = !!onRescue;
+  const showRescueFab  = variant === 'active'; // always show shield on active trips
   const bothFabs       = showPlanFab && showRescueFab;
   // Right-edge offsets: Plan always rightmost at 20; Rescue to its left when both present
   const rescueFabRight = bothFabs ? 20 + FAB_SIZE + 8 : 20;
