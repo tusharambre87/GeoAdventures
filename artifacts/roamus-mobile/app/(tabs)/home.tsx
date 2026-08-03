@@ -691,11 +691,11 @@ const fbh = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  // Plan FAB — dark navy pill
+  // Plan FAB — brand orange pill
   planFabInner: {
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: "#2B3250",
+    backgroundColor: G.orange,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
