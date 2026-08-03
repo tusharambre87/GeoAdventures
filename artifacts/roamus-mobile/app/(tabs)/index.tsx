@@ -410,11 +410,32 @@ export default function TripsScreen() {
 
             {/* ── 2-column grid ── */}
             {rows.length === 0 ? (
-              <View style={s.noResults}>
-                <Text style={s.noResultsText}>
-                  {query ? `No trips matching "${query}"` : 'No trips in this category'}
-                </Text>
-              </View>
+              // Upcoming + no results → show Discover card instead of dead empty state
+              filter === 'upcoming' && !query ? (
+                <View style={s.discoverWrap}>
+                  <Text style={s.discoverHint}>{"No upcoming trips yet"}</Text>
+                  <TouchableOpacity
+                    style={s.discoverCard}
+                    activeOpacity={0.82}
+                    onPress={() => router.push("/discover" as any)}
+                  >
+                    <View style={s.discoverIconWrap}>
+                      <Text style={s.discoverIcon}>{"\uD83C\uDF0D"}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.discoverTitle}>Discover trips</Text>
+                      <Text style={s.discoverSub}>{"Community picks + AI ideas for your family"}</Text>
+                    </View>
+                    <Text style={s.discoverChevron}>{"›"}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={s.noResults}>
+                  <Text style={s.noResultsText}>
+                    {query ? `No trips matching "${query}"` : 'No trips in this category'}
+                  </Text>
+                </View>
+              )
             ) : (
               <View style={s.grid}>
                 {rows.map((row, ri) => (
@@ -545,6 +566,27 @@ const s = StyleSheet.create({
   // No results
   noResults:     { paddingTop: 60, alignItems: 'center' },
   noResultsText: { fontSize: 14, fontFamily: F.regular, color: C.muted },
+
+  // Discover card (shown when Upcoming filter is empty)
+  discoverWrap: { paddingTop: 32, paddingHorizontal: 16, gap: 12 },
+  discoverHint: { fontSize: 13, fontFamily: F.regular, color: C.muted, textAlign: 'center', marginBottom: 4 },
+  discoverCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: '#fff', borderRadius: 16,
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderWidth: 1, borderColor: 'rgba(26,31,46,0.08)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
+  },
+  discoverIconWrap: {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  discoverIcon:    { fontSize: 22 },
+  discoverTitle:   { fontSize: 15, fontFamily: F.bold, color: C.dark, marginBottom: 2 },
+  discoverSub:     { fontSize: 13, fontFamily: F.regular, color: C.muted, lineHeight: 18 },
+  discoverChevron: { fontSize: 22, color: C.muted },
 
   // Empty
   emptyWrap:     { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 60, gap: 12 },
