@@ -333,40 +333,91 @@ function FullBleedHero({
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
 
-  // Expandable Plan FAB: first tap expands to show label; second tap navigates.
+  // ── FAB: spring-animated expand (same pattern as Trips page) ──────────────
+  const fabAnim = React.useRef(new Animated.Value(0)).current;
   const [fabExpanded, setFabExpanded] = React.useState(false);
+  const fabCollapseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Wikipedia city photo fallback.
-  // Strategy: try 800px thumb (reliable size on Wikipedia CDN), fall back to
-  // whatever getDestinationImage returns if 800px errors.
+  function handleFabPress() {
+    if (fabExpanded) {
+      if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
+      setFabExpanded(false);
+      Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      onPlanTrip();
+    } else {
+      if (fabCollapseTimer.current) clearTimeout(fabCollapseTimer.current);
+      setFabExpanded(true);
+      Animated.spring(fabAnim, { toValue: 1, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      fabCollapseTimer.current = setTimeout(() => {
+        setFabExpanded(false);
+        Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+        fabCollapseTimer.current = null;
+      }, 3000);
+    }
+  }
+
+  function collapseFab() {
+    if (!fabExpanded) return;
+    if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
+    setFabExpanded(false);
+    Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+  }
+
+  // ── Photos ─────────────────────────────────────────────────────────────────
+  // Priority 1: trip.firstPhotoUrl (set by API photoMap — user's actual photo)
+  // Priority 2: fetch trip moments and grab first photo (catches cases where
+  //             photoMap didn't populate firstPhotoUrl)
+  // Priority 3: Wikipedia city photo (always a fallback, never shown if user
+  //             has any trip photos)
   const hiRes = (url: string | null) =>
     url ? url.replace(/\/\d+px-/, '/800px-') : null;
 
+  const [momentPhoto, setMomentPhoto] = React.useState<string | null>(null);
   const [wikiImage, setWikiImage] = React.useState<string | null>(null);
   const [wikiFallback, setWikiFallback] = React.useState<string | null>(null);
   const [imgError, setImgError] = React.useState(false);
 
+  // Try to load a real trip photo from moments when firstPhotoUrl is absent
   React.useEffect(() => {
     if (imageUri) return;
+    let cancelled = false;
+    apiFetch<any>(`/api/travel/trips/${trip.id}`)
+      .then(data => {
+        if (cancelled) return;
+        const moments: any[] = data?.moments ?? [];
+        for (const m of moments) {
+          const urls: string[] = Array.isArray(m.photoUrls)
+            ? m.photoUrls.filter(Boolean)
+            : (m.photoUrl ? [m.photoUrl] : []);
+          if (urls.length) { setMomentPhoto(urls[0]); return; }
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [trip.id, imageUri]);
+
+  // Wikipedia fallback only when no user photos found at all
+  React.useEffect(() => {
+    if (imageUri || momentPhoto) return;
     const city = trip.city ?? trip.destination ?? "";
     if (!city) return;
     let cancelled = false;
     getDestinationImage(city)
       .then(url => {
         if (!cancelled && url) {
-          setWikiFallback(url);       // original 330px as fallback
-          setWikiImage(hiRes(url));   // 800px as primary
+          setWikiFallback(url);
+          setWikiImage(hiRes(url));
           setImgError(false);
         }
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [imageUri, trip.city, trip.destination]);
+  }, [imageUri, momentPhoto, trip.city, trip.destination]);
 
-  // Pick the best available image; on error fall back down the chain
-  const displayImage = imageUri ?? (imgError ? wikiFallback : wikiImage);
+  // Best available image with fallback chain on error
+  const displayImage = imageUri ?? momentPhoto ?? (imgError ? wikiFallback : wikiImage);
 
-  // Eyebrow
+  // ── Eyebrow ────────────────────────────────────────────────────────────────
   const isCompleted = variant === "completed";
   const dotColor = isCompleted ? "#E8B84A" : "#6BB4D9";
   const eyebrowTextColor = isCompleted ? "#F0CC7A" : "#9DD3EC";
@@ -380,24 +431,18 @@ function FullBleedHero({
     eyebrowText = "UPCOMING TRIP";
   }
 
-  // Second line — orange for "Relive" CTA, muted white for countdown text
   const secondLineIsOrange = variant === "completed";
   let secondLine = "";
   if (variant === "completed") {
-    secondLine = `Relive ${tripName} \u2192`;
+    secondLine = "Relive " + tripName + " \u2192";
   } else if (variant === "countdown") {
     secondLine = `${daysUntil} ${daysUntil === 1 ? "day" : "days"} until departure`;
   } else {
     secondLine = "is coming up";
   }
 
-  function handleRootPress() {
-    if (fabExpanded) { setFabExpanded(false); return; }
-    onPress();
-  }
-
   return (
-    <Pressable style={fbh.root} onPress={handleRootPress}>
+    <Pressable style={fbh.root} onPress={() => { collapseFab(); onPress(); }}>
       {/* Background photo or gradient fallback */}
       {displayImage ? (
         <Image
@@ -406,82 +451,54 @@ function FullBleedHero({
           contentFit="cover"
           onError={() => setImgError(true)}
         />
-      ) : null}
-      {/* Always render a colour beneath in case image is still loading */}
-      {!displayImage && (
-        <LinearGradient
-          colors={["#1A3050", "#0D1A2E", "#0A0E14"]}
-          style={StyleSheet.absoluteFill}
-        />
+      ) : (
+        <LinearGradient colors={["#1A3050", "#0D1A2E", "#0A0E14"]} style={StyleSheet.absoluteFill} />
       )}
 
       {/* Dark gradient overlay */}
       <LinearGradient
-        colors={[
-          "rgba(10,14,25,0.45)",
-          "rgba(10,14,25,0.05)",
-          "rgba(10,14,25,0.50)",
-          "rgba(10,14,25,0.97)",
-        ]}
+        colors={["rgba(10,14,25,0.45)", "rgba(10,14,25,0.05)", "rgba(10,14,25,0.50)", "rgba(10,14,25,0.97)"]}
         locations={[0, 0.28, 0.60, 1.0]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Content */}
-      <View
-        style={[
-          fbh.content,
-          { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 20 },
-        ]}
-      >
-        {/* Header row: greeting + expandable Plan FAB */}
+      {/* Content — greeting at top, status block pinned to bottom */}
+      <View style={[fbh.content, { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 20 }]}>
         <View style={fbh.headerRow}>
           <Text style={fbh.greetTxt}>
             {greeting()}{firstName ? `,\n${firstName}` : ""}
           </Text>
-
-          {fabExpanded ? (
-            /* Expanded: full "Plan a trip →" pill */
-            <TouchableOpacity
-              style={fbh.planPill}
-              onPress={(e) => { e.stopPropagation?.(); onPlanTrip(); }}
-              activeOpacity={0.85}
-            >
-              <Text style={fbh.planPillTxt}>Plan a trip \u2192</Text>
-            </TouchableOpacity>
-          ) : (
-            /* Collapsed: orange + circle */
-            <TouchableOpacity
-              style={fbh.planFab}
-              onPress={(e) => { e.stopPropagation?.(); setFabExpanded(true); }}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="add" size={22} color="#fff" />
-            </TouchableOpacity>
-          )}
         </View>
-
-        {/* Spacer */}
         <View style={{ flex: 1 }} />
-
-        {/* Status block */}
         <View style={fbh.statusBlock}>
           <View style={fbh.eyebrowRow}>
             <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
-            <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>
-              {eyebrowText}
-            </Text>
+            <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>{eyebrowText}</Text>
           </View>
-
-          <Text style={fbh.tripName} numberOfLines={3}>
-            {tripName}
-          </Text>
-
-          <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>
-            {secondLine}
-          </Text>
+          <Text style={fbh.tripName} numberOfLines={3}>{tripName}</Text>
+          <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>{secondLine}</Text>
         </View>
       </View>
+
+      {/* Absolutely-positioned spring FAB — same pattern as Trips page */}
+      <TouchableOpacity
+        style={[fbh.fabWrap, { top: insetTop + 14 }]}
+        onPress={handleFabPress}
+        activeOpacity={0.85}
+      >
+        <Animated.View style={[fbh.fabInner, {
+          width: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [52, 168] }),
+        }]}>
+          <Ionicons name="add" size={24} color="#fff" />
+          <Animated.View style={{
+            overflow: 'hidden',
+            width: fabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 108] }),
+            opacity: fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+          }}>
+            <Text style={fbh.fabLabelTxt} numberOfLines={1}>Plan a trip</Text>
+          </Animated.View>
+        </Animated.View>
+      </TouchableOpacity>
     </Pressable>
   );
 }
@@ -507,38 +524,30 @@ const fbh = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
-  // Collapsed: orange circle
-  planFab: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  // Spring-animated FAB (same style as Trips page) — absolute top-right
+  fabWrap: {
+    position: "absolute",
+    right: 20,
+    shadowColor: G.orange,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabInner: {
+    height: 52,
+    borderRadius: 26,
     backgroundColor: G.orange,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: G.orange,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 6,
+    overflow: "hidden",
   },
-  // Expanded: orange pill with text
-  planPill: {
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: G.orange,
-    paddingHorizontal: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: G.orange,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  planPillTxt: {
-    fontFamily: F.bold,
-    fontSize: 14,
+  fabLabelTxt: {
     color: "#fff",
+    fontSize: 14,
+    fontFamily: F.bold,
+    marginLeft: 4,
   },
   statusBlock: { marginBottom: 6 },
   eyebrowRow: {
