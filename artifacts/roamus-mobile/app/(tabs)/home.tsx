@@ -37,7 +37,7 @@ import { useAuth } from "@/lib/authContext";
 import { API_BASE, apiFetch } from "@/lib/apiClient";
 import RescueSheet from "@/components/RescueSheet";
 import { F, G } from "@/lib/tokens";
-import { selectActiveTrip, getTripStatusInfo } from "@/lib/tripUtils";
+import { selectActiveTrip, getTripStatusInfo, parseLocalDate } from "@/lib/tripUtils";
 import {
   AI_PICKS,
   AGE_FILTERS,
@@ -304,6 +304,205 @@ const ts = StyleSheet.create({
   pillTxt: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
 });
 
+// ─── Full-bleed hero (States 2–4) ─────────────────────────────────────────────
+
+type FullBleedVariant = 'completed' | 'countdown' | 'anticipation';
+
+function FullBleedHero({
+  trip,
+  variant,
+  daysAgo,
+  daysUntil,
+  firstName,
+  insetTop,
+  insetBottom,
+  onPress,
+  onPlanTrip,
+}: {
+  trip: HomeTripData;
+  variant: FullBleedVariant;
+  daysAgo?: number;
+  daysUntil?: number;
+  firstName: string | null;
+  insetTop: number;
+  insetBottom: number;
+  onPress: () => void;
+  onPlanTrip: () => void;
+}) {
+  const tripName = trip.name || trip.destination || trip.city || "Your Trip";
+  const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
+
+  // Wikipedia city photo fallback
+  const [wikiImage, setWikiImage] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (imageUri) return;
+    const city = trip.city ?? trip.destination ?? "";
+    if (!city) return;
+    let cancelled = false;
+    getDestinationImage(city)
+      .then(url => { if (!cancelled && url) setWikiImage(url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [imageUri, trip.city, trip.destination]);
+  const displayImage = imageUri ?? wikiImage;
+
+  // Eyebrow
+  const isCompleted = variant === "completed";
+  const dotColor = isCompleted ? "#E8B84A" : "#6BB4D9";
+  const eyebrowTextColor = isCompleted ? "#F0CC7A" : "#9DD3EC";
+  let eyebrowText = "";
+  if (isCompleted) {
+    eyebrowText =
+      daysAgo === 0 ? "TRIP COMPLETE \u00B7 TODAY"
+      : daysAgo === 1 ? "TRIP COMPLETE \u00B7 YESTERDAY"
+      : `TRIP COMPLETE \u00B7 ${daysAgo} DAYS AGO`;
+  } else {
+    eyebrowText = "UPCOMING TRIP";
+  }
+
+  // Second line
+  let secondLine = "";
+  if (variant === "completed") {
+    secondLine = `Relive ${tripName} \u2192`;
+  } else if (variant === "countdown") {
+    secondLine = `${daysUntil} ${daysUntil === 1 ? "day" : "days"} until departure`;
+  } else {
+    secondLine = "is coming up";
+  }
+
+  return (
+    <Pressable style={fbh.root} onPress={onPress}>
+      {/* Background photo or solid fallback */}
+      {displayImage ? (
+        <Image
+          source={{ uri: displayImage }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1A2540" }]} />
+      )}
+
+      {/* Gradient overlay — matches spec: heavy at top & bottom, light in middle */}
+      <LinearGradient
+        colors={[
+          "rgba(10,14,25,0.55)",
+          "rgba(10,14,25,0.10)",
+          "rgba(10,14,25,0.55)",
+          "rgba(10,14,25,0.97)",
+        ]}
+        locations={[0, 0.30, 0.62, 1.0]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Content */}
+      <View
+        style={[
+          fbh.content,
+          { paddingTop: insetTop + 8, paddingBottom: insetBottom + 28 },
+        ]}
+      >
+        {/* Header row: greeting + Plan FAB */}
+        <View style={fbh.headerRow}>
+          <Text style={fbh.greetTxt}>
+            {greeting()}{firstName ? `,\n${firstName}` : ""}
+          </Text>
+          <TouchableOpacity style={fbh.planFab} onPress={onPlanTrip} activeOpacity={0.85}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Spacer */}
+        <View style={{ flex: 1 }} />
+
+        {/* Status block */}
+        <View style={fbh.statusBlock}>
+          {/* Eyebrow row */}
+          <View style={fbh.eyebrowRow}>
+            <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
+            <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>
+              {eyebrowText}
+            </Text>
+          </View>
+
+          {/* Trip name */}
+          <Text style={fbh.tripName} numberOfLines={3}>
+            {tripName}
+          </Text>
+
+          {/* Second line */}
+          <Text style={fbh.nextLine}>{secondLine}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+const fbh = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0A0E14" },
+  content: {
+    flex: 1,
+    paddingHorizontal: 22,
+    flexDirection: "column",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 6,
+  },
+  greetTxt: {
+    fontFamily: F.bold,
+    fontSize: 21,
+    color: "white",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+  },
+  planFab: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBlock: { marginBottom: 6 },
+  eyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  eyebrowDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  eyebrowTxt: {
+    fontFamily: F.bold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  tripName: {
+    color: "white",
+    fontSize: 32,
+    fontFamily: F.bold,
+    lineHeight: 36,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 20,
+    marginBottom: 6,
+  },
+  nextLine: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 14,
+    fontFamily: F.regular,
+  },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -391,6 +590,82 @@ export default function HomeScreen() {
     0,
     rescueStops.findIndex((s: any) => !s.isVisited && !s.visited && !s.isSkipped),
   );
+
+  // ── Priority-state computation (5 states, evaluated top-to-bottom) ─────────
+  //
+  // Uses parseLocalDate (local-midnight dates) so CDT/UTC offsets don't shift
+  // the comparison across the day boundary the way `new Date(isoString)` would.
+  //
+  // selectActiveTrip() has tier-3/4 fallbacks that return *something* even when
+  // no trip is running — so we cannot rely on `activeTrip` alone for branching.
+  // Instead we compute homeState independently from the raw trips array.
+  type HomeState =
+    | { kind: 'active'; trip: HomeTripData }
+    | { kind: 'completed'; trip: HomeTripData; daysAgo: number }
+    | { kind: 'countdown'; trip: HomeTripData; daysUntil: number }
+    | { kind: 'anticipation'; trip: HomeTripData; daysUntil: number }
+    | { kind: 'discover' };
+
+  const homeState = useMemo((): HomeState => {
+    const ref = devDate ?? new Date();
+    const refMidnight = new Date(ref); refMidnight.setHours(0, 0, 0, 0);
+    const refMs = refMidnight.getTime();
+
+    // P1 — any trip with today inside its [startDate, endDate] window,
+    //        or with an explicit active/in_progress status
+    const activeNow = trips.find(t => {
+      if (t.status === 'active' || t.status === 'in_progress') return true;
+      const s = parseLocalDate(t.startDate);
+      const e = parseLocalDate(t.endDate);
+      if (!s || !e) return false;
+      s.setHours(0, 0, 0, 0);
+      e.setHours(23, 59, 59, 999);
+      return refMs >= s.getTime() && refMs <= e.getTime();
+    });
+    if (activeNow) return { kind: 'active', trip: activeNow as HomeTripData };
+
+    // P2 — most recently completed trip whose endDate is 1–3 calendar days ago.
+    //        Anchored to endDate (NOT the server's completion-marking timestamp).
+    //        Beats P3 even if a future trip is imminent.
+    let bestCompleted: HomeTripData | null = null;
+    let bestCompletedDays = Infinity;
+    for (const t of trips) {
+      const e = parseLocalDate(t.endDate);
+      if (!e) continue;
+      e.setHours(0, 0, 0, 0);
+      if (e.getTime() >= refMs) continue; // ends today or future → still in range
+      const daysAgo = Math.round((refMs - e.getTime()) / 86_400_000);
+      if (daysAgo <= 3 && daysAgo < bestCompletedDays) {
+        bestCompleted = t as HomeTripData;
+        bestCompletedDays = daysAgo;
+      }
+    }
+    if (bestCompleted) return { kind: 'completed', trip: bestCompleted, daysAgo: bestCompletedDays };
+
+    // P3 / P4 — soonest upcoming trip (startDate strictly after today).
+    //            ≤7 days → countdown; 8+ days → anticipation.
+    let bestUpcoming: HomeTripData | null = null;
+    let bestUpcomingDays = Infinity;
+    for (const t of trips) {
+      const s = parseLocalDate(t.startDate);
+      if (!s) continue;
+      s.setHours(0, 0, 0, 0);
+      if (s.getTime() <= refMs) continue; // already started (or today)
+      const daysUntil = Math.round((s.getTime() - refMs) / 86_400_000);
+      if (daysUntil < bestUpcomingDays) {
+        bestUpcoming = t as HomeTripData;
+        bestUpcomingDays = daysUntil;
+      }
+    }
+    if (bestUpcoming) {
+      return bestUpcomingDays <= 7
+        ? { kind: 'countdown',    trip: bestUpcoming, daysUntil: bestUpcomingDays }
+        : { kind: 'anticipation', trip: bestUpcoming, daysUntil: bestUpcomingDays };
+    }
+
+    // P5 — nothing active, nothing recently completed, nothing upcoming
+    return { kind: 'discover' };
+  }, [trips, devDate]);
 
   // Fetch real day stops + location when rescue sheet opens
   useEffect(() => {
@@ -557,9 +832,10 @@ export default function HomeScreen() {
   const [activeDuration, setActiveDuration] = useState<string | null>(null);
   const [activeAge, setActiveAge] = useState<string | null>(null);
 
-  // Only fetch community shares when there's no active trip (saves a request)
+  // Only fetch community shares in State 5 (Discover) — saves a request in all other states.
+  // homeState is recalculated after trips load, so this effect runs at the right time.
   useEffect(() => {
-    if (activeTrip !== undefined) return; // skip if we already know there's a trip
+    if (homeState.kind !== 'discover') return;
     fetch(`${API_BASE}/api/travel/shares?limit=30`)
       .then(r => r.json())
       .then(async (data: CommunityShare[]) => {
@@ -713,8 +989,66 @@ export default function HomeScreen() {
     );
   }
 
-  // ── Active-trip branch ────────────────────────────────────────────────────
-  if (activeTrip) {
+  // ── State 2 — Just completed (endDate 1–3 days ago, beats upcoming) ────────
+  if (homeState.kind === 'completed') {
+    const { trip, daysAgo } = homeState;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
+        <FullBleedHero
+          trip={trip}
+          variant="completed"
+          daysAgo={daysAgo}
+          firstName={firstName}
+          insetTop={insets.top}
+          insetBottom={insets.bottom}
+          onPress={() => router.push(`/memories/${trip.id}/recap` as any)}
+          onPlanTrip={() => router.push('/onboarding/where' as any)}
+        />
+      </View>
+    );
+  }
+
+  // ── State 3 — Upcoming, ≤7 days ────────────────────────────────────────────
+  if (homeState.kind === 'countdown') {
+    const { trip, daysUntil } = homeState;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
+        <FullBleedHero
+          trip={trip}
+          variant="countdown"
+          daysUntil={daysUntil}
+          firstName={firstName}
+          insetTop={insets.top}
+          insetBottom={insets.bottom}
+          onPress={() => router.push(`/trip/${trip.id}` as any)}
+          onPlanTrip={() => router.push('/onboarding/where' as any)}
+        />
+      </View>
+    );
+  }
+
+  // ── State 4 — Upcoming, 8+ days ────────────────────────────────────────────
+  if (homeState.kind === 'anticipation') {
+    const { trip, daysUntil } = homeState;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
+        <FullBleedHero
+          trip={trip}
+          variant="anticipation"
+          daysUntil={daysUntil}
+          firstName={firstName}
+          insetTop={insets.top}
+          insetBottom={insets.bottom}
+          onPress={() => router.push(`/trip/${trip.id}` as any)}
+          onPlanTrip={() => router.push('/onboarding/where' as any)}
+        />
+      </View>
+    );
+  }
+
+  // ── State 1 — Active trip (already shipped, kept as-is) ───────────────────
+  if (homeState.kind === 'active') {
+    const activeTripData = homeState.trip;
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         {header}
@@ -729,12 +1063,12 @@ export default function HomeScreen() {
           scrollEventThrottle={16}
         >
           <ActiveTripCard
-            trip={activeTrip as HomeTripData}
+            trip={activeTripData}
             devDate={devDate}
             onPress={() =>
               router.push({
                 pathname: "/(tabs)/today" as any,
-                params: { tripId: activeTrip.id },
+                params: { tripId: activeTripData.id },
               })
             }
           />
@@ -767,9 +1101,9 @@ export default function HomeScreen() {
             context="morning"
             stops={rescueStops}
             currentStopIndex={rescueCurrentIdx}
-            tripId={activeTrip.id}
+            tripId={activeTripData.id}
             dayIndex={rescueDayIndex}
-            destination={activeTrip.destination ?? activeTrip.city ?? activeTrip.name}
+            destination={activeTripData.destination ?? activeTripData.city ?? activeTripData.name}
             onDropStop={handleRescueDrop}
             onWrapDay={handleRescueWrapDay}
             onStopsChanged={fetchRescueStops}
@@ -940,7 +1274,7 @@ export default function HomeScreen() {
     );
   }
 
-  // ── No-trip discover branch ───────────────────────────────────────────────
+  // ── State 5 — Discover (nothing active, recently completed, or upcoming) ────
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       {header}
