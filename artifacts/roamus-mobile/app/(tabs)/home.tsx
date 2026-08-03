@@ -35,7 +35,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/authContext";
 import { API_BASE, apiFetch } from "@/lib/apiClient";
-import { useOnboarding } from "@/lib/onboardingContext";
+import { useOnboarding, type Traveler } from "@/lib/onboardingContext";
 import RescueSheet from "@/components/RescueSheet";
 import { F, G } from "@/lib/tokens";
 import { selectActiveTrip, getTripStatusInfo, parseLocalDate } from "@/lib/tripUtils";
@@ -586,13 +586,28 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const firstName = user?.firstName || user?.username || null;
-  const { set: setOnboarding } = useOnboarding();
+  const { set: setOnboarding, reset: resetOnboarding } = useOnboarding();
 
-  // Navigate to the trip-planning wizard.
-  // Must set onboardingInProgress=true first or AuthGate bounces authenticated
-  // users back out of /onboarding/* routes.
-  function handlePlanTrip() {
-    setOnboarding({ onboardingInProgress: true });
+  // Navigate to the trip-planning wizard, pre-filling the family from the
+  // user's saved explorers so the traveler step is never blank for returning users.
+  async function handlePlanTrip() {
+    let travelers: Traveler[] = [];
+    try {
+      const data = await apiFetch<{ travelers: Traveler[] }>("/api/users/travelers");
+      if (Array.isArray(data?.travelers) && data.travelers.length) {
+        travelers = data.travelers.map(t => ({
+          ...t,
+          init: t.name?.[0]?.toUpperCase() ?? "?",
+        }));
+      }
+    } catch { /* silently ignore — wizard still works with empty list */ }
+
+    resetOnboarding();
+    setOnboarding({
+      onboardingInProgress: true,
+      returningUser: true,
+      ...(travelers.length ? { travelers } : {}),
+    });
     router.push("/onboarding/where" as any);
   }
 
@@ -1075,12 +1090,11 @@ export default function HomeScreen() {
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (tripsLoading) {
+    // Use a dark full-screen instead of the flat header so there's never
+    // a jarring flash of the old UI, regardless of which hero state follows.
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        {header}
-        <View style={s.center}>
-          <ActivityIndicator color={G.orange} />
-        </View>
+      <View style={{ flex: 1, backgroundColor: '#0A0E14', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={G.orange} size="large" />
       </View>
     );
   }
