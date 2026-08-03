@@ -64,8 +64,12 @@ export function SpeechTextInput({
         {...rest}
         style={style}
         onChangeText={onChangeText}
+        scrollEnabled={false}
       />
+      {/* pointerEvents="none" when not listening so the mic overlay never steals
+          touches from the TextInput (which would cause keyboard dismissal) */}
       <Animated.View
+        pointerEvents={isListening ? 'auto' : 'none'}
         style={[styles.micWrap, { transform: [{ scale: pulseAnim }] }]}
       >
         <TouchableOpacity

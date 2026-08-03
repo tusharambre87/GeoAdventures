@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
-import { memoriesAPI, travelAPI, Moment, API_BASE } from '@/lib/apiClient';
+import { memoriesAPI, travelAPI, Moment, API_BASE, apiFetch } from '@/lib/apiClient';
 import { F } from '@/lib/tokens';
 
 import StopPickerSheet from '@/components/StopPickerSheet';
@@ -71,6 +71,7 @@ export default function TripMemoryIndex() {
   const [showKidsStopPicker, setShowKidsStopPicker] = useState(false);
   const [igDestination, setIgDestination] = useState<'story' | 'post'>('story');
   const [selectedSharePhotos, setSelectedSharePhotos] = useState<Set<string>>(new Set());
+  const [extending, setExtending] = useState(false);
 
   // When opened from "Wrap Day", dayIndex is set — show day-level "Today's Story" view
   const focusDayIndex = dayIndexParam != null && dayIndexParam !== '' ? Number(dayIndexParam) : null;
@@ -153,6 +154,43 @@ export default function TripMemoryIndex() {
 
     return { visitedStops, momentsByStop, allPhotos, dayStops, dayMoments, dayPhotos, kidQuotes };
   }, [trip, moments, isDayView, focusDayIndex]);
+
+  /** Total number of days in this trip (derived from dates, with stops as fallback) */
+  const totalDays = useMemo(() => {
+    if (!trip) return 0;
+    const t = trip as any;
+    if (t.startDate && t.endDate) {
+      const sd = new Date(t.startDate);
+      const ed = new Date(t.endDate);
+      return Math.max(1, Math.round((ed.getTime() - sd.getTime()) / 86400000) + 1);
+    }
+    const stops: any[] = t.stops ?? [];
+    return stops.length > 0 ? Math.max(...stops.map((s: any) => (s.dayIndex ?? 0))) + 1 : 1;
+  }, [trip]);
+
+  const isLastDay = isDayView && focusDayIndex !== null && focusDayIndex + 1 >= totalDays;
+
+  async function handleExtendTrip() {
+    if (!tripId || !trip) return;
+    setExtending(true);
+    try {
+      const t = trip as any;
+      const currentEnd = t.endDate ? new Date(t.endDate) : new Date();
+      const newEnd = new Date(currentEnd.getTime() + 86400000);
+      const newEndStr = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`;
+      await apiFetch(`/api/travel/trips/${tripId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endDate: newEndStr }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
+      router.push({ pathname: '/trip/[tripId]' as never, params: { tripId } } as never);
+    } catch {
+      Alert.alert('Could not extend trip', 'Please check your connection and try again.');
+    } finally {
+      setExtending(false);
+    }
+  }
 
   function openPhotoSheet() { setShowPhotoSheet(true); }
 
@@ -407,7 +445,7 @@ export default function TripMemoryIndex() {
             dayIndex={focusDayIndex !== null ? focusDayIndex : undefined}
           />
 
-          {/* Secondary CTAs: Kids Zone (outline) + See Tomorrow's Plan (light fill) */}
+          {/* Secondary CTAs: Kids Zone + See Tomorrow's Plan (not shown on last day) */}
           <View style={dayStyles.secondaryRow}>
             {dayStops.length > 0 && (
               <TouchableOpacity
@@ -419,7 +457,8 @@ export default function TripMemoryIndex() {
               </TouchableOpacity>
             )}
 
-            {isDayView && focusDayIndex !== null && (
+            {/* Only show "See Tomorrow's Plan" when there IS a tomorrow */}
+            {isDayView && focusDayIndex !== null && !isLastDay && (
               <TouchableOpacity
                 style={dayStyles.doneBtn}
                 activeOpacity={0.85}
@@ -450,6 +489,20 @@ export default function TripMemoryIndex() {
                 <Text style={styles.shareBtnText}>Day {dayNum} Highlights</Text>
               </TouchableOpacity>
             </View>
+          )}
+
+          {/* Extend Your Trip — shown only on the last day's story */}
+          {isLastDay && (
+            <TouchableOpacity
+              style={{ alignItems: 'center', paddingVertical: 14, marginBottom: 8 }}
+              activeOpacity={0.7}
+              disabled={extending}
+              onPress={handleExtendTrip}
+            >
+              <Text style={{ fontSize: 14, fontFamily: F.bold, color: C.orange, opacity: extending ? 0.5 : 1 }}>
+                {extending ? 'Extending\u2026' : '\u271A Extend Your Trip'}
+              </Text>
+            </TouchableOpacity>
           )}
         </ScrollView>
 

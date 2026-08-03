@@ -4186,9 +4186,9 @@ export default function TodayScreen() {
     ];
 
     return (
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
           <LinearGradient
             colors={['#1D4A42', '#163830']}
             start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }}
@@ -4474,6 +4474,34 @@ export default function TodayScreen() {
             >
               <Text style={dc.completeBtnTitle}>{String.fromCodePoint(0x1F3C6)} Your trip is complete!</Text>
               <Text style={dc.completeBtnSub}>Tap to wrap up and view your shareable story</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Extend Your Trip */}
+          {resolvedDayIndex + 1 >= totalDays && (trip as any)?.status !== 'completed' && (
+            <TouchableOpacity
+              style={{ alignItems: 'center', paddingVertical: 12, marginBottom: 6 }}
+              activeOpacity={0.7}
+              onPress={async () => {
+                if (!trip?.id) return;
+                const t = trip as any;
+                const currentEnd = t.endDate ? new Date(t.endDate) : new Date();
+                const newEnd = new Date(currentEnd.getTime() + 86400000);
+                const newEndStr = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`;
+                try {
+                  await apiFetch(`/api/travel/trips/${trip.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endDate: newEndStr }),
+                  });
+                  void loadTrip();
+                  router.push({ pathname: '/trip/[tripId]' as never, params: { tripId: trip.id } } as never);
+                } catch {
+                  Alert.alert('Could not extend trip', 'Please check your connection and try again.');
+                }
+              }}
+            >
+              <Text style={{ fontSize: 14, fontFamily: F.semibold, color: C.orange }}>{'\u271A'} Extend Your Trip</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -5414,7 +5442,7 @@ const dc = StyleSheet.create({
   kidsXpText: { fontFamily: F.medium, fontSize: 14, color: '#3DAA6E' },
   kidsXpNum:  { fontFamily: F.bold, fontSize: 14, color: '#3DAA6E' },
   completeBtn: {
-    marginHorizontal: 16, marginBottom: 12, borderRadius: 16, paddingVertical: 18,
+    marginHorizontal: 16, marginTop: 16, marginBottom: 12, borderRadius: 16, paddingVertical: 18,
     paddingHorizontal: 20, backgroundColor: C.orange, alignItems: 'center', gap: 4,
   },
   completeBtnTitle: { fontFamily: F.bold, fontSize: 17, color: '#fff' },
