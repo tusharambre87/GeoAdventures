@@ -309,6 +309,9 @@ const ts = StyleSheet.create({
 
 type FullBleedVariant = 'active' | 'completed' | 'countdown' | 'anticipation';
 
+// FAB size token — "1 size smaller" than the original 52px
+const FAB_SIZE = 44;
+
 function FullBleedHero({
   trip,
   variant,
@@ -328,35 +331,37 @@ function FullBleedHero({
   variant: FullBleedVariant;
   daysAgo?: number;
   daysUntil?: number;
-  /** Active variant: which calendar day of the trip (1-based) */
   dayNum?: number;
-  /** Active variant: total planned days */
   totalDays?: number | null;
-  /** Active variant: upcoming unvisited stops for the glance strip */
   glanceStops?: { name: string; id: string }[];
   firstName: string | null;
   insetTop: number;
   insetBottom: number;
   onPress: () => void;
   onPlanTrip: () => void;
-  /** If provided, a spring-animated Rescue FAB appears above the glance strip */
   onRescue?: () => void;
 }) {
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
 
-  // ── Plan FAB: spring-animated expand ──────────────────────────────────────
+  // ── Plan FAB ──────────────────────────────────────────────────────────────
   const fabAnim = React.useRef(new Animated.Value(0)).current;
   const [fabExpanded, setFabExpanded] = React.useState(false);
   const fabCollapseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function collapsePlanFab() {
+    if (!fabExpanded) return;
+    if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
+    setFabExpanded(false);
+    Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+  }
+
   function handleFabPress() {
     if (fabExpanded) {
-      if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
-      setFabExpanded(false);
-      Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      collapsePlanFab();
       onPlanTrip();
     } else {
+      collapseRescueFab(); // mutual exclusion
       if (fabCollapseTimer.current) clearTimeout(fabCollapseTimer.current);
       setFabExpanded(true);
       Animated.spring(fabAnim, { toValue: 1, useNativeDriver: false, tension: 80, friction: 10 }).start();
@@ -368,19 +373,24 @@ function FullBleedHero({
     }
   }
 
-  // ── Rescue FAB: same spring pattern, shield → "Rescue" expand ─────────────
+  // ── Rescue FAB ────────────────────────────────────────────────────────────
   const rescueFabAnim = React.useRef(new Animated.Value(0)).current;
   const [rescueFabExpanded, setRescueFabExpanded] = React.useState(false);
   const rescueFabCollapseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function collapseRescueFab() {
+    if (!rescueFabExpanded) return;
+    if (rescueFabCollapseTimer.current) { clearTimeout(rescueFabCollapseTimer.current); rescueFabCollapseTimer.current = null; }
+    setRescueFabExpanded(false);
+    Animated.spring(rescueFabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+  }
+
   function handleRescueFabPress() {
     if (rescueFabExpanded) {
-      // Second tap → fire rescue
-      if (rescueFabCollapseTimer.current) { clearTimeout(rescueFabCollapseTimer.current); rescueFabCollapseTimer.current = null; }
-      setRescueFabExpanded(false);
-      Animated.spring(rescueFabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      collapseRescueFab();
       onRescue?.();
     } else {
+      collapsePlanFab(); // mutual exclusion
       if (rescueFabCollapseTimer.current) clearTimeout(rescueFabCollapseTimer.current);
       setRescueFabExpanded(true);
       Animated.spring(rescueFabAnim, { toValue: 1, useNativeDriver: false, tension: 80, friction: 10 }).start();
@@ -446,6 +456,15 @@ function FullBleedHero({
   // Best available image with fallback chain on error
   const displayImage = imageUri ?? momentPhoto ?? (imgError ? wikiFallback : wikiImage);
 
+  // ── FAB visibility rules ────────────────────────────────────────────────────
+  // Plan FAB: shown on all non-active variants, OR on the last day of an active trip
+  const isLastDay = variant === 'active' && dayNum != null && totalDays != null && dayNum >= totalDays;
+  const showPlanFab    = variant !== 'active' || isLastDay;
+  const showRescueFab  = !!onRescue;
+  const bothFabs       = showPlanFab && showRescueFab;
+  // Right-edge offsets: Plan always rightmost at 20; Rescue to its left when both present
+  const rescueFabRight = bothFabs ? 20 + FAB_SIZE + 8 : 20;
+
   // ── Eyebrow ────────────────────────────────────────────────────────────────
   let dotColor = "#6BB4D9";
   let eyebrowTextColor = "#9DD3EC";
@@ -467,43 +486,154 @@ function FullBleedHero({
     eyebrowText = "UPCOMING TRIP";
   }
 
-  const glanceLabels = ["Next", "Then", "After", "Later"];
-
-  // CTA button label + whether to render as orange pill vs orange text link
+  const glanceLabels = ["Now", "+1", "+2", "+3"];
   const showViewPlan = (variant === "countdown" && (daysUntil ?? 0) > 1) || variant === "anticipation";
   const showRelive   = variant === "completed";
 
+  // ── Shared FAB nodes (used in both render paths) ──────────────────────────
+  const planFabNode = showPlanFab ? (
+    <TouchableOpacity
+      style={[fbh.fabWrap, { top: insetTop + 14, right: 20 }]}
+      onPress={handleFabPress}
+      activeOpacity={0.9}
+    >
+      <Animated.View style={[fbh.planFabInner, {
+        width: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [FAB_SIZE, 152] }),
+      }]}>
+        <Ionicons name="add" size={20} color="#fff" />
+        <Animated.View style={{
+          overflow: 'hidden',
+          width: fabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 96] }),
+          opacity: fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+        }}>
+          <Text style={fbh.fabLabelTxt} numberOfLines={1}>Plan a trip</Text>
+        </Animated.View>
+      </Animated.View>
+    </TouchableOpacity>
+  ) : null;
+
+  const rescueFabNode = showRescueFab ? (
+    <TouchableOpacity
+      style={[fbh.fabWrap, { top: insetTop + 14, right: rescueFabRight }]}
+      onPress={handleRescueFabPress}
+      activeOpacity={0.9}
+    >
+      <Animated.View style={[fbh.rescueFabInner, {
+        width: rescueFabAnim.interpolate({ inputRange: [0, 1], outputRange: [FAB_SIZE, 128] }),
+      }]}>
+        <Ionicons name="shield-checkmark-outline" size={19} color="#fff" />
+        <Animated.View style={{
+          overflow: 'hidden',
+          width: rescueFabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 72] }),
+          opacity: rescueFabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+        }}>
+          <Text style={fbh.fabLabelTxt} numberOfLines={1}>Rescue</Text>
+        </Animated.View>
+      </Animated.View>
+    </TouchableOpacity>
+  ) : null;
+
+  // ── Active variant: card layout with blurred bg ────────────────────────────
+  if (variant === 'active') {
+    // How much padding-right to leave for FABs so greeting text doesn't overlap
+    const greetPadRight = bothFabs ? (FAB_SIZE * 2 + 8 + 20 + 8) : (FAB_SIZE + 20 + 8);
+    return (
+      <View style={fbh.root}>
+        {/* Blurred background — same photo, heavy overlay */}
+        {displayImage ? (
+          <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setImgError(true)} />
+        ) : (
+          <LinearGradient colors={["#0F1828", "#0A0E14"]} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,22,0.80)' }]} />
+
+        {/* Content */}
+        <View style={{ flex: 1, paddingTop: insetTop + 10, paddingHorizontal: 16, paddingBottom: insetBottom + TAB_BAR_H + 16 }}>
+          {/* Greeting */}
+          <Text style={[fbh.greetTxt, { paddingRight: greetPadRight, marginBottom: 14 }]}>
+            {greeting()}{firstName ? `,\n${firstName}` : ""}
+          </Text>
+
+          {/* Floating trip card */}
+          <View style={fbh.activeCard}>
+            {/* Crisp destination image — top portion */}
+            <View style={fbh.cardImgWrap}>
+              {displayImage ? (
+                <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <LinearGradient colors={["#1A2540", "#0D1525"]} style={StyleSheet.absoluteFill} />
+              )}
+              <LinearGradient
+                colors={["transparent", "rgba(12,17,30,0.55)"]}
+                locations={[0.5, 1.0]}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+
+            {/* Details section */}
+            <View style={fbh.cardDetails}>
+              <View style={fbh.eyebrowRow}>
+                <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
+                <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>{eyebrowText}</Text>
+              </View>
+              <Text style={fbh.cardTripName} numberOfLines={2}>{tripName}</Text>
+              {glanceStops && glanceStops.length > 0 && (
+                <Text style={fbh.nextStopLine} numberOfLines={1}>
+                  {"Next: "}
+                  <Text style={fbh.nextStopBold}>{glanceStops[0].name}</Text>
+                </Text>
+              )}
+              <TouchableOpacity style={fbh.ctaPill} onPress={onPress} activeOpacity={0.85}>
+                <Text style={fbh.ctaPillTxt}>{"Continue exploring \u2192"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* TODAY AT A GLANCE — below card */}
+          {glanceStops && glanceStops.length > 0 && (
+            <View style={fbh.glanceWrap}>
+              <Text style={fbh.glanceLabel}>TODAY AT A GLANCE</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+                {glanceStops.slice(0, 4).map((stop, i) => (
+                  <View key={stop.id || i} style={fbh.glanceChip}>
+                    <Text style={fbh.glanceTime}>{glanceLabels[i] ?? `+${i}`}</Text>
+                    <Text style={fbh.glanceName} numberOfLines={2}>{stop.name}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
+        {planFabNode}
+        {rescueFabNode}
+      </View>
+    );
+  }
+
+  // ── States 2-4: full-bleed hero ────────────────────────────────────────────
+  const greetPadRight2 = FAB_SIZE + 20 + 8; // only plan FAB in non-active states
   return (
     <View style={fbh.root}>
-      {/* Background photo or gradient fallback */}
       {displayImage ? (
-        <Image
-          source={{ uri: displayImage }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          onError={() => setImgError(true)}
-        />
+        <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setImgError(true)} />
       ) : (
         <LinearGradient colors={["#1A3050", "#0D1A2E", "#0A0E14"]} style={StyleSheet.absoluteFill} />
       )}
-
-      {/* Dark gradient overlay */}
       <LinearGradient
         colors={["rgba(10,14,25,0.45)", "rgba(10,14,25,0.05)", "rgba(10,14,25,0.50)", "rgba(10,14,25,0.97)"]}
         locations={[0, 0.28, 0.60, 1.0]}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Content — greeting at top, status block pinned to bottom */}
       <View style={[fbh.content, { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 16 }]}>
         <View style={fbh.headerRow}>
-          <Text style={fbh.greetTxt}>
+          <Text style={[fbh.greetTxt, { paddingRight: greetPadRight2 }]}>
             {greeting()}{firstName ? `,\n${firstName}` : ""}
           </Text>
         </View>
         <View style={{ flex: 1 }} />
 
-        {/* Status block */}
         <View style={fbh.statusBlock}>
           <View style={fbh.eyebrowRow}>
             <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
@@ -511,97 +641,24 @@ function FullBleedHero({
           </View>
           <Text style={fbh.tripName} numberOfLines={3}>{tripName}</Text>
 
-          {/* Active: "Continue exploring →" orange pill */}
-          {variant === "active" && (
-            <TouchableOpacity style={fbh.ctaPill} onPress={onPress} activeOpacity={0.85}>
-              <Text style={fbh.ctaPillTxt}>{"Continue exploring \u2192"}</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Countdown >1 day / Anticipation: "View Trip Plan →" orange pill */}
           {showViewPlan && (
             <TouchableOpacity style={fbh.ctaPill} onPress={onPress} activeOpacity={0.85}>
               <Text style={fbh.ctaPillTxt}>{"View Trip Plan \u2192"}</Text>
             </TouchableOpacity>
           )}
-
-          {/* Countdown 1 day: plain text (tomorrow!) */}
           {variant === "countdown" && (daysUntil ?? 0) === 1 && (
             <Text style={fbh.nextLine}>{"1 day until departure \u2014 adventure starts tomorrow!"}</Text>
           )}
-
-          {/* Completed: "Relive [trip] →" orange text link */}
           {showRelive && (
             <TouchableOpacity onPress={onPress} activeOpacity={0.75} hitSlop={8}>
               <Text style={fbh.nextLineOrange}>{"Relive " + tripName + " \u2192"}</Text>
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Active: Rescue FAB (above glance) + glance strip */}
-        {variant === "active" && (
-          <>
-            {/* Rescue spring FAB — right-aligned above glance */}
-            {onRescue && (
-              <View style={fbh.rescueFabRow}>
-                <TouchableOpacity onPress={handleRescueFabPress} activeOpacity={0.85}>
-                  <Animated.View style={[fbh.rescueFabInner, {
-                    width: rescueFabAnim.interpolate({ inputRange: [0, 1], outputRange: [48, 136] }),
-                  }]}>
-                    <Ionicons name="shield-checkmark-outline" size={20} color="#fff" />
-                    <Animated.View style={{
-                      overflow: 'hidden',
-                      width: rescueFabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 76] }),
-                      opacity: rescueFabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
-                    }}>
-                      <Text style={fbh.rescueFabTxt} numberOfLines={1}>Rescue</Text>
-                    </Animated.View>
-                  </Animated.View>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Glance strip */}
-            {glanceStops && glanceStops.length > 0 && (
-              <View style={fbh.glanceWrap}>
-                <Text style={fbh.glanceLabel}>TODAY AT A GLANCE</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-                >
-                  {glanceStops.slice(0, 4).map((stop, i) => (
-                    <View key={stop.id || i} style={fbh.glanceChip}>
-                      <Text style={fbh.glanceTime}>{glanceLabels[i] ?? `+${i}`}</Text>
-                      <Text style={fbh.glanceName} numberOfLines={2}>{stop.name}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </>
-        )}
       </View>
 
-      {/* Plan FAB — spring-animated, absolute top-right */}
-      <TouchableOpacity
-        style={[fbh.fabWrap, { top: insetTop + 14 }]}
-        onPress={handleFabPress}
-        activeOpacity={0.85}
-      >
-        <Animated.View style={[fbh.fabInner, {
-          width: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [52, 168] }),
-        }]}>
-          <Ionicons name="add" size={24} color="#fff" />
-          <Animated.View style={{
-            overflow: 'hidden',
-            width: fabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 108] }),
-            opacity: fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
-          }}>
-            <Text style={fbh.fabLabelTxt} numberOfLines={1}>Plan a trip</Text>
-          </Animated.View>
-        </Animated.View>
-      </TouchableOpacity>
+      {planFabNode}
+      {rescueFabNode}
     </View>
   );
 }
@@ -615,7 +672,6 @@ const fbh = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
     marginTop: 6,
   },
@@ -627,20 +683,29 @@ const fbh = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
-  // Spring-animated FAB (same style as Trips page) — absolute top-right
+  // FAB outer wrapper — absolutely positioned top-right; right is set inline
   fabWrap: {
     position: "absolute",
-    right: 20,
-    shadowColor: G.orange,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     elevation: 8,
   },
-  fabInner: {
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: G.orange,
+  // Plan FAB — dark navy pill
+  planFabInner: {
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: "#2B3250",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  // Rescue FAB — dark crimson pill
+  rescueFabInner: {
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: "#7A1C2E",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -648,9 +713,46 @@ const fbh = StyleSheet.create({
   },
   fabLabelTxt: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: F.bold,
-    marginLeft: 4,
+    marginLeft: 5,
+  },
+  // Active card
+  activeCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#131926',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 14,
+  },
+  cardImgWrap: {
+    height: 230,
+    overflow: 'hidden',
+  },
+  cardDetails: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  cardTripName: {
+    color: 'white',
+    fontSize: 26,
+    fontFamily: F.bold,
+    lineHeight: 30,
+    marginBottom: 6,
+  },
+  nextStopLine: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 13,
+    fontFamily: F.regular,
+    marginBottom: 14,
+  },
+  nextStopBold: {
+    color: 'white',
+    fontFamily: F.bold,
   },
   statusBlock: { marginBottom: 6 },
   eyebrowRow: {
@@ -681,15 +783,13 @@ const fbh = StyleSheet.create({
     fontFamily: F.bold,
     fontSize: 15,
   },
-  // Shared orange pill CTA (Continue exploring / View Trip Plan)
   ctaPill: {
     alignSelf: "flex-start",
     backgroundColor: G.orange,
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 9,
-    marginTop: 4,
-    marginBottom: 2,
+    marginTop: 2,
     shadowColor: G.orange,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
@@ -701,51 +801,23 @@ const fbh = StyleSheet.create({
     fontSize: 14,
     color: "#fff",
   },
-  // Rescue spring FAB row (right-aligned, sits above glance strip)
-  rescueFabRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  rescueFabInner: {
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: G.orange,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    shadowColor: G.orange,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  rescueFabTxt: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: F.bold,
-    marginLeft: 6,
-  },
-  // Glance strip (active variant)
   glanceWrap: {
-    marginTop: 0,
+    marginTop: 18,
   },
   glanceLabel: {
     fontFamily: F.bold,
     fontSize: 10,
     letterSpacing: 1.2,
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(255,255,255,0.45)",
     marginBottom: 8,
   },
   glanceChip: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     minWidth: 100,
-    maxWidth: 140,
+    maxWidth: 148,
   },
   glanceTime: {
     fontFamily: F.bold,
