@@ -125,6 +125,18 @@ export default function AccountScreen() {
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
+  // Dev-only: date override for home/today screen testing
+  const [devDateValue, setDevDateValue] = useState<string>("");
+  const [devDateSaved, setDevDateSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    AsyncStorage.getItem("dev_date_override").then(v => {
+      setDevDateSaved(v);
+      setDevDateValue(v ?? "");
+    }).catch(() => {});
+  }, []);
+
   // Explorer editing state
   const [editingExplorerId, setEditingExplorerId] = useState<string | null>(null);
   const [editExpName, setEditExpName] = useState("");
@@ -357,6 +369,26 @@ export default function AccountScreen() {
   async function handleSignOut() {
     await logout();
     router.replace("/onboarding/splash");
+  }
+
+  async function saveDevDate(date: string) {
+    const trimmed = date.trim();
+    if (!trimmed) { await clearDevDate(); return; }
+    // Accept YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      showToast("Format: YYYY-MM-DD"); return;
+    }
+    await AsyncStorage.setItem("dev_date_override", trimmed);
+    setDevDateSaved(trimmed);
+    setDevDateValue(trimmed);
+    showToast("Dev date set to " + trimmed + " — reload Home");
+  }
+
+  async function clearDevDate() {
+    await AsyncStorage.removeItem("dev_date_override");
+    setDevDateSaved(null);
+    setDevDateValue("");
+    showToast("Dev date cleared — back to today");
   }
 
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || "Explorer";
@@ -671,6 +703,83 @@ export default function AccountScreen() {
               <Text style={s.rowArrow}>{"›"}</Text>
             </Pressable>
           </View>
+
+          {/* Dev Tools — __DEV__ only */}
+          {__DEV__ && (
+            <>
+              <Text style={s.secLbl}>{"DEV TOOLS \u2014 DATE OVERRIDE"}</Text>
+              <View style={[s.card, { paddingHorizontal: 16, paddingVertical: 14, gap: 10 }]}>
+                <Text style={{ fontFamily: F.regular, fontSize: 12, color: G.muted, lineHeight: 17 }}>
+                  {"Set a fake \u2018today\u2019 so Home shows a specific state. Shake to reload after setting."}
+                </Text>
+                {devDateSaved ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#BBF7D0" }}>
+                      <Text style={{ fontFamily: F.bold, fontSize: 13, color: "#16A34A" }}>
+                        {"\u2713 Active: " + devDateSaved}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={({ pressed }) => [{ backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FECACA" }, pressed && { opacity: 0.7 }]}
+                      onPress={clearDevDate}
+                    >
+                      <Text style={{ fontFamily: F.bold, fontSize: 13, color: "#DC2626" }}>Clear</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: "#F9F9FB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "rgba(26,31,46,0.08)" }}>
+                    <Text style={{ fontFamily: F.regular, fontSize: 12, color: G.muted }}>{"No override — using today"}</Text>
+                  </View>
+                )}
+
+                {/* Custom date input */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TextInput
+                    style={[s.input, { flex: 1, marginBottom: 0 }]}
+                    value={devDateValue}
+                    onChangeText={setDevDateValue}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={G.muted}
+                    keyboardType="numbers-and-punctuation"
+                    autoCapitalize="none"
+                    returnKeyType="done"
+                    onSubmitEditing={() => saveDevDate(devDateValue)}
+                  />
+                  <Pressable
+                    style={({ pressed }) => [{ backgroundColor: G.orange, borderRadius: 12, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.85 }]}
+                    onPress={() => saveDevDate(devDateValue)}
+                  >
+                    <Text style={{ fontFamily: F.bold, fontSize: 13, color: "#fff" }}>Set</Text>
+                  </Pressable>
+                </View>
+
+                {/* Quick-set buttons */}
+                <Text style={{ fontFamily: F.bold, fontSize: 11, color: G.muted, letterSpacing: 0.5, marginTop: 2 }}>QUICK SET</Text>
+                <View style={{ gap: 6 }}>
+                  {[
+                    { label: "State 1 — Active (Aug 3)", date: "2026-08-03" },
+                    { label: "State 2 — Just completed (Aug 5)", date: "2026-08-05" },
+                    { label: "State 2 — Just completed (Aug 6)", date: "2026-08-06" },
+                  ].map(({ label, date }) => (
+                    <Pressable
+                      key={date}
+                      style={({ pressed }) => [{
+                        flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const,
+                        backgroundColor: devDateSaved === date ? "#FDF0E9" : "#F5F5F7",
+                        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+                        borderWidth: 1, borderColor: devDateSaved === date ? G.orange : "rgba(26,31,46,0.08)",
+                        opacity: pressed ? 0.75 : 1,
+                      }]}
+                      onPress={() => saveDevDate(date)}
+                    >
+                      <Text style={{ fontFamily: F.regular, fontSize: 13, color: G.deep, flex: 1 }}>{label}</Text>
+                      <Text style={{ fontFamily: F.bold, fontSize: 12, color: devDateSaved === date ? G.orange : G.muted }}>{date}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Sign out */}
           <Pressable
