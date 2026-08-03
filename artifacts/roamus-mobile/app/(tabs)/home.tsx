@@ -409,7 +409,7 @@ function FullBleedHero({
   // Priority 3: Wikipedia city photo (always a fallback, never shown if user
   //             has any trip photos)
   const hiRes = (url: string | null) =>
-    url ? url.replace(/\/\d+px-/, '/800px-') : null;
+    url ? url.replace(/\/\d+px-/, '/1200px-') : null;
 
   const [momentPhoto, setMomentPhoto] = React.useState<string | null>(null);
   const [wikiImage, setWikiImage] = React.useState<string | null>(null);
@@ -729,7 +729,7 @@ const fbh = StyleSheet.create({
     elevation: 14,
   },
   cardImgWrap: {
-    height: 230,
+    height: 290,
     overflow: 'hidden',
   },
   cardDetails: {
