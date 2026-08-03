@@ -322,6 +322,7 @@ function FullBleedHero({
   insetBottom,
   onPress,
   onPlanTrip,
+  onRescue,
 }: {
   trip: HomeTripData;
   variant: FullBleedVariant;
@@ -338,11 +339,13 @@ function FullBleedHero({
   insetBottom: number;
   onPress: () => void;
   onPlanTrip: () => void;
+  /** If provided, a spring-animated Rescue FAB appears above the glance strip */
+  onRescue?: () => void;
 }) {
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
 
-  // ── FAB: spring-animated expand (same pattern as Trips page) ──────────────
+  // ── Plan FAB: spring-animated expand ──────────────────────────────────────
   const fabAnim = React.useRef(new Animated.Value(0)).current;
   const [fabExpanded, setFabExpanded] = React.useState(false);
   const fabCollapseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -365,11 +368,28 @@ function FullBleedHero({
     }
   }
 
-  function collapseFab() {
-    if (!fabExpanded) return;
-    if (fabCollapseTimer.current) { clearTimeout(fabCollapseTimer.current); fabCollapseTimer.current = null; }
-    setFabExpanded(false);
-    Animated.spring(fabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+  // ── Rescue FAB: same spring pattern, shield → "Rescue" expand ─────────────
+  const rescueFabAnim = React.useRef(new Animated.Value(0)).current;
+  const [rescueFabExpanded, setRescueFabExpanded] = React.useState(false);
+  const rescueFabCollapseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleRescueFabPress() {
+    if (rescueFabExpanded) {
+      // Second tap → fire rescue
+      if (rescueFabCollapseTimer.current) { clearTimeout(rescueFabCollapseTimer.current); rescueFabCollapseTimer.current = null; }
+      setRescueFabExpanded(false);
+      Animated.spring(rescueFabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      onRescue?.();
+    } else {
+      if (rescueFabCollapseTimer.current) clearTimeout(rescueFabCollapseTimer.current);
+      setRescueFabExpanded(true);
+      Animated.spring(rescueFabAnim, { toValue: 1, useNativeDriver: false, tension: 80, friction: 10 }).start();
+      rescueFabCollapseTimer.current = setTimeout(() => {
+        setRescueFabExpanded(false);
+        Animated.spring(rescueFabAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 10 }).start();
+        rescueFabCollapseTimer.current = null;
+      }, 3000);
+    }
   }
 
   // ── Photos ─────────────────────────────────────────────────────────────────
@@ -447,22 +467,14 @@ function FullBleedHero({
     eyebrowText = "UPCOMING TRIP";
   }
 
-  const secondLineIsOrange = variant === "completed";
-  let secondLine = "";
-  if (variant === "active") {
-    secondLine = ""; // replaced by the CTA button below
-  } else if (variant === "completed") {
-    secondLine = "Relive " + tripName + " \u2192";
-  } else if (variant === "countdown") {
-    secondLine = `${daysUntil} ${daysUntil === 1 ? "day" : "days"} until departure`;
-  } else {
-    secondLine = "is coming up";
-  }
-
   const glanceLabels = ["Next", "Then", "After", "Later"];
 
+  // CTA button label + whether to render as orange pill vs orange text link
+  const showViewPlan = (variant === "countdown" && (daysUntil ?? 0) > 1) || variant === "anticipation";
+  const showRelive   = variant === "completed";
+
   return (
-    <Pressable style={fbh.root} onPress={() => { collapseFab(); onPress(); }}>
+    <View style={fbh.root}>
       {/* Background photo or gradient fallback */}
       {displayImage ? (
         <Image
@@ -499,37 +511,79 @@ function FullBleedHero({
           </View>
           <Text style={fbh.tripName} numberOfLines={3}>{tripName}</Text>
 
-          {/* Active: orange CTA button */}
-          {variant === "active" ? (
-            <TouchableOpacity style={fbh.continueCta} onPress={onPress} activeOpacity={0.85}>
-              <Text style={fbh.continueCtaTxt}>{"Continue exploring \u2192"}</Text>
+          {/* Active: "Continue exploring →" orange pill */}
+          {variant === "active" && (
+            <TouchableOpacity style={fbh.ctaPill} onPress={onPress} activeOpacity={0.85}>
+              <Text style={fbh.ctaPillTxt}>{"Continue exploring \u2192"}</Text>
             </TouchableOpacity>
-          ) : (
-            <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>{secondLine}</Text>
+          )}
+
+          {/* Countdown >1 day / Anticipation: "View Trip Plan →" orange pill */}
+          {showViewPlan && (
+            <TouchableOpacity style={fbh.ctaPill} onPress={onPress} activeOpacity={0.85}>
+              <Text style={fbh.ctaPillTxt}>{"View Trip Plan \u2192"}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Countdown 1 day: plain text (tomorrow!) */}
+          {variant === "countdown" && (daysUntil ?? 0) === 1 && (
+            <Text style={fbh.nextLine}>{"1 day until departure \u2014 adventure starts tomorrow!"}</Text>
+          )}
+
+          {/* Completed: "Relive [trip] →" orange text link */}
+          {showRelive && (
+            <TouchableOpacity onPress={onPress} activeOpacity={0.75} hitSlop={8}>
+              <Text style={fbh.nextLineOrange}>{"Relive " + tripName + " \u2192"}</Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Glance strip — active variant only */}
-        {variant === "active" && glanceStops && glanceStops.length > 0 && (
-          <View style={fbh.glanceWrap}>
-            <Text style={fbh.glanceLabel}>TODAY AT A GLANCE</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-            >
-              {glanceStops.slice(0, 4).map((stop, i) => (
-                <View key={stop.id || i} style={fbh.glanceChip}>
-                  <Text style={fbh.glanceTime}>{glanceLabels[i] ?? `+${i}`}</Text>
-                  <Text style={fbh.glanceName} numberOfLines={2}>{stop.name}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+        {/* Active: Rescue FAB (above glance) + glance strip */}
+        {variant === "active" && (
+          <>
+            {/* Rescue spring FAB — right-aligned above glance */}
+            {onRescue && (
+              <View style={fbh.rescueFabRow}>
+                <TouchableOpacity onPress={handleRescueFabPress} activeOpacity={0.85}>
+                  <Animated.View style={[fbh.rescueFabInner, {
+                    width: rescueFabAnim.interpolate({ inputRange: [0, 1], outputRange: [48, 136] }),
+                  }]}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color="#fff" />
+                    <Animated.View style={{
+                      overflow: 'hidden',
+                      width: rescueFabAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 76] }),
+                      opacity: rescueFabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+                    }}>
+                      <Text style={fbh.rescueFabTxt} numberOfLines={1}>Rescue</Text>
+                    </Animated.View>
+                  </Animated.View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Glance strip */}
+            {glanceStops && glanceStops.length > 0 && (
+              <View style={fbh.glanceWrap}>
+                <Text style={fbh.glanceLabel}>TODAY AT A GLANCE</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+                >
+                  {glanceStops.slice(0, 4).map((stop, i) => (
+                    <View key={stop.id || i} style={fbh.glanceChip}>
+                      <Text style={fbh.glanceTime}>{glanceLabels[i] ?? `+${i}`}</Text>
+                      <Text style={fbh.glanceName} numberOfLines={2}>{stop.name}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </>
         )}
       </View>
 
-      {/* Absolutely-positioned spring FAB — same pattern as Trips page */}
+      {/* Plan FAB — spring-animated, absolute top-right */}
       <TouchableOpacity
         style={[fbh.fabWrap, { top: insetTop + 14 }]}
         onPress={handleFabPress}
@@ -548,7 +602,7 @@ function FullBleedHero({
           </Animated.View>
         </Animated.View>
       </TouchableOpacity>
-    </Pressable>
+    </View>
   );
 }
 
@@ -627,8 +681,8 @@ const fbh = StyleSheet.create({
     fontFamily: F.bold,
     fontSize: 15,
   },
-  // Active variant: "Continue exploring →" CTA button
-  continueCta: {
+  // Shared orange pill CTA (Continue exploring / View Trip Plan)
+  ctaPill: {
     alignSelf: "flex-start",
     backgroundColor: G.orange,
     borderRadius: 22,
@@ -636,15 +690,47 @@ const fbh = StyleSheet.create({
     paddingVertical: 9,
     marginTop: 4,
     marginBottom: 2,
+    shadowColor: G.orange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  continueCtaTxt: {
+  ctaPillTxt: {
     fontFamily: F.bold,
     fontSize: 14,
     color: "#fff",
   },
+  // Rescue spring FAB row (right-aligned, sits above glance strip)
+  rescueFabRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  rescueFabInner: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: G.orange,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: G.orange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  rescueFabTxt: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: F.bold,
+    marginLeft: 6,
+  },
   // Glance strip (active variant)
   glanceWrap: {
-    marginTop: 16,
+    marginTop: 0,
   },
   glanceLabel: {
     fontFamily: F.bold,
@@ -1297,22 +1383,11 @@ export default function HomeScreen() {
             })
           }
           onPlanTrip={handlePlanTrip}
+          onRescue={isActiveToday ? () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setShowRescue(true);
+          } : undefined}
         />
-
-        {/* Rescue FAB — pill at bottom-left, only when inside trip dates */}
-        {isActiveToday && (
-          <TouchableOpacity
-            style={[hs.rescueFab, { bottom: insets.bottom + 90 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setShowRescue(true);
-            }}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="shield-checkmark-outline" size={22} color="#fff" />
-            <Text style={hs.rescueFabLabel}>Rescue</Text>
-          </TouchableOpacity>
-        )}
 
         {/* RescueSheet — standalone, loads real stops on open */}
         {isActiveToday && (
