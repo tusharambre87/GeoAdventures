@@ -669,9 +669,10 @@ export default function TodayScreen() {
   const breakStopIdRef = useRef<string | null>(null);
   // Guards against concurrent invocations (rapid double-tap)
   const breakDoneInFlight = useRef(false);
-  // When true, the next loadTrip() call skips updating currentStopIndex — break stops must
-  // not shift the planned day's progress index (they're bonus stops, not planned stops).
-  const skipNextIndexSyncRef = useRef(false);
+  // Set to the break stop's ID just before loadTrip() so the index sync can pin
+  // currentStopIndex to (breakStopPosition + 1), making stop_complete show the
+  // break stop as visitedStop with the correct next planned stop as NEXT UP.
+  const breakCompletedIdRef = useRef<string | null>(null);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
 
   // ── Persist break photos to AsyncStorage so they survive backgrounding ────────
@@ -1191,17 +1192,23 @@ export default function TodayScreen() {
       // The server is the source of truth (visit writes happen before loadTrip),
       // so we set absolutely — no Math.max(prev, ...) which would carry a stale
       // index from a previous day's larger stop list into today's smaller one.
-      // Exception: skip when a break stop was just completed — break stops are bonus
-      // stops (not part of the planned progression) and must not shift the day index.
       {
         const lastVisitedIdx = stops.reduce(
           (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
         );
         const serverDerivedIdx = Math.max(0, Math.min(lastVisitedIdx + 1, stops.length - 1));
-        if (!skipNextIndexSyncRef.current) {
-          setCurrentStopIndex(serverDerivedIdx);
+        setCurrentStopIndex(serverDerivedIdx);
+        // If a break stop was just completed, pin currentStopIndex to (breakIdx + 1)
+        // so stop_complete shows the break stop as visitedStop (not a planned stop
+        // that may have been shifted by the insertion).
+        const _breakId = breakCompletedIdRef.current;
+        if (_breakId) {
+          breakCompletedIdRef.current = null;
+          const breakIdx = stops.findIndex(s => s.id === _breakId);
+          if (breakIdx >= 0) {
+            setCurrentStopIndex(breakIdx + 1);
+          }
         }
-        skipNextIndexSyncRef.current = false; // always reset for next load
       }
 
       // Source of truth: if the server already marks this trip completed,
@@ -1811,9 +1818,10 @@ export default function TodayScreen() {
     setBreakQuote('');
     setBreakPhotos([]);
     closeSotwSheet();
-    // Skip the next index sync so this bonus stop never shifts the planned day's progress.
-    skipNextIndexSyncRef.current = true;
-    // Reload trip data so the new break stop appears in Memories immediately.
+    // Tell the next loadTrip() to pin currentStopIndex so the stop_complete screen
+    // shows THIS break stop as visitedStop (not a shifted planned stop).
+    breakCompletedIdRef.current = newStopId!;
+    // Reload trip data so the new stop appears in Memories and stop_complete renders correctly.
     void loadTrip();
   }
 
@@ -3979,7 +3987,16 @@ export default function TodayScreen() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (todayState === 'stop_complete') {
     const visitedStop = dayStops[currentStopIndex - 1] ?? dayStops[0];
-    const nextStop    = (currentStop && currentStop.id !== visitedStop?.id) ? currentStop : null;
+    // Find the first unvisited stop at or after currentStopIndex.
+    // A break stop may have been inserted before a planned stop that was already visited,
+    // shifting indices so dayStops[currentStopIndex] is a visited stop — skip those.
+    let _nsi = currentStopIndex;
+    while (_nsi < dayStops.length && (dayStops[_nsi].isVisited || dayStops[_nsi].visited)) {
+      _nsi++;
+    }
+    const nextStop = (_nsi < dayStops.length && dayStops[_nsi].id !== visitedStop?.id)
+      ? dayStops[_nsi]
+      : null;
     const isLastStop  = !nextStop || currentStopIndex >= dayStops.length;
     const firstKid    = (trip?.travelers ?? []).find(t => !t.isParent);
     const quoteKey    = visitedStop?.id ?? 'stop';
