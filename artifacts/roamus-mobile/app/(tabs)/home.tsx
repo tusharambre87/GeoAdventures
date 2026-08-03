@@ -333,22 +333,38 @@ function FullBleedHero({
   const tripName = trip.name || trip.destination || trip.city || "Your Trip";
   const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
 
-  // Wikipedia city photo fallback — boost thumbnail from 330px → 1200px for crisper hero
+  // Expandable Plan FAB: first tap expands to show label; second tap navigates.
+  const [fabExpanded, setFabExpanded] = React.useState(false);
+
+  // Wikipedia city photo fallback.
+  // Strategy: try 800px thumb (reliable size on Wikipedia CDN), fall back to
+  // whatever getDestinationImage returns if 800px errors.
   const hiRes = (url: string | null) =>
-    url ? url.replace(/\/\d+px-/, '/1200px-') : null;
+    url ? url.replace(/\/\d+px-/, '/800px-') : null;
 
   const [wikiImage, setWikiImage] = React.useState<string | null>(null);
+  const [wikiFallback, setWikiFallback] = React.useState<string | null>(null);
+  const [imgError, setImgError] = React.useState(false);
+
   React.useEffect(() => {
     if (imageUri) return;
     const city = trip.city ?? trip.destination ?? "";
     if (!city) return;
     let cancelled = false;
     getDestinationImage(city)
-      .then(url => { if (!cancelled && url) setWikiImage(hiRes(url)); })
+      .then(url => {
+        if (!cancelled && url) {
+          setWikiFallback(url);       // original 330px as fallback
+          setWikiImage(hiRes(url));   // 800px as primary
+          setImgError(false);
+        }
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [imageUri, trip.city, trip.destination]);
-  const displayImage = hiRes(imageUri) ?? wikiImage;
+
+  // Pick the best available image; on error fall back down the chain
+  const displayImage = imageUri ?? (imgError ? wikiFallback : wikiImage);
 
   // Eyebrow
   const isCompleted = variant === "completed";
@@ -364,7 +380,8 @@ function FullBleedHero({
     eyebrowText = "UPCOMING TRIP";
   }
 
-  // Second line
+  // Second line — orange for "Relive" CTA, muted white for countdown text
+  const secondLineIsOrange = variant === "completed";
   let secondLine = "";
   if (variant === "completed") {
     secondLine = `Relive ${tripName} \u2192`;
@@ -374,28 +391,39 @@ function FullBleedHero({
     secondLine = "is coming up";
   }
 
+  function handleRootPress() {
+    if (fabExpanded) { setFabExpanded(false); return; }
+    onPress();
+  }
+
   return (
-    <Pressable style={fbh.root} onPress={onPress}>
-      {/* Background photo or solid fallback */}
+    <Pressable style={fbh.root} onPress={handleRootPress}>
+      {/* Background photo or gradient fallback */}
       {displayImage ? (
         <Image
           source={{ uri: displayImage }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          onError={() => setImgError(true)}
         />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#1A2540" }]} />
+      ) : null}
+      {/* Always render a colour beneath in case image is still loading */}
+      {!displayImage && (
+        <LinearGradient
+          colors={["#1A3050", "#0D1A2E", "#0A0E14"]}
+          style={StyleSheet.absoluteFill}
+        />
       )}
 
-      {/* Gradient overlay — matches spec: heavy at top & bottom, light in middle */}
+      {/* Dark gradient overlay */}
       <LinearGradient
         colors={[
-          "rgba(10,14,25,0.55)",
-          "rgba(10,14,25,0.10)",
-          "rgba(10,14,25,0.55)",
+          "rgba(10,14,25,0.45)",
+          "rgba(10,14,25,0.05)",
+          "rgba(10,14,25,0.50)",
           "rgba(10,14,25,0.97)",
         ]}
-        locations={[0, 0.30, 0.62, 1.0]}
+        locations={[0, 0.28, 0.60, 1.0]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -406,14 +434,31 @@ function FullBleedHero({
           { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 20 },
         ]}
       >
-        {/* Header row: greeting + Plan FAB */}
+        {/* Header row: greeting + expandable Plan FAB */}
         <View style={fbh.headerRow}>
           <Text style={fbh.greetTxt}>
             {greeting()}{firstName ? `,\n${firstName}` : ""}
           </Text>
-          <TouchableOpacity style={fbh.planFab} onPress={onPlanTrip} activeOpacity={0.85}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
+
+          {fabExpanded ? (
+            /* Expanded: full "Plan a trip →" pill */
+            <TouchableOpacity
+              style={fbh.planPill}
+              onPress={(e) => { e.stopPropagation?.(); onPlanTrip(); }}
+              activeOpacity={0.85}
+            >
+              <Text style={fbh.planPillTxt}>Plan a trip \u2192</Text>
+            </TouchableOpacity>
+          ) : (
+            /* Collapsed: orange + circle */
+            <TouchableOpacity
+              style={fbh.planFab}
+              onPress={(e) => { e.stopPropagation?.(); setFabExpanded(true); }}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Spacer */}
@@ -421,7 +466,6 @@ function FullBleedHero({
 
         {/* Status block */}
         <View style={fbh.statusBlock}>
-          {/* Eyebrow row */}
           <View style={fbh.eyebrowRow}>
             <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
             <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>
@@ -429,13 +473,13 @@ function FullBleedHero({
             </Text>
           </View>
 
-          {/* Trip name */}
           <Text style={fbh.tripName} numberOfLines={3}>
             {tripName}
           </Text>
 
-          {/* Second line */}
-          <Text style={fbh.nextLine}>{secondLine}</Text>
+          <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>
+            {secondLine}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -463,15 +507,38 @@ const fbh = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
+  // Collapsed: orange circle
   planFab: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
+    backgroundColor: G.orange,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: G.orange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  // Expanded: orange pill with text
+  planPill: {
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: G.orange,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: G.orange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  planPillTxt: {
+    fontFamily: F.bold,
+    fontSize: 14,
+    color: "#fff",
   },
   statusBlock: { marginBottom: 6 },
   eyebrowRow: {
@@ -480,16 +547,8 @@ const fbh = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
   },
-  eyebrowDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  eyebrowTxt: {
-    fontFamily: F.bold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-  },
+  eyebrowDot: { width: 7, height: 7, borderRadius: 4 },
+  eyebrowTxt: { fontFamily: F.bold, fontSize: 11, letterSpacing: 1.2 },
   tripName: {
     color: "white",
     fontSize: 32,
@@ -501,9 +560,14 @@ const fbh = StyleSheet.create({
     marginBottom: 6,
   },
   nextLine: {
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(255,255,255,0.80)",
     fontSize: 14,
     fontFamily: F.regular,
+  },
+  nextLineOrange: {
+    color: G.orange,
+    fontFamily: F.bold,
+    fontSize: 15,
   },
 });
 
@@ -526,6 +590,11 @@ export default function HomeScreen() {
   // ── Trips (for active-trip detection) ─────────────────────────────────────
   const [trips, setTrips] = useState<HomeTripData[]>([]);
   const [tripsLoading, setTripsLoading] = useState(true);
+  // Only show the loading spinner on the very first mount. Subsequent
+  // focus events (switching tabs, returning from a screen) silently
+  // refresh in the background so the hero never flashes back to the
+  // white flat-header loading state.
+  const hasLoadedOnce = useRef(false);
 
   // Dev-only date override — refreshed on every focus so navigating back
   // from any screen picks up the latest value.
@@ -534,13 +603,18 @@ export default function HomeScreen() {
   // Refresh trips + devDate every time Home comes into focus so a newly
   // created (or status-changed) trip is picked up without a full app restart.
   useFocusEffect(useCallback(() => {
-    setTripsLoading(true);
+    // Only show the loading spinner on the very first load.
+    if (!hasLoadedOnce.current) setTripsLoading(true);
+
     apiFetch<{ trips: HomeTripData[] }>("/api/travel/trips")
       .then(data => {
         if (Array.isArray(data?.trips)) setTrips(data.trips);
       })
       .catch(() => {})
-      .finally(() => setTripsLoading(false));
+      .finally(() => {
+        setTripsLoading(false);
+        hasLoadedOnce.current = true;
+      });
 
     if (!__DEV__) return;
     AsyncStorage.getItem('dev_date_override').then(raw => {
