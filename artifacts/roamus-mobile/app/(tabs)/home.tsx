@@ -305,15 +305,18 @@ const ts = StyleSheet.create({
   pillTxt: { fontFamily: F.bold, fontSize: 12, color: "#fff" },
 });
 
-// ─── Full-bleed hero (States 2–4) ─────────────────────────────────────────────
+// ─── Full-bleed hero (States 1–4) ─────────────────────────────────────────────
 
-type FullBleedVariant = 'completed' | 'countdown' | 'anticipation';
+type FullBleedVariant = 'active' | 'completed' | 'countdown' | 'anticipation';
 
 function FullBleedHero({
   trip,
   variant,
   daysAgo,
   daysUntil,
+  dayNum,
+  totalDays,
+  glanceStops,
   firstName,
   insetTop,
   insetBottom,
@@ -324,6 +327,12 @@ function FullBleedHero({
   variant: FullBleedVariant;
   daysAgo?: number;
   daysUntil?: number;
+  /** Active variant: which calendar day of the trip (1-based) */
+  dayNum?: number;
+  /** Active variant: total planned days */
+  totalDays?: number | null;
+  /** Active variant: upcoming unvisited stops for the glance strip */
+  glanceStops?: { name: string; id: string }[];
   firstName: string | null;
   insetTop: number;
   insetBottom: number;
@@ -418,11 +427,18 @@ function FullBleedHero({
   const displayImage = imageUri ?? momentPhoto ?? (imgError ? wikiFallback : wikiImage);
 
   // ── Eyebrow ────────────────────────────────────────────────────────────────
-  const isCompleted = variant === "completed";
-  const dotColor = isCompleted ? "#E8B84A" : "#6BB4D9";
-  const eyebrowTextColor = isCompleted ? "#F0CC7A" : "#9DD3EC";
+  let dotColor = "#6BB4D9";
+  let eyebrowTextColor = "#9DD3EC";
   let eyebrowText = "";
-  if (isCompleted) {
+  if (variant === "active") {
+    dotColor = "#4ADE80";
+    eyebrowTextColor = "#86EFAC";
+    const dayStr = dayNum != null ? `DAY ${dayNum}` : "TODAY";
+    const totalStr = totalDays != null ? ` OF ${totalDays}` : "";
+    eyebrowText = `${dayStr}${totalStr} \u00B7 LIVE`;
+  } else if (variant === "completed") {
+    dotColor = "#E8B84A";
+    eyebrowTextColor = "#F0CC7A";
     eyebrowText =
       daysAgo === 0 ? "TRIP COMPLETE \u00B7 TODAY"
       : daysAgo === 1 ? "TRIP COMPLETE \u00B7 YESTERDAY"
@@ -433,13 +449,17 @@ function FullBleedHero({
 
   const secondLineIsOrange = variant === "completed";
   let secondLine = "";
-  if (variant === "completed") {
+  if (variant === "active") {
+    secondLine = ""; // replaced by the CTA button below
+  } else if (variant === "completed") {
     secondLine = "Relive " + tripName + " \u2192";
   } else if (variant === "countdown") {
     secondLine = `${daysUntil} ${daysUntil === 1 ? "day" : "days"} until departure`;
   } else {
     secondLine = "is coming up";
   }
+
+  const glanceLabels = ["Next", "Then", "After", "Later"];
 
   return (
     <Pressable style={fbh.root} onPress={() => { collapseFab(); onPress(); }}>
@@ -463,21 +483,50 @@ function FullBleedHero({
       />
 
       {/* Content — greeting at top, status block pinned to bottom */}
-      <View style={[fbh.content, { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 20 }]}>
+      <View style={[fbh.content, { paddingTop: insetTop + 8, paddingBottom: insetBottom + TAB_BAR_H + 16 }]}>
         <View style={fbh.headerRow}>
           <Text style={fbh.greetTxt}>
             {greeting()}{firstName ? `,\n${firstName}` : ""}
           </Text>
         </View>
         <View style={{ flex: 1 }} />
+
+        {/* Status block */}
         <View style={fbh.statusBlock}>
           <View style={fbh.eyebrowRow}>
             <View style={[fbh.eyebrowDot, { backgroundColor: dotColor }]} />
             <Text style={[fbh.eyebrowTxt, { color: eyebrowTextColor }]}>{eyebrowText}</Text>
           </View>
           <Text style={fbh.tripName} numberOfLines={3}>{tripName}</Text>
-          <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>{secondLine}</Text>
+
+          {/* Active: orange CTA button */}
+          {variant === "active" ? (
+            <TouchableOpacity style={fbh.continueCta} onPress={onPress} activeOpacity={0.85}>
+              <Text style={fbh.continueCtaTxt}>{"Continue exploring \u2192"}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={[fbh.nextLine, secondLineIsOrange && fbh.nextLineOrange]}>{secondLine}</Text>
+          )}
         </View>
+
+        {/* Glance strip — active variant only */}
+        {variant === "active" && glanceStops && glanceStops.length > 0 && (
+          <View style={fbh.glanceWrap}>
+            <Text style={fbh.glanceLabel}>TODAY AT A GLANCE</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+            >
+              {glanceStops.slice(0, 4).map((stop, i) => (
+                <View key={stop.id || i} style={fbh.glanceChip}>
+                  <Text style={fbh.glanceTime}>{glanceLabels[i] ?? `+${i}`}</Text>
+                  <Text style={fbh.glanceName} numberOfLines={2}>{stop.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Absolutely-positioned spring FAB — same pattern as Trips page */}
@@ -578,6 +627,53 @@ const fbh = StyleSheet.create({
     fontFamily: F.bold,
     fontSize: 15,
   },
+  // Active variant: "Continue exploring →" CTA button
+  continueCta: {
+    alignSelf: "flex-start",
+    backgroundColor: G.orange,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  continueCtaTxt: {
+    fontFamily: F.bold,
+    fontSize: 14,
+    color: "#fff",
+  },
+  // Glance strip (active variant)
+  glanceWrap: {
+    marginTop: 16,
+  },
+  glanceLabel: {
+    fontFamily: F.bold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: "rgba(255,255,255,0.55)",
+    marginBottom: 8,
+  },
+  glanceChip: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 100,
+    maxWidth: 140,
+  },
+  glanceTime: {
+    fontFamily: F.bold,
+    fontSize: 10,
+    color: "#86EFAC",
+    marginBottom: 3,
+    letterSpacing: 0.4,
+  },
+  glanceName: {
+    fontFamily: F.regular,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.90)",
+    lineHeight: 16,
+  },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -653,6 +749,9 @@ export default function HomeScreen() {
   const homeScrollY = useRef(new Animated.Value(0)).current;
   const fabLabelOpacity = homeScrollY.interpolate({ inputRange: [120, 180], outputRange: [1, 0], extrapolate: 'clamp' });
   const fabLabelMaxW    = homeScrollY.interpolate({ inputRange: [120, 180], outputRange: [68, 0], extrapolate: 'clamp' });
+
+  // ── Today's stops — fetched eagerly for the glance strip (State 1) ──────
+  const [todayStops, setTodayStops] = useState<{ id: string; name: string }[]>([]);
 
   // ── Rescue + SOTW state ───────────────────────────────────────────────────
   const [showRescue, setShowRescue] = useState(false);
@@ -819,6 +918,25 @@ export default function HomeScreen() {
         setRescueStops(day);
       }).catch(() => {});
   }
+
+  // Eagerly fetch today's stops for the glance strip in the active hero.
+  // Runs whenever the active trip or current day changes.
+  useEffect(() => {
+    if (homeState.kind !== 'active' || !activeTrip) return;
+    let cancelled = false;
+    apiFetch<{ stops: any[] }>(`/api/travel/trips/${activeTrip.id}/stops`)
+      .then(data => {
+        if (cancelled) return;
+        const upcoming = (data.stops ?? [])
+          .filter((s: any) => s.dayIndex === rescueDayIndex && !s.isVisited && !s.isSkipped)
+          .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+          .slice(0, 4)
+          .map((s: any) => ({ id: String(s.id), name: s.name ?? s.stopName ?? 'Stop' }));
+        setTodayStops(upcoming);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [homeState.kind, activeTrip?.id, rescueDayIndex]);
 
   async function handleRescueDrop(stopId: string) {
     try {
@@ -1156,37 +1274,32 @@ export default function HomeScreen() {
     );
   }
 
-  // ── State 1 — Active trip (already shipped, kept as-is) ───────────────────
+  // ── State 1 — Active trip (full-bleed hero matching spec) ───────────────
   if (homeState.kind === 'active') {
     const activeTripData = homeState.trip;
+    const dayNum = rescueDayIndex + 1;
+    const totalDays = activeTripData.tripDays ?? activeTripData.plannerTripDays ?? null;
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        {header}
-        <Animated.ScrollView
-          style={s.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 84 }}
-          showsVerticalScrollIndicator={false}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: homeScrollY } } }],
-            { useNativeDriver: false }
-          )}
-          scrollEventThrottle={16}
-        >
-          <ActiveTripCard
-            trip={activeTripData}
-            devDate={devDate}
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/today" as any,
-                params: { tripId: activeTripData.id },
-              })
-            }
-          />
-          {discoverMore}
-          {teasers}
-        </Animated.ScrollView>
+      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
+        <FullBleedHero
+          trip={activeTripData}
+          variant="active"
+          dayNum={dayNum}
+          totalDays={totalDays}
+          glanceStops={todayStops}
+          firstName={firstName}
+          insetTop={insets.top}
+          insetBottom={insets.bottom}
+          onPress={() =>
+            router.push({
+              pathname: "/(tabs)/today" as any,
+              params: { tripId: activeTripData.id },
+            })
+          }
+          onPlanTrip={handlePlanTrip}
+        />
 
-        {/* Rescue FAB — floating, only during live trip dates */}
+        {/* Rescue FAB — pill at bottom-left, only when inside trip dates */}
         {isActiveToday && (
           <TouchableOpacity
             style={[hs.rescueFab, { bottom: insets.bottom + 90 }]}
@@ -1197,9 +1310,7 @@ export default function HomeScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="shield-checkmark-outline" size={22} color="#fff" />
-            <Animated.View style={{ overflow: 'hidden', maxWidth: fabLabelMaxW, opacity: fabLabelOpacity, marginLeft: 6 }}>
-              <Text style={hs.rescueFabLabel}>Rescue</Text>
-            </Animated.View>
+            <Text style={hs.rescueFabLabel}>Rescue</Text>
           </TouchableOpacity>
         )}
 
