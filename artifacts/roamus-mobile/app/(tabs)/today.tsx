@@ -669,6 +669,9 @@ export default function TodayScreen() {
   const breakStopIdRef = useRef<string | null>(null);
   // Guards against concurrent invocations (rapid double-tap)
   const breakDoneInFlight = useRef(false);
+  // When true, the next loadTrip() call skips updating currentStopIndex — break stops must
+  // not shift the planned day's progress index (they're bonus stops, not planned stops).
+  const skipNextIndexSyncRef = useRef(false);
   const sotwSlideY  = useRef(new Animated.Value(900)).current;
 
   // ── Persist break photos to AsyncStorage so they survive backgrounding ────────
@@ -1188,12 +1191,17 @@ export default function TodayScreen() {
       // The server is the source of truth (visit writes happen before loadTrip),
       // so we set absolutely — no Math.max(prev, ...) which would carry a stale
       // index from a previous day's larger stop list into today's smaller one.
+      // Exception: skip when a break stop was just completed — break stops are bonus
+      // stops (not part of the planned progression) and must not shift the day index.
       {
         const lastVisitedIdx = stops.reduce(
           (best, s, i) => (s.isVisited || s.visited) ? i : best, -1
         );
         const serverDerivedIdx = Math.max(0, Math.min(lastVisitedIdx + 1, stops.length - 1));
-        setCurrentStopIndex(serverDerivedIdx);
+        if (!skipNextIndexSyncRef.current) {
+          setCurrentStopIndex(serverDerivedIdx);
+        }
+        skipNextIndexSyncRef.current = false; // always reset for next load
       }
 
       // Source of truth: if the server already marks this trip completed,
@@ -1803,7 +1811,9 @@ export default function TodayScreen() {
     setBreakQuote('');
     setBreakPhotos([]);
     closeSotwSheet();
-    // Reload trip data so the new break stop appears in the day plan immediately
+    // Skip the next index sync so this bonus stop never shifts the planned day's progress.
+    skipNextIndexSyncRef.current = true;
+    // Reload trip data so the new break stop appears in Memories immediately.
     void loadTrip();
   }
 
