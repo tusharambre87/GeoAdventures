@@ -4440,6 +4440,10 @@ export async function generateItinerary(
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
           const { stops: cityStops, parentSuggestions: cityParentSuggestions } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+          // Same zero-stop guard as single-city path — fall through to AI generation.
+          if (cityStops.length === 0) {
+            throw new Error(`selectStopsFromPool returned 0 stops for multi-city leg "${city}" — falling back to AI generation`);
+          }
           let selected: GeneratedStop[];
           if (restStopsActive) {
             const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(cityStops, itinMinChildAge);
@@ -4532,6 +4536,13 @@ export async function generateItinerary(
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
       const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
+      // Guard: if every unconditional gate in selectStopsFromPool fired and nothing
+      // survived, throw here so the catch block below falls through to AI generation.
+      // selectStopsFromPool never throws on an empty result — without this guard the
+      // caller would persist [] and build a trip with zero stops and no error surfaced.
+      if (rawSelectedStops.length === 0) {
+        throw new Error(`selectStopsFromPool returned 0 stops for "${cityName}" — falling back to AI generation`);
+      }
       let finalStops: GeneratedStop[];
       if (restStopsActive) {
         const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(rawSelectedStops, itinMinChildAge);
