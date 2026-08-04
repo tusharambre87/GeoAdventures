@@ -2305,9 +2305,22 @@ function isCityMustSee(city: string, stopName: string): boolean {
   // variants without needing exhaustive key enumeration. Checks exact equality
   // first, then "key," and "key " prefixes to avoid false-positives like
   // "washington" matching "washington township".
-  const matchedKey = Object.keys(CITY_MUST_SEE_ANCHORS).find(
-    k => cityKey === k || cityKey.startsWith(k + ',') || cityKey.startsWith(k + ' ')
-  );
+  // Sort longer (more-specific) keys first so 'new york city' beats 'new york',
+  // and 'washington dc' beats bare 'washington' before the suffix check below.
+  const matchedKey = Object.keys(CITY_MUST_SEE_ANCHORS)
+    .sort((a, b) => b.length - a.length)
+    .find(k => {
+      if (cityKey === k) return true;
+      if (cityKey.startsWith(k + ',')) return true;
+      // "Washington DC" (no comma): only accept a short state token after the space —
+      // ≤5 chars, no internal space — so "Washington Heights" (7-char suffix with no
+      // comma) no longer false-positives against the 'washington' DC entry.
+      if (cityKey.startsWith(k + ' ')) {
+        const suffix = cityKey.slice(k.length + 1);
+        return !suffix.includes(' ') && suffix.length <= 5;
+      }
+      return false;
+    });
   const list = matchedKey ? CITY_MUST_SEE_ANCHORS[matchedKey] : undefined;
   if (!list) return false;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
