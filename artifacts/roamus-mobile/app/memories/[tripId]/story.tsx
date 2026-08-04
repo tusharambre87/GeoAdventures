@@ -49,6 +49,34 @@ const C = {
   muted:  '#8A8FA8',
 } as const;
 
+// ─── Story template variants ───────────────────────────────────────────────────
+// Picked deterministically by tripId hash so each trip gets a consistent but
+// varied cover. New trips feel fresh; revisiting the same trip shows the same words.
+
+const SLIDE1_TEMPLATES = [
+  { eyebrow: 'Family Adventure',       title: "This is what they'll remember" },
+  { eyebrow: 'Worth Every Mile',       title: 'Made for moments like this' },
+  { eyebrow: 'Out There Together',     title: 'The world got a little smaller' },
+  { eyebrow: 'Sun \u00B7 Stops \u00B7 Stories', title: 'We made every day count' },
+  { eyebrow: 'Little Feet, Big Trips', title: "These kids are going to talk about this" },
+  { eyebrow: 'On The Road',            title: 'Turns out, this is what life is made of' },
+] as const;
+
+const SLIDE5_TEMPLATES = [
+  { eyebrow: 'Already dreaming about the next one', subtitle: 'The kind of trip that sticks with you' },
+  { eyebrow: 'Until next time',                     subtitle: 'We left a little piece of us here' },
+  { eyebrow: 'Trip\u2019s over. Story\u2019s not.', subtitle: 'Already planning the next chapter' },
+  { eyebrow: 'Packed up. Headed home.',              subtitle: 'The best souvenirs don\u2019t fit in a suitcase' },
+  { eyebrow: 'See you soon',                         subtitle: "This family doesn\u2019t stop" },
+  { eyebrow: 'Memories made',                        subtitle: "Filed under: ones they\u2019ll talk about forever" },
+] as const;
+
+function getTemplateIndex(id: string, len: number): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) { h = Math.imul(31, h) + id.charCodeAt(i) | 0; }
+  return Math.abs(h) % len;
+}
+
 function Wordmark({ opacity = 0.4, right = false }: { opacity?: number; right?: boolean }) {
   return (
     <Text style={[styles.wordmark, right && { left: undefined, right: 24 }, { color: `rgba(255,255,255,${opacity})` }]}>
@@ -59,9 +87,17 @@ function Wordmark({ opacity = 0.4, right = false }: { opacity?: number; right?: 
 
 // ─── Individual slides ────────────────────────────────────────────────────────
 
-function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null }) {
+function Slide1Cover({ trip, heroPhoto, templateIndex }: { trip: any; heroPhoto?: string | null; templateIndex: number }) {
   const [imgErr, setImgErr] = React.useState(false);
+  const tpl = SLIDE1_TEMPLATES[templateIndex % SLIDE1_TEMPLATES.length];
+  const [eyebrow, setEyebrow] = React.useState(tpl.eyebrow);
+  const [title, setTitle]     = React.useState(tpl.title);
+  const [editingField, setEditingField] = React.useState<'eyebrow' | 'title' | null>(null);
   const stopTotal = trip?.stops?.length ?? 0;
+
+  // Sync when template index changes (new trip)
+  React.useEffect(() => { setEyebrow(tpl.eyebrow); setTitle(tpl.title); }, [templateIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <View style={styles.slide}>
       {heroPhoto && !imgErr
@@ -76,8 +112,38 @@ function Slide1Cover({ trip, heroPhoto }: { trip: any; heroPhoto?: string | null
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.slide1Content}>
-        <Text style={styles.eyebrow}>Family Adventure</Text>
-        <Text style={styles.slide1Title}>This is what they'll remember</Text>
+        {/* Editable eyebrow */}
+        <TouchableOpacity onPress={() => setEditingField('eyebrow')} disabled={editingField === 'eyebrow'} activeOpacity={0.7}>
+          {editingField === 'eyebrow' ? (
+            <TextInput
+              value={eyebrow} onChangeText={setEyebrow}
+              onBlur={() => setEditingField(null)} autoFocus
+              style={s1e.eyebrowInput} placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholder="Add a label..." autoCapitalize="characters"
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Text style={styles.eyebrow}>{eyebrow || 'Tap to add label'}</Text>
+              <Text style={s1e.editHint}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {/* Editable title */}
+        <TouchableOpacity onPress={() => setEditingField('title')} disabled={editingField === 'title'} activeOpacity={0.7}>
+          {editingField === 'title' ? (
+            <TextInput
+              value={title} onChangeText={setTitle}
+              onBlur={() => setEditingField(null)} autoFocus multiline
+              style={s1e.titleInput} placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholder="Add a title..."
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Text style={[styles.slide1Title, { flex: 1 }]}>{title || 'Tap to add title'}</Text>
+              <Text style={[s1e.editHint, { fontSize: 14, marginTop: 2 }]}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <Text style={styles.slide1Meta}>
           {stopTotal > 0 ? `${stopTotal} stops` : ''}
           {trip?.destination ? `  \u00B7  ${trip.destination}` : ''}
@@ -401,8 +467,23 @@ function Slide4Quotes({
   );
 }
 
-function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: string | null }) {
+function Slide5Closing({ trip, closingPhoto, templateIndex }: { trip: any; closingPhoto?: string | null; templateIndex: number }) {
   const [imgErr, setImgErr] = React.useState(false);
+  const tpl = SLIDE5_TEMPLATES[templateIndex % SLIDE5_TEMPLATES.length];
+  const dest = trip?.destination ?? '';
+  const [eyebrow,  setEyebrow]  = React.useState(tpl.eyebrow);
+  const [title,    setTitle]    = React.useState(`Our ${dest} adventure`);
+  const [subtitle, setSubtitle] = React.useState(tpl.subtitle);
+  const [editingField, setEditingField] = React.useState<'eyebrow' | 'title' | 'subtitle' | null>(null);
+
+  // Sync destination when trip loads
+  React.useEffect(() => {
+    setTitle(t => (!t || t === 'Our  adventure' || t === `Our ${dest} adventure`) ? `Our ${dest} adventure` : t);
+  }, [dest]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync template when templateIndex changes
+  React.useEffect(() => { setEyebrow(tpl.eyebrow); setSubtitle(tpl.subtitle); }, [templateIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <View style={styles.slide}>
       {closingPhoto && !imgErr
@@ -411,10 +492,55 @@ function Slide5Closing({ trip, closingPhoto }: { trip: any; closingPhoto?: strin
       }
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
       <View style={styles.slide5Content}>
-        <Text style={styles.eyebrow}>Already dreaming about the next one</Text>
-        <Text style={styles.slide5Title}>Our {trip?.destination ?? ''} adventure</Text>
-        <Text style={styles.slide5Sub}>The kind of trip that sticks with you</Text>
-        <Text style={[styles.wordmark, { position: 'relative', bottom: undefined, left: undefined, marginTop: 12, textAlign: 'center', color: 'rgba(255,255,255,0.35)' }]}>
+        {/* Editable eyebrow */}
+        <TouchableOpacity onPress={() => setEditingField('eyebrow')} disabled={editingField === 'eyebrow'} activeOpacity={0.7}>
+          {editingField === 'eyebrow' ? (
+            <TextInput
+              value={eyebrow} onChangeText={setEyebrow}
+              onBlur={() => setEditingField(null)} autoFocus
+              style={s5e.eyebrowInput} placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholder="Add a label..."
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+              <Text style={styles.eyebrow}>{eyebrow || 'Tap to add label'}</Text>
+              <Text style={s5e.editHint}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {/* Editable title */}
+        <TouchableOpacity onPress={() => setEditingField('title')} disabled={editingField === 'title'} activeOpacity={0.7}>
+          {editingField === 'title' ? (
+            <TextInput
+              value={title} onChangeText={setTitle}
+              onBlur={() => setEditingField(null)} autoFocus multiline
+              style={s5e.titleInput} placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholder="Add a title..." textAlign="center"
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 8 }}>
+              <Text style={[styles.slide5Title, { flex: 1 }]}>{title || 'Tap to add title'}</Text>
+              <Text style={[s5e.editHint, { fontSize: 14, marginTop: 4 }]}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {/* Editable subtitle */}
+        <TouchableOpacity onPress={() => setEditingField('subtitle')} disabled={editingField === 'subtitle'} activeOpacity={0.7}>
+          {editingField === 'subtitle' ? (
+            <TextInput
+              value={subtitle} onChangeText={setSubtitle}
+              onBlur={() => setEditingField(null)} autoFocus
+              style={s5e.subtitleInput} placeholderTextColor="rgba(255,255,255,0.28)"
+              placeholder="Add a tagline..." textAlign="center"
+            />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 2 }}>
+              <Text style={styles.slide5Sub}>{subtitle || 'Tap to add tagline'}</Text>
+              <Text style={[s5e.editHint, { fontSize: 10 }]}>{'\u270E'}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <Text style={[styles.wordmark, { position: 'relative', bottom: undefined, left: undefined, marginTop: 16, textAlign: 'center', color: 'rgba(255,255,255,0.35)' }]}>
           ROAMUS
         </Text>
       </View>
@@ -786,6 +912,52 @@ export default function StoryScreen() {
     } catch {}
   }
 
+  // Save all 5 slides to camera roll, then open Instagram for carousel posting
+  async function handleSaveAllToInstagram() {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo access so we can save your slides to post as an Instagram carousel.');
+      return;
+    }
+    setSavingAll(true);
+    const originalSlide = slideIndexRef.current;
+    let savedCount = 0;
+    let firstAssetId: string | null = null;
+    try {
+      for (let i = 0; i < TOTAL_SLIDES; i++) {
+        slideOpacity.setValue(1);
+        setDisplaySlide(i);
+        await new Promise<void>(resolve => setTimeout(resolve, 1200));
+        const uri = await captureSlide();
+        if (uri) {
+          const asset = await MediaLibrary.createAssetAsync(uri);
+          if (i === 0) firstAssetId = asset.id;
+          savedCount++;
+        }
+      }
+    } finally {
+      setDisplaySlide(originalSlide);
+      setSavingAll(false);
+    }
+    if (savedCount === 0) { Alert.alert('Could not save slides', 'Please try again.'); return; }
+    showPhotoToast(`\uD83D\uDCF7 ${savedCount} slides saved to camera roll`);
+    // Open Instagram pointing at the first saved asset so user can select all for carousel
+    setTimeout(async () => {
+      const deepLink = Platform.OS === 'ios' && firstAssetId
+        ? `instagram://library?LocalIdentifier=${firstAssetId}`
+        : 'instagram://app';
+      const canOpen = await Linking.canOpenURL(deepLink).catch(() => false);
+      if (canOpen) {
+        await Linking.openURL(deepLink);
+      } else {
+        Alert.alert(
+          'Open Instagram',
+          `All ${savedCount} slides saved to your camera roll. Open Instagram \u2192 New Post \u2192 select all ${savedCount} to post as a carousel.`,
+        );
+      }
+    }, 1000);
+  }
+
   const handleAddPhoto = () => router.push({ pathname: '/(tabs)/today', params: { tripId } } as any);
   const handleAddQuote = () => router.push({ pathname: '/(tabs)/today', params: { tripId } } as any);
 
@@ -795,12 +967,14 @@ export default function StoryScreen() {
     ? ([0,1,2,3].map(i => overrideCollage[i] ?? collagePhotos[i] ?? null) as (string|null)[])
     : collagePhotos;
 
+  const templateIndex = useMemo(() => getTemplateIndex(tripId ?? '', SLIDE1_TEMPLATES.length), [tripId]);
+
   const slideContent = [
-    <Slide1Cover key="1" trip={trip} heroPhoto={finalHero} />,
+    <Slide1Cover key="1" trip={trip} heroPhoto={finalHero} templateIndex={templateIndex} />,
     <Slide2Map key="2" trip={trip} />,
     <Slide3Collage key="3" collagePhotos={finalCollage} trip={trip} onAddPhoto={handleAddPhoto} initialQuote={highlights[0]} />,
     <Slide4Quotes key="4" highlights={highlights} generating={generating} onAddQuote={handleAddQuote} />,
-    <Slide5Closing key="5" trip={trip} closingPhoto={finalClosing} />,
+    <Slide5Closing key="5" trip={trip} closingPhoto={finalClosing} templateIndex={templateIndex} />,
   ];
 
   return (
@@ -859,8 +1033,15 @@ export default function StoryScreen() {
           )}
         </View>
         <View style={styles.shareRow}>
-          <Pressable style={styles.shareSmall} onPress={handleShareLink}>
-            <Text style={styles.shareSmallText}>{'\uD83D\uDD17'} Share link</Text>
+          <Pressable
+            style={[styles.shareSmall, savingAll && { opacity: 0.6 }]}
+            onPress={handleSaveAllToInstagram}
+            disabled={savingAll}
+          >
+            {savingAll
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={styles.shareSmallText}>{'\uD83D\uDCF8'} Instagram</Text>
+            }
           </Pressable>
           <Pressable style={styles.shareSmall} onPress={nextSlide}>
             <Text style={styles.shareSmallText}>{slide < TOTAL_SLIDES - 1 ? 'Next \u2192' : 'Done \u2713'}</Text>
@@ -1241,6 +1422,46 @@ const pkr = StyleSheet.create({
   doneTxt: { fontFamily: F.bold, fontSize: 15, color: '#fff' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyTxt: { fontFamily: F.medium, fontSize: 15, color: '#8A8FA8', textAlign: 'center', lineHeight: 22 },
+});
+
+// ── Slide 1 editable-text styles ──────────────────────────────────────────────
+const s1e = StyleSheet.create({
+  eyebrowInput: {
+    fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 3, marginBottom: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    paddingBottom: 3, minWidth: 140,
+  },
+  titleInput: {
+    fontFamily: 'Georgia', fontSize: 28, fontWeight: '800', color: '#fff',
+    lineHeight: 34, minHeight: 68,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingBottom: 4,
+  },
+  editHint: { fontSize: 10, color: 'rgba(255,255,255,0.30)', fontFamily: F.regular },
+});
+
+// ── Slide 5 editable-text styles ──────────────────────────────────────────────
+const s5e = StyleSheet.create({
+  eyebrowInput: {
+    fontSize: 11, fontFamily: F.bold, color: 'rgba(255,255,255,0.85)',
+    letterSpacing: 3, marginBottom: 8, textAlign: 'center',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    paddingBottom: 3, minWidth: 160, alignSelf: 'center',
+  },
+  titleInput: {
+    fontFamily: 'Georgia', fontSize: 32, fontWeight: '800', color: '#fff',
+    lineHeight: 38, minHeight: 80, textAlign: 'center',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.25)',
+    paddingBottom: 4,
+  },
+  subtitleInput: {
+    fontSize: 14, fontFamily: F.regular, color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center', minWidth: 160, alignSelf: 'center',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.3)',
+    paddingBottom: 3,
+  },
+  editHint: { fontSize: 10, color: 'rgba(255,255,255,0.30)', fontFamily: F.regular },
 });
 
 // Slide 2 map marker styles
