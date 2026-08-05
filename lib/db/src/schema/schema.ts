@@ -4,6 +4,7 @@ import {
   date,
   index,
   uniqueIndex,
+  primaryKey,
   integer,
   jsonb,
   pgTable,
@@ -3979,14 +3980,16 @@ export type NearbyLandmarksCache = typeof nearbyLandmarksCache.$inferSelect;
 // ── DRIVING LEGS CACHE ────────────────────────────────────────────────────────
 // Caches Google Distance Matrix results keyed by lat/lng coordinate strings.
 // Eliminates repeat API calls for the same origin→destination pair.
-// Shape matches production: no serial PK, computed_at timestamptz NOT NULL.
+// PK: composite (origin_key, dest_key) — promoted from the former uq_travel_legs_pair
+// UNIQUE index via ALTER TABLE ... ADD PRIMARY KEY USING INDEX.  The constraint
+// and index both retain the name "uq_travel_legs_pair" in Postgres.
 export const travelLegs = pgTable("travel_legs", {
   originKey:       text("origin_key").notNull(),
   destKey:         text("dest_key").notNull(),
   durationSeconds: integer("duration_seconds").notNull(),
   computedAt:      timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("uq_travel_legs_pair").on(table.originKey, table.destKey),
+  primaryKey({ columns: [table.originKey, table.destKey], name: "uq_travel_legs_pair" }),
   index("idx_travel_legs_origin").on(table.originKey),
   index("idx_travel_legs_dest").on(table.destKey),
 ]);
