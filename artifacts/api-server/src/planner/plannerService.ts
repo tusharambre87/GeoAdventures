@@ -133,6 +133,29 @@ const normalizePoolKey = (s: string) =>
     .replace(/[\u2018\u2019\u201a\u201b\u02bc]/g, "'")
     .replace(/[\u201c\u201d\u201e\u201f]/g, '"');
 
+// Module-level semantic name normalizer — strips parentheticals, "The" prefix,
+// common synonym expansions, diacritics, and punctuation. Used as Pass 3 in
+// generateCityStopPool and for usedNormNames dedup in selectStopsFromPool.
+// IMPORTANT: keep in sync with the inline copy in dedup-norm-names.ts.
+const normStopNameGlobal = (n: string): string =>
+  n.toLowerCase()
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/^the\s+/, '')
+    .replace(/\bunited\s+states\b/g, 'us')
+    .replace(/\bmount\b/g, 'mt')
+    .replace(/\bsaint\b/g, 'st')
+    .replace(/\bof\s+arts?\b/g, 'of art')
+    .replace(/\s+regional\s+/g, ' ')
+    .replace(/\s+state\s+park\b/g, '')
+    .replace(/\s+national\s+park\b/g, '')
+    .replace(/\s+county\s+park\b/g, '')
+    .replace(/&/g, 'and')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ').slice(0, 5).join(' ');
+
 function getCityMustDoBlock(destination: string, localDayNumber: number, usedStopNames: string[]): string {
   const key = destination.toLowerCase().trim();
   // Strip country suffix if present (e.g. "New York City, USA" → "new york city")
@@ -2513,9 +2536,35 @@ export async function generateCityStopPool(
   }
   const finalDeduped = [...byGpPlace.values(), ...passThrough];
 
-  console.log(`[CityPoolSeeder] Building pool for ${city} from stop_library — ${uniqueRows.length} stops after name-dedup, ${finalDeduped.length} after gp_place_id dedup`);
+  // ── Pass 3: normStopName dedup ────────────────────────────────────────────
+  // Catches name variants that survive both normalizePoolKey (Pass 1) and
+  // gp_place_id (Pass 2): "The X"/"X", "Venue (Sub-location)"/"Venue",
+  // diacritic variants, etc. Keeper: highest scoreClassicFinal → gpRatingsTotal
+  // → shorter name. Mirrors the inline pass in dedup-norm-names.ts exactly.
+  const normSeen3 = new Map<string, typeof finalDeduped[number]>();
+  for (const stop of finalDeduped) {
+    const norm = normStopNameGlobal(stop.name ?? '');
+    const existing = normSeen3.get(norm);
+    if (!existing) { normSeen3.set(norm, stop); continue; }
+    const eScore = existing.scoreClassicFinal ?? -1;
+    const nScore = stop.scoreClassicFinal ?? -1;
+    const eGp    = existing.gpRatingsTotal ?? -1;
+    const nGp    = stop.gpRatingsTotal ?? -1;
+    const eName  = existing.name ?? '';
+    const nName  = stop.name ?? '';
+    if (
+      nScore > eScore ||
+      (nScore === eScore && nGp > eGp) ||
+      (nScore === eScore && nGp === eGp && nName.length < eName.length)
+    ) {
+      normSeen3.set(norm, stop);
+    }
+  }
+  const pass3Deduped = [...normSeen3.values()];
 
-  return finalDeduped.map((row): CachedStopCandidate => {
+  console.log(`[CityPoolSeeder] Building pool for ${city} from stop_library — ${uniqueRows.length} stops after name-dedup, ${finalDeduped.length} after gp_place_id dedup, ${pass3Deduped.length} after normStopName dedup`);
+
+  return pass3Deduped.map((row): CachedStopCandidate => {
     const enrichment = row.enrichment as Record<string, string> | null;
     const stopType = row.stopType ?? "landmark";
 
@@ -2658,8 +2707,15 @@ async function generateCityStopPoolFromAI(
   const batchB = await callBatch("B — hidden gems, local favourites, neighbourhood stops", batchANames);
 
   const all = [...batchA, ...batchB];
-  const deduped = all.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
-  console.log(`[CityPool] ✅ Total: ${deduped.length} stops for ${destination} (A:${batchA.length} + B:${batchB.length})`);
+  // Use normStopNameGlobal (same as Pass 3 in generateCityStopPool) rather than
+  // exact string equality so AI-generated name variants collapse correctly.
+  const aiNormSeen = new Map<string, typeof all[number]>();
+  for (const s of all) {
+    const k = normStopNameGlobal(s.name ?? '');
+    if (!aiNormSeen.has(k)) aiNormSeen.set(k, s);
+  }
+  const deduped = [...aiNormSeen.values()];
+  console.log(`[CityPool] ✅ Total: ${deduped.length} stops for ${destination} (A:${batchA.length} + B:${batchB.length}, pre-dedup ${all.length})`);
   return deduped;
 }
 
@@ -3170,24 +3226,9 @@ export function selectStopsFromPool(
 
   // Normalized name dedup — catches &/and, "The X"/"X", "Regional Park", punctuation variants,
   // parenthetical qualifiers ("Venue (Sub-attraction)"), and diacritic variants (café/cafe, Hōnaunau/Honaunau)
-  const normStopName = (n: string): string =>
-    n.toLowerCase()
-      .replace(/\s*\([^)]*\)/g, '')
-      .replace(/^the\s+/, '')
-      .replace(/\bunited\s+states\b/g, 'us')
-      .replace(/\bmount\b/g, 'mt')
-      .replace(/\bsaint\b/g, 'st')
-      .replace(/\bof\s+arts?\b/g, 'of art')
-      .replace(/\s+regional\s+/g, ' ')
-      .replace(/\s+state\s+park\b/g, '')
-      .replace(/\s+national\s+park\b/g, '')
-      .replace(/\s+county\s+park\b/g, '')
-      .replace(/&/g, 'and')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9 ]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ').slice(0, 5).join(' ');
+  // Alias to module-level normStopNameGlobal so all existing uses inside this
+  // function keep their short name without any behaviour change.
+  const normStopName = normStopNameGlobal;
   const usedNormNames = new Set<string>();
 
   // Track zones for the current day window (reset when dayPosition wraps to 0)
@@ -3503,6 +3544,7 @@ export function selectStopsFromPool(
       if (selected.length >= totalStopsNeeded) break;
       if (stop.type === 'museum' && museumsTotal >= maxMuseumsPerTrip) continue;
       if (REPEATABLE_NATURE_TYPES.has(stop.type ?? '') && natureStopsTotal >= maxNatureStopsPerTrip) continue;
+      if (usedNormNames.has(normStopName(stop.name))) continue;
       selected.push(stop);
       if (stop.type === 'museum') museumsTotal++;
       if (REPEATABLE_NATURE_TYPES.has(stop.type ?? '')) natureStopsTotal++;
@@ -3515,14 +3557,10 @@ export function selectStopsFromPool(
     const cityKey = targetCity.toLowerCase().trim().replace(/,\s*\w+$/, "");
     const mustDoEntry = CITY_MUST_DO_STOPS[cityKey];
     if (mustDoEntry) {
-      const mustDoNames = mustDoEntry.stops.map(s => s.name.toLowerCase().split(" ")[0]);
-      const alreadyHasMustDo = selected.some(s =>
-        mustDoNames.some(n => s.name.toLowerCase().includes(n))
-      );
+      const mustDoNorms = mustDoEntry.stops.map(s => normStopName(s.name));
+      const alreadyHasMustDo = selected.some(s => mustDoNorms.includes(normStopName(s.name)));
       if (!alreadyHasMustDo) {
-        const mustDoCandidate = pool.find(c =>
-          mustDoNames.some(n => c.name.toLowerCase().includes(n))
-        );
+        const mustDoCandidate = pool.find(c => mustDoNorms.includes(normStopName(c.name)));
         if (mustDoCandidate) {
           const swapIdx = selected.findIndex(s => s.familyAnchorType === "filler" || s.familyAnchorType === "reset");
           if (swapIdx !== -1) {
@@ -3551,7 +3589,7 @@ export function selectStopsFromPool(
       .slice(0, AUTO_MUST_DO_MAX);
 
     for (const candidate of autoMustDoCandidates) {
-      const alreadyIn = selected.some(s => normalizePoolKey(s.name) === normalizePoolKey(candidate.name));
+      const alreadyIn = selected.some(s => normStopName(s.name) === normStopName(candidate.name));
       if (alreadyIn) continue;
       const swapIdx = selected.findIndex(s => s.familyAnchorType === "filler" || s.familyAnchorType === "reset");
       if (swapIdx !== -1) {
