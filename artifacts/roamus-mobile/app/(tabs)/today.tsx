@@ -657,6 +657,8 @@ export default function TodayScreen() {
   const [sotwLocDenied, setSotwLocDenied]             = useState(false);
   const [sotwFilter, setSotwFilter]                   = useState<SotwFilter>('playground');
   const [sotwPlaces, setSotwPlaces]                   = useState<SotwPlace[]>([]);
+  /** placeId → true when /api/travel/place-photo returned an error for that place */
+  const [sotwImageFailed, setSotwImageFailed]         = useState<Record<string, boolean>>({});
   const [sotwLoading, setSotwLoading]                 = useState(false);
   const [sotwQuery, setSotwQuery]                     = useState('');
   const [sotwUserLoc, setSotwUserLoc]                 = useState<{ lat: number; lng: number } | null>(null);
@@ -1699,6 +1701,7 @@ export default function TodayScreen() {
     if (!position) return;
     const query = overrideQuery !== undefined ? overrideQuery : sotwQuery;
     setSotwFilter(filter);
+    setSotwImageFailed({});
     setSotwLoading(true);
     try {
       let url = `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${trip?.id ?? ''}`;
@@ -3561,12 +3564,15 @@ export default function TodayScreen() {
                       return (
                         <TouchableOpacity key={place.placeId} style={[sotw.richCard, { borderColor: '#E8692A' }]} onPress={() => openBreakCapture(place)} activeOpacity={0.92}>
                           <View style={sotw.richImg}>
-                            {place.photoReference ? (
+                            {place.photoReference && !sotwImageFailed[place.placeId] ? (
                               <Image
                                 source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }}
                                 style={StyleSheet.absoluteFill}
                                 resizeMode="cover"
-                                onError={(e) => console.log('[SOTW img error]', place.name, e.nativeEvent.error)}
+                                onError={(e) => {
+                                  console.log('[SOTW img error]', place.name, e.nativeEvent.error);
+                                  setSotwImageFailed(prev => ({ ...prev, [place.placeId]: true }));
+                                }}
                                 onLoad={() => console.log('[SOTW img loaded]', place.name)}
                               />
                             ) : (
@@ -4677,11 +4683,15 @@ export default function TodayScreen() {
                         return (
                           <TouchableOpacity key={place.placeId} style={[sotw.richCard, { borderColor: '#E8692A' }]} onPress={() => openBreakCapture(place)} activeOpacity={0.92}>
                             <View style={sotw.richImg}>
-                              {place.photoReference ? (
+                              {place.photoReference && !sotwImageFailed[place.placeId] ? (
                                 <Image
                                   source={{ uri: `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}` }}
                                   style={StyleSheet.absoluteFill}
                                   resizeMode="cover"
+                                  onError={(e) => {
+                                    console.log('[SOTW img error]', place.name, e.nativeEvent.error);
+                                    setSotwImageFailed(prev => ({ ...prev, [place.placeId]: true }));
+                                  }}
                                 />
                               ) : (
                                 <View style={[StyleSheet.absoluteFill, { backgroundColor: '#7A9E8E', justifyContent: 'center', alignItems: 'center' }]}>

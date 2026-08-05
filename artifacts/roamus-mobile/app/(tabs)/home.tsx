@@ -922,6 +922,8 @@ export default function HomeScreen() {
   const [sotwGoing, setSotwGoing] = useState<string | null>(null);
   const [sotwQuery, setSotwQuery] = useState('');
   const [sotwRadius, setSotwRadius] = useState(5000);
+  /** placeId → true when /api/travel/place-photo returned an error for that place */
+  const [sotwImageFailed, setSotwImageFailed] = useState<Record<string, boolean>>({});
   const sotwSlideY = useRef(new Animated.Value(900)).current;
 
   // Compare dates by local calendar day (YYYY-MM-DD) to avoid UTC/timezone mismatch.
@@ -1163,6 +1165,7 @@ export default function HomeScreen() {
     const radius = overrideRadius ?? sotwRadius;
     const query  = overrideQuery  ?? sotwQuery;
     setSotwFilter(filter);
+    setSotwImageFailed({});
     setSotwLoading(true);
     try {
       let url = `/api/travel/stops-on-the-way?lat=${position.lat}&lng=${position.lng}&type=${filter}&tripId=${activeTrip?.id ?? ''}&radius=${radius}`;
@@ -1541,7 +1544,7 @@ export default function HomeScreen() {
                   <>
                     <Text style={hs.sotwCount}>{sotwPlaces.length} {sotwPlaces.length === 1 ? 'place' : 'places'} found</Text>
                     {sotwPlaces.map((place, index) => {
-                      const photoUrl = place.photoReference
+                      const photoUrl = place.photoReference && !sotwImageFailed[place.placeId]
                         ? `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(place.photoReference)}`
                         : null;
                       const going = sotwGoing === place.placeId;
@@ -1550,7 +1553,15 @@ export default function HomeScreen() {
                         return (
                           <View key={place.placeId} style={hs.sotwFeat}>
                             {photoUrl ? (
-                              <Image source={{ uri: photoUrl }} style={hs.sotwFeatImg} contentFit="cover" />
+                              <Image
+                                source={{ uri: photoUrl }}
+                                style={hs.sotwFeatImg}
+                                contentFit="cover"
+                                onError={(e) => {
+                                  console.log('[SOTW img error]', place.name, (e as any).error ?? e);
+                                  setSotwImageFailed(prev => ({ ...prev, [place.placeId]: true }));
+                                }}
+                              />
                             ) : (
                               <View style={[hs.sotwFeatImg, { backgroundColor: '#D1D5E0' }]} />
                             )}
