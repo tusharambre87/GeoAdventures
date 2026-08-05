@@ -5725,21 +5725,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Single source of truth for stop count: getStopsPerDay with age bracket
         const plannerPace: "relaxed" | "moderate" | "busy" =
           effectivePace === "chill" ? "relaxed" : effectivePace === "packed" ? "busy" : "moderate";
-        const effectivePerDay = getStopsPerDay(plannerPace, minChildAge).total;
+        const _baseSpd = getStopsPerDay(plannerPace, minChildAge);
+        const effectivePerDay = _baseSpd.total;
 
         // Read arrival signals from tailoring JSONB
         const arrivalTimeSig = tripTailoring?.arrivalTime as string | null;
         const lastDayType = tripTailoring?.lastDay as string | null;
 
-        // Arrival day cap (onboarding emits: morning|afternoon|evening — late/late_night unreachable, deleted)
-        const arrivalDayCap = arrivalTimeSig === "evening"   ? 0
-          : arrivalTimeSig === "afternoon" ? Math.max(0, effectivePerDay - 1)
-          : effectivePerDay; // morning or null → full pace
-
-        // Last day cap: travel day = 0 (heading home — no stops), leaving late = min(2,pace), full day = normal
-        const lastDayCap = lastDayType === "travel" ? 0
-          : lastDayType === "late" ? Math.min(2, effectivePerDay)
-          : effectivePerDay;
+        // Derive arrival/departure day caps from dayRoleCap() — one source of truth.
+        // Previously two hand-rolled ternaries that drifted from the spec at relaxed
+        // and busy pace (e.g. busy+afternoon gave 2 instead of spec's 1).  Now both
+        // scalars are anchors + fillers from the same function used to build perDayCapsArr.
+        const _arrivalRoleCap   = dayRoleCap('arrival',  arrivalTimeSig, _baseSpd);
+        const _departureRoleCap = dayRoleCap('departure', lastDayType,   _baseSpd);
+        const arrivalDayCap = _arrivalRoleCap.anchors   + _arrivalRoleCap.fillers;
+        const lastDayCap    = _departureRoleCap.anchors + _departureRoleCap.fillers;
 
         // Total: arrival day + middle days + last day (each capped separately)
         const middleDays = tripDays ? Math.max(0, tripDays - 2) : 0;
@@ -5783,8 +5783,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateTrip(tripId, { latitude: String(firstWithCoords.latitude), longitude: String(firstWithCoords.longitude) });
             }
             const plannerTripDays = tripDays || Math.ceil(effectiveStopCount / (effectivePerDay || 2));
-            // Per-day arrival/departure caps fed into the pool path
-            const _baseSpd = getStopsPerDay(plannerPace, minChildAge);
+            // Per-day arrival/departure caps fed into the pool path.
+            // _baseSpd / _arrivalRoleCap / _departureRoleCap are hoisted above —
+            // shared with the arrivalDayCap/lastDayCap scalar computation.
             const perDayCapsArr: DayRoleCap[] = [];
             if (plannerTripDays >= 2) {
               perDayCapsArr.push(dayRoleCap('arrival', arrivalTimeSig, _baseSpd));
@@ -5793,7 +5794,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               perDayCapsArr.push(dayRoleCap('departure', lastDayType, _baseSpd));
             } else if (plannerTripDays === 1) {
-              perDayCapsArr.push(dayRoleCap('middle', null, _baseSpd));
+              // A 1-day trip is simultaneously an arrival and a departure day.
+              // Take the more restrictive of both caps per component so the tighter
+              // constraint always wins (evening-arrival + travel-departure → 0 stops;
+              // morning-arrival + full-departure → full base pace).
+              perDayCapsArr.push({
+                anchors:   Math.min(_arrivalRoleCap.anchors,  _departureRoleCap.anchors),
+                fillers:   Math.min(_arrivalRoleCap.fillers,  _departureRoleCap.fillers),
+                dayRole:   'arrival' as const,
+                capReason: `1-day: ${_arrivalRoleCap.capReason} & ${_departureRoleCap.capReason}`,
+              });
             }
             const plannerInput: PlannerInput = {
               destination: cityName,
@@ -7194,7 +7204,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (let _d = 1; _d < tripDays - 1; _d++) _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
           _prevCaps.push(dayRoleCap('departure', _prevLastSig, _prevBaseSpd));
         } else {
-          _prevCaps.push(dayRoleCap('middle', null, _prevBaseSpd));
+          // 1-day preview: arrival and departure simultaneously — take the more restrictive per component.
+          const _pArrCap = dayRoleCap('arrival',   _prevArrSig,  _prevBaseSpd);
+          const _pDepCap = dayRoleCap('departure',  _prevLastSig, _prevBaseSpd);
+          _prevCaps.push({
+            anchors:   Math.min(_pArrCap.anchors,  _pDepCap.anchors),
+            fillers:   Math.min(_pArrCap.fillers,  _pDepCap.fillers),
+            dayRole:   'arrival' as const,
+            capReason: `1-day: ${_pArrCap.capReason} & ${_pDepCap.capReason}`,
+          });
         }
         const plannerInput: PlannerInput = {
           destination: city,
