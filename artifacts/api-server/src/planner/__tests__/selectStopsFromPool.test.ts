@@ -149,7 +149,105 @@ describe('selectStopsFromPool — zero-stop via Pass-1 exhausting remaining', ()
 });
 
 // ---------------------------------------------------------------------------
-// 2. Fill-up masks gates ⑫–⑮ (documents observed behaviour, not a fix)
+// 2. Shortfall / cascading truncation guard
+// ---------------------------------------------------------------------------
+//
+// Root cause (plannerService.ts result-assembly loop):
+//
+//   for (let day = 1; day <= input.tripDays; day++) {
+//     const daySlice = selected.slice(stopIdx, stopIdx + daySize);
+//     stopIdx += daySize;
+//     if (daySlice.length === 0) break;   ← drops every remaining day
+//   }
+//
+// When pool exhaustion causes any day to come up empty, `break` silently
+// drops that day AND every day after it.  A 3-day trip whose pool ran out
+// after day 2 returns 4 stops — non-zero, so the old guard (=== 0) would
+// not fire, and the trip would be persisted with day 3 blank.
+//
+// Fix: return `totalStopsNeeded` from selectStopsFromPool and replace the
+// === 0 guard at the call site with `< totalStopsNeeded`.
+//
+// Trade-off (documented here, not resolved here):
+//   The new guard causes the entire trip to regenerate via AI when even a
+//   single day is short.  A future improvement could supplement only the
+//   shortfall and preserve the pool-generated days, but that requires new
+//   plumbing (partial AI call + merge step) outside this brief's scope.
+
+describe('selectStopsFromPool — shortfall / cascading truncation', () => {
+  it('returns fewer stops than totalStopsNeeded when pool is exhausted before the last day', () => {
+    // 3-day trip needing 2 stops/day = totalStopsNeeded 6.
+    // Pool has only 4 non-anchor candidates (all 'support' → Pass-1 skips them,
+    // remaining={4}, greedy loop exhausts them in 4 iterations).
+    //
+    // Result-assembly loop:
+    //   Day 1: slice(0,2) = [A,B]  → length 2 ✓
+    //   Day 2: slice(2,4) = [C,D]  → length 2 ✓
+    //   Day 3: slice(4,6) = []     → length 0 → break
+    //
+    // result.stops.length (4) > 0  → old guard (=== 0) would NOT have fired.
+    // result.stops.length (4) < totalStopsNeeded (6) → new guard fires correctly.
+    //
+    // Landmark/park/nature/viewpoint chosen deliberately: none are in
+    // IMMERSIVE_TYPES, so the per-day immersive cap cannot interfere.
+    // All at the same coordinates cluster (< 1 km apart) so legCap never fires.
+    // Quality gate is skipped for pools with < 10 scored candidates.
+    const pool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Landmark A',  type: 'landmark',  familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7580', longitude: '-73.9855' }),
+      makeCandidate({ name: 'Park B',      type: 'park',      familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7589', longitude: '-73.9841' }),
+      makeCandidate({ name: 'Nature C',    type: 'nature',    familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7596', longitude: '-73.9868' }),
+      makeCandidate({ name: 'Viewpoint D', type: 'viewpoint', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7572', longitude: '-73.9877' }),
+    ];
+
+    const result = selectStopsFromPool(
+      pool,
+      makeInput({ tripDays: 3, stopsPerDayOverride: 2, childrenAges: [7], pace: 'moderate' }),
+    );
+
+    // totalStopsNeeded is 3 days × 2 stops/day = 6
+    expect(result.totalStopsNeeded).toBe(6);
+
+    // Pool only had 4 valid candidates — result has fewer than the trip needs
+    expect(result.stops.length).toBeLessThan(result.totalStopsNeeded);
+
+    // stops.length > 0: the old guard (=== 0) would NOT have caught this shortfall
+    expect(result.stops.length).toBeGreaterThan(0);
+  });
+
+  it('the updated call-site guard throws on a shortfall, not just on zero stops', () => {
+    // Mirrors the guard at plannerService.ts (single-city pool path):
+    //
+    //   const { stops, totalStopsNeeded } = selectStopsFromPool(...);
+    //   if (stops.length < totalStopsNeeded) {
+    //     throw new Error(`selectStopsFromPool returned N of M needed stops for "..." — falling back...`);
+    //   }
+    //
+    // Before this change, a 4-of-6 result was indistinguishable from full success:
+    // the trip was persisted with days 3+ having zero stops, no error surfaced.
+    function simulateCaller(pool: CachedStopCandidate[], input: PlannerInput): void {
+      const { stops, totalStopsNeeded } = selectStopsFromPool(pool, input);
+      if (stops.length < totalStopsNeeded) {
+        throw new Error(
+          `selectStopsFromPool returned ${stops.length} of ${totalStopsNeeded} needed stops for "${input.destination}" — falling back to AI generation`,
+        );
+      }
+    }
+
+    const shortPool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Landmark A',  type: 'landmark',  familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7580', longitude: '-73.9855' }),
+      makeCandidate({ name: 'Park B',      type: 'park',      familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7589', longitude: '-73.9841' }),
+      makeCandidate({ name: 'Nature C',    type: 'nature',    familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7596', longitude: '-73.9868' }),
+      makeCandidate({ name: 'Viewpoint D', type: 'viewpoint', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '40.7572', longitude: '-73.9877' }),
+    ];
+
+    expect(() =>
+      simulateCaller(shortPool, makeInput({ tripDays: 3, stopsPerDayOverride: 2, childrenAges: [7], pace: 'moderate' })),
+    ).toThrow('falling back to AI generation');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Fill-up masks gates ⑫–⑮ (documents observed behaviour, not a fix)
 // ---------------------------------------------------------------------------
 
 describe('selectStopsFromPool — fill-up bypasses geo leg-cap (gates ⑭/⑮)', () => {

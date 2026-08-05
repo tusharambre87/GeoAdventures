@@ -2814,6 +2814,11 @@ function estimateTravelMins(km: number, mode: string): number {
 export type StopPoolResult = {
   stops: GeneratedStop[];
   parentSuggestions: GeneratedStop[];
+  /** Total activity-stop slots needed for this trip (sum of per-day caps).
+   *  Returned so the call-site guard can detect cascading truncation:
+   *  stops.length < totalStopsNeeded means at least one day received zero stops
+   *  and the result-assembly loop broke early, silently dropping later days. */
+  totalStopsNeeded: number;
 };
 
 /**
@@ -3978,7 +3983,7 @@ export function selectStopsFromPool(
     ...parentSuggestions.map(s => ({ ...s, bucketType: 'age_stretch' as const })),
   ];
 
-  return { stops: result, parentSuggestions: allParentSuggestions };
+  return { stops: result, parentSuggestions: allParentSuggestions, totalStopsNeeded };
 }
 
 // ── Day-bucketing output types ────────────────────────────────────────────────
@@ -4579,13 +4584,15 @@ export async function generateItinerary(
     try {
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
-      const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
-      // Guard: if every unconditional gate in selectStopsFromPool fired and nothing
-      // survived, throw here so the catch block below falls through to AI generation.
-      // selectStopsFromPool never throws on an empty result — without this guard the
-      // caller would persist [] and build a trip with zero stops and no error surfaced.
-      if (rawSelectedStops.length === 0) {
-        throw new Error(`selectStopsFromPool returned 0 stops for "${cityName}" — falling back to AI generation`);
+      const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions, totalStopsNeeded } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
+      // Guard: throw whenever the pool couldn't fill every day, not just when it
+      // returned zero total. The result-assembly loop inside selectStopsFromPool
+      // does `if (daySlice.length === 0) break` — once any day comes up empty,
+      // every subsequent day is also dropped silently. A trip that needs 6 stops
+      // and returns 4 has the same cascading problem as one that returns 0.
+      // Same throw, same catch block below, same AI-fallback path.
+      if (rawSelectedStops.length < totalStopsNeeded) {
+        throw new Error(`selectStopsFromPool returned ${rawSelectedStops.length} of ${totalStopsNeeded} needed stops for "${cityName}" — falling back to AI generation`);
       }
       let finalStops: GeneratedStop[];
       if (restStopsActive) {
