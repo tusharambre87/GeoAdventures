@@ -32,7 +32,8 @@
     "seed:yellowstone": "tsx src/scripts/seed-yellowstone.ts",
     "seed:yosemite": "tsx src/scripts/seed-yosemite.ts",
     "dedup:gp-place-id": "tsx src/scripts/dedup-gp-place-id.ts",
-    "dedup:gp-place-id:yellowstone": "DEDUP_CITY=Yellowstone tsx src/scripts/dedup-gp-place-id.ts"
+    "dedup:gp-place-id:yellowstone": "DEDUP_CITY=Yellowstone tsx src/scripts/dedup-gp-place-id.ts",
+    "dedup:norm-names": "tsx src/scripts/dedup-norm-names.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
