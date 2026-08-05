@@ -8274,8 +8274,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? db.select({
                   ppName: plannerPlaces.name,
                   ppCity: plannerPlaces.city,
-                  restroomConfidence: plannerStopIntelligence.restroomConfidence,
-                  strollerEaseScore:  plannerStopIntelligence.strollerEaseScore,
+                  restroomConfidence:       plannerStopIntelligence.restroomConfidence,
+                  strollerEaseScore:        plannerStopIntelligence.strollerEaseScore,
+                  parkingAvailabilityScore: plannerStopIntelligence.parkingAvailabilityScore,
                 })
                 .from(plannerStopIntelligence)
                 .innerJoin(plannerPlaces, eq(plannerPlaces.id, plannerStopIntelligence.placeId))
@@ -8298,6 +8299,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             if (exploreData?.parkingInfo && !enrich.parkingNotes) {
               enrich.parkingNotes = exploreData.parkingInfo;
+            }
+            // Fallback: convert PSI parkingAvailabilityScore to text only when
+            // neither explore_cache nor AI output provided parkingNotes.
+            if (!enrich.parkingNotes && (psi?.parkingAvailabilityScore ?? null) !== null) {
+              const ps = psi!.parkingAvailabilityScore as number;
+              enrich.parkingNotes = ps >= 70 ? 'Parking is generally available nearby'
+                : ps >= 40 ? 'Parking may be limited'
+                : 'Parking can be difficult to find';
             }
             if (psi?.strollerEaseScore != null && enrich.strollerFriendly == null) {
               enrich.strollerFriendly = psi.strollerEaseScore >= 60;
@@ -11256,8 +11265,9 @@ Return ONLY valid JSON in this exact format:
             : Promise.resolve(null),
           stop.name
             ? db.select({
-                restroomConfidence: plannerStopIntelligence.restroomConfidence,
-                strollerEaseScore:  plannerStopIntelligence.strollerEaseScore,
+                restroomConfidence:       plannerStopIntelligence.restroomConfidence,
+                strollerEaseScore:        plannerStopIntelligence.strollerEaseScore,
+                parkingAvailabilityScore: plannerStopIntelligence.parkingAvailabilityScore,
               })
               .from(plannerStopIntelligence)
               .innerJoin(plannerPlaces, eq(plannerPlaces.id, plannerStopIntelligence.placeId))
@@ -11278,6 +11288,14 @@ Return ONLY valid JSON in this exact format:
         const baseEnrichment: any = lib?.enrichment ?? {};
         if (exploreData?.parkingInfo && !baseEnrichment.parkingNotes) {
           baseEnrichment.parkingNotes = exploreData.parkingInfo;
+        }
+        // Fix 1b: PSI parkingAvailabilityScore as final fallback — only when
+        // neither explore_cache nor AI output provided parkingNotes.
+        if (!baseEnrichment.parkingNotes && (psi?.parkingAvailabilityScore ?? null) !== null) {
+          const ps = psi!.parkingAvailabilityScore as number;
+          baseEnrichment.parkingNotes = ps >= 70 ? 'Parking is generally available nearby'
+            : ps >= 40 ? 'Parking may be limited'
+            : 'Parking can be difficult to find';
         }
 
         // Fix 2: planner_stop_intelligence.restroom_confidence → meta.restroomConfidence label
