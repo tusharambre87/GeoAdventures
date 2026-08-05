@@ -3414,6 +3414,26 @@ export function selectStopsFromPool(
       let _injected = 0;
       for (const anchor of _injAnchors) {
         if (selected.length >= totalStopsNeeded) break;
+        // Hoist coordinate parse — used by both the proximity gate below and
+        // the lastLat/lastLon propagation that follows the push.
+        const _aLat = anchor.latitude ? parseFloat(String(anchor.latitude)) : null;
+        const _aLon = anchor.longitude ? parseFloat(String(anchor.longitude)) : null;
+        // Mirror gate ⑯: skip this anchor if it falls within 400 m of any stop
+        // already in `selected` (all days so far).  Pass 1 previously bypassed
+        // gate ⑯ entirely — two qualifying anchors for the same attraction (e.g.
+        // "Pyramids of Giza" / "The Great Pyramid of Giza") could be injected onto
+        // different days without the greedy proximity check ever seeing them.
+        // When skipped, `_injected` is not incremented so the slot falls through to
+        // findBest() on the next iteration — same fallback as every other backstop.
+        if (_aLat && _aLon) {
+          const _anchorTooClose = selected.some(s => {
+            const sLat = s.latitude ? parseFloat(String(s.latitude)) : null;
+            const sLon = s.longitude ? parseFloat(String(s.longitude)) : null;
+            if (!sLat || !sLon) return false;
+            return haversineKm(_aLat, _aLon, sLat, sLon) < 0.4;
+          });
+          if (_anchorTooClose) continue;
+        }
         selected.push(anchor);
         usedTypes.set(anchor.type, (usedTypes.get(anchor.type) ?? 0) + 1);
         anchorsInCurrentDay++;
@@ -3421,8 +3441,6 @@ export function selectStopsFromPool(
         // Propagate anchor coordinates so the geographic leg-cap fires for slot 1.
         // Without this, lastLat stays null (reset at day boundary) and the 25-min cap
         // is never evaluated for the second stop on any 2-stop day.
-        const _aLat = anchor.latitude ? parseFloat(String(anchor.latitude)) : null;
-        const _aLon = anchor.longitude ? parseFloat(String(anchor.longitude)) : null;
         if (_aLat && _aLon) {
           lastLat = _aLat; lastLon = _aLon;
           // Seed geo-clusters from injected anchors so filler scoring has context

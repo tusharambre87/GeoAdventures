@@ -353,6 +353,145 @@ describe('selectStopsFromPool — multi-city leg: per-city totalStopsNeeded', ()
 });
 
 // ---------------------------------------------------------------------------
+// 5. Anchor injection proximity gate (mirror of gate ⑯)
+// ---------------------------------------------------------------------------
+//
+// Root cause (before this fix):
+//   Pass 1 injects pre-selected anchors into `selected` inside the greedy
+//   while loop at dayPosition === 0 via a direct `selected.push(anchor)` with
+//   no proximity check.  Gate ⑯ (400 m dedup) lives further down the same
+//   loop body and is never reached for injected anchors.
+//
+//   Consequence: two qualifying anchors for the same physical location (e.g.
+//   Cairo's "Pyramids of Giza" / "The Great Pyramid of Giza", both familyAnchorType
+//   = 'anchor', scoreClassicFinal = 80, dist = 0 km — confirmed live in pool cache)
+//   could be assigned to different days by Pass 1 and injected without the
+//   greedy proximity dedup ever seeing them.
+//
+// Fix (plannerService.ts injection loop):
+//   Before `selected.push(anchor)`, compute the anchor's coordinates and run
+//   the same `haversineKm < 0.4` check gate ⑯ uses against all of `selected`.
+//   If too close, `continue` (skip injection).  `_injected` is not incremented,
+//   so `if (_injected > 0) continue` does not fire and the slot falls through
+//   to findBest() — the same fallback every other backstop uses.
+//
+// Item 1 — surrounding control flow (no change needed):
+//   • ALL anchors skipped → _injected===0 → `if (_injected > 0) continue` is
+//     false → falls straight to findBest().
+//   • SOME anchors skipped, some pushed → _injected>0 → `continue` fires after
+//     the injected ones → remaining slots get findBest() on re-entry.
+//   No change to the surrounding while-loop or outer if(dayPosition===0) needed.
+//
+// Item 4 — composition with the zero-stop shortfall guard:
+//   When skipping leaves a day unable to be filled (thin pool), the existing
+//   `stops.length < totalStopsNeeded` guard at call-sites catches the shortfall
+//   and falls back to AI generation.  The two fixes compose without a gap.
+
+describe('selectStopsFromPool — anchor injection proximity gate (mirror of gate ⑯)', () => {
+  // Shared pool: two anchor-qualifying stops at the same coords (dist = 0 km,
+  // well inside the 0.4 km threshold), plus 4 unique-type filler stops spread
+  // ~6–15 km away to avoid triggering gate ⑯ between themselves or against the
+  // anchor pair.
+  //
+  // Pass-1 distributes the two anchors round-robin: AnchorA → Day 1, AnchorB → Day 2.
+  // Day 1: AnchorA injected (selected is empty — no proximity hit).
+  // Day 2: AnchorB injection → haversineKm(AnchorA, AnchorB) = 0 < 0.4 → SKIPPED.
+  //         _injected = 0 → slot falls to findBest() → picks Filler2.
+  //         Gate ⑯ later removes AnchorB from `remaining` when greedy proposes it.
+  // Result: [AnchorA, Filler1, Filler2, Filler3] — fully filled, AnchorB absent.
+  const ANCHOR_LAT = '29.9792';
+  const ANCHOR_LON = '31.1342';
+
+  function makeAnchorPool(): CachedStopCandidate[] {
+    return [
+      // Two qualifying anchors at identical coordinates
+      makeCandidate({ name: 'Pyramids of Giza',         type: 'landmark', familyAnchorType: 'anchor', scoreClassicFinal: 80, latitude: ANCHOR_LAT, longitude: ANCHOR_LON }),
+      makeCandidate({ name: 'The Great Pyramid of Giza', type: 'mountain', familyAnchorType: 'anchor', scoreClassicFinal: 75, latitude: ANCHOR_LAT, longitude: ANCHOR_LON }),
+      // Fillers spread ~6–15 km away; all unique stop types to avoid the
+      // per-day type-diversity gate interfering with the assertions.
+      makeCandidate({ name: 'Filler Park',      type: 'park',      familyAnchorType: 'support', scoreClassicFinal: 65, latitude: '30.03', longitude: '31.20' }),
+      makeCandidate({ name: 'Filler Viewpoint', type: 'viewpoint', familyAnchorType: 'support', scoreClassicFinal: 60, latitude: '30.06', longitude: '31.25' }),
+      makeCandidate({ name: 'Filler Activity',  type: 'activity',  familyAnchorType: 'support', scoreClassicFinal: 55, latitude: '30.09', longitude: '31.30' }),
+      makeCandidate({ name: 'Filler Nature',    type: 'nature',    familyAnchorType: 'support', scoreClassicFinal: 50, latitude: '30.12', longitude: '31.35' }),
+    ];
+  }
+
+  it('near-duplicate anchor is not injected when it is within 400 m of an already-placed stop', () => {
+    // Trip: 2 days × 2 stops/day = 4 total.
+    // Pass 1 assigns AnchorA→Day 1, AnchorB→Day 2.
+    // AnchorB injection is skipped (0 km from AnchorA); its slot falls to greedy.
+    // The trip is fully filled and AnchorB never appears.
+    const result = selectStopsFromPool(
+      makeAnchorPool(),
+      makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [8], pace: 'moderate' }),
+    );
+
+    // Trip fully filled — proximity skip doesn't create a shortfall when the
+    // pool has enough non-duplicate fillers.
+    expect(result.stops).toHaveLength(result.totalStopsNeeded);
+
+    // The near-duplicate anchor must not appear in any day.
+    const names = result.stops.map(s => s.name);
+    expect(names).not.toContain('The Great Pyramid of Giza');
+  });
+
+  it('the injected anchor still appears; only the near-duplicate is blocked', () => {
+    // Same setup — confirm AnchorA (the higher-scoring one, assigned Day 1)
+    // was injected successfully and is present in the result.
+    const result = selectStopsFromPool(
+      makeAnchorPool(),
+      makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [8], pace: 'moderate' }),
+    );
+
+    const names = result.stops.map(s => s.name);
+    expect(names).toContain('Pyramids of Giza');
+  });
+
+  it('the day whose anchor was skipped is still filled by greedy selection', () => {
+    // Day 2's anchor injection is skipped; findBest() must fill the slot.
+    // If the day were left empty the result would be shorter than totalStopsNeeded.
+    const result = selectStopsFromPool(
+      makeAnchorPool(),
+      makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [8], pace: 'moderate' }),
+    );
+
+    // Full fill confirms greedy recovered the skipped slot.
+    expect(result.stops.length).toBe(result.totalStopsNeeded);
+
+    // Day 2 must contain at least one stop (a filler, not the skipped anchor).
+    const day2Stops = result.stops.filter(s => (s as any).dayNumber === 2);
+    expect(day2Stops.length).toBeGreaterThan(0);
+  });
+
+  it('composes correctly with the shortfall guard when the pool is too thin to recover', () => {
+    // Same two near-duplicate anchors, but only ONE filler available.
+    // Day 1: AnchorA injected + Filler used → remaining empty.
+    // Day 2: AnchorB injection skipped (proximity) → falls to findBest →
+    //         remaining empty → findBest returns null → while exits.
+    // Result: 2 stops selected out of 4 needed → shortfall.
+    // The existing `stops.length < totalStopsNeeded` guard at call-sites catches this.
+    const thinPool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Pyramids of Giza',         type: 'landmark', familyAnchorType: 'anchor', scoreClassicFinal: 80, latitude: ANCHOR_LAT, longitude: ANCHOR_LON }),
+      makeCandidate({ name: 'The Great Pyramid of Giza', type: 'mountain', familyAnchorType: 'anchor', scoreClassicFinal: 75, latitude: ANCHOR_LAT, longitude: ANCHOR_LON }),
+      makeCandidate({ name: 'Filler Park', type: 'park', familyAnchorType: 'support', scoreClassicFinal: 65, latitude: '30.03', longitude: '31.20' }),
+    ];
+
+    const result = selectStopsFromPool(
+      thinPool,
+      makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [8], pace: 'moderate' }),
+    );
+
+    // Shortfall: pool ran out before filling all 4 slots.
+    expect(result.totalStopsNeeded).toBe(4);
+    expect(result.stops.length).toBeLessThan(result.totalStopsNeeded);
+
+    // Not zero — the old guard (=== 0) would NOT have caught this; the
+    // `< totalStopsNeeded` guard from task #488/#494 does.
+    expect(result.stops.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 4. Fill-up masks gates ⑫–⑮ (documents observed behaviour, not a fix)
 // ---------------------------------------------------------------------------
 
