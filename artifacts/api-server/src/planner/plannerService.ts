@@ -2822,6 +2822,23 @@ export type StopPoolResult = {
 };
 
 /**
+ * Stop-to-stop buffer minutes by pace tier.
+ * Counts against the per-day stop-duration budget (paceConfig.totalStopMinutes.max)
+ * once per stop-to-stop transition within selectStopsFromPool — not before the
+ * first stop of a day, not after the last.
+ *
+ *   relaxed  → 25 min  (generous handoff, family-paced transitions)
+ *   moderate → 15 min  (base buffer)
+ *   busy     → 10 min  (floor; never zero)
+ */
+export function stopToStopBufferMins(pace: string): number {
+  const p = pace?.toLowerCase().trim();
+  return p === 'relaxed' || p === 'chill' ? 25
+    : p === 'busy' || p === 'packed' ? 10
+    : 15;
+}
+
+/**
  * Convert a raw 0–100 parkingAvailabilityScore (PSI) to a human-readable
  * parking note.  Returns null when score is null so call sites can treat null
  * as "no information available" and leave parkingNotes unchanged.
@@ -3288,6 +3305,9 @@ export function selectStopsFromPool(
   let natureStopsTotal = 0;
   // Track cumulative effective-duration minutes for the current day
   let dailyDurationMins = 0;
+  // Stop-to-stop buffer: added once per transition (not before the first stop of a day).
+  // Counts against paceConfig.totalStopMinutes.max alongside stop durations.
+  const bufferMins = stopToStopBufferMins(input.pace);
   // Track cumulative travel distance and last-stop coordinates for geographic scoring
   let dailyTravelKm = 0;
   let dailyTravelMins = 0;
@@ -3455,7 +3475,9 @@ export function selectStopsFromPool(
 
         if (dayPosition > 0) {
           const effDur = effectiveDuration(c.durationMinutes, minChildAge);
-          if (dailyDurationMins + effDur > paceConfig.totalStopMinutes.max) continue;
+          // Gate ⑫: reject candidate if adding it — including the buffer for the
+          // transition from the previous stop — would exceed the daily duration budget.
+          if (dailyDurationMins + bufferMins + effDur > paceConfig.totalStopMinutes.max) continue;
           if (napActive && input.pace !== "relaxed" && dayPosition === stopsForDay[_currDay] - 1) {
             if (effDur >= 45) continue;
           }
@@ -3563,7 +3585,10 @@ export function selectStopsFromPool(
     if (REPEATABLE_NATURE_TYPES.has(bestCandidate.type ?? '')) natureStopsTotal++;
     if (IMMERSIVE_TYPES.has(bestCandidate.type ?? '') && (bestCandidate.durationMinutes ?? 0) >= 90) immersivesInCurrentDay++;
     if (bestCandidate.familyAnchorType === 'anchor') anchorsInCurrentDay++;
-    dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge);
+    // Accumulate: stop duration + one buffer for the transition FROM the previous stop.
+    // dayPosition===0 is the first stop of the day — no preceding stop, no buffer.
+    dailyDurationMins += effectiveDuration(bestCandidate.durationMinutes, minChildAge)
+      + (dayPosition > 0 ? bufferMins : 0);
   }
 
   // Fill if we still need more stops (pool exhausted before totalStopsNeeded)
