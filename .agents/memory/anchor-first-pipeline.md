@@ -60,4 +60,12 @@ Auth endpoint: `POST /api/auth/token` (not `/api/auth/login` or `/api/auth/regis
 Register: `POST /api/register` (requires `players: [{name, age: string}]`).
 Duplicate-city guard prevents re-creating a trip for the same destination.
 
+## Injection proximity gate (mirror of gate ⑯)
+
+Added after confirming the bypass was live: 15+ city pools (Cairo, Washington DC, Dublin, Seattle, Munich, …) had two qualifying anchors (familyAnchorType='anchor', score≥54) within 400 m of each other. Pass 1 assigned them to different days and injected both without any proximity check.
+
+**Fix:** In the injection for-loop, _aLat/_aLon are now hoisted before `selected.push(anchor)`. Before the push, gate ⑯'s exact `haversineKm < 0.4` check runs against all of `selected[]`. If too close → `continue` (skip injection, no `_injected` increment). The `if (_injected > 0) continue` guard then doesn't fire, so the slot falls through to `findBest()`. No change to the surrounding while-loop or outer dayPosition===0 block needed.
+
+**Composes with shortfall guard:** If the skipped slot can't be filled (thin pool), `stops.length < totalStopsNeeded` fires at the call-site and falls back to AI. Both fixes are in `selectStopsFromPool.test.ts` section 5 (4 cases).
+
 **Why:** Pass 1 ensures anchor quality is locked in before any filler selection, preventing high-scoring anchors from being displaced by greedy order. AnchorConstraint must honor `anchorsPerDay` or it silently reverts to 1-anchor-per-day regardless of pace.
