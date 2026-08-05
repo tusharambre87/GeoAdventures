@@ -2709,6 +2709,12 @@ async function generateCityStopPoolFromAI(
   const all = [...batchA, ...batchB];
   // Use normStopNameGlobal (same as Pass 3 in generateCityStopPool) rather than
   // exact string equality so AI-generated name variants collapse correctly.
+  // First-seen-wins is load-bearing here: all = [...batchA, ...batchB] keeps
+  // batch A ("iconic anchors / must-sees") ahead of batch B ("hidden gems").
+  // On a name collision, the must-see wins — a meaningful proxy for quality
+  // that isn't available yet (scoreClassicFinal/gpRatingsTotal are only
+  // populated after enrichAndPersistScores runs downstream).
+  // If batch ordering ever changes, or a batch C is added, revisit this.
   const aiNormSeen = new Map<string, typeof all[number]>();
   for (const s of all) {
     const k = normStopNameGlobal(s.name ?? '');
