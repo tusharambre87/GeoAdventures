@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, nearbyLandmarksCache, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, insertRestStopsIntoStopList, generateCityStopPool, bucketStopsTodays, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, parkingBandFromScore, insertRestStopsIntoStopList, generateCityStopPool, bucketStopsTodays, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -8302,11 +8302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             // Fallback: convert PSI parkingAvailabilityScore to text only when
             // neither explore_cache nor AI output provided parkingNotes.
-            if (!enrich.parkingNotes && (psi?.parkingAvailabilityScore ?? null) !== null) {
-              const ps = psi!.parkingAvailabilityScore as number;
-              enrich.parkingNotes = ps >= 70 ? 'Parking is generally available nearby'
-                : ps >= 40 ? 'Parking may be limited'
-                : 'Parking can be difficult to find';
+            const _psiBand = parkingBandFromScore(psi?.parkingAvailabilityScore ?? null);
+            if (!enrich.parkingNotes && _psiBand !== null) {
+              enrich.parkingNotes = _psiBand;
             }
             if (psi?.strollerEaseScore != null && enrich.strollerFriendly == null) {
               enrich.strollerFriendly = psi.strollerEaseScore >= 60;
@@ -11291,11 +11289,9 @@ Return ONLY valid JSON in this exact format:
         }
         // Fix 1b: PSI parkingAvailabilityScore as final fallback — only when
         // neither explore_cache nor AI output provided parkingNotes.
-        if (!baseEnrichment.parkingNotes && (psi?.parkingAvailabilityScore ?? null) !== null) {
-          const ps = psi!.parkingAvailabilityScore as number;
-          baseEnrichment.parkingNotes = ps >= 70 ? 'Parking is generally available nearby'
-            : ps >= 40 ? 'Parking may be limited'
-            : 'Parking can be difficult to find';
+        const _psiParkingNote = parkingBandFromScore(psi?.parkingAvailabilityScore ?? null);
+        if (!baseEnrichment.parkingNotes && _psiParkingNote !== null) {
+          baseEnrichment.parkingNotes = _psiParkingNote;
         }
 
         // Fix 2: planner_stop_intelligence.restroom_confidence → meta.restroomConfidence label

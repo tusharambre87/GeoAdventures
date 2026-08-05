@@ -247,7 +247,113 @@ describe('selectStopsFromPool — shortfall / cascading truncation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Fill-up masks gates ⑫–⑮ (documents observed behaviour, not a fix)
+// 3. Multi-city leg: per-city totalStopsNeeded and guard scope
+// ---------------------------------------------------------------------------
+//
+// In the multi-city loop (plannerService.ts ~4478) selectStopsFromPool is
+// called with cityInput = { ...input, tripDays: daysForCity }, so
+// totalStopsNeeded is daysForCity × stopsPerDay — not the full trip total.
+//
+// The updated guard at the multi-city call site:
+//
+//   const { stops: cityStops, ..., totalStopsNeeded: cityStopsNeeded }
+//     = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+//   if (cityStops.length < cityStopsNeeded) {
+//     throw new Error(`... ${cityStops.length} of ${cityStopsNeeded} needed ...`);
+//   }
+//
+// When the guard fires, the catch at ~4530 handles only that city and falls
+// through to per-day AI generation for just that city.  Previous cities that
+// completed via `continue` have their stops persisted and are unaffected —
+// the trade-off is strictly per-city, not trip-wide.
+
+describe('selectStopsFromPool — multi-city leg: per-city totalStopsNeeded', () => {
+  it('totalStopsNeeded equals daysForCity × stopsPerDay, not the full trip length', () => {
+    // Simulates a 2-day city leg inside a longer multi-city trip.
+    // cityInput has tripDays=2 and stopsPerDayOverride=2 → totalStopsNeeded=4.
+    // (A 5-day full trip would have totalStopsNeeded=10 — the result here is
+    //  scoped to just these 2 days, confirming the guard is per-city.)
+    //
+    // Note: we only assert totalStopsNeeded here (the per-city scoping claim).
+    // Whether the greedy algorithm fills all 4 slots depends on pool composition
+    // and internal caps — tested separately in the shortfall case below.
+    const pool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Landmark A', type: 'landmark', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9072', longitude: '-77.0369' }),
+      makeCandidate({ name: 'Park B',     type: 'park',     familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9080', longitude: '-77.0350' }),
+      makeCandidate({ name: 'Nature C',   type: 'nature',   familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9065', longitude: '-77.0382' }),
+      makeCandidate({ name: 'Viewpoint D', type: 'viewpoint', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9058', longitude: '-77.0395' }),
+    ];
+
+    const cityInput = makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [7] });
+    const result = selectStopsFromPool(pool, cityInput, undefined, 'Washington DC');
+
+    // Core assertion: totalStopsNeeded is 2 days × 2 stops/day = 4, not a
+    // trip-wide number — confirming the guard is scoped to this city leg only.
+    expect(result.totalStopsNeeded).toBe(4);
+  });
+
+  it('thin pool on a 2-day leg produces a shortfall — guard condition fires', () => {
+    // Pool has only 2 candidates for a 2-day × 2-stop leg (totalStopsNeeded=4).
+    // Day 1 gets 2 stops; day 2's slice is empty → break.
+    // stops.length (2) < totalStopsNeeded (4) → guard fires for this city only.
+    const thinPool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Landmark A', type: 'landmark', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9072', longitude: '-77.0369' }),
+      makeCandidate({ name: 'Park B',     type: 'park',     familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9080', longitude: '-77.0350' }),
+    ];
+
+    const cityInput = makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [7] });
+    const result = selectStopsFromPool(thinPool, cityInput, undefined, 'CityB');
+
+    expect(result.totalStopsNeeded).toBe(4);
+    expect(result.stops.length).toBeGreaterThan(0);           // old guard (=== 0) would NOT fire
+    expect(result.stops.length).toBeLessThan(result.totalStopsNeeded); // new guard fires
+  });
+
+  it('multi-city guard throws on shortfall — the catch handles only the deficient city', () => {
+    // Mirrors the updated guard at the multi-city call site:
+    //
+    //   const { stops: cityStops, ..., totalStopsNeeded: cityStopsNeeded }
+    //     = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+    //   if (cityStops.length < cityStopsNeeded) {
+    //     throw new Error(`... ${cityStops.length} of ${cityStopsNeeded} needed stops
+    //       for multi-city leg "${city}" — falling back to AI generation`);
+    //   }
+    //
+    // The message is checked to confirm the city name and both counts are present,
+    // matching the log output used to diagnose production shortfalls.
+    function simulateMultiCityGuard(
+      pool: CachedStopCandidate[],
+      cityInput: PlannerInput,
+      cityName: string,
+    ): void {
+      const { stops: cityStops, totalStopsNeeded: cityStopsNeeded } =
+        selectStopsFromPool(pool, cityInput, undefined, cityName);
+      if (cityStops.length < cityStopsNeeded) {
+        throw new Error(
+          `selectStopsFromPool returned ${cityStops.length} of ${cityStopsNeeded} needed stops for multi-city leg "${cityName}" — falling back to AI generation`,
+        );
+      }
+    }
+
+    const thinPool: CachedStopCandidate[] = [
+      makeCandidate({ name: 'Landmark A', type: 'landmark', familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9072', longitude: '-77.0369' }),
+      makeCandidate({ name: 'Park B',     type: 'park',     familyAnchorType: 'support', scoreClassicFinal: 75, latitude: '38.9080', longitude: '-77.0350' }),
+    ];
+
+    const cityInput = makeInput({ tripDays: 2, stopsPerDayOverride: 2, childrenAges: [7] });
+
+    expect(() => simulateMultiCityGuard(thinPool, cityInput, 'CityB'))
+      .toThrow(/multi-city leg "CityB"/);
+    expect(() => simulateMultiCityGuard(thinPool, cityInput, 'CityB'))
+      .toThrow(/falling back to AI generation/);
+    // Error message includes both the returned count and the needed count
+    expect(() => simulateMultiCityGuard(thinPool, cityInput, 'CityB'))
+      .toThrow(/\d+ of \d+ needed/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Fill-up masks gates ⑫–⑮ (documents observed behaviour, not a fix)
 // ---------------------------------------------------------------------------
 
 describe('selectStopsFromPool — fill-up bypasses geo leg-cap (gates ⑭/⑮)', () => {

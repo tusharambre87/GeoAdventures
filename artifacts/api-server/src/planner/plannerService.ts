@@ -2822,6 +2822,26 @@ export type StopPoolResult = {
 };
 
 /**
+ * Convert a raw 0–100 parkingAvailabilityScore (PSI) to a human-readable
+ * parking note.  Returns null when score is null so call sites can treat null
+ * as "no information available" and leave parkingNotes unchanged.
+ *
+ *   ≥70  → "Parking is generally available nearby"
+ *   40–69 → "Parking may be limited"
+ *   <40   → "Parking can be difficult to find"
+ *
+ * Used as a last-resort fallback at both enrichment call sites in routes.ts;
+ * only fires when neither explore_cache.parkingInfo nor AI output provided
+ * parkingNotes first.
+ */
+export function parkingBandFromScore(score: number | null): string | null {
+  if (score === null) return null;
+  return score >= 70 ? 'Parking is generally available nearby'
+    : score >= 40 ? 'Parking may be limited'
+    : 'Parking can be difficult to find';
+}
+
+/**
  * Compute where in an existing day a parent-suggestion stop fits best.
  * Uses PSI time-of-day fit scores to determine morning / afternoon / late slot,
  * then picks the adjacent existing stop for proximity calculation.
@@ -4488,10 +4508,13 @@ export async function generateItinerary(
       if (pool && pool.stopPool && pool.stopPool.length > 0) {
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
-          const { stops: cityStops, parentSuggestions: cityParentSuggestions } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
-          // Same zero-stop guard as single-city path — fall through to AI generation.
-          if (cityStops.length === 0) {
-            throw new Error(`selectStopsFromPool returned 0 stops for multi-city leg "${city}" — falling back to AI generation`);
+          const { stops: cityStops, parentSuggestions: cityParentSuggestions, totalStopsNeeded: cityStopsNeeded } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+          // Widened guard: same cascading-truncation fix as single-city path.
+          // cityInput has tripDays=daysForCity, so cityStopsNeeded is scoped to
+          // this city only.  Cities that already completed via `continue` above
+          // have their stops persisted in the DB and are unaffected by this throw.
+          if (cityStops.length < cityStopsNeeded) {
+            throw new Error(`selectStopsFromPool returned ${cityStops.length} of ${cityStopsNeeded} needed stops for multi-city leg "${city}" — falling back to AI generation`);
           }
           let selected: GeneratedStop[];
           if (restStopsActive) {
