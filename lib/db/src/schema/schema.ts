@@ -544,6 +544,11 @@ export const XP_REWARDS = {
   FLAG_QUEST_CORRECT: 10,
   CAPITAL_QUEST_CORRECT: 10,
   EXPERIENCE_COMPLETE: 15,
+  // Trip milestone rewards (RoamUs travel flow)
+  TRIP_STOP_VISITED: 20,
+  TRIP_DAY_COMPLETE: 35,
+  TRIP_VOICE_QUOTE: 12,
+  TRIP_COMPLETE: 75,
 } as const;
 
 export const EXPLORER_XP_RANKS = [

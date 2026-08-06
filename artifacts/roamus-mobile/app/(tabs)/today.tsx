@@ -867,6 +867,16 @@ export default function TodayScreen() {
     async function markTripComplete(attempt = 1): Promise<void> {
       try {
         await apiFetch(`/api/travel/trips/${tripId}/complete`, { method: 'POST' });
+        // Award trip-complete XP to each kid explorer — fire-and-forget
+        getMyPlayers().then(players => {
+          const kids = players.filter((p: any) => p.profileType === 'kid' && !p.isArchived);
+          kids.forEach((k: any) => {
+            apiFetch(`/api/players/${k.id}/award-xp`, {
+              method: 'POST',
+              body: JSON.stringify({ source: 'TRIP_COMPLETE' }),
+            }).catch(() => {});
+          });
+        }).catch(() => {});
       } catch (err) {
         if (attempt < 3) {
           await new Promise(r => setTimeout(r, attempt * 1000));
@@ -1049,6 +1059,18 @@ export default function TodayScreen() {
     const visited = dayStops.filter(s => s.isVisited || s.visited).length;
     const skipped = dayStops.filter((s: any) => s.isSkipped).length;
     Analytics.track('day_completed', { trip_id: resolvedTripId ?? '', day_index: resolvedDayIndex, stops_visited: visited, stops_skipped: skipped });
+    // Award day-complete XP to each kid explorer — fire-and-forget
+    if (resolvedTripId) {
+      getMyPlayers().then(players => {
+        const kids = players.filter((p: any) => p.profileType === 'kid' && !p.isArchived);
+        kids.forEach((k: any) => {
+          apiFetch(`/api/players/${k.id}/award-xp`, {
+            method: 'POST',
+            body: JSON.stringify({ source: 'TRIP_DAY_COMPLETE' }),
+          }).catch(() => {});
+        });
+      }).catch(() => {});
+    }
   }, [todayState]);
 
   // ── Paywall: show after Day 1 completes for free users ──
@@ -4479,6 +4501,8 @@ export default function TodayScreen() {
                       }
                       await memoriesAPI.createMoment({ tripId: trip.id, photoUrls: cloudPhotoUrls });
                     }
+                    const playersForXp = await getMyPlayers().catch(() => [] as any[]);
+                    const kidsForXp = playersForXp.filter((p: any) => p.profileType === 'kid' && !p.isArchived);
                     for (const [key, quote] of filledQuotes) {
                       try {
                         const childName = key.startsWith('dw-') ? key.slice(3) : null;
@@ -4486,6 +4510,16 @@ export default function TodayScreen() {
                           tripId: trip.id,
                           kidPromptResponse: childName ? `${childName}|${quote.trim()}` : quote.trim(),
                         });
+                        // Award voice-quote XP to the matching kid — fire-and-forget
+                        const matchedKid = childName
+                          ? kidsForXp.find((k: any) => k.name?.toLowerCase() === childName.toLowerCase())
+                          : kidsForXp[0];
+                        if (matchedKid) {
+                          apiFetch(`/api/players/${matchedKid.id}/award-xp`, {
+                            method: 'POST',
+                            body: JSON.stringify({ source: 'TRIP_VOICE_QUOTE' }),
+                          }).catch(() => {});
+                        }
                       } catch { /* best-effort */ }
                     }
                     try {

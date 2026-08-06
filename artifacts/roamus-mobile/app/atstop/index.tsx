@@ -811,6 +811,13 @@ export default function AtStopScreen() {
     setSubmittingFeedback(true);
     try {
       await apiFetch(`/api/travel/stops/${currentStop.id}/visit`, { method: 'POST' });
+      // Award trip stop XP to each kid explorer — fire-and-forget, never blocks
+      kidPlayers.forEach(k => {
+        apiFetch(`/api/players/${k.id}/award-xp`, {
+          method: 'POST',
+          body: JSON.stringify({ source: 'TRIP_STOP_VISITED' }),
+        }).catch(() => {});
+      });
       // Quality signal is fire-and-forget — its failure must never prevent local state update
       if (!skipFeedback) {
         apiFetch(`/api/travel/stops/${currentStop.id}/quality-signal`, {

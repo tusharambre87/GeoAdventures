@@ -49,6 +49,7 @@ import {
   saveCompassAchievements,
 } from "@/lib/compassQuestData";
 import { getDistanceMiles, getBearing } from "@workspace/compass-quest";
+import { getExplorerRank } from "@shared/schema";
 
 declare const L: typeof import("leaflet");
 import turkeyPiece1 from "@assets/1_1773756593418.png";
@@ -2291,38 +2292,6 @@ export default function CompassQuest() {
             const compassAchievements = loadCompassAchievements(explorerId);
             const unlockedCount = Object.keys(compassAchievements).length;
             const explorerXp = activeExplorer?.totalXp ?? 0;
-            const { getExplorerRank } = (() => {
-              const EXPLORER_XP_RANKS = [
-                { level: 1, name: 'Explorer', minXp: 0, icon: '🧭' },
-                { level: 2, name: 'Trail Seeker', minXp: 50, icon: '🥾' },
-                { level: 3, name: 'Pathfinder', minXp: 150, icon: '🗺️' },
-                { level: 4, name: 'City Spotter', minXp: 350, icon: '🔭' },
-                { level: 5, name: 'Cartographer', minXp: 650, icon: '🎭' },
-                { level: 6, name: 'World Ranger', minXp: 1100, icon: '🌍' },
-                { level: 7, name: 'Navigator', minXp: 1800, icon: '🧭' },
-                { level: 8, name: 'Voyager', minXp: 2800, icon: '✈️' },
-                { level: 9, name: 'World Scholar', minXp: 4200, icon: '📚' },
-                { level: 10, name: 'Master Explorer', minXp: 6200, icon: '⭐' },
-                { level: 11, name: 'Geography Legend', minXp: 9000, icon: '🏆' },
-                { level: 12, name: 'GeoQuest Champion', minXp: 13000, icon: '👑' },
-              ];
-              return {
-                getExplorerRank: (xp: number) => {
-                  let current = EXPLORER_XP_RANKS[0];
-                  let next: typeof EXPLORER_XP_RANKS[0] | null = null;
-                  for (let i = 0; i < EXPLORER_XP_RANKS.length; i++) {
-                    if (xp >= EXPLORER_XP_RANKS[i].minXp) current = EXPLORER_XP_RANKS[i];
-                  }
-                  const idx = EXPLORER_XP_RANKS.indexOf(current);
-                  next = idx < EXPLORER_XP_RANKS.length - 1 ? EXPLORER_XP_RANKS[idx + 1] : null;
-                  const xpToNext = next ? next.minXp - xp : 0;
-                  const xpInLevel = xp - current.minXp;
-                  const rangeSize = next ? next.minXp - current.minXp : 1;
-                  const progressPct = next ? Math.min(100, Math.round((xpInLevel / rangeSize) * 100)) : 100;
-                  return { rank: current, next, xpToNext, progressPct };
-                }
-              };
-            })();
             const rankInfo = getExplorerRank(explorerXp);
 
             function handlePlayQuest() {
@@ -2500,14 +2469,14 @@ export default function CompassQuest() {
                       {/* XP progress bar */}
                       <div>
                         <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
-                          <span>Progress to {rankInfo.next?.name ?? "Max"}</span>
-                          <span>{rankInfo.progressPct}%</span>
+                          <span>Progress to {rankInfo.nextRank?.name ?? "Max"}</span>
+                          <span>{rankInfo.progressPercent}%</span>
                         </div>
                         <div className="h-1.5 bg-sky-100 rounded-full overflow-hidden">
                           <motion.div
                             className="h-full bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full"
                             initial={{ width: 0 }}
-                            animate={{ width: `${rankInfo.progressPct}%` }}
+                            animate={{ width: `${rankInfo.progressPercent}%` }}
                             transition={{ duration: 0.8, ease: "easeOut" }}
                           />
                         </div>
@@ -2694,30 +2663,28 @@ export default function CompassQuest() {
           })()}
 
           {screen === "explorer-dashboard" && (() => {
-            const EXPLORER_XP_RANKS_DASH = [
-              { level: 1, name: 'Explorer', minXp: 0, icon: '🧭', flavor: 'Every journey begins somewhere 🌍' },
-              { level: 2, name: 'Trail Seeker', minXp: 50, icon: '🥾', flavor: "You're finding your path" },
-              { level: 3, name: 'Pathfinder', minXp: 150, icon: '🗺️', flavor: 'The world awaits your footsteps' },
-              { level: 4, name: 'City Spotter', minXp: 350, icon: '🔭', flavor: 'Your eyes are trained on the skyline' },
-              { level: 5, name: 'Cartographer', minXp: 650, icon: '🎭', flavor: "You're mapping your own story" },
-              { level: 6, name: 'World Ranger', minXp: 1100, icon: '🌍', flavor: 'You roam where few have ventured' },
-              { level: 7, name: 'Navigator', minXp: 1800, icon: '🧭', flavor: 'The stars guide your way' },
-              { level: 8, name: 'Voyager', minXp: 2800, icon: '✈️', flavor: 'Seas and skies hold no mystery' },
-              { level: 9, name: 'World Scholar', minXp: 4200, icon: '📚', flavor: 'Your knowledge shapes empires' },
-              { level: 10, name: 'Master Explorer', minXp: 6200, icon: '⭐', flavor: "You've mastered the art of discovery" },
-              { level: 11, name: 'Geography Legend', minXp: 9000, icon: '🏆', flavor: 'Legends are written in your footsteps' },
-              { level: 12, name: 'GeoQuest Champion', minXp: 13000, icon: '👑', flavor: 'The world bows to your knowledge' },
-            ];
             const explorerXpDash = activeExplorer?.totalXp ?? 0;
-            let currentRankDash = EXPLORER_XP_RANKS_DASH[0];
-            for (const r of EXPLORER_XP_RANKS_DASH) {
-              if (explorerXpDash >= r.minXp) currentRankDash = r;
-            }
-            const idxDash = EXPLORER_XP_RANKS_DASH.indexOf(currentRankDash);
-            const nextRankDash = idxDash < EXPLORER_XP_RANKS_DASH.length - 1 ? EXPLORER_XP_RANKS_DASH[idxDash + 1] : null;
-            const xpInLevelDash = explorerXpDash - currentRankDash.minXp;
-            const rangeSizeDash = nextRankDash ? nextRankDash.minXp - currentRankDash.minXp : 1;
-            const progressPctDash = nextRankDash ? Math.min(100, Math.round((xpInLevelDash / rangeSizeDash) * 100)) : 100;
+            const rankInfoDash = getExplorerRank(explorerXpDash);
+            const RANK_FLAVORS: Record<string, string> = {
+              explorer:          'Every journey begins somewhere 🌍',
+              trail_seeker:      "You’re finding your path",
+              pathfinder:        'The world awaits your footsteps',
+              city_spotter:      'Your eyes are trained on the skyline',
+              cartographer:      "You’re mapping your own story",
+              world_ranger:      'You roam where few have ventured',
+              navigator:         'The stars guide your way',
+              voyager:           'Seas and skies hold no mystery',
+              world_scholar:     'Your knowledge shapes empires',
+              master_explorer:   "You’ve mastered the art of discovery",
+              geography_legend:  'Legends are written in your footsteps',
+              geoquest_champion: 'The world bows to your knowledge',
+              world_architect:   'You reshape the map',
+              grand_pathfinder:  'No trail goes unmapped',
+              culture_keeper:    "Guardian of the world’s stories",
+              legacy_explorer:   'Your legend spans continents',
+              geomaster:         'Master of all realms',
+              mythic_voyager:    'Beyond the edge of the known world',
+            };
 
             const dashStats = loadCompassStats(explorerId);
             const dashAchievements = loadCompassAchievements(explorerId);
@@ -2779,12 +2746,12 @@ export default function CompassQuest() {
                         animate={{ scale: [1, 1.06, 1] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                       >
-                        {currentRankDash.icon}
+                        {rankInfoDash.rank.icon}
                       </motion.div>
                       <div className="flex-1">
-                        <p className="text-xs text-sky-200 font-medium uppercase tracking-wider">Level {currentRankDash.level}</p>
-                        <p className="text-xl font-bold leading-tight" data-testid="text-hero-rank">{currentRankDash.name}</p>
-                        <p className="text-sky-200 text-xs mt-0.5 italic">{currentRankDash.flavor}</p>
+                        <p className="text-xs text-sky-200 font-medium uppercase tracking-wider">Level {rankInfoDash.level}</p>
+                        <p className="text-xl font-bold leading-tight" data-testid="text-hero-rank">{rankInfoDash.rank.name}</p>
+                        <p className="text-sky-200 text-xs mt-0.5 italic">{RANK_FLAVORS[rankInfoDash.rank.id] ?? ''}</p>
                       </div>
                     </div>
                     <p className="text-lg font-bold text-white mb-3" data-testid="text-hero-xp">
@@ -2792,19 +2759,19 @@ export default function CompassQuest() {
                     </p>
                     <div>
                       <div className="flex justify-between text-xs text-sky-200 mb-1">
-                        <span>Progress to {nextRankDash?.name ?? "Max Rank"}</span>
-                        <span>{progressPctDash}%</span>
+                        <span>Progress to {rankInfoDash.nextRank?.name ?? "Max Rank"}</span>
+                        <span>{rankInfoDash.progressPercent}%</span>
                       </div>
                       <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
                           className="h-full bg-white rounded-full"
                           initial={{ width: 0 }}
-                          animate={{ width: `${progressPctDash}%` }}
+                          animate={{ width: `${rankInfoDash.progressPercent}%` }}
                           transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
                         />
                       </div>
-                      {nextRankDash && (
-                        <p className="text-xs text-sky-200 mt-1">{nextRankDash.minXp - explorerXpDash} XP to unlock {nextRankDash.name}</p>
+                      {rankInfoDash.nextRank && (
+                        <p className="text-xs text-sky-200 mt-1">{rankInfoDash.xpToNextRank} XP to unlock {rankInfoDash.nextRank!.name}</p>
                       )}
                     </div>
                   </CardContent>
