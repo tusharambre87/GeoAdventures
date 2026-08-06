@@ -1237,7 +1237,7 @@ export default function AtStopScreen() {
                   return (
                     <>
                       <TouchableOpacity
-                        onPress={() => router.push('/(tabs)/today' as never)}
+                        onPress={() => trip?.id && router.push(`/memories/${trip.id}/recap` as any)}
                         style={{ backgroundColor: '#E8692A', borderRadius: 14,
                           paddingVertical: 14, paddingHorizontal: 32,
                           width: '100%', alignItems: 'center', marginBottom: 10 }}
