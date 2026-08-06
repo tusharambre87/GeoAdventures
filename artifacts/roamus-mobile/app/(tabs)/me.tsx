@@ -48,6 +48,7 @@ type Explorer = {
   name: string;
   isParent?: boolean;
   profileType?: string;
+  ageRange?: string;
   age?: string | null;
   totalXp?: number;
   unlockedAchievementIds?: string[];
@@ -118,6 +119,12 @@ export default function MeScreen() {
   useEffect(() => {
     load();
   }, [cachedUser?.id]);
+
+  // Reset the explorer XP accordion on every tab focus so it always
+  // opens collapsed regardless of what the user did last visit.
+  useFocusEffect(
+    useCallback(() => { setXpExpanded(false); }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -248,7 +255,11 @@ export default function MeScreen() {
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.visitedStops ?? 0), 0);
   // Filter out adult/parent profiles — this screen is kids-only in the explorer section
-  const kidExplorers = explorers.filter(e => !e.isParent && e.profileType !== 'adult');
+  // Exclude adults: check both profileType AND ageRange because some legacy rows
+  // have profileType='kid' but ageRange='adult' (created before the type was enforced).
+  const kidExplorers = explorers.filter(
+    e => !e.isParent && e.profileType !== 'adult' && e.ageRange !== 'adult'
+  );
   // Account-level XP: sum of all parent/adult player rows for this account (Brief 2)
   const accountXp = explorers
     .filter(e => e.profileType === 'adult' || e.profileType === 'parent')
