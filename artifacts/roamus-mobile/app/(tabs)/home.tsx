@@ -834,6 +834,262 @@ const fbh = StyleSheet.create({
   },
 });
 
+
+// ─── Upcoming-trip card (States 3 & 4) ───────────────────────────────────────
+// Replaces the old full-bleed hero with a crisp contained card so the city
+// photo renders clearly instead of filling the whole screen as a blurry bg.
+
+function UpcomingTripHero({
+  trip,
+  daysUntil,
+  firstName,
+  insets,
+  onPlanTrip,
+}: {
+  trip: HomeTripData;
+  daysUntil: number;
+  firstName: string | null;
+  insets: { top: number; bottom: number };
+  onPlanTrip: () => void;
+}) {
+  const tripName = trip.name || trip.destination || trip.city || 'Your Trip';
+  const imageUri = trip.firstPhotoUrl ?? trip.coverImageUrl ?? null;
+  const city = trip.city ?? trip.destination ?? '';
+
+  const [wikiImage, setWikiImage] = React.useState<string | null>(null);
+  const [imgError, setImgError] = React.useState(false);
+  React.useEffect(() => {
+    if (imageUri) return;
+    if (!city) return;
+    let cancelled = false;
+    getDestinationImage(city)
+      .then(url => { if (!cancelled && url) setWikiImage(url); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [imageUri, city]);
+  const displayImage = (!imgError && imageUri) ? imageUri : wikiImage;
+
+  const startLabel = trip.startDate
+    ? new Date(trip.startDate).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+      })
+    : '';
+
+  return (
+    <View style={{ flex: 1, backgroundColor: G.bg }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + TAB_BAR_H + 20,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Greeting */}
+        <View style={uth.greetRow}>
+          <Text style={uth.greetTxt}>
+            {greeting()}{firstName ? `,\n${firstName}` : ''}
+          </Text>
+        </View>
+
+        {/* Trip card */}
+        <View style={uth.card}>
+          <View style={uth.cardPhoto}>
+            {displayImage ? (
+              <Image
+                source={{ uri: displayImage }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <LinearGradient
+                colors={['#1A2540', '#0D1525']}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+          </View>
+          <View style={uth.cardDetails}>
+            <View style={uth.eyebrowRow}>
+              <View style={uth.eyebrowDot} />
+              <Text style={uth.eyebrowTxt}>UPCOMING TRIP</Text>
+            </View>
+            <Text style={uth.cardName} numberOfLines={2}>{tripName}</Text>
+            <Text style={uth.cardMeta}>
+              {daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days away`}
+              {startLabel ? `  \u00B7  ${startLabel}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Review Stops action row */}
+        <TouchableOpacity
+          style={uth.actionRow}
+          activeOpacity={0.85}
+          onPress={() =>
+            router.push({
+              pathname: '/trip/review-stops' as any,
+              params: { tripId: trip.id },
+            })
+          }
+        >
+          <View style={[uth.actionIcon, { backgroundColor: '#EEF2FF' }]}>
+            <Text style={uth.actionIconTxt}>{'\uD83D\uDCCC'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={uth.actionTitle}>Review Stops</Text>
+            <Text style={uth.actionSub}>Add or remove stops before your trip</Text>
+          </View>
+          <Text style={uth.actionChevron}>{'>'}</Text>
+        </TouchableOpacity>
+
+        {/* Trip Essentials action row */}
+        <TouchableOpacity
+          style={uth.actionRow}
+          activeOpacity={0.85}
+          onPress={() =>
+            router.push({
+              pathname: '/trip/essentials' as any,
+              params: { tripId: trip.id },
+            })
+          }
+        >
+          <View style={[uth.actionIcon, { backgroundColor: '#FFF8F0' }]}>
+            <Text style={uth.actionIconTxt}>{'\u2713'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={uth.actionTitle}>Trip Essentials</Text>
+            <Text style={uth.actionSub}>Packing list, tickets & more</Text>
+          </View>
+          <Text style={uth.actionChevron}>{'>'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Plan-a-trip FAB */}
+      <TouchableOpacity
+        style={[fbh.fabWrap, { position: 'absolute', top: insets.top + 14, right: 20, zIndex: 100 }]}
+        onPress={onPlanTrip}
+        activeOpacity={0.9}
+      >
+        <View style={[fbh.planFabInner, { width: FAB_SIZE }]}>
+          <Ionicons name="add" size={20} color="#fff" />
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const uth = StyleSheet.create({
+  greetRow: {
+    paddingHorizontal: 20,
+    marginBottom: 18,
+    paddingRight: FAB_SIZE + 20 + 12,
+  },
+  greetTxt: {
+    fontFamily: F.bold,
+    fontSize: 22,
+    color: G.deep,
+    lineHeight: 28,
+  },
+  card: {
+    marginHorizontal: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#131926',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 10,
+    marginBottom: 14,
+  },
+  cardPhoto: {
+    height: 220,
+    overflow: 'hidden',
+  },
+  cardDetails: {
+    backgroundColor: '#131926',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  eyebrowRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: 8,
+  },
+  eyebrowDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: G.orange,
+  },
+  eyebrowTxt: {
+    fontFamily: F.bold,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.65)',
+    letterSpacing: 1.2,
+  },
+  cardName: {
+    fontFamily: F.bold,
+    fontSize: 24,
+    color: '#fff',
+    lineHeight: 29,
+    marginBottom: 6,
+  },
+  cardMeta: {
+    fontFamily: F.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  actionRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(26,31,46,0.07)',
+    padding: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  actionIconTxt: {
+    fontSize: 20,
+  },
+  actionTitle: {
+    fontFamily: F.bold,
+    fontSize: 14,
+    color: G.deep,
+    marginBottom: 2,
+  },
+  actionSub: {
+    fontFamily: F.regular,
+    fontSize: 12,
+    color: G.muted,
+    lineHeight: 16,
+  },
+  actionChevron: {
+    fontSize: 20,
+    color: G.muted,
+    fontFamily: F.bold,
+  },
+});
+
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -1401,18 +1657,13 @@ export default function HomeScreen() {
   if (homeState.kind === 'countdown') {
     const { trip, daysUntil } = homeState;
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
-        <FullBleedHero
-          trip={trip}
-          variant="countdown"
-          daysUntil={daysUntil}
-          firstName={firstName}
-          insetTop={insets.top}
-          insetBottom={insets.bottom}
-          onPress={() => router.push(`/trip/${trip.id}` as any)}
-          onPlanTrip={handlePlanTrip}
-        />
-      </View>
+      <UpcomingTripHero
+        trip={trip}
+        daysUntil={daysUntil}
+        firstName={firstName}
+        insets={insets}
+        onPlanTrip={handlePlanTrip}
+      />
     );
   }
 
@@ -1420,18 +1671,13 @@ export default function HomeScreen() {
   if (homeState.kind === 'anticipation') {
     const { trip, daysUntil } = homeState;
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0E14' }}>
-        <FullBleedHero
-          trip={trip}
-          variant="anticipation"
-          daysUntil={daysUntil}
-          firstName={firstName}
-          insetTop={insets.top}
-          insetBottom={insets.bottom}
-          onPress={() => router.push(`/trip/${trip.id}` as any)}
-          onPlanTrip={handlePlanTrip}
-        />
-      </View>
+      <UpcomingTripHero
+        trip={trip}
+        daysUntil={daysUntil}
+        firstName={firstName}
+        insets={insets}
+        onPlanTrip={handlePlanTrip}
+      />
     );
   }
 
