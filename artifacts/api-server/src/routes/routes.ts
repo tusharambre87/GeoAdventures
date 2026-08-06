@@ -2747,7 +2747,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Array.isArray(travelers)) {
         return res.status(400).json({ message: "travelers must be an array" });
       }
-      // 1. Persist travelers to the user's most recent active trip
+      // Validate any submitted player IDs belong to this account before persisting.
+      // A client that received its own crew list via GET /api/users/travelers will submit t.id
+      // as the player UUID. We must verify ownership: an attacker or buggy client could submit
+      // any UUID. If ANY submitted ID fails ownership, reject the whole request with 400.
+      const submittedIds = (travelers as any[])
+        .map((t: any) => t.id)
+        .filter((id: any): id is string => !!id && typeof id === 'string');
+      let validatedIds = new Set<string>();
+      if (submittedIds.length > 0) {
+        const owned = await db
+          .select({ id: players.id })
+          .from(players)
+          .where(and(inArray(players.id, submittedIds), eq(players.userId, userId)));
+        const ownedSet = new Set(owned.map((r: any) => r.id));
+        const rejected = submittedIds.filter(id => !ownedSet.has(id));
+        if (rejected.length > 0) {
+          return res.status(400).json({
+            message: "One or more explorer IDs do not belong to your account.",
+            rejectedIds: rejected,
+          });
+        }
+        validatedIds = ownedSet;
+      }
+      // 1. Persist travelers to the user's most recent active trip, including explorerId when validated
       const trips = await storage.getTripsByUserId(userId);
       const activeTrip = trips.find(t => t.status !== 'completed' && t.status !== 'archived') ?? trips[0];
       if (activeTrip) {
@@ -2756,6 +2779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isParent: Boolean(t.isParent),
           ...(t.age != null ? { age: Number(t.age) } : {}),
           ...(t.avatar != null ? { avatar: t.avatar } : {}),
+          ...(t.id && validatedIds.has(t.id) ? { explorerId: t.id } : {}),
         }));
         await storage.updateTrip(activeTrip.id, { travelers: formatted as any });
       }
@@ -6895,6 +6919,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const guestTripDays = rawGuestTripDays ? Number(rawGuestTripDays) : null;
 
+      // Strip any explorerId from guest travelers — there is no authenticated user to validate
+      // ownership against, so any submitted ID would be unverifiable and must be discarded.
+      const guestTravelers = (travelers || []).map(({ explorerId: _drop, ...rest }: any) => rest);
+
       const trip = await storage.createTrip({
         userId: null as any,
         guestToken,
@@ -6902,7 +6930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         destination,
         country,
         city: city || null,
-        travelers: travelers || [],
+        travelers: guestTravelers,
         adventureContext: adventureContext || 'travel',
         adventureStyle,
         pace,
@@ -6970,6 +6998,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Transfer ownership to the newly authenticated user
       await storage.updateTrip(tripId, { userId, guestToken: null as any });
+
+      // Sync player rows for any traveler names that have no GeoQuest identity yet.
+      // Same name-match pattern as PUT /api/users/travelers — but without the archive step,
+      // so existing profiles with real XP are never touched, renamed, or duplicated.
+      // Only genuinely new trip-traveler names produce new rows.
+      const tripTravelers = (trip.travelers ?? []) as Array<{
+        name?: string; isParent?: boolean; age?: number; avatar?: string; explorerId?: string;
+      }>;
+      if (tripTravelers.length > 0) {
+        const existingPlayers = await storage.getActiveExplorers(userId);
+        const existingByName = new Map(
+          (existingPlayers as any[]).map((p: any) => [p.name.toLowerCase().trim(), p])
+        );
+        let createdAny = false;
+
+        for (const t of tripTravelers) {
+          const nameLower = (t.name ?? '').toLowerCase().trim();
+          if (!nameLower || existingByName.has(nameLower)) continue;
+          // No matching player row — create one with the same field mapping as PUT /api/users/travelers
+          const isParent = Boolean(t.isParent);
+          const age = t.age != null ? String(t.age) : (isParent ? 'adult' : 'unknown');
+          await db.insert(players).values({
+            userId,
+            name: t.name!,
+            age,
+            avatar: t.avatar ?? null,
+            profileType: isParent ? 'adult' : 'kid',
+            ageRange: isParent ? 'adult' : (t.age != null
+              ? (Number(t.age) <= 5 ? '3-5' : Number(t.age) <= 9 ? '6-9' : '9+')
+              : undefined),
+            isGuest: false,
+            isArchived: false,
+          });
+          console.log(`[ClaimGuest] Created player row for traveler "${t.name}" (userId=${userId})`);
+          createdAny = true;
+        }
+
+        // Re-read the full player list (includes newly created rows) and write explorerId
+        // back into the travelers JSONB — this is the Piece 1 link that connects trip
+        // crew entries to their GeoQuest identity without a further PUT /api/users/travelers call.
+        const allPlayers: any[] = createdAny
+          ? await storage.getActiveExplorers(userId)
+          : existingPlayers;
+        const playerByName = new Map(
+          (allPlayers as any[]).map((p: any) => [p.name.toLowerCase().trim(), p])
+        );
+        const updatedTravelers = tripTravelers.map((t) => {
+          if (t.explorerId) return t; // already linked — don't overwrite on a double-claim
+          const match = playerByName.get((t.name ?? '').toLowerCase().trim());
+          return match ? { ...t, explorerId: match.id } : t;
+        });
+        if (updatedTravelers.some((t) => t.explorerId)) {
+          await storage.updateTrip(tripId, { travelers: updatedTravelers as any });
+        }
+      }
+
       res.json({ success: true, tripId });
     } catch (err: any) {
       console.error('[ClaimGuest]', err.message);
@@ -7493,7 +7577,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const e = parseLocalDateOnly(endDate);
         computedTripDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       }
-      
+
+      // Sanitize traveler explorerId fields: validate ownership, strip any that fail.
+      // No current client sends explorerId at trip-creation time (players don't exist yet for
+      // new users; the PUT /api/users/travelers sync runs after creation). This guard ensures
+      // that if a future client or attacker submits one, it is verified before being stored.
+      const rawTravelerList: any[] = Array.isArray(travelers) ? travelers : [];
+      const explorerIdsToCheck = rawTravelerList
+        .map((t: any) => t.explorerId)
+        .filter((id: any): id is string => !!id && typeof id === 'string');
+      let ownedExplorerIds = new Set<string>();
+      if (explorerIdsToCheck.length > 0) {
+        const owned = await db
+          .select({ id: players.id })
+          .from(players)
+          .where(and(inArray(players.id, explorerIdsToCheck), eq(players.userId, userId)));
+        const ownedSet = new Set(owned.map((r: any) => r.id));
+        const rejected = explorerIdsToCheck.filter(id => !ownedSet.has(id));
+        if (rejected.length > 0) {
+          return res.status(400).json({
+            message: "One or more explorer IDs do not belong to your account.",
+            rejectedIds: rejected,
+          });
+        }
+        ownedExplorerIds = ownedSet;
+      }
+      const sanitizedTravelers = rawTravelerList.map((t: any) => {
+        const { explorerId, ...rest } = t;
+        return (explorerId && ownedExplorerIds.has(explorerId)) ? { ...rest, explorerId } : rest;
+      });
+
       const trip = await storage.createTrip({
         userId,
         name: tripName,
@@ -7502,7 +7615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         city: city || null,
         startDate: startDate ? parseLocalDateOnly(startDate) : undefined,
         endDate: endDate ? parseLocalDateOnly(endDate) : undefined,
-        travelers: travelers || [],
+        travelers: sanitizedTravelers,
         adventureContext: adventureContext || 'travel',
         adventureStyle: adventureStyle || 'family_explorer',
         pace: pace || 'balanced',
