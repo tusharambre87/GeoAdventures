@@ -11934,6 +11934,58 @@ Return ONLY valid JSON in this exact format:
     }
   });
 
+  /**
+   * Award TRIP_STOP_VISITED XP only to explorers who engaged with the journey pack
+   * (listened to the audio story or completed the explore section) at this stop.
+   * Called fire-and-forget by the client immediately after marking a stop visited.
+   *
+   * Body: { explorerIds: string[] }
+   * Returns: { awarded: string[], skipped: string[] }
+   */
+  app.post('/api/travel/stops/:stopId/award-stop-xp', isAuthenticated, travelModeGuard, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { stopId } = req.params;
+      const { explorerIds } = req.body;
+
+      if (!Array.isArray(explorerIds) || explorerIds.length === 0) {
+        return res.status(400).json({ message: "explorerIds must be a non-empty array" });
+      }
+
+      // Verify the stop belongs to a trip owned by this user
+      const [stop] = await db.select().from(travelStops).where(eq(travelStops.id, stopId));
+      if (!stop) return res.status(404).json({ message: "Stop not found" });
+
+      const trip = await storage.getTripById(stop.tripId);
+      if (!trip || trip.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Validate that all submitted explorer IDs belong to this user
+      const userExplorers = await storage.getPlayersByUserId(userId);
+      const validIds = new Set(userExplorers.map((p: any) => p.id));
+      const ownedIds = (explorerIds as string[]).filter(id => validIds.has(id));
+      if (ownedIds.length === 0) {
+        return res.json({ awarded: [], skipped: explorerIds });
+      }
+
+      // Find which explorers actually engaged (listen or explore section completed)
+      const engagedIds = await storage.getEngagedExplorers(stopId, ownedIds);
+      const skipped = ownedIds.filter(id => !engagedIds.includes(id));
+
+      // Award XP to engaged explorers
+      await Promise.all(
+        engagedIds.map(id => storage.awardXp(id, XP_REWARDS.TRIP_STOP_VISITED).catch(() => {}))
+      );
+
+      console.log(`🏆 [StopXP] stop=${stopId} awarded=${engagedIds.length} skipped=${skipped.length}`);
+      return res.json({ awarded: engagedIds, skipped });
+    } catch (error) {
+      console.error("Error awarding stop XP:", error);
+      return res.status(500).json({ message: "Failed to award stop XP" });
+    }
+  });
+
   app.post('/api/travel/stops/:stopId/generate-missions', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -3296,6 +3296,29 @@ export class DatabaseStorage implements IStorage {
     return progress;
   }
   
+  /**
+   * Returns the subset of explorerIds that have engaged with the journey pack at
+   * the given stop — i.e. have 'listen' or 'explore' in their completed_sections.
+   * Used by the award-stop-xp endpoint to gate TRIP_STOP_VISITED per kid.
+   */
+  async getEngagedExplorers(stopId: string, explorerIds: string[]): Promise<string[]> {
+    if (explorerIds.length === 0) return [];
+    const rows = await db
+      .select({ explorerId: journeyPackProgress.explorerId })
+      .from(journeyPackProgress)
+      .where(
+        and(
+          eq(journeyPackProgress.stopId, stopId),
+          inArray(journeyPackProgress.explorerId, explorerIds),
+          or(
+            sql`'listen' = ANY(${journeyPackProgress.completedSections})`,
+            sql`'explore' = ANY(${journeyPackProgress.completedSections})`
+          )
+        )
+      );
+    return rows.map(r => r.explorerId);
+  }
+
   async saveJourneyPackProgress(data: InsertJourneyPackProgress): Promise<JourneyPackProgress> {
     // Upsert: update if exists, insert if not
     const existing = await this.getJourneyPackProgress(data.stopId, data.explorerId);
