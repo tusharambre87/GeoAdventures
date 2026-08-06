@@ -397,9 +397,9 @@ export function effectiveDuration(baseDurationMins: number, youngestChildAge: nu
 }
 
 /**
- * Sort a flat stop list by familyAnchorType priority (descending), then
- * distribute round-robin across trip days, respecting per-day caps for arrival
- * and departure days.
+ * Sort a flat stop list by anchorScore (descending), then distribute
+ * round-robin across trip days, respecting per-day caps for arrival and
+ * departure days.
  *
  * Round-robin rather than sequential fill ensures high-priority stops spread
  * evenly across days rather than clustering on the (often short) arrival day.
@@ -412,17 +412,26 @@ export function effectiveDuration(baseDurationMins: number, youngestChildAge: nu
  * that DB insertions produce correct within-day ordering without a follow-up
  * resequencing pass.
  *
- * NOTE: anchorScore (a stop_library numeric column) is not available on
- * AI-generated stops. familyAnchorType is the equivalent signal the AI
- * explicitly assigns; it is the correct sort key for this path.
+ * Generic over the concrete stop type T so this function works with both
+ * travelContent.GeneratedStop (the actual caller, which has anchorScore 1–5
+ * explicitly set by the AI) and plannerService.GeneratedStop without requiring
+ * either to be cast. Only the fields relevant to distribution are required.
+ *
+ * Sort key rationale: the caller is travelContent.generateCityStops, whose AI
+ * prompt assigns anchorScore 1–5 ("ANCHOR PROTECTION" section). That is the
+ * only priority signal populated on stops reaching this function. The
+ * plannerService.GeneratedStop field familyAnchorType is from a separate AI
+ * path (the plannerService per-day loops) and is NOT present on these objects.
  */
-export function distributeStopsToDays(
-  stops: GeneratedStop[],
+export function distributeStopsToDays<
+  T extends { dayNumber: number; displayOrder: number; anchorScore?: number },
+>(
+  stops: T[],
   tripDays: number,
   arrivalCap: number,
   lastDayCap: number,
   perDay: number,
-): GeneratedStop[] {
+): T[] {
   // Build per-day capacity array (arrival=0, middle days, departure=last)
   const caps: number[] = [];
   for (let d = 0; d < tripDays; d++) {
@@ -431,17 +440,15 @@ export function distributeStopsToDays(
     else caps.push(perDay);
   }
 
-  // Sort descending by anchor weight so high-priority stops are distributed first
-  const ANCHOR_WEIGHT: Record<GeneratedStop['familyAnchorType'], number> = {
-    anchor: 4, support: 3, filler: 2, meal: 1, reset: 0,
-  };
+  // Sort descending by anchorScore (5 = must-protect anchor, 1 = drop first).
+  // Default to 3 (midpoint of the 1–5 scale) when anchorScore is absent.
   const sorted = [...stops].sort(
-    (a, b) => (ANCHOR_WEIGHT[b.familyAnchorType] ?? 2) - (ANCHOR_WEIGHT[a.familyAnchorType] ?? 2),
+    (a, b) => (b.anchorScore ?? 3) - (a.anchorScore ?? 3),
   );
 
   // counts[d] = stops assigned to day d so far; also used as displayOrder
   const counts = new Array<number>(tripDays).fill(0);
-  const result: GeneratedStop[] = [];
+  const result: T[] = [];
   let dayPointer = 0;
 
   for (const stop of sorted) {
