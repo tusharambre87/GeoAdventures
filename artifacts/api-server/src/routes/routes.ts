@@ -11881,6 +11881,11 @@ Return ONLY valid JSON in this exact format:
           if (ownsExplorer) {
             validatedExplorerId = explorerId;
             await storage.awardXp(explorerId, xpAwarded);
+            // Mission completion is an independent trigger for stop XP — award it here,
+            // not through the journey-pack-gated endpoint from Part C.
+            // The stop.missionCompleted early-return above makes this idempotent:
+            // any repeat call for the same stop exits before reaching this line.
+            await storage.awardXp(explorerId, XP_REWARDS.TRIP_STOP_VISITED);
           }
         } catch (e) {
           console.error("Error awarding mission XP:", e);
