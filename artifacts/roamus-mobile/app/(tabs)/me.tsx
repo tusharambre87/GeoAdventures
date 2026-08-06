@@ -22,18 +22,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/authContext";
 import { API_BASE } from "@/lib/authContext";
 import { CITY_IMGS, F, G } from "@/lib/tokens";
+import { getRoamusRank } from "@workspace/api-client-react";
 
 const EXPLORER_COLORS = ["#7C3AED", "#E8692A", "#1A1F2E", "#DC2626", "#16A34A"];
 const FALLBACK_CREW_COLORS = ["#F97316", "#8B5CF6", "#3B82F6", "#10B981", "#EC4899", "#F59E0B"];
-
-function getExplorerRank(xp: number): string {
-  if (xp >= 5000) return "\uD83C\uDFC6 Legend";
-  if (xp >= 2000) return "\u2B50 Expert";
-  if (xp >= 1000) return "\uD83D\uDD25 Adventurer";
-  if (xp >= 500)  return "\uD83D\uDDFA Explorer";
-  if (xp >= 100)  return "\uD83C\uDF31 Rookie";
-  return "\uD83D\uDC23 Beginner";
-}
 
 type Trip = {
   id: string;
@@ -254,7 +246,6 @@ export default function MeScreen() {
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.visitedStops ?? 0), 0);
   const explorerCount = explorers.length;
-  const totalFamilyXp = explorers.reduce((sum, e) => sum + (e.totalXp ?? 0), 0);
 
   const user = fetchedUser ?? cachedUser;
   const firstLetter = (user?.firstName ?? user?.username ?? user?.email ?? "U")[0];
@@ -326,10 +317,36 @@ export default function MeScreen() {
               </View>
             ))}
           </View>
-          {totalFamilyXp > 0 && (
-            <Text style={s.familyXpText}>
-              {"\u26A1"} {totalFamilyXp.toLocaleString()} family XP{"  \u00B7  "}{getExplorerRank(totalFamilyXp)}
-            </Text>
+          {explorers.length > 0 && (
+            <View style={s.xpStrip}>
+              {explorers.map((e, i) => {
+                const xp = e.totalXp ?? 0;
+                const rd = getRoamusRank(xp);
+                const clr = EXPLORER_COLORS[i % EXPLORER_COLORS.length];
+                return (
+                  <View key={e.id} style={s.xpCard}>
+                    <View style={[s.xpDot, { backgroundColor: clr }]}>
+                      <Text style={s.xpDotText}>{e.name[0]?.toUpperCase() ?? "?"}</Text>
+                    </View>
+                    <View style={s.xpCardBody}>
+                      <View style={s.xpCardRow}>
+                        <Text style={s.xpCardName} numberOfLines={1}>{e.name}</Text>
+                        <Text style={s.xpCardXp}>{xp.toLocaleString()} XP</Text>
+                      </View>
+                      <Text style={s.xpCardRank} numberOfLines={1}>{rd.rank.name}</Text>
+                      <View style={s.xpTrack}>
+                        <View style={[s.xpFill, { width: `${rd.progressPercent}%` as any, backgroundColor: clr }]} />
+                      </View>
+                      {rd.nextRank ? (
+                        <Text style={s.xpCardNext}>{rd.xpToNextRank.toLocaleString()} XP to {rd.nextRank.name}</Text>
+                      ) : (
+                        <Text style={s.xpCardNext}>Max rank reached</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
           )}
         </View>
 
@@ -821,6 +838,44 @@ const s = StyleSheet.create({
     marginTop: 12,
     textAlign: "center",
   },
+  xpStrip: { marginTop: 16, gap: 8 },
+  xpCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    padding: 10,
+  },
+  xpDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  xpDotText: { fontFamily: F.bold, fontSize: 13, color: "#fff" },
+  xpCardBody: { flex: 1 },
+  xpCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 1,
+  },
+  xpCardName: { fontFamily: F.bold, fontSize: 13, color: "#fff", flex: 1, marginRight: 6 },
+  xpCardXp: { fontFamily: F.semibold, fontSize: 12, color: G.orange },
+  xpCardRank: { fontFamily: F.medium, fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 6 },
+  xpTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  xpFill: { height: 3, borderRadius: 2 },
+  xpCardNext: { fontFamily: F.regular, fontSize: 10, color: "rgba(255,255,255,0.35)" },
   kidsZoneRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -109,7 +109,7 @@ export default function PassportView() {
   const cityMastery = (stats?.cityMastery as Record<string, number>) || {};
 
   const explorerXp = activeExplorer?.totalXp || 0;
-  const explorerRankName = getExplorerRank(explorerXp).name;
+  const explorerRankName = getExplorerRank(explorerXp).rank.name;
 
   const citiesDiscovered = explorerCollectedIds.length;
   const citiesMastered = useMemo(() => {

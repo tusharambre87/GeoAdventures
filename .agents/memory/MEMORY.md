@@ -1,3 +1,4 @@
+- [RoamUs rank table canonical location](roamus-rank-table.md) — single source in `lib/api-client-react/src/rank.ts`; schema.ts re-exports compat aliases; never define a second copy
 - [expo-file-system v56 legacy API](expo-file-system-v56.md) — use `expo-file-system/legacy` for cacheDirectory, writeAsStringAsync, getInfoAsync (v56 broke the top-level export)
 - [atstop emoji/regex edits](atstop-edit-rules.md) — Python `\n` in triple-quoted strings writes literal newlines into JSX; NEVER use the write/edit tool directly on atstop.tsx (or any file with emoji); always use Python scripts via bash.
 - [atstop API data shape](atstop-api-shape.md) — Stop enrichment is a flat JSON blob; field names, fallback chains, and keepDetailOnFocus ref pattern.

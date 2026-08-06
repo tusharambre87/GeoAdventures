@@ -1,3 +1,4 @@
+import { ROAMUS_XP_RANKS, ROAMUS_ELITE_THRESHOLD, getRoamusRank } from "@workspace/api-client-react/rank";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -551,35 +552,28 @@ export const XP_REWARDS = {
   TRIP_COMPLETE: 75,
 } as const;
 
-export const EXPLORER_XP_RANKS = [
-  { level: 1, id: 'explorer', name: 'Explorer', minXp: 0, icon: '🧭' },
-  { level: 2, id: 'trail_seeker', name: 'Trail Seeker', minXp: 50, icon: '🥾' },
-  { level: 3, id: 'pathfinder', name: 'Pathfinder', minXp: 150, icon: '🗺️' },
-  { level: 4, id: 'city_spotter', name: 'City Spotter', minXp: 350, icon: '🔭' },
-  { level: 5, id: 'cartographer', name: 'Cartographer', minXp: 650, icon: '🎭' },
-  { level: 6, id: 'world_ranger', name: 'World Ranger', minXp: 1100, icon: '🌍' },
-  { level: 7, id: 'navigator', name: 'Navigator', minXp: 1800, icon: '🧭' },
-  { level: 8, id: 'voyager', name: 'Voyager', minXp: 2800, icon: '✈️' },
-  { level: 9, id: 'world_scholar', name: 'World Scholar', minXp: 4200, icon: '📚' },
-  { level: 10, id: 'master_explorer', name: 'Master Explorer', minXp: 6200, icon: '⭐' },
-  { level: 11, id: 'geography_legend', name: 'Geography Legend', minXp: 9000, icon: '🏆' },
-  { level: 12, id: 'geoquest_champion', name: 'GeoQuest Champion', minXp: 13000, icon: '👑' },
-] as const;
+// ── Canonical rank table — defined once in @workspace/api-client-react/src/rank.ts ──
+// Re-exported here so all web + API-server consumers keep the same import path.
+export {
+  ROAMUS_XP_RANKS,
+  ROAMUS_ELITE_THRESHOLD,
+  getRoamusRank,
+} from "@workspace/api-client-react/rank";
+export type { RoamusXpRank } from "@workspace/api-client-react/rank";
 
-export type ExplorerXpRank = typeof EXPLORER_XP_RANKS[number];
+// Backward-compat aliases — existing consumers import these names; they now point at
+// the unified 18-level travel table. No second copy of the data.
+export { ROAMUS_XP_RANKS as EXPLORER_XP_RANKS } from "@workspace/api-client-react/rank";
+export type { RoamusXpRank as ExplorerXpRank } from "@workspace/api-client-react/rank";
+export { getRoamusRank as getExplorerRank } from "@workspace/api-client-react/rank";
 
-export const ELITE_XP_THRESHOLD = 13000;
+/** First minXp where a rank is considered elite (level 13 — World Wanderer). */
+export const ELITE_XP_THRESHOLD = ROAMUS_ELITE_THRESHOLD;
 
-export const ELITE_XP_RANKS = [
-  { level: 13, id: 'world_architect', name: 'World Architect', minXp: 20000, icon: '🏛️', tagline: 'You reshape the map' },
-  { level: 14, id: 'grand_pathfinder', name: 'Grand Pathfinder', minXp: 35000, icon: '🧭', tagline: 'No trail goes unmapped' },
-  { level: 15, id: 'culture_keeper', name: 'Culture Keeper', minXp: 55000, icon: '🎭', tagline: 'Guardian of the world\'s stories' },
-  { level: 16, id: 'legacy_explorer', name: 'Legacy Explorer', minXp: 80000, icon: '🗿', tagline: 'Your legend spans continents' },
-  { level: 17, id: 'geomaster', name: 'GeoMaster', minXp: 120000, icon: '🌐', tagline: 'Master of all realms' },
-  { level: 18, id: 'mythic_voyager', name: 'Mythic Voyager', minXp: 200000, icon: '⚡', tagline: 'Beyond the edge of the known world' },
-] as const;
-
-export type EliteXpRank = typeof ELITE_XP_RANKS[number];
+/** Elite slice of the unified rank table (levels 13-18), for components that
+ *  still reference ELITE_XP_RANKS by name. */
+export const ELITE_XP_RANKS = ROAMUS_XP_RANKS.filter(r => r.level >= 13);
+export type EliteXpRank = (typeof ELITE_XP_RANKS)[number];
 
 export const KIT_TIER_RANK_GATES: Record<number, number> = {
   1: 0,
@@ -589,96 +583,6 @@ export const KIT_TIER_RANK_GATES: Record<number, number> = {
 };
 
 export const KIT_TIER_NAMES = ['Locked', 'Bronze', 'Silver', 'Gold', 'Mythic'] as const;
-
-export function getExplorerRank(totalXp: number) {
-  const isElite = totalXp >= ELITE_XP_THRESHOLD;
-
-  if (isElite) {
-    const champion = EXPLORER_XP_RANKS[EXPLORER_XP_RANKS.length - 1];
-    const firstEliteRank = ELITE_XP_RANKS[0];
-
-    let currentEliteRank: typeof ELITE_XP_RANKS[number] | null = null;
-    for (const rank of ELITE_XP_RANKS) {
-      if (totalXp >= rank.minXp) {
-        currentEliteRank = rank;
-      } else {
-        break;
-      }
-    }
-
-    if (!currentEliteRank) {
-      const xpInto = totalXp - champion.minXp;
-      const xpNeeded = firstEliteRank.minXp - champion.minXp;
-      const progress = Math.min(100, Math.round((xpInto / xpNeeded) * 100));
-      return {
-        rank: { level: champion.level, id: champion.id, name: champion.name, minXp: champion.minXp, icon: champion.icon },
-        level: champion.level,
-        totalXp,
-        nextRank: { level: firstEliteRank.level, id: firstEliteRank.id, name: firstEliteRank.name, minXp: firstEliteRank.minXp, icon: firstEliteRank.icon },
-        xpToNextRank: firstEliteRank.minXp - totalXp,
-        progressPercent: progress,
-        isElite: true,
-        eliteRank: null,
-        nextEliteRank: firstEliteRank,
-      };
-    }
-
-    const eliteIndex = ELITE_XP_RANKS.findIndex(r => r.id === currentEliteRank!.id);
-    const nextEliteRank = eliteIndex < ELITE_XP_RANKS.length - 1
-      ? ELITE_XP_RANKS[eliteIndex + 1]
-      : null;
-
-    const xpIntoCurrentLevel = totalXp - currentEliteRank.minXp;
-    const xpNeededForNext = nextEliteRank ? nextEliteRank.minXp - currentEliteRank.minXp : 0;
-    const progressPercent = nextEliteRank
-      ? Math.min(100, Math.round((xpIntoCurrentLevel / xpNeededForNext) * 100))
-      : 100;
-
-    return {
-      rank: { level: currentEliteRank.level, id: currentEliteRank.id, name: currentEliteRank.name, minXp: currentEliteRank.minXp, icon: currentEliteRank.icon },
-      level: currentEliteRank.level,
-      totalXp,
-      nextRank: nextEliteRank ? { level: nextEliteRank.level, id: nextEliteRank.id, name: nextEliteRank.name, minXp: nextEliteRank.minXp, icon: nextEliteRank.icon } : null,
-      xpToNextRank: nextEliteRank ? nextEliteRank.minXp - totalXp : 0,
-      progressPercent,
-      isElite: true,
-      eliteRank: currentEliteRank,
-      nextEliteRank,
-    };
-  }
-
-  let currentRank: ExplorerXpRank = EXPLORER_XP_RANKS[0];
-  for (const rank of EXPLORER_XP_RANKS) {
-    if (totalXp >= rank.minXp) {
-      currentRank = rank;
-    } else {
-      break;
-    }
-  }
-
-  const currentIndex = EXPLORER_XP_RANKS.findIndex(r => r.id === currentRank.id);
-  const nextRank = currentIndex < EXPLORER_XP_RANKS.length - 1
-    ? EXPLORER_XP_RANKS[currentIndex + 1]
-    : null;
-
-  const xpIntoCurrentLevel = totalXp - currentRank.minXp;
-  const xpNeededForNext = nextRank ? nextRank.minXp - currentRank.minXp : 0;
-  const progressPercent = nextRank
-    ? Math.min(100, Math.round((xpIntoCurrentLevel / xpNeededForNext) * 100))
-    : 100;
-
-  return {
-    rank: currentRank as { level: number; id: string; name: string; minXp: number; icon: string },
-    level: currentRank.level,
-    totalXp,
-    nextRank: nextRank as { level: number; id: string; name: string; minXp: number; icon: string } | null,
-    xpToNextRank: nextRank ? nextRank.minXp - totalXp : 0,
-    progressPercent,
-    isElite: false,
-    eliteRank: null,
-    nextEliteRank: null,
-  };
-}
 
 // Trade request schema
 export const tradeStickersSchema = z.object({
