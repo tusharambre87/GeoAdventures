@@ -4608,10 +4608,15 @@ export async function generateItinerary(
       console.log(`[Planner] Multi-city AI generation for ${city} (${daysForCity} days, starting day ${currentDay})`);
       const usedStopNames: string[] = [];
       for (let day = 1; day <= daysForCity; day++) {
+        // Apply per-day stop-count cap (arrival / departure / middle) from perDayCaps when
+        // present — same source-of-truth as selectStopsFromPool and the single-city AI path.
+        // Global day index into perDayCaps is 0-based: (currentDay - 1) + (day - 1).
+        const _aiDayCap = input.perDayCaps?.[currentDay + day - 2];
+        const aiDayStopsCount = _aiDayCap ? _aiDayCap.anchors + _aiDayCap.fillers : stopsPerDay;
         let dayStops = await generateDayStops(
           currentDay + day - 1,       // global day — used for trip-context prompt
           { ...input, destination: cityDestination },
-          stopsPerDay,
+          aiDayStopsCount,
           ageContext,
           usedStopNames,
           day,                        // city-local day — used for canonical template lookup
@@ -4620,6 +4625,7 @@ export async function generateItinerary(
         );
         // Assign day numbers, then normalize + insert rest stops based on age bracket
         dayStops.forEach((stop, idx) => { stop.dayNumber = currentDay + day - 1; stop.displayOrder = idx; });
+        if (_aiDayCap) dayStops.forEach(s => { s.dayRole = _aiDayCap.dayRole; s.capReason = _aiDayCap.capReason; });
         if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
         if (restStopsActive) {
           const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
