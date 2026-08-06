@@ -306,7 +306,7 @@ export interface PlannerInput {
    *  caller is the single source of truth for stop-count per day. */
   stopsPerDayOverride?: number;
   /** Per-day stop caps — index 0 = arrival day, index n-1 = departure day, middle = base.
-   *  Computed by dayRoleCap() in routes.ts. Pool path only; AI fallback ignores. */
+   *  Computed by dayRoleCap() in routes.ts. Applied by both pool path and AI fallback. */
   perDayCaps?: DayRoleCap[];
 }
 
@@ -363,6 +363,12 @@ export interface GeneratedStop {
   dayRole?: 'arrival' | 'departure' | 'middle';
   /** Human-readable cap reason for the banner (e.g. "evening arrival"). */
   capReason?: string;
+  /** True when the AI-generated day's total duration (stop time + stop-to-stop buffers,
+   *  rest stops excluded) exceeds paceConfig.totalStopMinutes.max for this pace.
+   *  Persisted to planner_trip_plan_stops so callers can surface it post-hoc. */
+  budgetExceeded?: boolean;
+  /** Human-readable overage summary, e.g. "day total 280 min exceeds Balanced budget of 240 min". */
+  budgetNote?: string;
   /** Why this stop was selected for this family — captured at generation time, stored on travel_stops. */
   selectionReason?: string;
   /** For parent suggestions: recommended insertion position in the day (0-indexed after this stop). */
@@ -1250,6 +1256,8 @@ async function persistStop(
     placeProfileData: stop.placeProfileData,
     reviewRequired: stop.reviewRequired ?? false,
     reviewNote: stop.reviewNote ?? null,
+    budgetExceeded: stop.budgetExceeded ?? false,
+    budgetNote: stop.budgetNote ?? null,
   }).returning();
 
   return { place, inserted };
@@ -2836,6 +2844,43 @@ export function stopToStopBufferMins(pace: string): number {
   return p === 'relaxed' || p === 'chill' ? 25
     : p === 'busy' || p === 'packed' ? 10
     : 15;
+}
+
+/**
+ * Stamps budgetExceeded / budgetNote on every stop in the list when the day's
+ * cumulative active time (stop durations + stop-to-stop buffers, rest stops
+ * excluded) exceeds paceConfig.totalStopMinutes.max.  Mutates in place.
+ *
+ * Uses the same Gate ⑫ formula as selectStopsFromPool so AI-path and pool-path
+ * budget accounting are identical.  Rest stops are excluded from the duration
+ * sum (they are inserted as padding, not counted against the activity budget)
+ * but ARE stamped when the day is over-budget so every stop in that day carries
+ * the flag — matching how dayRole / capReason propagate.
+ *
+ * Called in generateItinerary immediately after dayRole / capReason are stamped
+ * and before rest-stop injection, so the budget check always runs against the
+ * AI-generated activity stops only.
+ */
+export function stampBudgetExceeded(
+  stops: GeneratedStop[],
+  pace: string,
+  minChildAge: number,
+): void {
+  const cfg = getPaceConfig(pace);
+  const bufferMins = stopToStopBufferMins(pace);
+  const mainStops = stops.filter(s => s.type !== 'rest');
+  if (mainStops.length === 0) return;
+  const totalMins = mainStops.reduce(
+    (sum, s, i) => sum + effectiveDuration(s.durationMinutes, minChildAge) + (i > 0 ? bufferMins : 0),
+    0,
+  );
+  if (totalMins > cfg.totalStopMinutes.max) {
+    const note = `day total ${totalMins} min exceeds ${cfg.label} budget of ${cfg.totalStopMinutes.max} min`;
+    for (const s of stops) {
+      s.budgetExceeded = true;
+      s.budgetNote = note;
+    }
+  }
 }
 
 /**
@@ -4626,6 +4671,9 @@ export async function generateItinerary(
         // Assign day numbers, then normalize + insert rest stops based on age bracket
         dayStops.forEach((stop, idx) => { stop.dayNumber = currentDay + day - 1; stop.displayOrder = idx; });
         if (_aiDayCap) dayStops.forEach(s => { s.dayRole = _aiDayCap.dayRole; s.capReason = _aiDayCap.capReason; });
+        // Budget check: stamp budgetExceeded/budgetNote before rest-stop injection so
+        // only AI-generated activity stops count against the duration budget.
+        stampBudgetExceeded(dayStops, input.pace, itinMinChildAge);
         if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
         if (restStopsActive) {
           const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
@@ -4721,6 +4769,9 @@ export async function generateItinerary(
       // Stamp arrival/departure banner fields so the UI can render the same day-role
       // indicators it already shows for the pool path.
       if (_aiDayCap) dayStops.forEach(s => { s.dayRole = _aiDayCap.dayRole; s.capReason = _aiDayCap.capReason; });
+      // Budget check: stamp budgetExceeded/budgetNote before rest-stop injection so
+      // only AI-generated activity stops count against the duration budget.
+      stampBudgetExceeded(dayStops, input.pace, itinMinChildAge);
       // Normalize + insert rest stops based on age bracket
       if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
       if (restStopsActive) {
