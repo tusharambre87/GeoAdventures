@@ -26,6 +26,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image as RNImage,
 } from "react-native";
 import * as ExpoLocation from "expo-location";
 import * as Haptics from "expo-haptics";
@@ -879,11 +880,11 @@ function UpcomingTripHero({
     <View style={{ flex: 1, backgroundColor: '#0D1525' }}>
       {/* Blurred background — same city photo, low-opacity dark overlay */}
       {displayImage ? (
-        <Image
+        <RNImage
           source={{ uri: displayImage }}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          blurRadius={14}
+          resizeMode="cover"
+          blurRadius={18}
         />
       ) : (
         <LinearGradient
