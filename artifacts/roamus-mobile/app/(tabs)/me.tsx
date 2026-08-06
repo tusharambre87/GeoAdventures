@@ -261,8 +261,10 @@ export default function MeScreen() {
     e => !e.isParent && e.profileType !== 'adult' && e.ageRange !== 'adult'
   );
   // Account-level XP: sum of all parent/adult player rows for this account (Brief 2)
+  // Include ageRange='adult' fallback — some legacy rows have profileType='kid'
+  // but ageRange='adult' (created before type enforcement). Both gates needed.
   const accountXp = explorers
-    .filter(e => e.profileType === 'adult' || e.profileType === 'parent')
+    .filter(e => e.profileType === 'adult' || e.profileType === 'parent' || e.ageRange === 'adult')
     .reduce((sum, e) => sum + (e.totalXp ?? 0), 0);
 
   const explorerCount = kidExplorers.length;
