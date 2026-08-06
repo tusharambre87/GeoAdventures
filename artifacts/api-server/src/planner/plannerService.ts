@@ -4727,7 +4727,13 @@ export async function generateItinerary(
     for (const city of routeCityNames) {
       const daysForCity = cityDayMap[city] || 1;
       const stopsNeeded = daysForCity * stopsPerDay;
-      const cityInput: PlannerInput = { ...input, tripDays: daysForCity };
+      // Slice perDayCaps to city-local indices so selectStopsFromPool reads
+      // _d=0..daysForCity-1 against this city's own cap slots, not city 1's.
+      const cityInput: PlannerInput = {
+        ...input,
+        tripDays: daysForCity,
+        perDayCaps: input.perDayCaps?.slice(currentDay - 1, currentDay - 1 + daysForCity),
+      };
 
       // Resolve per-city country: prefer routeStops lookup, fall back to global countryName
       const cityCountry = input.routeStops?.find((rs) => rs.name.trim() === city)?.countryName || countryName;

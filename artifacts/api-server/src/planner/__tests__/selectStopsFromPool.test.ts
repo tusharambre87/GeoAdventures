@@ -562,3 +562,99 @@ describe('selectStopsFromPool — fill-up bypasses geo leg-cap (gates ⑭/⑮)',
     expect(names).toContain('Tower of London');
   });
 });
+
+// ---------------------------------------------------------------------------
+// perDayCaps index alignment (#501 regression guard)
+//
+// selectStopsFromPool reads input.perDayCaps?.[_d] at 0-based city-local
+// indices (_d = 0..tripDays-1).  For multi-city trips the caller must slice
+// the global perDayCaps array to city-local indices before passing cityInput,
+// otherwise city-2's stopsForDay[0] reads city-1's cap slot.
+//
+// This suite proves the mechanism: stopsForDay[0] == perDayCaps[0].anchors +
+// perDayCaps[0].fillers.  A slice to the wrong offset would pass a different
+// value at index 0 and produce the wrong stopsForDay — caught here.
+// ---------------------------------------------------------------------------
+
+describe('selectStopsFromPool — perDayCaps index alignment', () => {
+  function makePool(n: number): CachedStopCandidate[] {
+    return Array.from({ length: n }, (_, i) =>
+      makeCandidate({
+        name: `Stop ${i + 1}`,
+        type: 'landmark',
+        familyAnchorType: 'anchor',
+        scoreClassicFinal: 70,
+        latitude: `40.${i}`,
+        longitude: `-73.${i}`,
+      }),
+    );
+  }
+
+  it('stopsForDay[0] matches perDayCaps[0] anchors+fillers when cap is restrictive (1 stop)', () => {
+    // Simulates city-2 arrival day sliced to index 0: anchors=1, fillers=0 → 1 stop expected
+    const result = selectStopsFromPool(
+      makePool(6),
+      makeInput({
+        tripDays: 1,
+        stopsPerDayOverride: undefined,
+        perDayCaps: [{ anchors: 1, fillers: 0, dayRole: 'arrival', capReason: 'afternoon arrival' }],
+      }),
+    );
+    expect(result.stopsForDay[0]).toBe(1);
+  });
+
+  it('stopsForDay[0] matches perDayCaps[0] anchors+fillers when cap is full (4 stops)', () => {
+    // Simulates city-2 middle day sliced to index 0: anchors=3, fillers=1 → 4 stops expected
+    const result = selectStopsFromPool(
+      makePool(6),
+      makeInput({
+        tripDays: 1,
+        stopsPerDayOverride: undefined,
+        perDayCaps: [{ anchors: 3, fillers: 1, dayRole: 'middle', capReason: 'middle day' }],
+      }),
+    );
+    expect(result.stopsForDay[0]).toBe(4);
+  });
+
+  it('stopsForDay[0] differs between arrival-day and middle-day caps at the same index — proves slicing matters', () => {
+    // If the caller slices correctly, city-2 arrival (1 stop) ≠ city-1 middle (4 stops).
+    // If the caller forgets to slice, city-2 reads city-1's slot → gets 4 when it should get 1.
+    const pool = makePool(6);
+    const arrivalResult = selectStopsFromPool(
+      pool,
+      makeInput({
+        tripDays: 1,
+        stopsPerDayOverride: undefined,
+        perDayCaps: [{ anchors: 1, fillers: 0, dayRole: 'arrival', capReason: 'afternoon arrival' }],
+      }),
+    );
+    const middleResult = selectStopsFromPool(
+      pool,
+      makeInput({
+        tripDays: 1,
+        stopsPerDayOverride: undefined,
+        perDayCaps: [{ anchors: 3, fillers: 1, dayRole: 'middle', capReason: 'middle day' }],
+      }),
+    );
+    expect(arrivalResult.stopsForDay[0]).toBe(1);
+    expect(middleResult.stopsForDay[0]).toBe(4);
+    expect(arrivalResult.stopsForDay[0]).not.toBe(middleResult.stopsForDay[0]);
+  });
+
+  it('multi-day trip: each stopsForDay entry matches its corresponding perDayCaps slot', () => {
+    // 3-day city: arrival(1), middle(4), departure(2) → stopsForDay=[1,4,2]
+    const result = selectStopsFromPool(
+      makePool(10),
+      makeInput({
+        tripDays: 3,
+        stopsPerDayOverride: undefined,
+        perDayCaps: [
+          { anchors: 1, fillers: 0, dayRole: 'arrival',   capReason: 'afternoon arrival' },
+          { anchors: 3, fillers: 1, dayRole: 'middle',    capReason: 'middle day' },
+          { anchors: 2, fillers: 0, dayRole: 'departure', capReason: 'late departure' },
+        ],
+      }),
+    );
+    expect(result.stopsForDay).toEqual([1, 4, 2]);
+  });
+});
