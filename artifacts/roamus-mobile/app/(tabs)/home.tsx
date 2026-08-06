@@ -875,16 +875,12 @@ function UpcomingTripHero({
       })
     : '';
 
-  // bgImage: same photo as the card — CITY_IMGS[city] gives an instant fallback
-  // without waiting for the async wikiImage fetch, so the blurred bg is never blank.
-  const bgImage = displayImage ?? CITY_IMGS[city] ?? null;
-
   return (
     <View style={{ flex: 1, backgroundColor: '#0D1525' }}>
       {/* Blurred background — same city photo, low-opacity dark overlay */}
-      {bgImage ? (
+      {displayImage ? (
         <Image
-          source={{ uri: bgImage }}
+          source={{ uri: displayImage }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           blurRadius={14}
