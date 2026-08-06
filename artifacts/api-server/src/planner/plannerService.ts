@@ -2899,7 +2899,76 @@ export type StopPoolResult = {
    *  stops.length < totalStopsNeeded means at least one day received zero stops
    *  and the result-assembly loop broke early, silently dropping later days. */
   totalStopsNeeded: number;
+  /** Per-day slot counts used to build the trip, one entry per tripDays.
+   *  Reuses the array already computed inside selectStopsFromPool so callers
+   *  never independently re-derive per-day caps (the parallel-implementation
+   *  pattern that has caused bugs). */
+  stopsForDay: number[];
 };
+
+/**
+ * Classify pool-selected stops by city-local day, splitting them into days
+ * that met their cap (passing) and days that fell short.
+ *
+ * Used by generateItinerary to persist adequate pool days immediately and
+ * AI-patch only the short ones — instead of discarding the whole city when a
+ * single day comes up short.
+ *
+ * cityStops: GeneratedStop[] with dayNumber set to city-local values (1..N)
+ * stopsForDay: the matching StopPoolResult.stopsForDay array (length == N)
+ */
+export function classifyPoolDays(
+  cityStops: GeneratedStop[],
+  stopsForDay: number[],
+): { passingStops: GeneratedStop[]; shortLocalDays: number[] } {
+  const byDay = new Map<number, GeneratedStop[]>();
+  for (const stop of cityStops) {
+    const d = stop.dayNumber;
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d)!.push(stop);
+  }
+
+  const passingStops: GeneratedStop[] = [];
+  const shortLocalDays: number[] = [];
+
+  for (let localDay = 1; localDay <= stopsForDay.length; localDay++) {
+    const expected = stopsForDay[localDay - 1] ?? 0;
+    const actual = byDay.get(localDay)?.length ?? 0;
+    if (actual >= expected) {
+      passingStops.push(...(byDay.get(localDay) ?? []));
+    } else {
+      shortLocalDays.push(localDay);
+    }
+  }
+
+  return { passingStops, shortLocalDays };
+}
+
+/**
+ * Call `generate()`, check the result count, and retry once on shortfall.
+ * After one retry the best result is accepted and a warning is logged —
+ * matching the warn-don't-silently-fail pattern used elsewhere in the planner.
+ *
+ * The caller is responsible for NOT persisting anything before this resolves
+ * so that a retry never has to delete-and-rewrite DB rows.
+ */
+export async function generateDayWithRetry(
+  generate: () => Promise<GeneratedStop[]>,
+  expectedCount: number,
+  label: string,
+): Promise<GeneratedStop[]> {
+  const first = await generate();
+  if (first.length >= expectedCount) return first;
+
+  console.warn(`[Planner] ${label}: AI returned ${first.length}/${expectedCount} stops — retrying once`);
+  const retry = await generate();
+  if (retry.length >= expectedCount) return retry;
+
+  // Both attempts short: take whichever returned more stops, log and proceed.
+  const best = retry.length >= first.length ? retry : first;
+  console.warn(`[Planner] ${label}: retry also short (${retry.length}/${expectedCount}) — accepting ${best.length} stops`);
+  return best;
+}
 
 /**
  * Stop-to-stop buffer minutes by pace tier.
@@ -4163,7 +4232,7 @@ export function selectStopsFromPool(
     ...parentSuggestions.map(s => ({ ...s, bucketType: 'age_stretch' as const })),
   ];
 
-  return { stops: result, parentSuggestions: allParentSuggestions, totalStopsNeeded };
+  return { stops: result, parentSuggestions: allParentSuggestions, totalStopsNeeded, stopsForDay };
 }
 
 // ── Day-bucketing output types ────────────────────────────────────────────────
@@ -4668,29 +4737,58 @@ export async function generateItinerary(
       if (pool && pool.stopPool && pool.stopPool.length > 0) {
         console.log(`[Planner] Multi-city cache hit for ${city}: ${pool.stopPool.length} stops, need ${stopsNeeded}`);
         try {
-          const { stops: cityStops, parentSuggestions: cityParentSuggestions, totalStopsNeeded: cityStopsNeeded } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
-          // Widened guard: same cascading-truncation fix as single-city path.
-          // cityInput has tripDays=daysForCity, so cityStopsNeeded is scoped to
-          // this city only.  Cities that already completed via `continue` above
-          // have their stops persisted in the DB and are unaffected by this throw.
-          if (cityStops.length < cityStopsNeeded) {
-            throw new Error(`selectStopsFromPool returned ${cityStops.length} of ${cityStopsNeeded} needed stops for multi-city leg "${city}" — falling back to AI generation`);
-          }
-          let selected: GeneratedStop[];
+          const { stops: cityStops, parentSuggestions: cityParentSuggestions, stopsForDay: cityStopsForDay } = selectStopsFromPool(pool.stopPool, cityInput, qualityProfile, city);
+          const { passingStops, shortLocalDays } = classifyPoolDays(cityStops, cityStopsForDay);
+          const cityDestinationForPatch = `${city}, ${cityCountry}`;
+
+          // ── Persist passing pool days ─────────────────────────────────────
           if (restStopsActive) {
-            const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(cityStops, itinMinChildAge);
-            selected = withMarkers;
-            allBreakMarkers.push(...breakMarkers);
-          } else {
-            selected = cityStops;
+            const { breakMarkers: passingMarkers } = insertRestStopsIntoStopList(passingStops, itinMinChildAge);
+            allBreakMarkers.push(...passingMarkers);
           }
-          for (const stop of selected) {
+          const usedStopNamesForCity: string[] = [];
+          for (const stop of passingStops) {
             stop.dayNumber += dayOffset;
             const { place, inserted } = await persistStop(stop, planId, city, countryName);
             allInserted.push(inserted);
-            if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
+            if (stop.type !== "rest") {
+              await enrichAndPersistScores(stop, place.id, input);
+              usedStopNamesForCity.push(stop.name);
+            }
           }
-          console.log(`[Planner] Multi-city ${city}: ${selected.length} stops persisted (days ${currentDay}–${currentDay + daysForCity - 1})${restStopsActive ? ` [rest stops inserted, age ${itinMinChildAge}]` : ""}`);
+
+          // ── AI-patch short days in order ──────────────────────────────────
+          for (const localDay of shortLocalDays) {
+            const globalDay = currentDay + localDay - 1;
+            const _patchCap = input.perDayCaps?.[globalDay - 1];
+            const patchStopsCount = _patchCap ? _patchCap.anchors + _patchCap.fillers : stopsPerDay;
+            let dayStops = await generateDayWithRetry(
+              () => generateDayStops(globalDay, { ...input, destination: cityDestinationForPatch }, patchStopsCount, ageContext, usedStopNamesForCity, localDay, qualityProfile, city),
+              patchStopsCount,
+              `multi-city ${city} day ${globalDay} (pool short)`,
+            );
+            dayStops.forEach((stop, idx) => { stop.dayNumber = globalDay; stop.displayOrder = idx; });
+            if (_patchCap) dayStops.forEach(s => { s.dayRole = _patchCap.dayRole; s.capReason = _patchCap.capReason; });
+            stampBudgetExceeded(dayStops, input.pace, itinMinChildAge);
+            if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
+            if (restStopsActive) {
+              const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+              dayStops = withMarkers;
+              allBreakMarkers.push(...breakMarkers);
+            }
+            for (const stop of dayStops) {
+              if (stop.type !== "rest") usedStopNamesForCity.push(stop.name);
+              const { place, inserted } = await persistStop(stop, planId, city, cityCountry);
+              allInserted.push(inserted);
+              if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
+            }
+          }
+
+          if (shortLocalDays.length > 0) {
+            console.log(`[Planner] Multi-city ${city}: ${passingStops.length} pool stops + AI-patched days [${shortLocalDays.map(d => currentDay + d - 1).join(', ')}] (days ${currentDay}–${currentDay + daysForCity - 1})`);
+          } else {
+            console.log(`[Planner] Multi-city ${city}: ${passingStops.length} stops persisted from pool (days ${currentDay}–${currentDay + daysForCity - 1})${restStopsActive ? ` [rest stops inserted, age ${itinMinChildAge}]` : ""}`);
+          }
           if (cityParentSuggestions && cityParentSuggestions.length > 0) {
             const byDay: Record<string, typeof cityParentSuggestions> = {};
             for (const s of cityParentSuggestions) {
@@ -4730,15 +4828,21 @@ export async function generateItinerary(
         // Global day index into perDayCaps is 0-based: (currentDay - 1) + (day - 1).
         const _aiDayCap = input.perDayCaps?.[currentDay + day - 2];
         const aiDayStopsCount = _aiDayCap ? _aiDayCap.anchors + _aiDayCap.fillers : stopsPerDay;
-        let dayStops = await generateDayStops(
-          currentDay + day - 1,       // global day — used for trip-context prompt
-          { ...input, destination: cityDestination },
+        // Piece B: count check before persist — retry once on shortfall so nothing
+        // hits the DB until an adequate (or final-attempt) result exists.
+        let dayStops = await generateDayWithRetry(
+          () => generateDayStops(
+            currentDay + day - 1,     // global day — used for trip-context prompt
+            { ...input, destination: cityDestination },
+            aiDayStopsCount,
+            ageContext,
+            usedStopNames,
+            day,                      // city-local day — used for canonical template lookup
+            qualityProfile,
+            city,
+          ),
           aiDayStopsCount,
-          ageContext,
-          usedStopNames,
-          day,                        // city-local day — used for canonical template lookup
-          qualityProfile,
-          city,
+          `multi-city ${city} day ${currentDay + day - 1}`,
         );
         // Assign day numbers, then normalize + insert rest stops based on age bracket
         dayStops.forEach((stop, idx) => { stop.dayNumber = currentDay + day - 1; stop.displayOrder = idx; });
@@ -4776,32 +4880,60 @@ export async function generateItinerary(
     try {
       // selectStopsFromPool applies all personalization constraints, then returns
       // GeneratedStop objects ready for the existing persistStop + enrichAndPersistScores pipeline.
-      const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions, totalStopsNeeded } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
-      // Guard: throw whenever the pool couldn't fill every day, not just when it
-      // returned zero total. The result-assembly loop inside selectStopsFromPool
-      // does `if (daySlice.length === 0) break` — once any day comes up empty,
-      // every subsequent day is also dropped silently. A trip that needs 6 stops
-      // and returns 4 has the same cascading problem as one that returns 0.
-      // Same throw, same catch block below, same AI-fallback path.
-      if (rawSelectedStops.length < totalStopsNeeded) {
-        throw new Error(`selectStopsFromPool returned ${rawSelectedStops.length} of ${totalStopsNeeded} needed stops for "${cityName}" — falling back to AI generation`);
-      }
-      let finalStops: GeneratedStop[];
+      const { stops: rawSelectedStops, parentSuggestions: poolParentSuggestions, stopsForDay: poolStopsForDay } = selectStopsFromPool(cachedPool.stopPool, input, qualityProfile, cityName);
+      // Per-day check: persist days that met their cap, AI-patch short ones.
+      // Replaces the city-level throw so a single short day does not discard
+      // the whole pool result. stopsForDay comes directly from selectStopsFromPool
+      // (same computation, no independent re-derivation of caps).
+      const { passingStops: poolPassing, shortLocalDays: poolShortDays } = classifyPoolDays(rawSelectedStops, poolStopsForDay);
+
+      // ── Persist passing pool days ─────────────────────────────────────────
       if (restStopsActive) {
-        const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(rawSelectedStops, itinMinChildAge);
-        finalStops = withMarkers;
-        allBreakMarkers.push(...breakMarkers);
-      } else {
-        finalStops = rawSelectedStops;
+        const { breakMarkers: passingMarkers } = insertRestStopsIntoStopList(poolPassing, itinMinChildAge);
+        allBreakMarkers.push(...passingMarkers);
       }
       const insertedStops: PlannerTripPlanStop[] = [];
-      for (const stop of finalStops) {
+      const usedStopNamesPool: string[] = [];
+      for (const stop of poolPassing) {
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
         insertedStops.push(inserted);
-        // Full scoring/enrichment pipeline — skipped for nap placeholder stops
-        if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
+        if (stop.type !== "rest") {
+          await enrichAndPersistScores(stop, place.id, input);
+          usedStopNamesPool.push(stop.name);
+        }
       }
-      console.log(`[Planner] Cache-served itinerary: ${insertedStops.length} stops persisted and scored${napActive ? " [nap windows inserted]" : ""}`);
+
+      // ── AI-patch short days in order ──────────────────────────────────────
+      for (const localDay of poolShortDays) {
+        const _patchCap = input.perDayCaps?.[localDay - 1];
+        const patchStopsCount = _patchCap ? _patchCap.anchors + _patchCap.fillers : stopsPerDay;
+        let dayStops = await generateDayWithRetry(
+          () => generateDayStops(localDay, input, patchStopsCount, ageContext, usedStopNamesPool, undefined, qualityProfile, cityName),
+          patchStopsCount,
+          `single-city ${cityName} day ${localDay} (pool short)`,
+        );
+        dayStops.forEach((stop, idx) => { stop.dayNumber = localDay; stop.displayOrder = idx; });
+        if (_patchCap) dayStops.forEach(s => { s.dayRole = _patchCap.dayRole; s.capReason = _patchCap.capReason; });
+        stampBudgetExceeded(dayStops, input.pace, itinMinChildAge);
+        if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
+        if (restStopsActive) {
+          const { stops: withMarkers, breakMarkers } = insertRestStopsIntoStopList(dayStops, itinMinChildAge);
+          dayStops = withMarkers;
+          allBreakMarkers.push(...breakMarkers);
+        }
+        for (const stop of dayStops) {
+          if (stop.type !== "rest") usedStopNamesPool.push(stop.name);
+          const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
+          insertedStops.push(inserted);
+          if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
+        }
+      }
+
+      if (poolShortDays.length > 0) {
+        console.log(`[Planner] Cache-served itinerary: ${poolPassing.length} pool stops + AI-patched days [${poolShortDays.join(', ')}] — ${insertedStops.length} total`);
+      } else {
+        console.log(`[Planner] Cache-served itinerary: ${insertedStops.length} stops persisted and scored${napActive ? " [nap windows inserted]" : ""}`);
+      }
       // Save parent suggestions to travel_trips
       if (poolParentSuggestions && poolParentSuggestions.length > 0) {
         const byDay: Record<string, typeof poolParentSuggestions> = {};
@@ -4833,7 +4965,13 @@ export async function generateItinerary(
       // this path ignored it and passed flat stopsPerDay for every day.
       const _aiDayCap = input.perDayCaps?.[day - 1];
       const aiDayStopsCount = _aiDayCap ? _aiDayCap.anchors + _aiDayCap.fillers : stopsPerDay;
-      let dayStops = await generateDayStops(day, input, aiDayStopsCount, ageContext, usedStopNames, undefined, qualityProfile, cityName);
+      // Piece B: count check before persist — retry once on shortfall so nothing
+      // hits the DB until an adequate (or final-attempt) result exists.
+      let dayStops = await generateDayWithRetry(
+        () => generateDayStops(day, input, aiDayStopsCount, ageContext, usedStopNames, undefined, qualityProfile, cityName),
+        aiDayStopsCount,
+        `single-city ${cityName} day ${day}`,
+      );
       dayStops.forEach((stop, idx) => {
         stop.dayNumber = day;
         stop.displayOrder = idx;
