@@ -4701,11 +4701,20 @@ export async function generateItinerary(
     const usedStopNames: string[] = [];
 
     for (let day = 1; day <= input.tripDays; day++) {
-      let dayStops = await generateDayStops(day, input, stopsPerDay, ageContext, usedStopNames, undefined, qualityProfile, cityName);
+      // Apply per-day stop-count cap (arrival / departure / middle) from perDayCaps when
+      // present — same source-of-truth as selectStopsFromPool and bucketStopsTodays.
+      // perDayCaps is populated by routes.ts before calling generateItinerary; previously
+      // this path ignored it and passed flat stopsPerDay for every day.
+      const _aiDayCap = input.perDayCaps?.[day - 1];
+      const aiDayStopsCount = _aiDayCap ? _aiDayCap.anchors + _aiDayCap.fillers : stopsPerDay;
+      let dayStops = await generateDayStops(day, input, aiDayStopsCount, ageContext, usedStopNames, undefined, qualityProfile, cityName);
       dayStops.forEach((stop, idx) => {
         stop.dayNumber = day;
         stop.displayOrder = idx;
       });
+      // Stamp arrival/departure banner fields so the UI can render the same day-role
+      // indicators it already shows for the pool path.
+      if (_aiDayCap) dayStops.forEach(s => { s.dayRole = _aiDayCap.dayRole; s.capReason = _aiDayCap.capReason; });
       // Normalize + insert rest stops based on age bracket
       if (napActive) dayStops = normalizeNapDayStops(dayStops, input.pace, itinMinChildAge);
       if (restStopsActive) {
