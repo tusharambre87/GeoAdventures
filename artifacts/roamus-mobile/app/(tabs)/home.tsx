@@ -875,8 +875,28 @@ function UpcomingTripHero({
       })
     : '';
 
+  // bgImage: same photo as the card — CITY_IMGS[city] gives an instant fallback
+  // without waiting for the async wikiImage fetch, so the blurred bg is never blank.
+  const bgImage = displayImage ?? CITY_IMGS[city] ?? null;
+
   return (
-    <View style={{ flex: 1, backgroundColor: G.bg }}>
+    <View style={{ flex: 1, backgroundColor: '#0D1525' }}>
+      {/* Blurred background — same city photo, low-opacity dark overlay */}
+      {bgImage ? (
+        <Image
+          source={{ uri: bgImage }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          blurRadius={14}
+        />
+      ) : (
+        <LinearGradient
+          colors={['#1A2540', '#0D1525']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,11,22,0.42)' }]} pointerEvents="none" />
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -885,10 +905,11 @@ function UpcomingTripHero({
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting */}
+        {/* Greeting — white on dark blurred bg */}
         <View style={uth.greetRow}>
           <Text style={uth.greetTxt}>
-            {greeting()}{firstName ? `,\n${firstName}` : ''}
+            {greeting()}{firstName ? `,
+${firstName}` : ''}
           </Text>
         </View>
 
@@ -917,52 +938,59 @@ function UpcomingTripHero({
             <Text style={uth.cardName} numberOfLines={2}>{tripName}</Text>
             <Text style={uth.cardMeta}>
               {daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days away`}
-              {startLabel ? `  \u00B7  ${startLabel}` : ''}
+              {startLabel ? `  ·  ${startLabel}` : ''}
             </Text>
+            <TouchableOpacity
+              style={uth.viewPlanBtn}
+              activeOpacity={0.85}
+              onPress={() =>
+                router.push({
+                  pathname: '/trip/review-stops' as any,
+                  params: { tripId: trip.id },
+                })
+              }
+            >
+              <Text style={uth.viewPlanTxt}>View Trip Plan →</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Review Stops action row */}
-        <TouchableOpacity
-          style={uth.actionRow}
-          activeOpacity={0.85}
-          onPress={() =>
-            router.push({
-              pathname: '/trip/review-stops' as any,
-              params: { tripId: trip.id },
-            })
-          }
-        >
-          <View style={[uth.actionIcon, { backgroundColor: '#EEF2FF' }]}>
-            <Text style={uth.actionIconTxt}>{'\uD83D\uDCCC'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={uth.actionTitle}>Review Stops</Text>
-            <Text style={uth.actionSub}>Add or remove stops before your trip</Text>
-          </View>
-          <Text style={uth.actionChevron}>{'>'}</Text>
-        </TouchableOpacity>
-
-        {/* Trip Essentials action row */}
-        <TouchableOpacity
-          style={uth.actionRow}
-          activeOpacity={0.85}
-          onPress={() =>
-            router.push({
-              pathname: '/trip/essentials' as any,
-              params: { tripId: trip.id },
-            })
-          }
-        >
-          <View style={[uth.actionIcon, { backgroundColor: '#FFF8F0' }]}>
-            <Text style={uth.actionIconTxt}>{'\u2713'}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={uth.actionTitle}>Trip Essentials</Text>
-            <Text style={uth.actionSub}>Packing list, tickets & more</Text>
-          </View>
-          <Text style={uth.actionChevron}>{'>'}</Text>
-        </TouchableOpacity>
+        {/* Before-you-leave chips — styled like TODAY AT A GLANCE */}
+        <View style={uth.glanceWrap}>
+          <Text style={uth.glanceLabel}>BEFORE YOU LEAVE</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={uth.glanceRow}
+          >
+            <TouchableOpacity
+              style={uth.actionChip}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: '/trip/review-stops' as any,
+                  params: { tripId: trip.id },
+                })
+              }
+            >
+              <Text style={uth.actionChipLabel}>STOPS</Text>
+              <Text style={uth.actionChipName}>Review Stops</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={uth.actionChip}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push({
+                  pathname: '/trip/essentials' as any,
+                  params: { tripId: trip.id },
+                })
+              }
+            >
+              <Text style={uth.actionChipLabel}>ESSENTIALS</Text>
+              <Text style={uth.actionChipName}>Trip Essentials</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </ScrollView>
 
       {/* Plan-a-trip FAB */}
@@ -988,7 +1016,7 @@ const uth = StyleSheet.create({
   greetTxt: {
     fontFamily: F.bold,
     fontSize: 22,
-    color: G.deep,
+    color: '#fff',
     lineHeight: 28,
   },
   card: {
@@ -998,13 +1026,13 @@ const uth = StyleSheet.create({
     backgroundColor: '#131926',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.28,
     shadowRadius: 18,
     elevation: 10,
     marginBottom: 14,
   },
   cardPhoto: {
-    height: 220,
+    height: 290,
     overflow: 'hidden',
   },
   cardDetails: {
@@ -1042,50 +1070,54 @@ const uth = StyleSheet.create({
     fontFamily: F.regular,
     fontSize: 13,
     color: 'rgba(255,255,255,0.55)',
+    marginBottom: 14,
   },
-  actionRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 12,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(26,31,46,0.07)',
-    padding: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+  viewPlanBtn: {
+    alignSelf: 'flex-start' as const,
+    backgroundColor: G.orange,
+    borderRadius: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  actionIconTxt: {
-    fontSize: 20,
-  },
-  actionTitle: {
+  viewPlanTxt: {
     fontFamily: F.bold,
     fontSize: 14,
-    color: G.deep,
-    marginBottom: 2,
+    color: '#fff',
   },
-  actionSub: {
-    fontFamily: F.regular,
-    fontSize: 12,
-    color: G.muted,
-    lineHeight: 16,
+  glanceWrap: {
+    marginHorizontal: 16,
+    marginTop: 4,
   },
-  actionChevron: {
-    fontSize: 20,
-    color: G.muted,
+  glanceLabel: {
     fontFamily: F.bold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 8,
+  },
+  glanceRow: {
+    flexDirection: 'row' as const,
+    gap: 10,
+  },
+  actionChip: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    minWidth: 120,
+  },
+  actionChipLabel: {
+    fontFamily: F.bold,
+    fontSize: 10,
+    color: G.orange,
+    marginBottom: 3,
+    letterSpacing: 0.4,
+  },
+  actionChipName: {
+    fontFamily: F.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.90)',
+    lineHeight: 17,
   },
 });
 

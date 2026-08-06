@@ -18,7 +18,7 @@ import {
   Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { F, G } from '@/lib/tokens';
@@ -174,6 +174,7 @@ export default function TripEssentialsScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: G.bg }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       {/* ── Header ── */}
       <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={8}>

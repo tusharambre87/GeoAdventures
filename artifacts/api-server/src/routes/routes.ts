@@ -11557,6 +11557,32 @@ Return ONLY valid JSON in this exact format:
           req.log.error({ err: e }, "[FamilySignals] Background signal update failed");
         }
       })();
+
+      // ── Account-level stop XP (Brief 2) ──────────────────────────────────────
+      // Award TRIP_STOP_VISITED to every parent/adult player row on this account.
+      // This is unconditional on kid engagement — it fires for every completed visit,
+      // separate from and additive to the per-kid awards in award-stop-xp.
+      if (mode === "completed") {
+        (async () => {
+          try {
+            const parentPlayers = await db
+              .select({ id: players.id })
+              .from(players)
+              .where(
+                and(
+                  eq(players.userId, userId),
+                  eq(players.isArchived, false),
+                  sql`${players.profileType} IN ('parent', 'adult')`,
+                )
+              );
+            await Promise.all(
+              parentPlayers.map(p => storage.awardXp(p.id, XP_REWARDS.TRIP_STOP_VISITED).catch(() => {}))
+            );
+          } catch (e) {
+            req.log.error({ err: e }, "[AccountXP] Parent player XP award failed");
+          }
+        })();
+      }
     } catch (error) {
       req.log.error({ err: error }, "Error marking stop visited");
       res.status(500).json({ message: "Failed to mark stop visited" });
@@ -11810,23 +11836,15 @@ Return ONLY valid JSON in this exact format:
         return res.status(403).json({ message: "Access denied" });
       }
 
-      if (stop.missionCompleted) {
-        return res.status(400).json({ message: "Mission already completed" });
-      }
+      // missionCompleted is a UI-state flag (shows "already solved / want to replay?")
+      // but it NO LONGER gates XP — each kid completes missions independently.
       if (!stop.missionType || !stop.missionQuestion) {
         return res.status(400).json({ message: "This stop has no mission" });
       }
 
-      const allStops = await storage.getStopsByTripId(stop.tripId);
-      const sortedStops = allStops.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-      const missionStops = sortedStops.filter(s => s.missionType && s.missionQuestion);
-      const currentMissionIdx = missionStops.findIndex(s => s.id === stopId);
-      if (currentMissionIdx > 0) {
-        const prevMission = missionStops[currentMissionIdx - 1];
-        if (!prevMission.missionCompleted) {
-          return res.status(400).json({ message: "Complete previous missions first" });
-        }
-      }
+      // Sequential ordering is intentionally removed: it was account-level, so one
+      // kid completing mission N-1 would block every other kid from mission N.
+      // Each kid now engages with missions on their own terms.
 
       let isCorrect = true;
       if (stop.missionType === 'knowledge' && stop.missionAnswer) {
@@ -11860,18 +11878,23 @@ Return ONLY valid JSON in this exact format:
       };
       const xpAwarded = difficultyXp[stop.missionDifficulty || 'normal'] || XP_REWARDS.MISSION_NORMAL;
 
-      await storage.updateStop(stopId, {
-        missionCompleted: true,
-        missionCompletedAt: new Date(),
-        missionXpAwarded: xpAwarded,
-      });
-
-      const currentCompleted = trip.missionsCompleted || 0;
-      const currentXpTotal = trip.missionXpTotal || 0;
-      await storage.updateTrip(stop.tripId, {
-        missionsCompleted: currentCompleted + 1,
-        missionXpTotal: currentXpTotal + xpAwarded,
-      });
+      // ── UI state: mark the stop solved (first kid to finish sets the flag) ──
+      // This is for "already solved — want to replay?" UX only; it does not gate XP.
+      if (!stop.missionCompleted) {
+        await storage.updateStop(stopId, {
+          missionCompleted: true,
+          missionCompletedAt: new Date(),
+          missionXpAwarded: xpAwarded,
+        });
+        // Trip-level counters track "how many distinct mission stops were completed"
+        // (not kid × stop pairs), so only increment once per stop.
+        const currentCompleted = trip.missionsCompleted || 0;
+        const currentXpTotal = trip.missionXpTotal || 0;
+        await storage.updateTrip(stop.tripId, {
+          missionsCompleted: currentCompleted + 1,
+          missionXpTotal: currentXpTotal + xpAwarded,
+        });
+      }
 
       let validatedExplorerId: string | null = null;
       if (explorerId) {
@@ -11880,12 +11903,25 @@ Return ONLY valid JSON in this exact format:
           const ownsExplorer = userExplorers.some(p => p.id === explorerId);
           if (ownsExplorer) {
             validatedExplorerId = explorerId;
-            await storage.awardXp(explorerId, xpAwarded);
-            // Mission completion is an independent trigger for stop XP — award it here,
-            // not through the journey-pack-gated endpoint from Part C.
-            // The stop.missionCompleted early-return above makes this idempotent:
-            // any repeat call for the same stop exits before reaching this line.
-            await storage.awardXp(explorerId, XP_REWARDS.TRIP_STOP_VISITED);
+
+            // ── Mission XP: per-kid, once per stop ──────────────────────────
+            // hasMissionCompletion prevents a replay from re-awarding XP to
+            // the same kid, while allowing every other kid their own first award.
+            const alreadyEarnedMissionXp = await storage.hasMissionCompletion(explorerId, stopId);
+            if (!alreadyEarnedMissionXp) {
+              await storage.awardXp(explorerId, xpAwarded);
+              await storage.recordMissionCompletion(explorerId, stopId, xpAwarded);
+            }
+
+            // ── Stop-visited XP: per-kid, once per stop ──────────────────────
+            // Mission completion is an independent trigger; hasStopXpAward ensures
+            // a kid who also listened to audio gets exactly one TRIP_STOP_VISITED
+            // (not one from each path).
+            const alreadyEarnedStopXp = await storage.hasStopXpAward(explorerId, stopId);
+            if (!alreadyEarnedStopXp) {
+              await storage.awardXp(explorerId, XP_REWARDS.TRIP_STOP_VISITED);
+              await storage.recordStopXpAward(explorerId, stopId);
+            }
           }
         } catch (e) {
           console.error("Error awarding mission XP:", e);
@@ -11976,15 +12012,27 @@ Return ONLY valid JSON in this exact format:
 
       // Find which explorers actually engaged (listen or explore section completed)
       const engagedIds = await storage.getEngagedExplorers(stopId, ownedIds);
-      const skipped = ownedIds.filter(id => !engagedIds.includes(id));
+      const notEngaged = ownedIds.filter(id => !engagedIds.includes(id));
 
-      // Award XP to engaged explorers
-      await Promise.all(
-        engagedIds.map(id => storage.awardXp(id, XP_REWARDS.TRIP_STOP_VISITED).catch(() => {}))
-      );
+      // Award XP per kid, idempotent: each kid gets at most one TRIP_STOP_VISITED
+      // per stop regardless of how many times this endpoint is called or whether the
+      // mission-completion path already fired for that kid.
+      const awarded: string[] = [];
+      const alreadyHeld: string[] = [];
+      for (const id of engagedIds) {
+        const alreadyAwarded = await storage.hasStopXpAward(id, stopId);
+        if (alreadyAwarded) {
+          alreadyHeld.push(id);
+          continue;
+        }
+        await storage.awardXp(id, XP_REWARDS.TRIP_STOP_VISITED).catch(() => {});
+        await storage.recordStopXpAward(id, stopId).catch(() => {});
+        awarded.push(id);
+      }
 
-      console.log(`🏆 [StopXP] stop=${stopId} awarded=${engagedIds.length} skipped=${skipped.length}`);
-      return res.json({ awarded: engagedIds, skipped });
+      const skipped = [...notEngaged, ...alreadyHeld];
+      console.log(`🏆 [StopXP] stop=${stopId} awarded=${awarded.length} alreadyHeld=${alreadyHeld.length} notEngaged=${notEngaged.length}`);
+      return res.json({ awarded, skipped });
     } catch (error) {
       console.error("Error awarding stop XP:", error);
       return res.status(500).json({ message: "Failed to award stop XP" });

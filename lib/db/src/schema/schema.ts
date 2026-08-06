@@ -3909,3 +3909,30 @@ export const travelLegs = pgTable("travel_legs", {
   index("idx_travel_legs_dest").on(table.destKey),
 ]);
 export type TravelLeg = typeof travelLegs.$inferSelect;
+
+// ── PER-KID STOP XP IDEMPOTENCY ───────────────────────────────────────────────
+// Composite PK (explorer_id, stop_id) ensures each kid earns at most one
+// TRIP_STOP_VISITED award per stop, regardless of how many qualifying triggers
+// fire (audio listen, mission complete, or both).
+export const explorerStopXpAwards = pgTable("explorer_stop_xp_awards", {
+  explorerId: text("explorer_id").notNull(),
+  stopId:     text("stop_id").notNull(),
+  awardedAt:  timestamp("awarded_at").notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.explorerId, table.stopId], name: "pk_explorer_stop_xp_awards" }),
+]);
+export type ExplorerStopXpAward = typeof explorerStopXpAwards.$inferSelect;
+
+// ── PER-KID MISSION COMPLETION GUARD ─────────────────────────────────────────
+// Composite PK (explorer_id, stop_id) ensures each kid earns mission XP exactly
+// once per mission stop, even if they replay. Does NOT block other kids from
+// completing the same mission — every kid has their own row.
+export const explorerMissionCompletions = pgTable("explorer_mission_completions", {
+  explorerId:  text("explorer_id").notNull(),
+  stopId:      text("stop_id").notNull(),
+  xpAwarded:   integer("xp_awarded").notNull(),
+  completedAt: timestamp("completed_at").notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.explorerId, table.stopId], name: "pk_explorer_mission_completions" }),
+]);
+export type ExplorerMissionCompletion = typeof explorerMissionCompletions.$inferSelect;

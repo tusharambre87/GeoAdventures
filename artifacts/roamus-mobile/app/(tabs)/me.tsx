@@ -47,6 +47,7 @@ type Explorer = {
   id: string;
   name: string;
   isParent?: boolean;
+  profileType?: string;
   age?: string | null;
   totalXp?: number;
   unlockedAchievementIds?: string[];
@@ -111,6 +112,7 @@ export default function MeScreen() {
 
   const [kidsPickerOpen, setKidsPickerOpen] = useState(false);
   const sheetAnim = useRef(new Animated.Value(400)).current;
+  const [xpExpanded, setXpExpanded] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -245,7 +247,14 @@ export default function MeScreen() {
 
   const tripCount = trips.length;
   const stopCount = trips.reduce((sum, t) => sum + (t.visitedStops ?? 0), 0);
-  const explorerCount = explorers.length;
+  // Filter out adult/parent profiles — this screen is kids-only in the explorer section
+  const kidExplorers = explorers.filter(e => !e.isParent && e.profileType !== 'adult');
+  // Account-level XP: sum of all parent/adult player rows for this account (Brief 2)
+  const accountXp = explorers
+    .filter(e => e.profileType === 'adult' || e.profileType === 'parent')
+    .reduce((sum, e) => sum + (e.totalXp ?? 0), 0);
+
+  const explorerCount = kidExplorers.length;
 
   const user = fetchedUser ?? cachedUser;
   const firstLetter = (user?.firstName ?? user?.username ?? user?.email ?? "U")[0];
@@ -317,37 +326,75 @@ export default function MeScreen() {
               </View>
             ))}
           </View>
-          {explorers.length > 0 && (
-            <View style={s.xpStrip}>
-              {explorers.map((e, i) => {
-                const xp = e.totalXp ?? 0;
-                const rd = getRoamusRank(xp);
-                const clr = EXPLORER_COLORS[i % EXPLORER_COLORS.length];
-                return (
-                  <View key={e.id} style={s.xpCard}>
-                    <View style={[s.xpDot, { backgroundColor: clr }]}>
-                      <Text style={s.xpDotText}>{e.name[0]?.toUpperCase() ?? "?"}</Text>
+          {kidExplorers.length > 0 && (
+            <View style={{ marginTop: 14 }}>
+              {/* Collapsed summary row — always visible */}
+              <Pressable
+                style={s.xpSummaryRow}
+                onPress={() => setXpExpanded(prev => !prev)}
+              >
+                <View style={s.xpSummaryDots}>
+                  {kidExplorers.slice(0, 4).map((e, i) => (
+                    <View
+                      key={e.id}
+                      style={[
+                        s.xpSummaryDot,
+                        { backgroundColor: EXPLORER_COLORS[i % EXPLORER_COLORS.length], marginLeft: i > 0 ? -8 : 0, zIndex: 10 - i },
+                      ]}
+                    >
+                      <Text style={s.xpDotText}>{e.name[0]?.toUpperCase() ?? '?'}</Text>
                     </View>
-                    <View style={s.xpCardBody}>
-                      <View style={s.xpCardRow}>
-                        <Text style={s.xpCardName} numberOfLines={1}>{e.name}</Text>
-                        <Text style={s.xpCardXp}>{xp.toLocaleString()} XP</Text>
+                  ))}
+                </View>
+                <Text style={s.xpSummaryLabel} numberOfLines={1}>
+                  {kidExplorers.length === 1 ? kidExplorers[0].name : `${kidExplorers.length} Explorers`}
+                </Text>
+                <Text style={s.xpSummaryChevron}>{xpExpanded ? '\u2227' : '\u2228'}</Text>
+              </Pressable>
+
+              {/* Per-kid detail cards — expanded on tap */}
+              {xpExpanded && (
+                <View style={s.xpStrip}>
+                  {kidExplorers.map((e, i) => {
+                    const xp = e.totalXp ?? 0;
+                    const rd = getRoamusRank(xp);
+                    const clr = EXPLORER_COLORS[i % EXPLORER_COLORS.length];
+                    return (
+                      <View key={e.id} style={s.xpCard}>
+                        <View style={[s.xpDot, { backgroundColor: clr }]}>
+                          <Text style={s.xpDotText}>{e.name[0]?.toUpperCase() ?? '?'}</Text>
+                        </View>
+                        <View style={s.xpCardBody}>
+                          <View style={s.xpCardRow}>
+                            <Text style={s.xpCardName} numberOfLines={1}>{e.name}</Text>
+                            <Text style={s.xpCardXp}>{xp.toLocaleString()} XP</Text>
+                          </View>
+                          <Text style={s.xpCardRank} numberOfLines={1}>{rd.rank.name}</Text>
+                          <View style={s.xpTrack}>
+                            <View style={[s.xpFill, { width: `${rd.progressPercent}%` as any, backgroundColor: clr }]} />
+                          </View>
+                          {rd.nextRank ? (
+                            <Text style={s.xpCardNext}>{rd.xpToNextRank.toLocaleString()} XP to {rd.nextRank.name}</Text>
+                          ) : (
+                            <Text style={s.xpCardNext}>Max rank reached</Text>
+                          )}
+                        </View>
                       </View>
-                      <Text style={s.xpCardRank} numberOfLines={1}>{rd.rank.name}</Text>
-                      <View style={s.xpTrack}>
-                        <View style={[s.xpFill, { width: `${rd.progressPercent}%` as any, backgroundColor: clr }]} />
-                      </View>
-                      {rd.nextRank ? (
-                        <Text style={s.xpCardNext}>{rd.xpToNextRank.toLocaleString()} XP to {rd.nextRank.name}</Text>
-                      ) : (
-                        <Text style={s.xpCardNext}>Max rank reached</Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
+          {/* Family Adventure XP — account-level, separate from per-kid XP */}
+          <View style={s.accountXpRow}>
+            <Text style={s.accountXpIcon}>{'\u2726'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.accountXpLabel}>Family Adventure XP</Text>
+              <Text style={s.accountXpSub}>Earned across every stop your family visited</Text>
+            </View>
+            <Text style={s.accountXpVal}>{accountXp.toLocaleString()}</Text>
+          </View>
         </View>
 
         {/* ── 2. My Travel Journal ── */}
@@ -619,7 +666,7 @@ export default function MeScreen() {
             <Text style={s.pickerTitle}>{"Who's exploring?"}</Text>
             <Text style={s.pickerSub}>Pick the explorer for this stop</Text>
             <View style={s.pickerList}>
-              {explorers.filter(e => !e.isParent).map((exp, i) => (
+              {kidExplorers.filter(e => !e.isParent).map((exp, i) => (
                 <TouchableOpacity
                   key={exp.id}
                   style={s.pickerRow}
@@ -1009,5 +1056,66 @@ const s = StyleSheet.create({
     fontFamily: F.semibold,
     fontSize: 15,
     color: G.muted,
+  },
+
+  xpSummaryRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    paddingVertical: 6,
+  },
+  xpSummaryDots: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+  },
+  xpSummaryDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 2,
+    borderColor: 'rgba(15,18,30,0.8)',
+  },
+  xpSummaryLabel: {
+    flex: 1,
+    fontFamily: F.semibold,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  xpSummaryChevron: {
+    fontFamily: F.bold,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  accountXpRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    marginTop: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  accountXpIcon: {
+    fontSize: 16,
+    color: G.amber,
+  },
+  accountXpLabel: {
+    fontFamily: F.bold,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 1,
+  },
+  accountXpSub: {
+    fontFamily: F.regular,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.38)',
+  },
+  accountXpVal: {
+    fontFamily: F.bold,
+    fontSize: 15,
+    color: G.amber,
   },
 });
