@@ -367,15 +367,19 @@ export default function WhereScreen() {
   );
 
   function selectCity(name: string, country?: string) {
-    if (country) setSelCountries(prev => ({ ...prev, [name]: country }));
+    // Normalise to title-case so any future free-form entry path can't
+    // store "new york" or "big island" verbatim. No-op for autocomplete
+    // selections that already come from ALL_CITIES with proper casing.
+    const normalized = name.trim().replace(/\b\w/g, c => c.toUpperCase());
+    if (country) setSelCountries(prev => ({ ...prev, [normalized]: country }));
     if (mode === "one") {
-      setSel([name]);
+      setSel([normalized]);
       setQuery("");
-      fetchPreview(name);
+      fetchPreview(normalized);
     } else {
-      if (!sel.includes(name) && sel.length < 3) {
-        setSel(prev => [...prev, name]);
-        fetchPreview(name);
+      if (!sel.includes(normalized) && sel.length < 3) {
+        setSel(prev => [...prev, normalized]);
+        fetchPreview(normalized);
       }
       setQuery("");
     }
