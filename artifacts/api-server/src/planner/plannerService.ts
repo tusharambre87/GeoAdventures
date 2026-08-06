@@ -397,6 +397,71 @@ export function effectiveDuration(baseDurationMins: number, youngestChildAge: nu
 }
 
 /**
+ * Sort a flat stop list by familyAnchorType priority (descending), then
+ * distribute round-robin across trip days, respecting per-day caps for arrival
+ * and departure days.
+ *
+ * Round-robin rather than sequential fill ensures high-priority stops spread
+ * evenly across days rather than clustering on the (often short) arrival day.
+ * For example, with arrivalCap=2 a sequential descending fill would place the
+ * two highest-scored stops on day 0 — exactly the day a tired-from-travel
+ * family has the least time. Round-robin gives each day one stop from each
+ * priority tier before any day receives a second.
+ *
+ * displayOrder is reassigned as a contiguous 0-based index within each day so
+ * that DB insertions produce correct within-day ordering without a follow-up
+ * resequencing pass.
+ *
+ * NOTE: anchorScore (a stop_library numeric column) is not available on
+ * AI-generated stops. familyAnchorType is the equivalent signal the AI
+ * explicitly assigns; it is the correct sort key for this path.
+ */
+export function distributeStopsToDays(
+  stops: GeneratedStop[],
+  tripDays: number,
+  arrivalCap: number,
+  lastDayCap: number,
+  perDay: number,
+): GeneratedStop[] {
+  // Build per-day capacity array (arrival=0, middle days, departure=last)
+  const caps: number[] = [];
+  for (let d = 0; d < tripDays; d++) {
+    if (d === 0) caps.push(arrivalCap);
+    else if (d === tripDays - 1) caps.push(lastDayCap);
+    else caps.push(perDay);
+  }
+
+  // Sort descending by anchor weight so high-priority stops are distributed first
+  const ANCHOR_WEIGHT: Record<GeneratedStop['familyAnchorType'], number> = {
+    anchor: 4, support: 3, filler: 2, meal: 1, reset: 0,
+  };
+  const sorted = [...stops].sort(
+    (a, b) => (ANCHOR_WEIGHT[b.familyAnchorType] ?? 2) - (ANCHOR_WEIGHT[a.familyAnchorType] ?? 2),
+  );
+
+  // counts[d] = stops assigned to day d so far; also used as displayOrder
+  const counts = new Array<number>(tripDays).fill(0);
+  const result: GeneratedStop[] = [];
+  let dayPointer = 0;
+
+  for (const stop of sorted) {
+    // Advance round-robin pointer past any full days
+    let skipped = 0;
+    while (counts[dayPointer] >= caps[dayPointer] && skipped < tripDays) {
+      dayPointer = (dayPointer + 1) % tripDays;
+      skipped++;
+    }
+    // Assign stop; displayOrder is its 0-based position within the assigned day
+    result.push({ ...stop, dayNumber: dayPointer + 1, displayOrder: counts[dayPointer] });
+    counts[dayPointer]++;
+    // Advance to the next day for the next round-robin slot
+    dayPointer = (dayPointer + 1) % tripDays;
+  }
+
+  return result;
+}
+
+/**
  * Create a "Rest / Nap time" placeholder stop for families with children under 3.
  * This stop is persisted to the DB for display but is NOT passed through Stop Intelligence enrichment.
  */

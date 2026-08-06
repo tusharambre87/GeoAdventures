@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, attachUserIfPresent } from "../replitAuth";
 import jwt from "jsonwebtoken";
 import { emailRegistrationSchema, emailLoginSchema, updatePlayerStatsSchema, insertGameEventSchema, travelTrips, travelMoments, travelStops, users, geoBuddyStories, accountStoryProgress, dailyQuestCities, players, ttsAudioCache, XP_REWARDS, getExplorerRank, TemplateStop, TemplateKeepsake, ExplorerChallengeMission, compassRandomQuestTemplates, plannerTripPlans, plannerTripPlanStops, plannerPasses, plannerPlaces, plannerPlaceProfiles, plannerParentSupport, plannerPlaceReference, plannerStopIntelligence, tripDayMemories, insertStopQualitySignalSchema, stopQualitySignals, waitlistSignups, stopLibrary, shareReports, tripAnchors, journeyPacks, exploreCache, tripMembers, stopActivityLog, nearbyLandmarksCache, type TripMember } from "@workspace/db";
 import { computeStopQualityScore, buildUserStopTypeProfile, type UserStopTypeProfile } from "../stopQualityScoring";
-import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, parkingBandFromScore, insertRestStopsIntoStopList, generateCityStopPool, bucketStopsTodays, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
+import { selectStopsFromPool, familyDurationFloor, getStopsPerDay, dayRoleCap, parkingBandFromScore, insertRestStopsIntoStopList, generateCityStopPool, bucketStopsTodays, distributeStopsToDays, type PlannerInput, type DayRoleCap, type GeneratedStop, type StopPoolResult, type BreakMarker } from "../planner/plannerService";
 import { buildCityPoolKey } from "../cityPoolUtils.js";
 import { assignSuggestionsByProximity } from "../planner/proximityAssignment";
 import { fromError } from "zod-validation-error";
@@ -5296,34 +5296,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // TRAVEL MODE ROUTES (Isolated from World Mode)
   // All routes under /api/travel/* are feature-flagged
   // ============================================================================
-
-  // Distribute stops across days respecting per-day caps for arrival/departure days.
-  function distributeStopsToDays(
-    stops: GeneratedStop[],
-    tripDays: number,
-    arrivalCap: number,
-    lastDayCap: number,
-    perDay: number,
-  ): GeneratedStop[] {
-    const caps: number[] = [];
-    for (let d = 0; d < tripDays; d++) {
-      if (d === 0) caps.push(arrivalCap);
-      else if (d === tripDays - 1) caps.push(lastDayCap);
-      else caps.push(perDay);
-    }
-    let dayIndex = 0;
-    let countInDay = 0;
-    const result: GeneratedStop[] = [];
-    for (const stop of stops) {
-      while (dayIndex < tripDays - 1 && countInDay >= caps[dayIndex]) {
-        dayIndex++;
-        countInDay = 0;
-      }
-      result.push({ ...stop, dayNumber: dayIndex + 1 });
-      countInDay++;
-    }
-    return result;
-  }
 
   // Background story preloader — called after all stops for a trip have been generated.
   // Iterates over every stop sequentially and generates + caches Kids Explore content
