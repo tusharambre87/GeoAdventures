@@ -2430,13 +2430,14 @@ function isCityMustSee(city: string, stopName: string): boolean {
     });
   const list = matchedKey ? CITY_MUST_SEE_ANCHORS[matchedKey] : undefined;
   if (!list) return false;
+  // Exact match only — unlike isParkAnchor (which intentionally uses substring
+  // matching to classify anchor TYPE), must-see slot priority must be precise:
+  // "Mammoth Hot Springs Terraces" must NOT inherit must-see status just because
+  // "Mammoth Hot Springs" is a substring of its name. Same class of bug as the
+  // "Washington" → "Washington Heights" prefix false-positive fixed earlier.
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const stopNorm = norm(stopName);
-  return list.some(a => {
-    const aNorm = norm(a);
-    if (aNorm.length < 8) return aNorm === stopNorm;
-    return stopNorm.includes(aNorm) || aNorm.includes(stopNorm);
-  });
+  return list.some(a => norm(a) === stopNorm);
 }
 
 /**
