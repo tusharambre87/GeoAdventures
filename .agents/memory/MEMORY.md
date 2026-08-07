@@ -33,3 +33,4 @@
 - [stop_library near-duplicate pattern](stop-library-near-dupe-pattern.md) — same venue with two slightly different names (e.g. "Zoo" vs "Zoological Park") survives exact-match dedup; detect by matching gp_ratings_total; delete inferior row + invalidate pool cache
 - [Pool shortfall guard](pool-shortfall-guard.md) — result-assembly loop cascades on empty day (break drops all later days); guard must be `< totalStopsNeeded`, not `=== 0`; totalStopsNeeded now in StopPoolResult
 - [Pool neighborhoodZone gap](pool-neighborhoodzone-gap.md) — stop_pool JSONB and stop_library both lack neighborhoodZone; zones block in generateDayStops is empty for call site 3 until pool cache is regenerated
+- [stop_library enrichment schema drift](stop-library-enrichment-schema-drift.md) — old-format enrichment JSON (sensoryLoad/bestTimeOfDay) triggers Gate 2 but writes all-null PSI rows; fix: NULL the enrichment column so AI runs, then run scoring backfill
