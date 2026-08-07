@@ -830,14 +830,15 @@ async function generateDayStops(
   input: PlannerInput,
   stopsPerDay: number,
   ageContext: string,
-  usedStopNames: string[] = [],
+  usedStopNames: { name: string; zone?: string; day?: number }[] = [],
   localDayNumber?: number,  // city-local day index for canonical template lookup in multi-city trips
   qualityProfile?: UserStopTypeProfile,
   targetCity?: string,
 ): Promise<GeneratedStop[]> {
   const pace = getPaceConstraints(input.pace);
+  // Dedup block uses names only — type change is transparent to this block.
   const excludeBlock = usedStopNames.length > 0
-    ? `\nALREADY USED IN OTHER DAYS (do NOT include these or any very similar places):\n${usedStopNames.map((n) => `- ${n}`).join("\n")}\n`
+    ? `\nALREADY USED IN OTHER DAYS (do NOT include these or any very similar places):\n${usedStopNames.map((e) => `- ${e.name}`).join("\n")}\n`
     : "";
 
   const cfg = getPaceConfig(input.pace);
@@ -987,7 +988,7 @@ ${sessionAnalysis}`;
   const mustDoBlock = getCityMustDoBlock(
     targetCity ?? input.destination,
     localDayNumber ?? dayNumber,
-    usedStopNames,
+    usedStopNames.map(e => e.name),
   );
 
   // Auto-must-do: extend the mandate with high-review-count pool stops for any city
@@ -1005,7 +1006,7 @@ ${sessionAnalysis}`;
         .filter(r => (r.gpRatingsTotal ?? 0) >= AUTO_MUST_DO_REVIEW_THRESHOLD)
         .sort((a, b) => (b.gpRatingsTotal ?? 0) - (a.gpRatingsTotal ?? 0))
         .filter(r => !_handConfigured.has(normalizePoolKey(r.name)))
-        .filter(r => !usedStopNames.some(u => normalizePoolKey(u) === normalizePoolKey(r.name)))
+        .filter(r => !usedStopNames.some(u => normalizePoolKey(u.name) === normalizePoolKey(r.name)))
         .slice(0, AUTO_MUST_DO_MAX)
         .map(r => r.name);
       if (autoMustDos.length) {
@@ -1053,6 +1054,28 @@ ${sessionAnalysis}`;
     }
   }
 
+  // Build prior-days geographic zones block — feeds back each prior day's
+  // neighbourhoods so the AI stays in coherent parts of the destination rather
+  // than scattering to unrelated areas (the primary gap in the AI patch path).
+  let zonesBlock = "";
+  if (usedStopNames.length > 0) {
+    const byDay = new Map<number, string[]>();
+    for (const e of usedStopNames) {
+      if (!e.zone) continue;
+      const d = e.day ?? 0;
+      if (!byDay.has(d)) byDay.set(d, []);
+      const zones = byDay.get(d)!;
+      if (!zones.includes(e.zone)) zones.push(e.zone);
+    }
+    if (byDay.size > 0) {
+      const dayLines = [...byDay.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([d, zones]) => `  Day ${d}: ${zones.join(", ")}`)
+        .join("\n");
+      zonesBlock = `\nPRIOR DAYS' ZONES (geographic anchors already established — generate today's stops in compatible areas):\n${dayLines}\n`;
+    }
+  }
+
   const prompt = `You are a family travel expert planning Day ${dayNumber} of a ${input.tripDays}-day family trip.
 
 CONTEXT
@@ -1062,7 +1085,7 @@ Children: ${ageContext}
 Pace: ${cfg.label}
 Transport: ${input.transportMode ?? "walking"}
 Budget: ${input.budgetSensitivity ?? "moderate"}
-${familyContext}${qualityContextBlock}${fullMustDoBlock}${canonicalBlock}${webIntelligenceBlock}${fixedAnchorBlock}${excludeBlock}
+${familyContext}${qualityContextBlock}${fullMustDoBlock}${canonicalBlock}${webIntelligenceBlock}${fixedAnchorBlock}${excludeBlock}${zonesBlock}
 HARD CONSTRAINTS (these are firm rules, not suggestions):
 
 1. SESSION-BASED DAY PLANNING: Plan using 3 natural family sessions, not by counting stops
@@ -1086,7 +1109,7 @@ HARD CONSTRAINTS (these are firm rules, not suggestions):
 
 2. TRANSITIONS: Max ${cfg.maxTransitions} transitions between stops per day
    - Each travelMinutes should be under 20 min
-   - Cluster stops geographically before scoring content
+   - Cluster stops geographically — if PRIOR DAYS' ZONES are listed above, stay within those established areas; do not suggest stops in unrelated parts of the destination
 
 3. ENERGY ARC — follow this structure every day:
    - Morning (first stop): High-energy anchor. Interactive, iconic, or movement-based. MUST be the strongest kid-engagement stop.
@@ -4726,14 +4749,14 @@ export async function generateItinerary(
             const { breakMarkers: passingMarkers } = insertRestStopsIntoStopList(passingStops, itinMinChildAge);
             allBreakMarkers.push(...passingMarkers);
           }
-          const usedStopNamesForCity: string[] = [];
+          const usedStopNamesForCity: { name: string; zone?: string; day?: number }[] = [];
           for (const stop of passingStops) {
             stop.dayNumber += dayOffset;
             const { place, inserted } = await persistStop(stop, planId, city, countryName);
             allInserted.push(inserted);
             if (stop.type !== "rest") {
               await enrichAndPersistScores(stop, place.id, input);
-              usedStopNamesForCity.push(stop.name);
+              usedStopNamesForCity.push({ name: stop.name, zone: stop.neighborhoodZone, day: stop.dayNumber });
             }
           }
 
@@ -4757,7 +4780,7 @@ export async function generateItinerary(
               allBreakMarkers.push(...breakMarkers);
             }
             for (const stop of dayStops) {
-              if (stop.type !== "rest") usedStopNamesForCity.push(stop.name);
+              if (stop.type !== "rest") usedStopNamesForCity.push({ name: stop.name, zone: stop.neighborhoodZone, day: globalDay });
               const { place, inserted } = await persistStop(stop, planId, city, cityCountry);
               allInserted.push(inserted);
               if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
@@ -4801,7 +4824,7 @@ export async function generateItinerary(
       }
 
       console.log(`[Planner] Multi-city AI generation for ${city} (${daysForCity} days, starting day ${currentDay})`);
-      const usedStopNames: string[] = [];
+      const usedStopNames: { name: string; zone?: string; day?: number }[] = [];
       for (let day = 1; day <= daysForCity; day++) {
         // Apply per-day stop-count cap (arrival / departure / middle) from perDayCaps when
         // present — same source-of-truth as selectStopsFromPool and the single-city AI path.
@@ -4837,7 +4860,7 @@ export async function generateItinerary(
           allBreakMarkers.push(...breakMarkers);
         }
         for (const stop of dayStops) {
-          if (stop.type !== "rest") usedStopNames.push(stop.name);
+          if (stop.type !== "rest") usedStopNames.push({ name: stop.name, zone: stop.neighborhoodZone, day: currentDay + day - 1 });
           const { place, inserted } = await persistStop(stop, planId, city, cityCountry);
           allInserted.push(inserted);
           if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
@@ -4873,13 +4896,13 @@ export async function generateItinerary(
         allBreakMarkers.push(...passingMarkers);
       }
       const insertedStops: PlannerTripPlanStop[] = [];
-      const usedStopNamesPool: string[] = [];
+      const usedStopNamesPool: { name: string; zone?: string; day?: number }[] = [];
       for (const stop of poolPassing) {
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
         insertedStops.push(inserted);
         if (stop.type !== "rest") {
           await enrichAndPersistScores(stop, place.id, input);
-          usedStopNamesPool.push(stop.name);
+          usedStopNamesPool.push({ name: stop.name, zone: stop.neighborhoodZone, day: stop.dayNumber });
         }
       }
 
@@ -4902,7 +4925,7 @@ export async function generateItinerary(
           allBreakMarkers.push(...breakMarkers);
         }
         for (const stop of dayStops) {
-          if (stop.type !== "rest") usedStopNamesPool.push(stop.name);
+          if (stop.type !== "rest") usedStopNamesPool.push({ name: stop.name, zone: stop.neighborhoodZone, day: localDay });
           const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
           insertedStops.push(inserted);
           if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);
@@ -4936,7 +4959,7 @@ export async function generateItinerary(
   // ── AI generation (cache miss or fallback) ─────────────────────────────────
   try {
     const insertedStops: PlannerTripPlanStop[] = [];
-    const usedStopNames: string[] = [];
+    const usedStopNames: { name: string; zone?: string; day?: number }[] = [];
 
     for (let day = 1; day <= input.tripDays; day++) {
       // Apply per-day stop-count cap (arrival / departure / middle) from perDayCaps when
@@ -4972,7 +4995,7 @@ export async function generateItinerary(
       console.log(`[Planner] Day ${day} generated: ${dayStops.length} stops`);
 
       for (const stop of dayStops) {
-        if (stop.type !== "rest") usedStopNames.push(stop.name);
+        if (stop.type !== "rest") usedStopNames.push({ name: stop.name, zone: stop.neighborhoodZone, day });
         const { place, inserted } = await persistStop(stop, planId, cityName, countryName);
         insertedStops.push(inserted);
         if (stop.type !== "rest") await enrichAndPersistScores(stop, place.id, input);

@@ -32,3 +32,4 @@
 - [stop_library country+key invariant](stop-library-country-key-invariant.md) — normalized_key must equal LOWER(TRIM(city))||':'||LOWER(TRIM(country)); any UPDATE to city/country must also UPDATE normalized_key or seeders break idempotency
 - [stop_library near-duplicate pattern](stop-library-near-dupe-pattern.md) — same venue with two slightly different names (e.g. "Zoo" vs "Zoological Park") survives exact-match dedup; detect by matching gp_ratings_total; delete inferior row + invalidate pool cache
 - [Pool shortfall guard](pool-shortfall-guard.md) — result-assembly loop cascades on empty day (break drops all later days); guard must be `< totalStopsNeeded`, not `=== 0`; totalStopsNeeded now in StopPoolResult
+- [Pool neighborhoodZone gap](pool-neighborhoodzone-gap.md) — stop_pool JSONB and stop_library both lack neighborhoodZone; zones block in generateDayStops is empty for call site 3 until pool cache is regenerated
