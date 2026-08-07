@@ -445,7 +445,7 @@ function FullBleedHero({
     getDestinationImage(city)
       .then(url => {
         if (!cancelled && url) {
-          setWikiFallback(url);
+          setWikiFallback(hiRes(url));
           setWikiImage(hiRes(url));
           setImgError(false);
         }
@@ -540,7 +540,7 @@ function FullBleedHero({
     const greetPadRight = bothFabs ? (FAB_SIZE * 2 + 8 + 20 + 8) : (FAB_SIZE + 20 + 8);
     return (
       <View style={fbh.root}>
-        {/* Blurred background — same photo, heavy overlay */}
+        {/* Full-bleed background — same photo, dark overlay */}
         {displayImage ? (
           <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setImgError(true)} />
         ) : (
@@ -564,11 +564,7 @@ function FullBleedHero({
               ) : (
                 <LinearGradient colors={["#1A2540", "#0D1525"]} style={StyleSheet.absoluteFill} />
               )}
-              <LinearGradient
-                colors={["transparent", "rgba(12,17,30,0.55)"]}
-                locations={[0.5, 1.0]}
-                style={StyleSheet.absoluteFill}
-              />
+
             </View>
 
             {/* Details section */}
