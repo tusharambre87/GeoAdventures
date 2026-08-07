@@ -235,6 +235,35 @@ async function findExistingIntelligence(placeId: string): Promise<IntelligenceRo
  * This is Cache Gate 2: a non-null `enrichment` lets the stop enrichment path
  * skip the AI call entirely and hydrate planner_stop_intelligence directly.
  */
+/**
+ * Type-guard that validates a parsed JSON object is a real PlacePlanningProfile
+ * with current-schema content, not a stale blob from a prior enrichment schema
+ * (e.g. old logistics-only blobs with keys like sensoryLoad / bestTimeOfDay /
+ * nearestRestroom / typicalWaitTime / parkingAvailability / strollerAccessibility).
+ *
+ * A valid profile must have BOTH:
+ *   • at least one Phase-1 text signal  (rationaleShort or bestArrivalWindow)
+ *   • at least one Phase-1 numeric signal (restroomConfidence, age2to4Fit, or wowFactorScore)
+ *
+ * Old-format blobs have neither — their keys map to `undefined` under this schema,
+ * which the `?? null` spread in buildIntelligenceValues silently converts to null,
+ * producing a wholly-null PSI row even though `cached_at` is set.
+ *
+ * Exported so the verification script can test it directly without needing a DB.
+ */
+export function isValidPlacePlanningProfile(obj: unknown): obj is PlacePlanningProfile {
+  if (!obj || typeof obj !== "object") return false;
+  const p = obj as Record<string, unknown>;
+  const hasTextSignal =
+    (typeof p.rationaleShort === "string" && p.rationaleShort.length > 0) ||
+    (typeof p.bestArrivalWindow === "string" && p.bestArrivalWindow.length > 0);
+  const hasNumericSignal =
+    typeof p.restroomConfidence === "number" ||
+    typeof p.age2to4Fit === "number" ||
+    typeof p.wowFactorScore === "number";
+  return hasTextSignal && hasNumericSignal;
+}
+
 async function findStopLibraryEnrichment(
   name: string,
   city: string,
@@ -257,10 +286,24 @@ async function findStopLibraryEnrichment(
   const row = rows[0];
   if (!row) return { enrichment: null, hasStoryContent: false };
 
-  const enrichment =
-    row.enrichment && typeof row.enrichment === "object"
-      ? (row.enrichment as PlacePlanningProfile)
-      : null;
+  // Guard: reject stale blobs from prior enrichment schemas that don't carry
+  // current PlacePlanningProfile fields. A truthy-but-wrong object would pass
+  // the old `typeof === "object"` check and cause buildIntelligenceValues to
+  // write a wholly-null PSI shell. isValidPlacePlanningProfile requires both a
+  // text signal and a numeric signal from the current schema before accepting.
+  const enrichment = isValidPlacePlanningProfile(row.enrichment)
+    ? row.enrichment
+    : null;
+
+  if (row.enrichment && !enrichment) {
+    console.warn(
+      `[StopEnrichment] Gate 2 rejected stop_library.enrichment for "${name}" (${city}): ` +
+      `object present but failed schema field-presence check. ` +
+      `Keys found: ${Object.keys(row.enrichment as object).join(", ")}. ` +
+      `Falling through to AI enrichment.`
+    );
+  }
+
   const hasStoryContent = !!(row.storyPack || row.audioUrl);
 
   return { enrichment, hasStoryContent };
@@ -382,7 +425,22 @@ Return JSON with all of the following fields:
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error(`No enrichment content returned for stop: ${stop.name}`);
 
-  return JSON.parse(content) as PlacePlanningProfile;
+  const parsed: unknown = JSON.parse(content);
+
+  // Guard: if the model returned JSON with a different shape (schema drift, prompt
+  // change, or model regression) every field would silently map to undefined → null
+  // in buildIntelligenceValues, producing a wholly-null PSI shell that looks fresh.
+  // Throw here so the caller retries or logs the failure loudly, instead of silently
+  // writing a useless row.
+  if (!isValidPlacePlanningProfile(parsed)) {
+    throw new Error(
+      `[EnrichmentAI] Response for "${stop.name}" failed field-presence check — ` +
+      `expected rationaleShort/bestArrivalWindow + a numeric Phase-1 field, ` +
+      `but got keys: ${Object.keys(parsed as object).slice(0, 12).join(", ")}`
+    );
+  }
+
+  return parsed;
 }
 
 function buildIntelligenceValues(placeId: string, profile: PlacePlanningProfile) {
