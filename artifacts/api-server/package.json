@@ -25,6 +25,7 @@
     "backfill:google-places": "tsx src/scripts/backfill-google-places.ts",
     "backfill:recompute-gp-floor": "tsx src/scripts/recompute-gp-floor.ts",
     "backfill:recompute-gp-floor-cache-bust": "tsx src/scripts/recompute-gp-floor-cache-bust.ts",
+    "backfill:pool-zones": "tsx src/planner/backfillPoolZones.ts",
     "backfill:stop-desc": "tsx src/planner/backfillStopDescriptions.ts",
     "script:tag-metro": "tsx src/scripts/tagMetroStops.ts",
     "seed:duluth": "tsx src/scripts/seed-duluth.ts",

@@ -11,7 +11,5 @@ description: city_stop_pool_cache.stop_pool JSONB has no neighborhoodZone values
 
 **How to apply:**
 - Any feature that relies on `stop.neighborhoodZone` being populated for pool-served stops will silently degrade to empty for all current cached pools.
-- The fix requires either:
-  1. Re-running pool generation (via the pool backfill workflow) so new JSONB entries carry `neighborhoodZone` from the AI prompt at line ~2224.
-  2. OR adding an explicit enrichment step that writes `neighborhoodZone` into existing pool JSONB rows.
-- The `PRIOR DAYS' ZONES` prompt block (added to `generateDayStops`) is empty for call site 3 (single-city pool patch) until the pool data is refreshed. Call site 4 (full AI path) works immediately since AI-generated stops DO carry `neighborhoodZone`.
+- **RESOLVED** via `backfillPoolZones.ts` (zone-enrichment patch script, `backfill:pool-zones` in package.json). 3201/3205 pool stops across all 167 cities now have `neighborhoodZone`. Re-run the script if new cities are added to the pool cache.
+- Zone name drift risk: pool backfill and `generateDayStops` AI calls may assign different labels for the same area (e.g. "Upper Geyser Basin" vs "Old Faithful Area"). Mitigate by adding the destination to `CITY_ZONE_HINTS` in `plannerService.ts` — both the backfill script and the day-generation prompt will then use the exact same label list. Yellowstone was added as part of this work.

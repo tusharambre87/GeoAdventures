@@ -2176,6 +2176,7 @@ const CITY_ZONE_HINTS: Record<string, string> = {
   "boston, usa":          "Zones: Downtown/Beacon Hill, Back Bay, Fenway/Kenmore, Cambridge, Charlestown, South Boston, North End",
   "miami, usa":           "Zones: South Beach/Art Deco, Brickell/Downtown, Wynwood, Coconut Grove, Coral Gables, Key Biscayne, Midtown",
   "seattle, usa":         "Zones: Downtown/Pike Place, Capitol Hill, Queen Anne/Seattle Center, Ballard, South Lake Union, Fremont, West Seattle",
+  "yellowstone national park, usa": "Zones: Mammoth Hot Springs, Norris Geyser Basin, Upper Geyser Basin, Midway Geyser Basin, Canyon Village, Grand Canyon Area, Hayden Valley, Lake Village, West Thumb, Lamar Valley, Tower-Roosevelt, West Yellowstone",
 };
 
 function buildPoolBatchPrompt(destination: string, batchLabel: string, excludeNames: string[]): string {
