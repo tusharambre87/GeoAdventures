@@ -836,6 +836,12 @@ const fbh = StyleSheet.create({
 // Replaces the old full-bleed hero with a crisp contained card so the city
 // photo renders clearly instead of filling the whole screen as a blurry bg.
 
+// Upgrades a Wikipedia thumbnail URL to 1600 px — used by both FullBleedHero
+// and UpcomingTripHero so neither renders a 330 px thumb at card scale.
+function toHiResWiki(url: string | null): string | null {
+  return url ? url.replace(/\/\d+px-/, '/1600px-') : null;
+}
+
 function UpcomingTripHero({
   trip,
   daysUntil,
@@ -860,7 +866,7 @@ function UpcomingTripHero({
     if (!city) return;
     let cancelled = false;
     getDestinationImage(city)
-      .then(url => { if (!cancelled && url) setWikiImage(url); })
+      .then(url => { if (!cancelled && url) setWikiImage(toHiResWiki(url)); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [imageUri, city]);
@@ -1155,6 +1161,27 @@ export default function HomeScreen() {
   // white flat-header loading state.
   const hasLoadedOnce = useRef(false);
 
+  // Stale-while-revalidate: load the last-known trips from AsyncStorage so the
+  // hero renders immediately on re-visits without waiting for the API call.
+  const TRIPS_CACHE_KEY = '@roamus/home_trips';
+  useEffect(() => {
+    AsyncStorage.getItem(TRIPS_CACHE_KEY)
+      .then(raw => {
+        if (!raw || hasLoadedOnce.current) return;
+        try {
+          const cached = JSON.parse(raw) as HomeTripData[];
+          if (Array.isArray(cached) && cached.length > 0) {
+            setTrips(cached);
+            setTripsLoading(false);
+            hasLoadedOnce.current = true;
+          }
+        } catch {}
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   // Dev-only date override — refreshed on every focus so navigating back
   // from any screen picks up the latest value.
   const [devDate, setDevDate] = useState<Date | null>(null);
@@ -1167,7 +1194,11 @@ export default function HomeScreen() {
 
     apiFetch<{ trips: HomeTripData[] }>("/api/travel/trips")
       .then(data => {
-        if (Array.isArray(data?.trips)) setTrips(data.trips);
+        if (Array.isArray(data?.trips)) {
+          setTrips(data.trips);
+          // Persist for stale-while-revalidate on next launch
+          AsyncStorage.setItem(TRIPS_CACHE_KEY, JSON.stringify(data.trips)).catch(() => {});
+        }
       })
       .catch(() => {})
       .finally(() => {
