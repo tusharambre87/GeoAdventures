@@ -2702,10 +2702,13 @@ export async function generateCityStopPool(
       // PSI family_anchor_type is unreliable — the 'support' value is the planner_places DB default
       // that was bulk-copied into PSI via a past migration. Only trust PSI when it carries an
       // explicitly meaningful value (anchor, meal, reset, filler). For 'support' and null,
-      // always derive from stop type which is the authoritative classification.
+      // check isParkAnchor() first (curated must-see stops that stop_type='nature' would wrongly
+      // classify as 'support'), then derive from stop type as the final fallback.
       familyAnchorType: (() => {
         const psiType = row.familyAnchorType as CachedStopCandidate["familyAnchorType"] | null;
-        return (psiType && psiType !== 'support') ? psiType : anchorTypeByStopType(stopType, row.gpRatingsTotal ?? undefined);
+        if (psiType && psiType !== 'support') return psiType;
+        if (city && isParkAnchor(city, row.name ?? '')) return 'anchor';
+        return anchorTypeByStopType(stopType, row.gpRatingsTotal ?? undefined);
       })(),
       minAge,
       whyNow,
