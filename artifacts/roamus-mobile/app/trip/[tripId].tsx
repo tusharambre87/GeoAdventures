@@ -682,6 +682,22 @@ function useStopHeroImage(stopId: string | null): string | null {
   return url;
 }
 
+// ─── fetchWikiThumbnail — shared by hero photo effects and onError fallbacks ─────────────
+
+async function fetchWikiThumbnail(name: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(name)}&prop=pageimages&format=json&pithumbsize=500&origin=*`
+    );
+    const d = await r.json();
+    const pages = (d?.query?.pages ?? {}) as Record<string, any>;
+    const page = Object.values(pages)[0] as any;
+    return (page?.thumbnail?.source as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── apiFetch helper ──────────────────────────────────────────────────────────
 
 async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
@@ -4247,14 +4263,14 @@ function AddStopDetailSheet({
   const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(`${opt.name} ${city}`)}`;
   const gradColors = heroGradColors(rawType);
 
+  const heroPhaseRef = useRef<'lib' | 'wiki' | 'gradient'>('gradient');
   const [heroImageUri, setHeroImageUri] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
+    heroPhaseRef.current = 'gradient';
+    setHeroImageUri(null);
 
-    // Priority 1: stop_library photo — imageUrl is already a full URL from the server
-    // (stop-images/ paths are converted to full /api/travel/stop-library-image?path=… URLs
-    // by the smart-suggestions endpoint before sending); gpPhotoRefs[0] goes through the
-    // existing place-photo proxy, same path StopDetailSheet already uses.
+    // Priority 1: stop_library photo
     const libUrl = (() => {
       if (opt.imageUrl) return opt.imageUrl;
       const ref = opt.gpPhotoRefs?.[0];
@@ -4262,21 +4278,18 @@ function AddStopDetailSheet({
       return null;
     })();
     if (libUrl) {
+      heroPhaseRef.current = 'lib';
       setHeroImageUri(libUrl);
       return () => {};
     }
 
     // Priority 2: Wikipedia thumbnail — fallback for cities with thin stop_library coverage
     (async () => {
-      try {
-        const r = await fetch(
-          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(opt.name)}&prop=pageimages&format=json&pithumbsize=500&origin=*`
-        );
-        const d = await r.json();
-        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
-        const page = Object.values(pages)[0] as any;
-        if (!cancelled && page?.thumbnail?.source) setHeroImageUri(page.thumbnail.source as string);
-      } catch { /* gradient fallback */ }
+      const wikiUrl = await fetchWikiThumbnail(opt.name);
+      if (!cancelled) {
+        heroPhaseRef.current = wikiUrl ? 'wiki' : 'gradient';
+        setHeroImageUri(wikiUrl);
+      }
     })();
     return () => { cancelled = true; };
   }, [opt.name, opt.imageUrl, opt.gpPhotoRefs]);
@@ -4299,7 +4312,23 @@ function AddStopDetailSheet({
         <ScrollView style={{ flex: 1 }} contentContainerStyle={asd.body} showsVerticalScrollIndicator={false}>
           <View style={asd.heroWrap}>
             {heroImageUri ? (
-              <ExpoImage source={{ uri: heroImageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              <ExpoImage
+                source={{ uri: heroImageUri }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                onError={() => {
+                  if (heroPhaseRef.current === 'lib') {
+                    (async () => {
+                      const wikiUrl = await fetchWikiThumbnail(opt.name);
+                      heroPhaseRef.current = wikiUrl ? 'wiki' : 'gradient';
+                      setHeroImageUri(wikiUrl);
+                    })();
+                  } else {
+                    heroPhaseRef.current = 'gradient';
+                    setHeroImageUri(null);
+                  }
+                }}
+              />
             ) : (
               <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             )}
@@ -4480,9 +4509,12 @@ function StopPreviewSheetPanel({
   const kidsBlurb = opt.description;
   const isKidFriendly = !!opt.description || (opt.tags ?? []).some(t => /kid|famil/i.test(t));
 
+  const heroPhaseRef = useRef<'lib' | 'wiki' | 'gradient'>('gradient');
   const [heroImageUri, setHeroImageUri] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
+    heroPhaseRef.current = 'gradient';
+    setHeroImageUri(null);
     // Priority 1: stop_library photo
     const libUrl = (() => {
       if (opt.imageUrl) return opt.imageUrl;
@@ -4491,20 +4523,17 @@ function StopPreviewSheetPanel({
       return null;
     })();
     if (libUrl) {
+      heroPhaseRef.current = 'lib';
       setHeroImageUri(libUrl);
       return () => {};
     }
     // Priority 2: Wikipedia thumbnail
     (async () => {
-      try {
-        const r = await fetch(
-          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(opt.name)}&prop=pageimages&format=json&pithumbsize=500&origin=*`
-        );
-        const d = await r.json();
-        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
-        const page = Object.values(pages)[0] as any;
-        if (!cancelled && page?.thumbnail?.source) setHeroImageUri(page.thumbnail.source as string);
-      } catch { /* gradient fallback */ }
+      const wikiUrl = await fetchWikiThumbnail(opt.name);
+      if (!cancelled) {
+        heroPhaseRef.current = wikiUrl ? 'wiki' : 'gradient';
+        setHeroImageUri(wikiUrl);
+      }
     })();
     return () => { cancelled = true; };
   }, [opt.name, opt.imageUrl, opt.gpPhotoRefs]);
@@ -4534,6 +4563,18 @@ function StopPreviewSheetPanel({
                 style={StyleSheet.absoluteFillObject}
                 contentFit="cover"
                 transition={300}
+                onError={() => {
+                  if (heroPhaseRef.current === 'lib') {
+                    (async () => {
+                      const wikiUrl = await fetchWikiThumbnail(opt.name);
+                      heroPhaseRef.current = wikiUrl ? 'wiki' : 'gradient';
+                      setHeroImageUri(wikiUrl);
+                    })();
+                  } else {
+                    heroPhaseRef.current = 'gradient';
+                    setHeroImageUri(null);
+                  }
+                }}
               />
             ) : (
               <LinearGradient colors={gradColors} style={sps.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
