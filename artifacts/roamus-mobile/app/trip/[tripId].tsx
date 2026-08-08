@@ -218,6 +218,10 @@ type StopOption = {
   description?: string;
   priceRange?: string;
   tags?: string[];
+  /** Full URL (or stop-images/ path already converted to full URL by server) from stop_library */
+  imageUrl?: string;
+  /** GP photo reference strings — use with /api/travel/place-photo?ref= proxy */
+  gpPhotoRefs?: string[];
 };
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
@@ -4246,6 +4250,23 @@ function AddStopDetailSheet({
   const [heroImageUri, setHeroImageUri] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
+
+    // Priority 1: stop_library photo — imageUrl is already a full URL from the server
+    // (stop-images/ paths are converted to full /api/travel/stop-library-image?path=… URLs
+    // by the smart-suggestions endpoint before sending); gpPhotoRefs[0] goes through the
+    // existing place-photo proxy, same path StopDetailSheet already uses.
+    const libUrl = (() => {
+      if (opt.imageUrl) return opt.imageUrl;
+      const ref = opt.gpPhotoRefs?.[0];
+      if (ref) return `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(ref)}`;
+      return null;
+    })();
+    if (libUrl) {
+      setHeroImageUri(libUrl);
+      return () => {};
+    }
+
+    // Priority 2: Wikipedia thumbnail — fallback for cities with thin stop_library coverage
     (async () => {
       try {
         const r = await fetch(
@@ -4255,10 +4276,10 @@ function AddStopDetailSheet({
         const pages = (d?.query?.pages ?? {}) as Record<string, any>;
         const page = Object.values(pages)[0] as any;
         if (!cancelled && page?.thumbnail?.source) setHeroImageUri(page.thumbnail.source as string);
-      } catch { /* no image — gradient fallback */ }
+      } catch { /* gradient fallback */ }
     })();
     return () => { cancelled = true; };
-  }, [opt.name]);
+  }, [opt.name, opt.imageUrl, opt.gpPhotoRefs]);
 
   return (
     <View style={asd.overlay}>
@@ -4459,6 +4480,35 @@ function StopPreviewSheetPanel({
   const kidsBlurb = opt.description;
   const isKidFriendly = !!opt.description || (opt.tags ?? []).some(t => /kid|famil/i.test(t));
 
+  const [heroImageUri, setHeroImageUri] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    // Priority 1: stop_library photo
+    const libUrl = (() => {
+      if (opt.imageUrl) return opt.imageUrl;
+      const ref = opt.gpPhotoRefs?.[0];
+      if (ref) return `${API_BASE}/api/travel/place-photo?ref=${encodeURIComponent(ref)}`;
+      return null;
+    })();
+    if (libUrl) {
+      setHeroImageUri(libUrl);
+      return () => {};
+    }
+    // Priority 2: Wikipedia thumbnail
+    (async () => {
+      try {
+        const r = await fetch(
+          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(opt.name)}&prop=pageimages&format=json&pithumbsize=500&origin=*`
+        );
+        const d = await r.json();
+        const pages = (d?.query?.pages ?? {}) as Record<string, any>;
+        const page = Object.values(pages)[0] as any;
+        if (!cancelled && page?.thumbnail?.source) setHeroImageUri(page.thumbnail.source as string);
+      } catch { /* gradient fallback */ }
+    })();
+    return () => { cancelled = true; };
+  }, [opt.name, opt.imageUrl, opt.gpPhotoRefs]);
+
   const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [700, 0] });
   const overlayOp  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
   const tabBottom  = TAB_BAR_H + insets.bottom;
@@ -4478,9 +4528,18 @@ function StopPreviewSheetPanel({
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={sps.body} showsVerticalScrollIndicator={false}>
           <View style={sps.heroWrap}>
-            <LinearGradient colors={gradColors} style={sps.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Text style={sps.heroEmoji}>{opt.icon ?? '\uD83D\uDCCD'}</Text>
-            </LinearGradient>
+            {heroImageUri ? (
+              <ExpoImage
+                source={{ uri: heroImageUri }}
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+                transition={300}
+              />
+            ) : (
+              <LinearGradient colors={gradColors} style={sps.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Text style={sps.heroEmoji}>{opt.icon ?? '\uD83D\uDCCD'}</Text>
+              </LinearGradient>
+            )}
           </View>
 
           <View style={sps.pillRow}>

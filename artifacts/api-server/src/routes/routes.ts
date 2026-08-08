@@ -9646,14 +9646,16 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
           ? ['playground', 'park', 'beach', 'waterfall', 'zoo', 'aquarium', 'adventure', 'kid_attraction', 'nature', 'anchor', 'support', 'other', 'attraction']
           : ['landmark', 'museum', 'park', 'beach', 'waterfall', 'zoo', 'aquarium', 'nature', 'anchor', 'historic', 'attraction', 'art', 'support', 'other'];
 
-        type LibRow = { id: string; name: string; stopType: string | null; address: string | null; description: string | null; city: string | null };
+        type LibRow = { id: string; name: string; stopType: string | null; address: string | null; description: string | null; city: string | null; imageUrl: string | null; gpPhotoRefs: string[] | null };
         const libSelect = {
-          id:          stopLibrary.id,
-          name:        stopLibrary.name,
-          stopType:    stopLibrary.stopType,
-          address:     stopLibrary.address,
-          description: stopLibrary.description,
-          city:        stopLibrary.city,
+          id:           stopLibrary.id,
+          name:         stopLibrary.name,
+          stopType:     stopLibrary.stopType,
+          address:      stopLibrary.address,
+          description:  stopLibrary.description,
+          city:         stopLibrary.city,
+          imageUrl:     stopLibrary.imageUrl,
+          gpPhotoRefs:  stopLibrary.gpPhotoRefs,
         };
 
         let libRows: LibRow[] = await db.select(libSelect).from(stopLibrary)
@@ -9677,13 +9679,26 @@ Return ONLY real, well-known places in or near ${destination}. Return valid JSON
 
         if (libRows.length > 0) {
           const shuffled = [...libRows].sort(() => Math.random() - 0.5);
-          const toStop = (r: LibRow) => ({
-            name:        r.name,
-            stopType:    r.stopType ?? 'other',
-            duration:    '45–60 min',
-            description: r.description ?? '',
-            address:     r.address ?? '',
-          });
+          const libBaseUrl = process.env.REPLIT_DOMAINS
+            ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+            : `${req.protocol}://${req.get('host')}`;
+          const toStop = (r: LibRow) => {
+            let imageUrl: string | undefined;
+            if (r.imageUrl) {
+              imageUrl = r.imageUrl.startsWith('stop-images/')
+                ? `${libBaseUrl}/api/travel/stop-library-image?path=${encodeURIComponent(r.imageUrl)}`
+                : r.imageUrl;
+            }
+            return {
+              name:        r.name,
+              stopType:    r.stopType ?? 'other',
+              duration:    '45\u201360 min',
+              description: r.description ?? '',
+              address:     r.address ?? '',
+              ...(imageUrl              && { imageUrl }),
+              ...(r.gpPhotoRefs?.length && { gpPhotoRefs: r.gpPhotoRefs }),
+            };
+          };
           libNearby  = shuffled.slice(0, 4).map(toStop);
           libPopular = shuffled.slice(4, 8).map(toStop);
           if (libRows.length >= 4) {
